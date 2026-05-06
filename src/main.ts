@@ -21,6 +21,7 @@ const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
 const BODY_FILTERS = ["all", "planet", "moon", "dwarf_planet", "star"] as const;
 const ONBOARDING_DISMISSED_KEY = "cosmic-atlas.onboarding-dismissed";
 const TRANSFER_PATH_SAMPLES = 96;
+const ORBIT_PATH_SAMPLES = 192;
 const MIN_PX_PER_AU = 4;
 const MAX_PX_PER_AU = 24_000_000;
 const ICONS: Record<string, string> = {
@@ -58,7 +59,7 @@ const ICONS: Record<string, string> = {
 
 type BodyFilter = (typeof BODY_FILTERS)[number];
 type InteractionMode = "pan" | "target" | "measure";
-type DisplayLayer = "labels" | "rings" | "route" | "trails";
+type DisplayLayer = "labels" | "rings" | "orbits" | "route" | "trails";
 type ZoomPreset = "inner" | "outer" | "local" | "all";
 
 const BODY_FILTER_LABELS: Record<BodyFilter, string> = {
@@ -425,6 +426,7 @@ let trajectoryRequestId = 0;
 const displayLayers: Record<DisplayLayer, boolean> = {
   labels: true,
   rings: true,
+  orbits: true,
   route: true,
   trails: false
 };
@@ -856,6 +858,9 @@ function draw() {
   }
 
   if (ephemeris) {
+    if (displayLayers.orbits) {
+      drawOrbitPaths();
+    }
     if (displayLayers.trails) {
       drawBodyTrails();
     }
@@ -922,6 +927,140 @@ function drawDistanceRings() {
     }
   }
   ctx.restore();
+}
+
+function drawOrbitPaths() {
+  if (!ephemeris) return;
+  const drawableBodies = ephemeris.bodies
+    .filter((body) => body.orbit && body.orbit.semi_major_axis_km && body.orbit.eccentricity < 1)
+    .sort((a, b) => orbitDrawPriority(a) - orbitDrawPriority(b));
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const body of drawableBodies) {
+    drawOrbitPath(body);
+  }
+  ctx.restore();
+}
+
+function orbitDrawPriority(body: Body) {
+  if (body.key === selectedTarget) return 1000;
+  if (body.key === selectedBodyKey) return 900;
+  if (body.object_type === "moon") return 300 + body.radius_km / 1000;
+  return 100 + body.radius_km / 1000;
+}
+
+function drawOrbitPath(body: Body) {
+  if (!ephemeris || !body.orbit || body.orbit.semi_major_axis_km === null) return;
+  if (body.orbit.eccentricity >= 1) return;
+
+  const parent = bodyByKey.get(body.orbit.central_body_key);
+  if (!parent) return;
+
+  const points = orbitPathPoints(body, parent);
+  if (points.length < 3) return;
+
+  const screens = points.map((point) => worldToScreen(point.xAu, point.yAu));
+  if (!orbitPathShouldDraw(screens, body)) return;
+
+  const emphasized = body.key === selectedTarget || body.key === selectedBodyKey;
+  const isMoon = body.object_type === "moon";
+  const color = safeCssColor(body.color);
+
+  if (emphasized) {
+    ctx.setLineDash([]);
+    ctx.strokeStyle = hexToRgba(color, 0.18);
+    ctx.lineWidth = isMoon ? 6 : 5;
+    drawScreenPath(screens);
+  }
+
+  ctx.setLineDash(isMoon ? [3, 6] : []);
+  ctx.strokeStyle = hexToRgba(color, emphasized ? 0.86 : isMoon ? 0.38 : 0.46);
+  ctx.lineWidth = emphasized ? 2.2 : isMoon ? 1.1 : 1.35;
+  drawScreenPath(screens);
+
+  if (emphasized) {
+    const periapsis = orbitPointAtTrueAnomaly(body, parent, 0);
+    if (periapsis) {
+      const marker = worldToScreen(periapsis.xAu, periapsis.yAu);
+      if (isScreenPointVisible(marker, 16)) {
+        ctx.setLineDash([]);
+        ctx.fillStyle = hexToRgba(color, 0.78);
+        ctx.beginPath();
+        ctx.arc(marker.x, marker.y, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function orbitPathPoints(body: Body, parent: Body) {
+  const points: RoutePoint[] = [];
+  for (let index = 0; index <= ORBIT_PATH_SAMPLES; index += 1) {
+    const trueAnomalyRad = (index / ORBIT_PATH_SAMPLES) * Math.PI * 2;
+    const point = orbitPointAtTrueAnomaly(body, parent, trueAnomalyRad);
+    if (point) points.push(point);
+  }
+  return points;
+}
+
+function orbitPointAtTrueAnomaly(body: Body, parent: Body, trueAnomalyRad: number): RoutePoint | null {
+  if (!ephemeris || !body.orbit || body.orbit.semi_major_axis_km === null) return null;
+  const eccentricity = body.orbit.eccentricity;
+  if (eccentricity >= 1) return null;
+
+  const semiMajorAxisAu = body.orbit.semi_major_axis_km / ephemeris.au_km;
+  const semiLatusRectumAu = semiMajorAxisAu * (1 - eccentricity * eccentricity);
+  const radiusAu = semiLatusRectumAu / (1 + eccentricity * Math.cos(trueAnomalyRad));
+  if (!Number.isFinite(radiusAu) || radiusAu <= 0) return null;
+
+  const inclinationRad = degToRad(body.orbit.inclination_deg ?? 0);
+  const longitudeNodeRad = degToRad(body.orbit.longitude_of_ascending_node_deg ?? 0);
+  const argumentPeriapsisRad = degToRad(body.orbit.argument_of_periapsis_deg ?? 0);
+  const argumentRad = argumentPeriapsisRad + trueAnomalyRad;
+
+  const cosNode = Math.cos(longitudeNodeRad);
+  const sinNode = Math.sin(longitudeNodeRad);
+  const cosInclination = Math.cos(inclinationRad);
+  const sinInclination = Math.sin(inclinationRad);
+  const cosArgument = Math.cos(argumentRad);
+  const sinArgument = Math.sin(argumentRad);
+
+  const xAu = radiusAu * (cosNode * cosArgument - sinNode * sinArgument * cosInclination);
+  const yAu = radiusAu * (sinNode * cosArgument + cosNode * sinArgument * cosInclination);
+  const zAu = radiusAu * (sinArgument * sinInclination);
+
+  return {
+    xAu: parent.position.x_au + xAu,
+    yAu: parent.position.y_au + yAu,
+    zAu: parent.position.z_au + zAu
+  };
+}
+
+function orbitPathShouldDraw(screens: ScreenPoint[], body: Body) {
+  const emphasized = body.key === selectedTarget || body.key === selectedBodyKey;
+  const xs = screens.map((point) => point.x);
+  const ys = screens.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const width = canvas.width / devicePixelRatio;
+  const height = canvas.height / devicePixelRatio;
+  const spanPx = Math.max(maxX - minX, maxY - minY);
+  if (spanPx < (emphasized ? 4 : 7)) return false;
+  if (maxX < -80 || minX > width + 80 || maxY < -80 || minY > height + 80) return false;
+  return true;
+}
+
+function drawScreenPath(screens: ScreenPoint[]) {
+  ctx.beginPath();
+  screens.forEach((screen, index) => {
+    if (index === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  });
+  ctx.stroke();
 }
 
 function drawRouteGuide() {
@@ -2563,6 +2702,15 @@ function safeCssColor(color: string) {
   return /^#[0-9a-f]{6}$/i.test(color) ? color : "#d9b86f";
 }
 
+function hexToRgba(color: string, alpha: number) {
+  const safe = safeCssColor(color);
+  const value = safe.slice(1);
+  const red = Number.parseInt(value.slice(0, 2), 16);
+  const green = Number.parseInt(value.slice(2, 4), 16);
+  const blue = Number.parseInt(value.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${clamp(alpha, 0, 1)})`;
+}
+
 function icon(name: string) {
   return ICONS[name] ?? "";
 }
@@ -2773,6 +2921,10 @@ function shortScaleText(kmPerPx: number, auKm: number) {
 
 function formatTimestamp(timestampUtc: string) {
   return timestampUtc.replace("T", " ").replace(/\.\d+Z$/, " UTC").replace("Z", " UTC");
+}
+
+function degToRad(degrees: number) {
+  return (degrees * Math.PI) / 180;
 }
 
 function formatDistance(km: number) {

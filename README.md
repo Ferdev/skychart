@@ -7,6 +7,7 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 - Sun, Mercury, Venus, Earth, Moon, Mars, Phobos, Deimos, Jupiter, Io, Europa, Ganymede, Callisto, Saturn, Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Iapetus, Uranus, Neptune, and Pluto.
 - Real current-date body positions from Skyfield using NASA/JPL DE440s, the NAIF Mars satellite SPK, and NASA/JPL Horizons vectors for Jupiter and Saturn moons.
 - Catalog-first object metadata for each loaded body: object type, parent body, source kernel, catalog group, and dynamic/static position model.
+- Top-down osculating orbit overlays drawn from the current parent-relative state vectors.
 - 2D top-down canvas map using heliocentric ecliptic x/y coordinates.
 - Quick target shortcuts for Moon, Mars, Jupiter, and Saturn.
 - Destination search for targeting and jumping to any loaded body.
@@ -93,7 +94,7 @@ Positions are computed as heliocentric ecliptic Cartesian coordinates:
 
 Distances are never numerically compressed or altered. Zoom only changes the map transform from AU to pixels.
 
-Planet and Moon display radii are deliberately exaggerated so bodies remain visible. AU rings are distance guides, not generated orbit paths.
+Planet and Moon display radii are deliberately exaggerated so bodies remain visible. AU rings are distance guides. The Orbits layer draws current osculating orbit references from the epoch state vectors; these are visual guides, not n-body propagated paths.
 
 ## Time Controls
 
