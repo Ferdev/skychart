@@ -19,6 +19,7 @@ const EARTH_MOON_AVG_KM = 384_400;
 const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
 const BODY_FILTERS = ["all", "planet", "moon", "star"] as const;
 const ONBOARDING_DISMISSED_KEY = "cosmic-atlas.onboarding-dismissed";
+const TRANSFER_PATH_SAMPLES = 96;
 const ICONS: Record<string, string> = {
   target:
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg>',
@@ -132,6 +133,12 @@ type BodyTrail = {
   key: string;
   name: string;
   points: TrailPoint[];
+};
+
+type RoutePoint = {
+  xAu: number;
+  yAu: number;
+  zAu: number;
 };
 
 const canvas = requiredElement<HTMLCanvasElement>("#map");
@@ -638,20 +645,22 @@ function drawDistanceRings() {
 }
 
 function drawRouteGuide() {
-  if (!ship) return;
   const earth = bodyByKey.get("earth");
   const target = bodyByKey.get(selectedTarget);
   if (!earth || !target) return;
 
   const routeBodies = routeBodySequence(earth, target);
-  const routeScreens = routeBodies.map((body) => worldToScreen(body.position.x_au, body.position.y_au));
-  const shipScreen = worldToScreen(ship.xAu, ship.yAu);
-  const targetScreen = routeScreens[routeScreens.length - 1];
+  const routePoints = routeTrajectoryPoints(earth, target);
+  if (routePoints.length < 2) return;
+  const routeScreens = routePoints.map((point) => worldToScreen(point.xAu, point.yAu));
 
   ctx.save();
-  ctx.lineWidth = 2;
-  ctx.setLineDash([7, 7]);
-  ctx.strokeStyle = "rgba(116, 196, 255, 0.44)";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = "rgba(116, 196, 255, 0.12)";
+  ctx.lineWidth = 8;
   ctx.beginPath();
   routeScreens.forEach((screen, index) => {
     if (index === 0) ctx.moveTo(screen.x, screen.y);
@@ -659,12 +668,32 @@ function drawRouteGuide() {
   });
   ctx.stroke();
 
-  ctx.setLineDash([2, 6]);
-  ctx.strokeStyle = "rgba(255, 209, 102, 0.46)";
+  ctx.strokeStyle = routeWaypoints.length ? "rgba(217, 184, 111, 0.72)" : "rgba(116, 196, 255, 0.68)";
+  ctx.lineWidth = 2.4;
+  ctx.setLineDash(routeWaypoints.length ? [9, 7] : []);
   ctx.beginPath();
-  ctx.moveTo(shipScreen.x, shipScreen.y);
-  ctx.lineTo(targetScreen.x, targetScreen.y);
+  routeScreens.forEach((screen, index) => {
+    if (index === 0) ctx.moveTo(screen.x, screen.y);
+    else ctx.lineTo(screen.x, screen.y);
+  });
   ctx.stroke();
+
+  ctx.setLineDash([]);
+  for (const body of routeBodies) {
+    const screen = worldToScreen(body.position.x_au, body.position.y_au);
+    ctx.strokeStyle = body.key === selectedTarget ? "rgba(217, 184, 111, 0.88)" : "rgba(116, 196, 255, 0.58)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, Math.max(7, displayRadius(body) + 4), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  const labelPoint = routeScreens[Math.floor(routeScreens.length * 0.5)];
+  if (labelPoint) {
+    ctx.fillStyle = routeWaypoints.length ? "rgba(217, 184, 111, 0.86)" : "rgba(116, 196, 255, 0.82)";
+    ctx.font = "700 11px ui-sans-serif, system-ui";
+    ctx.fillText(routeWaypoints.length ? "gravity-assist preview" : "transfer preview", labelPoint.x + 10, labelPoint.y - 8);
+  }
   ctx.restore();
 }
 
@@ -888,7 +917,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
   const earth = bodyByKey.get("earth");
   if (!earth) return;
 
-  const progress = journeyProgress(earth.position, target.position, ship);
+  const progress = journeyRouteProgress(earth, target, ship);
   const progressPercent = progress * 100;
   const remainingLightSeconds = shipTargetKm / LIGHT_SPEED_KM_S;
   const navigation = navigationMetrics(target, shipTargetKm);
@@ -896,8 +925,8 @@ function updateJourney(target: Body, shipTargetKm: number) {
   const targetLightSeconds = target.distance_from_earth_km / LIGHT_SPEED_KM_S;
   const routeDistanceKm = routeTotalDistanceKm(earth, target);
   const directRouteLabel = routeWaypoints.length
-    ? `Earth-route distance via ${routeWaypoints.length} waypoint${routeWaypoints.length === 1 ? "" : "s"}`
-    : "Earth-target guide distance";
+    ? `Transfer preview via ${routeWaypoints.length} waypoint${routeWaypoints.length === 1 ? "" : "s"}`
+    : "Approx transfer preview distance";
   const nextAction = nextGuidanceText(navigation, shipTargetKm, thresholdKm);
   const comparisonText = distanceComparisonText(target.distance_from_earth_km);
   const status = journeyStats.arrived
@@ -928,7 +957,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
         <div class="route-track">
           <span class="route-progress-dot" style="left: ${routeProgress.toFixed(2)}%"></span>
         </div>
-        <span>route guide · ${formatDistance(routeDistanceKm)}</span>
+        <span>transfer preview · ${formatDistance(routeDistanceKm)}</span>
       </div>
       <div class="route-body destination">
         ${bodyOrbHtml(target, "large")}
@@ -936,6 +965,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
         <strong>${escapeHtml(target.name)}</strong>
       </div>
     </div>
+    <p class="route-note">Approximate Sun-centered trajectory preview. It uses real current positions, but it is not a full mission-grade gravity solve yet.</p>
     <div class="distance-focus">
       <span>${nextAction}</span>
       <strong>${formatDistance(shipTargetKm)}</strong>
@@ -944,7 +974,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
       <div class="progress-fill" style="width: ${progressPercent.toFixed(2)}%"></div>
     </div>
     <div class="progress-caption">
-      <span>${progressPercent.toFixed(2)}% along Earth-target vector</span>
+      <span>${progressPercent.toFixed(2)}% along transfer preview</span>
       <span>${formatDuration(remainingLightSeconds)} light time remaining</span>
     </div>
     <div class="metric-tiles">
@@ -1035,28 +1065,6 @@ function updateBodyInfo() {
       <span>Mean radius</span><strong>${formatDistance(body.radius_km)}</strong>
     </div>
   `;
-}
-
-function journeyProgress(earth: BodyPosition, target: BodyPosition, currentShip: Ship) {
-  const ex = earth.x_au;
-  const ey = earth.y_au;
-  const ez = earth.z_au;
-  const tx = target.x_au;
-  const ty = target.y_au;
-  const tz = target.z_au;
-  const sx = currentShip.xAu;
-  const sy = currentShip.yAu;
-  const sz = currentShip.zAu;
-
-  const vx = tx - ex;
-  const vy = ty - ey;
-  const vz = tz - ez;
-  const wx = sx - ex;
-  const wy = sy - ey;
-  const wz = sz - ez;
-  const mag2 = vx * vx + vy * vy + vz * vz;
-  if (mag2 === 0) return 0;
-  return clamp((wx * vx + wy * vy + wz * vz) / mag2, 0, 1);
 }
 
 function shipTargetDistanceKm(target: Body) {
@@ -1314,16 +1322,147 @@ function routeBodySequence(earth: Body, target: Body) {
   return sequence;
 }
 
+function routeTrajectoryPoints(earth: Body, target: Body) {
+  const sequence = routeBodySequence(earth, target);
+  const points: RoutePoint[] = [];
+  for (let index = 1; index < sequence.length; index += 1) {
+    const segment = transferSegmentPoints(sequence[index - 1].position, sequence[index].position, TRANSFER_PATH_SAMPLES);
+    if (points.length) {
+      segment.shift();
+    }
+    points.push(...segment);
+  }
+  return points;
+}
+
+function transferSegmentPoints(start: BodyPosition, end: BodyPosition, sampleCount: number) {
+  const startPoint = positionToRoutePoint(start);
+  const endPoint = positionToRoutePoint(end);
+  const chordAu = routePointDistanceAu(startPoint, endPoint);
+  if (chordAu === 0) return [startPoint, endPoint];
+
+  const startRadiusAu = Math.hypot(startPoint.xAu, startPoint.yAu);
+  const endRadiusAu = Math.hypot(endPoint.xAu, endPoint.yAu);
+  if (startRadiusAu < 0.02 || endRadiusAu < 0.02) {
+    return linearSegmentPoints(startPoint, endPoint, sampleCount);
+  }
+
+  const startTangent = progradeTangent(startPoint);
+  const endTangent = progradeTangent(endPoint);
+  const controlAu = clamp(chordAu * 0.44 + Math.abs(endRadiusAu - startRadiusAu) * 0.08, 0.001, Math.max(chordAu, startRadiusAu, endRadiusAu) * 0.8);
+  const controlA = {
+    xAu: startPoint.xAu + startTangent.x * controlAu,
+    yAu: startPoint.yAu + startTangent.y * controlAu,
+    zAu: startPoint.zAu
+  };
+  const controlB = {
+    xAu: endPoint.xAu - endTangent.x * controlAu,
+    yAu: endPoint.yAu - endTangent.y * controlAu,
+    zAu: endPoint.zAu
+  };
+
+  const points: RoutePoint[] = [];
+  for (let index = 0; index <= sampleCount; index += 1) {
+    const t = index / sampleCount;
+    points.push(cubicRoutePoint(startPoint, controlA, controlB, endPoint, t));
+  }
+  return points;
+}
+
+function linearSegmentPoints(start: RoutePoint, end: RoutePoint, sampleCount: number) {
+  const points: RoutePoint[] = [];
+  for (let index = 0; index <= sampleCount; index += 1) {
+    const t = index / sampleCount;
+    points.push({
+      xAu: start.xAu + (end.xAu - start.xAu) * t,
+      yAu: start.yAu + (end.yAu - start.yAu) * t,
+      zAu: start.zAu + (end.zAu - start.zAu) * t
+    });
+  }
+  return points;
+}
+
+function positionToRoutePoint(position: BodyPosition): RoutePoint {
+  return {
+    xAu: position.x_au,
+    yAu: position.y_au,
+    zAu: position.z_au
+  };
+}
+
+function progradeTangent(point: RoutePoint) {
+  const radiusAu = Math.hypot(point.xAu, point.yAu);
+  if (radiusAu === 0) return { x: 0, y: 1 };
+  return { x: -point.yAu / radiusAu, y: point.xAu / radiusAu };
+}
+
+function cubicRoutePoint(a: RoutePoint, b: RoutePoint, c: RoutePoint, d: RoutePoint, t: number) {
+  const inv = 1 - t;
+  const inv2 = inv * inv;
+  const t2 = t * t;
+  return {
+    xAu: inv2 * inv * a.xAu + 3 * inv2 * t * b.xAu + 3 * inv * t2 * c.xAu + t2 * t * d.xAu,
+    yAu: inv2 * inv * a.yAu + 3 * inv2 * t * b.yAu + 3 * inv * t2 * c.yAu + t2 * t * d.yAu,
+    zAu: a.zAu + (d.zAu - a.zAu) * t
+  };
+}
+
+function routePointDistanceAu(a: RoutePoint, b: RoutePoint) {
+  return Math.hypot(a.xAu - b.xAu, a.yAu - b.yAu, a.zAu - b.zAu);
+}
+
 function routeTotalDistanceKm(earth: Body, target: Body) {
   if (!ephemeris) return target.distance_from_earth_km;
-  const sequence = routeBodySequence(earth, target);
+  const points = routeTrajectoryPoints(earth, target);
   let totalKm = 0;
-  for (let index = 1; index < sequence.length; index += 1) {
-    const previous = sequence[index - 1].position;
-    const current = sequence[index].position;
-    totalKm += Math.hypot(current.x_au - previous.x_au, current.y_au - previous.y_au, current.z_au - previous.z_au) * ephemeris.au_km;
+  for (let index = 1; index < points.length; index += 1) {
+    totalKm += routePointDistanceAu(points[index - 1], points[index]) * ephemeris.au_km;
   }
   return totalKm;
+}
+
+function journeyRouteProgress(earth: Body, target: Body, currentShip: Ship) {
+  const points = routeTrajectoryPoints(earth, target);
+  if (points.length < 2) return 0;
+
+  const shipPoint = { xAu: currentShip.xAu, yAu: currentShip.yAu, zAu: currentShip.zAu };
+  let totalAu = 0;
+  let walkedAu = 0;
+  let nearestDistanceAu = Number.POSITIVE_INFINITY;
+  let nearestAlongAu = 0;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    const segmentAu = routePointDistanceAu(start, end);
+    if (segmentAu === 0) continue;
+
+    const projection = closestProgressOnSegment(start, end, shipPoint);
+    if (projection.distanceAu < nearestDistanceAu) {
+      nearestDistanceAu = projection.distanceAu;
+      nearestAlongAu = walkedAu + segmentAu * projection.t;
+    }
+    walkedAu += segmentAu;
+    totalAu += segmentAu;
+  }
+
+  if (totalAu === 0) return 0;
+  return clamp(nearestAlongAu / totalAu, 0, 1);
+}
+
+function closestProgressOnSegment(start: RoutePoint, end: RoutePoint, point: RoutePoint) {
+  const vx = end.xAu - start.xAu;
+  const vy = end.yAu - start.yAu;
+  const vz = end.zAu - start.zAu;
+  const wx = point.xAu - start.xAu;
+  const wy = point.yAu - start.yAu;
+  const wz = point.zAu - start.zAu;
+  const mag2 = vx * vx + vy * vy + vz * vz;
+  const t = mag2 === 0 ? 0 : clamp((wx * vx + wy * vy + wz * vz) / mag2, 0, 1);
+  return {
+    t,
+    distanceAu: Math.hypot(start.xAu + vx * t - point.xAu, start.yAu + vy * t - point.yAu, start.zAu + vz * t - point.zAu)
+  };
 }
 
 function nextGuidanceText(navigation: ReturnType<typeof navigationMetrics>, distanceKm: number, thresholdKm: number) {
