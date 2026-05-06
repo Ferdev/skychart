@@ -19,6 +19,7 @@
 - [x] Add sampled real-ephemeris orbit trails for selected bodies, clearly labeled as time-sampled reference paths.
 - [x] Add a minimap or scale strip that helps users understand where they are while zoomed in.
 - [x] Add body search filters for planets, moons, dwarf planets, asteroids, spacecraft, and other catalog classes once the catalog expands.
+- [x] Add viewport-side nearest-object references that update while panning and show off-screen object name, glyph, and real distance from the current map center.
 
 ## P2 — Make journeys feel rewarding
 
@@ -40,7 +41,10 @@
 
 ## Future — Prepare for 3D without building it yet
 
-- [ ] Expand the catalog through explicit ephemeris/kernel adapters for additional moon systems, dwarf planets, asteroids, comets, and spacecraft without changing the destination picker contract.
+- [x] Add a first outside-Solar-System catalog slice using nearby exoplanet-host stars from NASA Exoplanet Archive coordinates.
+- [ ] Expand the catalog through explicit ephemeris/kernel adapters for additional moon systems, dwarf planets, asteroids, comets, spacecraft, nearby stars, and exoplanet systems without changing the destination picker contract.
+- [ ] Add a catalog ingestion pipeline instead of manually curating nearby exoplanet-host star rows in source code.
+- [ ] Add stellar proper motion and epoch handling for star catalog positions before treating interstellar coordinates as high-precision navigation data.
 - [ ] Keep coordinate and rendering code separated so a future 3D view can reuse the same ephemeris and navigation state.
 - [ ] Define a future 2D/3D view switch only when the 3D mode has a concrete user benefit beyond visual spectacle.
 - [ ] Preserve all current 2D workflows when 3D is introduced: search, inspect, target, measure, route progress, and time controls.

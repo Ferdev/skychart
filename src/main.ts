@@ -16,14 +16,19 @@ import { firstRunSteps, keyboardControls, modeCopy } from "./onboardingContent";
 
 const AU_KM_FALLBACK = 149_597_870.7;
 const LIGHT_SPEED_KM_S = 299_792.458;
+const LIGHT_YEAR_KM = 9_460_730_472_580.8;
 const EARTH_MOON_AVG_KM = 384_400;
 const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
 const BODY_FILTERS = ["all", "planet", "moon", "dwarf_planet", "star"] as const;
 const ONBOARDING_DISMISSED_KEY = "cosmic-atlas.onboarding-dismissed";
 const TRANSFER_PATH_SAMPLES = 96;
 const ORBIT_PATH_SAMPLES = 192;
-const MIN_PX_PER_AU = 4;
+const MIN_PX_PER_AU = 0.00005;
 const MAX_PX_PER_AU = 24_000_000;
+const VIEWPORT_REFERENCE_SIDES: ViewportReferenceSide[] = ["top", "right", "bottom", "left"];
+const VIEWPORT_REFERENCE_CARD_WIDTH = 190;
+const VIEWPORT_REFERENCE_CARD_HEIGHT = 56;
+const VIEWPORT_REFERENCE_MARGIN = 14;
 const ICONS: Record<string, string> = {
   target:
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg>',
@@ -146,6 +151,16 @@ type BodyOrbit = {
   notes: string[];
 };
 
+type StellarInfo = {
+  ra_deg: number | null;
+  dec_deg: number | null;
+  distance_pc: number | null;
+  distance_ly: number | null;
+  exoplanet_count: number | null;
+  stellar_radius_solar: number | null;
+  stellar_teff_k: number | null;
+};
+
 type Body = {
   key: string;
   name: string;
@@ -158,6 +173,7 @@ type Body = {
   position: BodyPosition;
   state_vector?: BodyStateVector;
   orbit?: BodyOrbit | null;
+  stellar?: StellarInfo | null;
   distance_from_earth_km: number;
 };
 
@@ -173,6 +189,12 @@ type CatalogObject = {
   ephemeris_source: string;
   position_model: string;
   dynamic_position: boolean;
+  ra_deg?: number | null;
+  dec_deg?: number | null;
+  distance_pc?: number | null;
+  exoplanet_count?: number | null;
+  stellar_radius_solar?: number | null;
+  stellar_teff_k?: number | null;
 };
 
 type CatalogSummary = {
@@ -249,6 +271,16 @@ type RoutePoint = {
 type ScreenPoint = {
   x: number;
   y: number;
+};
+
+type ViewportReferenceSide = "left" | "right" | "top" | "bottom";
+
+type ViewportReference = {
+  side: ViewportReferenceSide;
+  body: Body;
+  distanceKm: number;
+  screen: ScreenPoint;
+  anchor: ScreenPoint;
 };
 
 type LabelRect = {
@@ -681,7 +713,15 @@ async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: 
 }
 
 async function loadTrajectoryPlan() {
-  if (!ephemeris || !selectedTarget || selectedTarget === "earth" || selectedTarget === "sun") {
+  const targetBody = bodyByKey.get(selectedTarget);
+  if (
+    !ephemeris ||
+    !targetBody ||
+    !selectedTarget ||
+    selectedTarget === "earth" ||
+    selectedTarget === "sun" ||
+    isStaticStellarCatalogBody(targetBody)
+  ) {
     trajectoryPlan = null;
     selectedTrajectoryCandidateId = null;
     trajectoryLoading = false;
@@ -730,7 +770,7 @@ async function loadTrails() {
   trailsError = "";
   try {
     const bodyKeys = ephemeris.bodies
-      .filter((body) => body.key !== "sun" && body.catalog?.position_model !== "horizons_vectors")
+      .filter((body) => body.key !== "sun" && body.catalog?.position_model !== "horizons_vectors" && !isStaticStellarCatalogBody(body))
       .map((body) => body.key)
       .join(",");
     const query = new URLSearchParams({
@@ -872,6 +912,9 @@ function draw() {
 
   drawMeasurement();
   drawShip();
+  if (ephemeris) {
+    drawViewportReferences(width, height);
+  }
   drawMiniMap(width, height);
   ctx.restore();
 }
@@ -1410,6 +1453,335 @@ function drawBodyTrails() {
   ctx.restore();
 }
 
+function drawViewportReferences(width: number, height: number) {
+  const references = viewportReferences(width, height);
+  if (!references.length) return;
+
+  const obstructions = canvasOverlayRects(width, height);
+  ctx.save();
+  for (const reference of references) {
+    const rect = viewportReferenceRect(reference, width, height, obstructions);
+    drawViewportReferenceLead(reference, rect);
+    drawViewportReferenceCard(reference, rect);
+  }
+  ctx.restore();
+}
+
+function viewportReferences(width: number, height: number) {
+  if (!ephemeris) return [];
+
+  const closestBySide = new Map<ViewportReferenceSide, ViewportReference>();
+  const center = { x: width / 2, y: height / 2 };
+
+  for (const body of ephemeris.bodies) {
+    if (!Number.isFinite(body.position.x_au) || !Number.isFinite(body.position.y_au)) continue;
+    const screen = worldToScreen(body.position.x_au, body.position.y_au);
+    if (isPointInViewport(screen, width, height, 40)) continue;
+
+    const dx = screen.x - center.x;
+    const dy = screen.y - center.y;
+    if (Math.hypot(dx, dy) < 1) continue;
+
+    const side = viewportReferenceSide(dx, dy, width, height);
+    const distanceKm = bodyDistanceFromCameraCenterKm(body);
+    const existing = closestBySide.get(side);
+    if (existing && existing.distanceKm <= distanceKm) continue;
+
+    closestBySide.set(side, {
+      side,
+      body,
+      distanceKm,
+      screen,
+      anchor: viewportEdgeIntersection(side, dx, dy, width, height)
+    });
+  }
+
+  return VIEWPORT_REFERENCE_SIDES.map((side) => closestBySide.get(side)).filter((reference): reference is ViewportReference =>
+    Boolean(reference)
+  );
+}
+
+function viewportReferenceSide(dx: number, dy: number, width: number, height: number): ViewportReferenceSide {
+  const tx = dx === 0 ? Number.POSITIVE_INFINITY : Math.abs((width / 2) / dx);
+  const ty = dy === 0 ? Number.POSITIVE_INFINITY : Math.abs((height / 2) / dy);
+  if (tx < ty) return dx < 0 ? "left" : "right";
+  return dy < 0 ? "top" : "bottom";
+}
+
+function viewportEdgeIntersection(side: ViewportReferenceSide, dx: number, dy: number, width: number, height: number): ScreenPoint {
+  const center = { x: width / 2, y: height / 2 };
+  if (side === "left" || side === "right") {
+    const x = side === "left" ? 0 : width;
+    const t = dx === 0 ? 0 : (x - center.x) / dx;
+    return { x, y: clamp(center.y + dy * t, 0, height) };
+  }
+
+  const y = side === "top" ? 0 : height;
+  const t = dy === 0 ? 0 : (y - center.y) / dy;
+  return { x: clamp(center.x + dx * t, 0, width), y };
+}
+
+function isPointInViewport(point: ScreenPoint, width: number, height: number, margin = 0) {
+  return point.x >= -margin && point.x <= width + margin && point.y >= -margin && point.y <= height + margin;
+}
+
+function bodyDistanceFromCameraCenterKm(body: Body) {
+  const auKm = ephemeris?.au_km ?? AU_KM_FALLBACK;
+  return Math.hypot(body.position.x_au - camera.xAu, body.position.y_au - camera.yAu, body.position.z_au) * auKm;
+}
+
+function viewportReferenceRect(reference: ViewportReference, width: number, height: number, obstructions: LabelRect[]): LabelRect {
+  const cardWidth = Math.min(VIEWPORT_REFERENCE_CARD_WIDTH, Math.max(144, width - VIEWPORT_REFERENCE_MARGIN * 2));
+  const cardHeight = VIEWPORT_REFERENCE_CARD_HEIGHT;
+  let rect: LabelRect;
+
+  if (reference.side === "left") {
+    rect = {
+      x: VIEWPORT_REFERENCE_MARGIN,
+      y: reference.anchor.y - cardHeight / 2,
+      width: cardWidth,
+      height: cardHeight
+    };
+  } else if (reference.side === "right") {
+    rect = {
+      x: width - cardWidth - VIEWPORT_REFERENCE_MARGIN,
+      y: reference.anchor.y - cardHeight / 2,
+      width: cardWidth,
+      height: cardHeight
+    };
+  } else if (reference.side === "top") {
+    rect = {
+      x: reference.anchor.x - cardWidth / 2,
+      y: VIEWPORT_REFERENCE_MARGIN,
+      width: cardWidth,
+      height: cardHeight
+    };
+  } else {
+    rect = {
+      x: reference.anchor.x - cardWidth / 2,
+      y: height - cardHeight - VIEWPORT_REFERENCE_MARGIN,
+      width: cardWidth,
+      height: cardHeight
+    };
+  }
+
+  return avoidReferenceObstructions(clampReferenceRect(rect, width, height), reference.side, obstructions, width, height);
+}
+
+function avoidReferenceObstructions(
+  rect: LabelRect,
+  side: ViewportReferenceSide,
+  obstructions: LabelRect[],
+  width: number,
+  height: number
+) {
+  let next = rect;
+  for (let index = 0; index < obstructions.length * 2; index += 1) {
+    const obstruction = obstructions.find((candidate) => rectsOverlap(next, candidate, 8));
+    if (!obstruction) break;
+
+    if (side === "left") {
+      const belowY = obstruction.y + obstruction.height + 10;
+      const aboveY = obstruction.y - next.height - 10;
+      next =
+        obstruction.x <= next.x
+          ? { ...next, x: obstruction.x + obstruction.width + 10 }
+          : belowY <= height - next.height - VIEWPORT_REFERENCE_MARGIN
+            ? { ...next, y: belowY }
+            : { ...next, y: aboveY };
+    } else if (side === "right") {
+      const belowY = obstruction.y + obstruction.height + 10;
+      const aboveY = obstruction.y - next.height - 10;
+      next =
+        obstruction.x + obstruction.width >= next.x + next.width
+          ? { ...next, x: obstruction.x - next.width - 10 }
+          : belowY <= height - next.height - VIEWPORT_REFERENCE_MARGIN
+            ? { ...next, y: belowY }
+            : { ...next, y: aboveY };
+    } else if (side === "top") {
+      const leftX = obstruction.x - next.width - 10;
+      const rightX = obstruction.x + obstruction.width + 10;
+      next =
+        obstruction.x + obstruction.width / 2 > width / 2 && leftX >= VIEWPORT_REFERENCE_MARGIN
+          ? { ...next, x: leftX }
+          : rightX <= width - next.width - VIEWPORT_REFERENCE_MARGIN
+            ? { ...next, x: rightX }
+            : { ...next, y: obstruction.y + obstruction.height + 10 };
+    } else {
+      const leftX = obstruction.x - next.width - 10;
+      const rightX = obstruction.x + obstruction.width + 10;
+      const aboveY = obstruction.y - next.height - 10;
+      next =
+        aboveY >= VIEWPORT_REFERENCE_MARGIN
+          ? { ...next, y: aboveY }
+          : obstruction.x + obstruction.width / 2 > width / 2 && leftX >= VIEWPORT_REFERENCE_MARGIN
+          ? { ...next, x: leftX }
+          : rightX <= width - next.width - VIEWPORT_REFERENCE_MARGIN
+            ? { ...next, x: rightX }
+            : { ...next, y: aboveY };
+    }
+    next = clampReferenceRect(next, width, height);
+  }
+  return next;
+}
+
+function clampReferenceRect(rect: LabelRect, width: number, height: number): LabelRect {
+  return {
+    ...rect,
+    x: clamp(rect.x, VIEWPORT_REFERENCE_MARGIN, Math.max(VIEWPORT_REFERENCE_MARGIN, width - rect.width - VIEWPORT_REFERENCE_MARGIN)),
+    y: clamp(rect.y, VIEWPORT_REFERENCE_MARGIN, Math.max(VIEWPORT_REFERENCE_MARGIN, height - rect.height - VIEWPORT_REFERENCE_MARGIN))
+  };
+}
+
+function canvasOverlayRects(width: number, height: number): LabelRect[] {
+  const canvasRect = canvas.getBoundingClientRect();
+  const selectors = [".hud", ".map-tools", ".onboarding-panel", ".mission-panel", ".journey-panel", ".flight-deck", ".measure-panel", ".body-popover"];
+  return selectors
+    .flatMap((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector)))
+    .filter((element) => {
+      const style = window.getComputedStyle(element);
+      return !element.hidden && style.display !== "none" && style.visibility !== "hidden";
+    })
+    .map((element) => element.getBoundingClientRect())
+    .map((rect) => ({
+      x: rect.left - canvasRect.left,
+      y: rect.top - canvasRect.top,
+      width: rect.width,
+      height: rect.height
+    }))
+    .filter((rect) => rect.x < width && rect.y < height && rect.x + rect.width > 0 && rect.y + rect.height > 0);
+}
+
+function drawViewportReferenceLead(reference: ViewportReference, rect: LabelRect) {
+  const attach = viewportReferenceAttachPoint(reference.side, rect);
+  ctx.save();
+  ctx.strokeStyle = "rgba(217, 184, 111, 0.34)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 5]);
+  ctx.beginPath();
+  ctx.moveTo(attach.x, attach.y);
+  ctx.lineTo(reference.anchor.x, reference.anchor.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function viewportReferenceAttachPoint(side: ViewportReferenceSide, rect: LabelRect): ScreenPoint {
+  if (side === "left") return { x: rect.x, y: rect.y + rect.height / 2 };
+  if (side === "right") return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
+  if (side === "top") return { x: rect.x + rect.width / 2, y: rect.y };
+  return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
+}
+
+function drawViewportReferenceCard(reference: ViewportReference, rect: LabelRect) {
+  const iconSize = 34;
+  const iconX = rect.x + 13 + iconSize / 2;
+  const iconY = rect.y + rect.height / 2;
+  const textX = rect.x + 58;
+  const textWidth = rect.width - 70;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.32)";
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 8;
+  ctx.fillStyle = "rgba(11, 15, 16, 0.88)";
+  ctx.strokeStyle = "rgba(217, 184, 111, 0.34)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(rect.x, rect.y, rect.width, rect.height, 8);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.stroke();
+
+  drawReferenceBodyImage(reference.body, iconX, iconY, iconSize);
+
+  ctx.textBaseline = "middle";
+  ctx.font = "700 12px Inter, system-ui, sans-serif";
+  ctx.fillStyle = "#f5efe3";
+  ctx.fillText(truncateCanvasText(reference.body.name, textWidth), textX, rect.y + 20);
+  ctx.font = "600 10px Inter, system-ui, sans-serif";
+  ctx.fillStyle = "rgba(217, 184, 111, 0.94)";
+  ctx.fillText(truncateCanvasText(compactDistance(reference.distanceKm), textWidth), textX, rect.y + 38);
+  ctx.restore();
+}
+
+function drawReferenceBodyImage(body: Body, x: number, y: number, size: number) {
+  const radius = size / 2;
+  ctx.save();
+  if (body.object_type === "star") {
+    const glow = ctx.createRadialGradient(x, y, radius * 0.15, x, y, radius * 1.35);
+    glow.addColorStop(0, body.color);
+    glow.addColorStop(0.54, `${body.color}88`);
+    glow.addColorStop(1, "rgba(255, 209, 102, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (body.key === "saturn") {
+    ctx.strokeStyle = "rgba(234, 214, 154, 0.72)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(x, y, radius * 1.25, radius * 0.42, -0.25, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = body.color;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.72, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  if (body.key === "earth") {
+    ctx.fillStyle = "rgba(91, 181, 121, 0.82)";
+    ctx.beginPath();
+    ctx.ellipse(x - radius * 0.18, y - radius * 0.14, radius * 0.22, radius * 0.34, -0.8, 0, Math.PI * 2);
+    ctx.ellipse(x + radius * 0.2, y + radius * 0.18, radius * 0.26, radius * 0.18, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (body.key === "jupiter" || body.key === "saturn") {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.7, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.strokeStyle = "rgba(255, 246, 214, 0.35)";
+    ctx.lineWidth = 2;
+    for (let offset = -radius * 0.32; offset <= radius * 0.36; offset += radius * 0.24) {
+      ctx.beginPath();
+      ctx.moveTo(x - radius, y + offset);
+      ctx.lineTo(x + radius, y + offset + radius * 0.06);
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else if (body.object_type === "moon") {
+    ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
+    for (const crater of [
+      { dx: -0.22, dy: -0.12, r: 0.08 },
+      { dx: 0.2, dy: 0.1, r: 0.11 },
+      { dx: -0.02, dy: 0.28, r: 0.06 }
+    ]) {
+      ctx.beginPath();
+      ctx.arc(x + radius * crater.dx, y + radius * crater.dy, radius * crater.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+function truncateCanvasText(text: string, maxWidth: number) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let low = 0;
+  let high = text.length;
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    if (ctx.measureText(`${text.slice(0, mid)}...`).width <= maxWidth) low = mid;
+    else high = mid - 1;
+  }
+  return `${text.slice(0, Math.max(1, low))}...`;
+}
+
 function drawMeasurement() {
   if (measurePoints.length === 0) return;
   ctx.save();
@@ -1439,7 +1811,9 @@ function drawMiniMap(width: number, height: number) {
   const x = width - size - 504;
   const y = height - size - 16;
   if (x < 380) return;
-  const maxAu = Math.max(1, ...ephemeris.bodies.map((body) => Math.hypot(body.position.x_au, body.position.y_au)));
+  const miniMapBodies = ephemeris.bodies.filter((body) => !isStaticStellarCatalogBody(body));
+  const bodies = miniMapBodies.length ? miniMapBodies : ephemeris.bodies;
+  const maxAu = Math.max(1, ...bodies.map((body) => Math.hypot(body.position.x_au, body.position.y_au)));
   const scale = (size - 22) / (maxAu * 2);
 
   ctx.save();
@@ -1453,7 +1827,7 @@ function drawMiniMap(width: number, height: number) {
 
   const centerX = x + size / 2;
   const centerY = y + size / 2;
-  for (const body of ephemeris.bodies) {
+  for (const body of bodies) {
     const px = centerX + body.position.x_au * scale;
     const py = centerY - body.position.y_au * scale;
     ctx.fillStyle = body.key === selectedTarget ? "#d9b86f" : body.color;
@@ -1617,8 +1991,11 @@ function updateJourney(target: Body, shipTargetKm: number) {
   const targetLightSeconds = target.distance_from_earth_km / LIGHT_SPEED_KM_S;
   const activePlan = activeTrajectoryCandidate();
   const routeDistanceKm = routeTotalDistanceKm(earth, target);
+  const isInterstellarTarget = isStaticStellarCatalogBody(target);
   const directRouteLabel = activePlan
     ? `${activePlan.label} path distance`
+    : isInterstellarTarget
+      ? "Straight-line catalog distance"
     : routeWaypoints.length
       ? `Transfer preview via ${routeWaypoints.length} waypoint${routeWaypoints.length === 1 ? "" : "s"}`
       : "Approx transfer preview distance";
@@ -1633,7 +2010,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
         : "not closing";
   const statusLabel = journeyStats.arrived ? "Arrival confirmed" : status;
   const routeProgress = clamp(progressPercent, 0, 100);
-  const progressLabel = activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : "transfer preview";
+  const progressLabel = activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : isInterstellarTarget ? "straight-line reference" : "transfer preview";
   const structuralKey = [
     ephemeris.timestamp_utc,
     target.key,
@@ -1716,7 +2093,10 @@ function updateJourney(target: Body, shipTargetKm: number) {
   }
 
   updateJourneyField("status", statusLabel);
-  updateJourneyField("route-summary", `${activePlan?.kind === "gravity_assist" ? "gravity assist" : "transfer"} · ${formatDistance(routeDistanceKm)}`);
+  updateJourneyField(
+    "route-summary",
+    `${activePlan?.kind === "gravity_assist" ? "gravity assist" : isInterstellarTarget ? "reference" : "transfer"} · ${formatDistance(routeDistanceKm)}`
+  );
   updateJourneyField("next-action", nextAction);
   updateJourneyField("ship-target-distance", formatDistance(shipTargetKm));
   updateJourneyField("progress-label", `${progressPercent.toFixed(2)}% along ${progressLabel}`);
@@ -1746,6 +2126,10 @@ function updateJourneyField(field: string, value: string) {
 
 function routeNoteText(candidate: TrajectoryCandidate | null) {
   if (!candidate) {
+    const target = bodyByKey.get(selectedTarget);
+    if (target && isStaticStellarCatalogBody(target)) {
+      return "Interstellar catalog target: straight-line reference distance only. No interstellar trajectory model is active yet.";
+    }
     return "Approximate Sun-centered trajectory preview. It uses real current positions, but it is not a full mission-grade gravity solve yet.";
   }
   if (candidate.kind === "gravity_assist") {
@@ -1875,6 +2259,7 @@ function updateBodyInfo() {
   const classification = classifyBody(body);
   const parent = body.parent_key ? bodyByKey.get(body.parent_key) : null;
   const source = body.catalog?.ephemeris_kernel ?? body.catalog_group ?? "loaded catalog";
+  const stellarRows = stellarInfoRows(body);
   const orbitRows = orbitInfoRows(body);
 
   bodyInfo.innerHTML = `
@@ -1895,8 +2280,25 @@ function updateBodyInfo() {
       <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
       <span>Mean radius</span><strong>${formatDistance(body.radius_km)}</strong>
       <span>Source</span><strong>${escapeHtml(source)}</strong>
+      ${stellarRows}
       ${orbitRows}
     </div>
+  `;
+}
+
+function stellarInfoRows(body: Body) {
+  const stellar = body.stellar;
+  if (!stellar) return "";
+  const exoplanetText = stellar.exoplanet_count === null ? "confirmed host" : `${stellar.exoplanet_count} confirmed`;
+  const coordinates =
+    stellar.ra_deg === null || stellar.dec_deg === null
+      ? "not listed"
+      : `${stellar.ra_deg.toFixed(2)}° RA / ${stellar.dec_deg.toFixed(2)}° Dec`;
+  return `
+    <span>Catalog distance</span><strong>${formatLightYears(stellar.distance_ly)}</strong>
+    <span>Exoplanets</span><strong>${escapeHtml(exoplanetText)}</strong>
+    <span>Sky position</span><strong>${escapeHtml(coordinates)}</strong>
+    <span>Stellar temp</span><strong>${stellar.stellar_teff_k ? `${formatNumber(stellar.stellar_teff_k)} K` : "not listed"}</strong>
   `;
 }
 
@@ -2186,7 +2588,12 @@ function routeTrajectoryPoints(earth: Body, target: Body) {
   const sequence = routeBodySequence(earth, target);
   const points: RoutePoint[] = [];
   for (let index = 1; index < sequence.length; index += 1) {
-    const segment = transferSegmentPoints(sequence[index - 1].position, sequence[index].position, TRANSFER_PATH_SAMPLES);
+    const start = sequence[index - 1];
+    const end = sequence[index];
+    const segment =
+      isStaticStellarCatalogBody(start) || isStaticStellarCatalogBody(end)
+        ? linearSegmentPoints(positionToRoutePoint(start.position), positionToRoutePoint(end.position), TRANSFER_PATH_SAMPLES)
+        : transferSegmentPoints(start.position, end.position, TRANSFER_PATH_SAMPLES);
     if (points.length) {
       segment.shift();
     }
@@ -2693,6 +3100,7 @@ function icon(name: string) {
 function compactDistance(km: number) {
   if (!Number.isFinite(km)) return "distance pending";
   const abs = Math.abs(km);
+  if (abs >= LIGHT_YEAR_KM * 0.1) return formatLightYears(km / LIGHT_YEAR_KM);
   if (abs >= AU_KM_FALLBACK * 0.1) return `${formatAu(km / AU_KM_FALLBACK)} AU`;
   if (abs >= 1_000_000) {
     const millions = km / 1_000_000;
@@ -2816,6 +3224,7 @@ function screenToWorld(x: number, y: number) {
 
 function displayRadius(body: Body) {
   if (body.key === "sun") return 15;
+  if (isStaticStellarCatalogBody(body)) return 5.5;
   if (body.key === "jupiter") return 10;
   if (body.key === "saturn") return 9;
   if (body.key === "uranus" || body.key === "neptune") return 7;
@@ -2827,6 +3236,8 @@ function displayRadius(body: Body) {
 }
 
 function localViewRadiusAu(body: Body) {
+  if (isStaticStellarCatalogBody(body)) return 25;
+
   const systemRadiusAu: Record<string, number> = {
     sun: 0.04,
     mercury: 0.00035,
@@ -2848,6 +3259,10 @@ function localViewRadiusAu(body: Body) {
   const auKm = ephemeris?.au_km ?? AU_KM_FALLBACK;
   const bodyRadiusAu = body.radius_km / auKm;
   return clamp(bodyRadiusAu * 180, 0.00008, 0.04);
+}
+
+function isStaticStellarCatalogBody(body: Body) {
+  return body.catalog?.position_model === "stellar_catalog_coordinates";
 }
 
 function pickGridAu() {
@@ -2875,12 +3290,28 @@ function pickGridAu() {
     1,
     2,
     5,
-    10
+    10,
+    20,
+    50,
+    100,
+    250,
+    500,
+    1_000,
+    2_500,
+    5_000,
+    10_000,
+    25_000,
+    50_000,
+    100_000,
+    250_000,
+    500_000,
+    1_000_000
   ];
-  return powers.find((value) => value >= rawAu) ?? 20;
+  return powers.find((value) => value >= rawAu) ?? 2_000_000;
 }
 
 function scaleText(kmPerPx: number, auKm: number) {
+  if (kmPerPx >= LIGHT_YEAR_KM * 0.001) return `1 px = ${formatLightYears(kmPerPx / LIGHT_YEAR_KM)}`;
   const auPerPx = kmPerPx / auKm;
   if (auPerPx >= 0.001) return `1 px = ${formatNumber(kmPerPx)} km / ${formatAu(auPerPx)} AU`;
   if (kmPerPx < 1) return `1 px = ${formatNumber(kmPerPx * 1000)} m`;
@@ -2888,6 +3319,7 @@ function scaleText(kmPerPx: number, auKm: number) {
 }
 
 function shortScaleText(kmPerPx: number, auKm: number) {
+  if (kmPerPx >= LIGHT_YEAR_KM * 0.001) return `${formatLightYears(kmPerPx / LIGHT_YEAR_KM)}/px`;
   const auPerPx = kmPerPx / auKm;
   if (auPerPx >= 0.001) return `${formatAu(auPerPx)} AU/px`;
   if (kmPerPx < 1) return `${formatNumber(kmPerPx * 1000)} m/px`;
@@ -2904,10 +3336,21 @@ function degToRad(degrees: number) {
 
 function formatDistance(km: number) {
   const abs = Math.abs(km);
+  if (abs >= LIGHT_YEAR_KM * 0.1) {
+    return formatLightYears(km / LIGHT_YEAR_KM);
+  }
   if (abs >= AU_KM_FALLBACK * 0.1) {
     return `${formatNumber(km)} km (${formatAu(km / AU_KM_FALLBACK)} AU)`;
   }
   return `${formatNumber(km)} km`;
+}
+
+function formatLightYears(lightYears: number | null) {
+  if (lightYears === null || !Number.isFinite(lightYears)) return "not listed";
+  const abs = Math.abs(lightYears);
+  if (abs >= 100) return `${formatNumber(lightYears)} ly`;
+  if (abs >= 10) return `${lightYears.toFixed(1)} ly`;
+  return `${lightYears.toFixed(2)} ly`;
 }
 
 function formatNullableDistance(km: number | null) {

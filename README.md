@@ -4,8 +4,9 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 
 ## What Is Included
 
-- Sun, Mercury, Venus, Earth, Moon, Mars, Phobos, Deimos, Jupiter, Io, Europa, Ganymede, Callisto, Saturn, Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Iapetus, Uranus, Neptune, and Pluto.
-- Real current-date body positions from Skyfield using NASA/JPL DE440s, the NAIF Mars satellite SPK, and NASA/JPL Horizons vectors for Jupiter and Saturn moons.
+- Sun, Mercury, Venus, Earth, Moon, Mars, Phobos, Deimos, Jupiter, Io, Europa, Ganymede, Callisto, Saturn, Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Iapetus, Uranus, Neptune, Pluto, and a first nearby exoplanet-host star slice.
+- Real current-date Solar System body positions from Skyfield using NASA/JPL DE440s, the NAIF Mars satellite SPK, and NASA/JPL Horizons vectors for Jupiter and Saturn moons.
+- Static nearby exoplanet-host star positions projected from NASA Exoplanet Archive right ascension, declination, and distance.
 - Catalog-first object metadata for each loaded body: object type, parent body, source kernel, catalog group, and dynamic/static position model.
 - Top-down osculating orbit overlays drawn from the current parent-relative state vectors.
 - 2D top-down canvas map using heliocentric ecliptic x/y coordinates.
@@ -20,6 +21,7 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 - Launch-window scanning using real JPL ephemeris states at departure, flyby, and arrival events.
 - Basic ship controls: `W` thrust, `S` reverse thrust, `A`/`D` rotate, `Space` toggle warp.
 - Mouse wheel zoom, pointer drag pan, and simple center buttons.
+- Viewport-side nearest-object references that update while panning and show each off-screen body's glyph, name, and distance from the current map center.
 - Reset controls for placing the ship back near Earth and restarting the current journey.
 
 ## Install
@@ -72,12 +74,14 @@ npm run dev
 
 The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL `de440s.bsp` planetary ephemeris kernel. It also loads the NAIF `mar099s.bsp` satellite SPK for Mars' moons. Jupiter and Saturn major moons are fetched from the NASA/JPL Horizons API as parent-relative vectors and then placed into the same heliocentric ecliptic coordinate space as the Skyfield bodies.
 
+Nearby exoplanet-host stars are a curated static slice from the NASA Exoplanet Archive. Their catalog right ascension, declination, and distance are converted into heliocentric ecliptic Cartesian coordinates so they can be searched, targeted, centered, measured, and rendered in the same map coordinate space. These stars are not JPL-propagated dynamic ephemeris bodies.
+
 The API now exposes a catalog layer:
 
 - `/api/catalog` returns loaded object metadata without positions.
 - `/api/ephemeris` returns the same catalog metadata alongside current positions.
 - `/api/orbits` returns parent-relative state vectors and osculating orbital elements derived from the current epoch.
-- Catalog groups are explicit (`core`, `mars_moons`, `jupiter_major_moons`, `saturn_major_moons`) so future object slices can be loaded by group instead of becoming another hardcoded UI list.
+- Catalog groups are explicit (`core`, `mars_moons`, `jupiter_major_moons`, `saturn_major_moons`, `nearby_exoplanet_systems`) so future object slices can be loaded by group instead of becoming another hardcoded UI list.
 
 ## Coordinate System
 
@@ -94,7 +98,7 @@ Positions are computed as heliocentric ecliptic Cartesian coordinates:
 
 Distances are never numerically compressed or altered. Zoom only changes the map transform from AU to pixels.
 
-Planet and Moon display radii are deliberately exaggerated so bodies remain visible. The Orbits layer draws current osculating orbit references from the epoch state vectors; these are visual guides, not n-body propagated paths.
+Planet, Moon, and star display radii are deliberately exaggerated so bodies remain visible. The Orbits layer draws current osculating orbit references from the epoch state vectors; these are visual guides, not n-body propagated paths. At interstellar scale the grid and HUD switch to light-year-friendly labels, but the underlying coordinates remain AU/km.
 
 ## Time Controls
 
@@ -105,7 +109,9 @@ The timestamp input is treated as UTC. Changing time recomputes every celestial 
 - Planet positions come from the JPL ephemeris through Skyfield, not circular orbit approximations.
 - Mars, Jupiter, Saturn, Uranus, Neptune, and Pluto use barycenter targets from the planetary ephemeris.
 - Phobos and Deimos use the official NAIF MAR099s satellite SPK. The Galilean moons and included Saturn moons use NASA/JPL Horizons parent-relative vectors. Many smaller or newly cataloged satellites are still missing.
+- Nearby exoplanet-host stars use static NASA Exoplanet Archive catalog positions. Proper motion, radial velocity, binary motion, and future/past epoch propagation are not implemented yet.
 - The app now has catalog group metadata, but the frontend still loads all default Solar System groups at startup. True viewport/lazy catalog streaming is a future scaling step.
+- Interstellar targets can be selected and measured, but the route planner is intentionally disabled for static stellar catalog targets until there is an interstellar navigation model.
 - Osculating orbital elements are computed from a single instantaneous state vector. They are useful for inspection and rough comparison, but they are not permanent catalog elements or mission-grade propagated orbits.
 - Gravity-assist plans are patched-conic planning estimates. They use real ephemeris positions and velocities, but they are not full Lambert/n-body mission optimizations.
 - Flyby feasibility is estimated from idealized turn angle, periapsis altitude, and incoming/outgoing excess velocity. It does not include launch vehicle constraints, finite burns, perturbations, or navigation margins.
