@@ -28,6 +28,16 @@
 - [x] Add richer educational comparisons for selected distances: light time, Earth-Moon distances, AU, and familiar mission distances.
 - [x] Add a clearer warp state: stronger ship cue, speed multiplier label, and "course correcting / drifting away" feedback.
 
+## P3 — Make travel paths orbital
+
+- [ ] Replace the straight Earth-destination route guide with route modes: direct reference, transfer trajectory, and gravity-assist plan.
+- [ ] Add launch-window exploration so users can see how departure date changes route shape, flight time, and target intercept.
+- [ ] Add planned trajectory previews that curve through real Solar System space instead of drawing a straight chord between bodies.
+- [ ] Add gravity-assist waypoint planning for flybys, with closest approach, assist body, expected speed change, and risk warnings.
+- [ ] Add route comparison cards for fastest, lowest-energy, and gravity-assisted travel options.
+- [ ] Let the ship follow a planned trajectory as an assisted autopilot mode while keeping manual arcade flight separate.
+- [ ] Clearly label planned paths as approximations until the app supports full mission-grade trajectory solving.
+
 ## Future — Prepare for 3D without building it yet
 
 - [ ] Keep coordinate and rendering code separated so a future 3D view can reuse the same ephemeris and navigation state.
