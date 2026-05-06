@@ -13,12 +13,12 @@
 
 ## P1 — Improve spatial understanding
 
-- [ ] Add a measurement/ruler mode for distances between any two bodies or map points.
-- [ ] Add inner/outer Solar System zoom presets with clear labels and icons.
-- [ ] Add display toggles for labels, AU rings, route lines, orbit trails, and educational overlays.
-- [ ] Add sampled real-ephemeris orbit trails for selected bodies, clearly labeled as time-sampled reference paths.
-- [ ] Add a minimap or scale strip that helps users understand where they are while zoomed in.
-- [ ] Add body search filters for planets, moons, dwarf planets, asteroids, spacecraft, and other catalog classes once the catalog expands.
+- [x] Add a measurement/ruler mode for distances between any two bodies or map points.
+- [x] Add inner/outer Solar System zoom presets with clear labels and icons.
+- [x] Add display toggles for labels, AU rings, route lines, orbit trails, and educational overlays.
+- [x] Add sampled real-ephemeris orbit trails for selected bodies, clearly labeled as time-sampled reference paths.
+- [x] Add a minimap or scale strip that helps users understand where they are while zoomed in.
+- [x] Add body search filters for planets, moons, dwarf planets, asteroids, spacecraft, and other catalog classes once the catalog expands.
 
 ## P2 — Make journeys feel rewarding
 
