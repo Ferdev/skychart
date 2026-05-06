@@ -105,6 +105,46 @@ type BodyPosition = {
   heliocentric_distance_km: number;
 };
 
+type VectorComponents = {
+  x: number;
+  y: number;
+  z: number;
+};
+
+type BodyStateVector = {
+  frame: string;
+  relative_to_key: string | null;
+  relative_to_name: string | null;
+  position_km: VectorComponents;
+  velocity_km_s: VectorComponents;
+  distance_km: number;
+  speed_km_s: number;
+  heliocentric_velocity_km_s: VectorComponents;
+  heliocentric_speed_km_s: number;
+};
+
+type BodyOrbit = {
+  epoch_utc: string;
+  central_body_key: string;
+  central_body_name: string;
+  central_mu_km3_s2: number;
+  source: string;
+  semi_major_axis_km: number | null;
+  eccentricity: number;
+  inclination_deg: number | null;
+  longitude_of_ascending_node_deg: number | null;
+  argument_of_periapsis_deg: number | null;
+  true_anomaly_deg: number | null;
+  periapsis_km: number | null;
+  apoapsis_km: number | null;
+  orbital_period_days: number | null;
+  mean_motion_deg_per_day: number | null;
+  specific_orbital_energy_km2_s2: number;
+  specific_angular_momentum_km2_s: number;
+  orbit_class: string;
+  notes: string[];
+};
+
 type Body = {
   key: string;
   name: string;
@@ -115,6 +155,8 @@ type Body = {
   catalog_group?: string;
   catalog?: CatalogObject;
   position: BodyPosition;
+  state_vector?: BodyStateVector;
+  orbit?: BodyOrbit | null;
   distance_from_earth_km: number;
 };
 
@@ -1719,6 +1761,7 @@ function updateBodyInfo() {
   const classification = classifyBody(body);
   const parent = body.parent_key ? bodyByKey.get(body.parent_key) : null;
   const source = body.catalog?.ephemeris_kernel ?? body.catalog_group ?? "loaded catalog";
+  const orbitRows = orbitInfoRows(body);
 
   bodyInfo.innerHTML = `
     <div class="body-info-title">
@@ -1738,7 +1781,31 @@ function updateBodyInfo() {
       <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
       <span>Mean radius</span><strong>${formatDistance(body.radius_km)}</strong>
       <span>Source</span><strong>${escapeHtml(source)}</strong>
+      ${orbitRows}
     </div>
+  `;
+}
+
+function orbitInfoRows(body: Body) {
+  const orbit = body.orbit;
+  const state = body.state_vector;
+  if (!orbit || !state) {
+    if (!state) return "";
+    return `
+      <span>State frame</span><strong>${escapeHtml(state.frame)}</strong>
+      <span>Speed</span><strong>${formatSpeed(state.heliocentric_speed_km_s)}</strong>
+    `;
+  }
+
+  return `
+    <span>Orbit around</span><strong>${escapeHtml(orbit.central_body_name)}</strong>
+    <span>Orbit class</span><strong>${escapeHtml(labelForOrbitClass(orbit.orbit_class))}</strong>
+    <span>Parent distance</span><strong>${formatDistance(state.distance_km)}</strong>
+    <span>Orbital speed</span><strong>${formatSpeed(state.speed_km_s)}</strong>
+    <span>Semi-major axis</span><strong>${formatNullableDistance(orbit.semi_major_axis_km)}</strong>
+    <span>Period</span><strong>${formatOrbitPeriod(orbit.orbital_period_days)}</strong>
+    <span>Eccentricity</span><strong>${formatRatio(orbit.eccentricity)}</strong>
+    <span>Inclination</span><strong>${formatNullableDegrees(orbit.inclination_deg)}</strong>
   `;
 }
 
@@ -2716,6 +2783,14 @@ function formatDistance(km: number) {
   return `${formatNumber(km)} km`;
 }
 
+function formatNullableDistance(km: number | null) {
+  return km === null || !Number.isFinite(km) ? "not defined" : formatDistance(km);
+}
+
+function formatSpeed(kmPerSecond: number) {
+  return `${formatNumber(kmPerSecond)} km/s`;
+}
+
 function formatDuration(seconds: number) {
   if (seconds < 90) return `${seconds.toFixed(1)} s`;
   const minutes = seconds / 60;
@@ -2725,8 +2800,25 @@ function formatDuration(seconds: number) {
   return `${(hours / 24).toFixed(2)} d`;
 }
 
+function formatOrbitPeriod(days: number | null) {
+  if (days === null || !Number.isFinite(days)) return "not closed";
+  if (days >= 365.25 * 2) return `${formatNumber(days / 365.25)} yr`;
+  if (days >= 2) return `${formatNumber(days)} d`;
+  return formatDuration(days * 86_400);
+}
+
 function formatDegrees(degrees: number) {
   return `${degrees.toFixed(1)}°`;
+}
+
+function formatNullableDegrees(degrees: number | null) {
+  return degrees === null || !Number.isFinite(degrees) ? "not defined" : formatDegrees(degrees);
+}
+
+function formatRatio(value: number) {
+  if (!Number.isFinite(value)) return "not defined";
+  if (Math.abs(value) < 0.01) return value.toExponential(2);
+  return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function formatDeltaV(value: number) {
@@ -2759,6 +2851,13 @@ function formatNumber(value: number) {
 
 function labelForKey(key: string) {
   return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function labelForOrbitClass(value: string) {
+  return value
+    .split("-")
+    .map((part) => labelForKey(part))
+    .join(" ");
 }
 
 function clamp(value: number, min: number, max: number) {

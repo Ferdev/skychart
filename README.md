@@ -75,6 +75,7 @@ The API now exposes a catalog layer:
 
 - `/api/catalog` returns loaded object metadata without positions.
 - `/api/ephemeris` returns the same catalog metadata alongside current positions.
+- `/api/orbits` returns parent-relative state vectors and osculating orbital elements derived from the current epoch.
 - Catalog groups are explicit (`core`, `mars_moons`, `jupiter_major_moons`, `saturn_major_moons`) so future object slices can be loaded by group instead of becoming another hardcoded UI list.
 
 ## Coordinate System
@@ -83,6 +84,8 @@ Positions are computed as heliocentric ecliptic Cartesian coordinates:
 
 - The Sun is the origin.
 - Body positions are expressed in astronomical units and kilometers.
+- Parent-relative state vectors expose position in kilometers and velocity in kilometers per second.
+- Orbital elements are derived from the parent-relative state vector at the current epoch.
 - The canvas renders x/y from the ecliptic frame as a 2D top-down map.
 - The z coordinate is retained in the data and used for distance calculations.
 
@@ -102,6 +105,7 @@ The timestamp input is treated as UTC. Changing time recomputes every celestial 
 - Mars, Jupiter, Saturn, Uranus, Neptune, and Pluto use barycenter targets from the planetary ephemeris.
 - Phobos and Deimos use the official NAIF MAR099s satellite SPK. The Galilean moons and included Saturn moons use NASA/JPL Horizons parent-relative vectors. Many smaller or newly cataloged satellites are still missing.
 - The app now has catalog group metadata, but the frontend still loads all default Solar System groups at startup. True viewport/lazy catalog streaming is a future scaling step.
+- Osculating orbital elements are computed from a single instantaneous state vector. They are useful for inspection and rough comparison, but they are not permanent catalog elements or mission-grade propagated orbits.
 - Gravity-assist plans are patched-conic planning estimates. They use real ephemeris positions and velocities, but they are not full Lambert/n-body mission optimizations.
 - Flyby feasibility is estimated from idealized turn angle, periapsis altitude, and incoming/outgoing excess velocity. It does not include launch vehicle constraints, finite burns, perturbations, or navigation margins.
 - The map is a top-down ecliptic projection, so it does not show vertical displacement visually.

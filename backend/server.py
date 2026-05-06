@@ -592,6 +592,14 @@ def vector3_dot(a: tuple[float, float, float], b: tuple[float, float, float]) ->
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
 
+def vector3_cross(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
+
+
 def vector3_norm(value: tuple[float, float, float]) -> float:
     return math.sqrt(vector3_dot(value, value))
 
@@ -610,6 +618,20 @@ def vector3_angle_deg(a: tuple[float, float, float], b: tuple[float, float, floa
         return 0.0
     cosine = clamp_float(vector3_dot(a, b) / (a_norm * b_norm), -1.0, 1.0)
     return math.degrees(math.acos(cosine))
+
+
+def angle_0_360_deg(radians: float) -> float:
+    return float(math.degrees(radians) % 360.0)
+
+
+def vector_components(value: tuple[float, float, float]) -> dict[str, float]:
+    return {"x": float(value[0]), "y": float(value[1]), "z": float(value[2])}
+
+
+def safe_float(value: float | None) -> float | None:
+    if value is None or not math.isfinite(value):
+        return None
+    return float(value)
 
 
 def body_state(
@@ -668,6 +690,161 @@ def body_state(
     if cache is not None:
         cache[cache_key] = payload
     return payload
+
+
+def body_state_vector_payload(
+    item: dict[str, Any],
+    timestamp: datetime,
+    cache: dict[tuple[str, str], dict[str, Any]],
+) -> dict[str, Any]:
+    state = body_state(item["key"], timestamp, cache)
+    parent_key = item.get("parent_key")
+    if parent_key:
+        parent_state = body_state(parent_key, timestamp, cache)
+        relative_position = vector3_sub(state["position_km"], parent_state["position_km"])
+        relative_velocity = vector3_sub(state["velocity_km_s"], parent_state["velocity_km_s"])
+        relative_to_name = parent_state["name"]
+    else:
+        relative_position = state["position_km"]
+        relative_velocity = state["velocity_km_s"]
+        relative_to_name = None
+
+    return {
+        "frame": "parent-centered ecliptic Cartesian" if parent_key else "heliocentric ecliptic Cartesian",
+        "relative_to_key": parent_key,
+        "relative_to_name": relative_to_name,
+        "position_km": vector_components(relative_position),
+        "velocity_km_s": vector_components(relative_velocity),
+        "distance_km": float(vector3_norm(relative_position)),
+        "speed_km_s": float(vector3_norm(relative_velocity)),
+        "heliocentric_velocity_km_s": vector_components(state["velocity_km_s"]),
+        "heliocentric_speed_km_s": float(vector3_norm(state["velocity_km_s"])),
+    }
+
+
+def orbit_class(eccentricity: float, semi_major_axis_km: float | None) -> str:
+    if eccentricity < 1e-4:
+        return "near-circular"
+    if eccentricity < 1.0:
+        return "elliptic"
+    if math.isclose(eccentricity, 1.0, rel_tol=0.0, abs_tol=1e-3):
+        return "near-parabolic"
+    if semi_major_axis_km is not None and semi_major_axis_km < 0:
+        return "hyperbolic"
+    return "open"
+
+
+def osculating_elements_from_state(
+    relative_position_km: tuple[float, float, float],
+    relative_velocity_km_s: tuple[float, float, float],
+    central_mu_km3_s2: float,
+) -> dict[str, Any] | None:
+    r_norm = vector3_norm(relative_position_km)
+    v_norm = vector3_norm(relative_velocity_km_s)
+    if central_mu_km3_s2 <= 0 or r_norm <= 0 or v_norm <= 0:
+        return None
+
+    h_vec = vector3_cross(relative_position_km, relative_velocity_km_s)
+    h_norm = vector3_norm(h_vec)
+    if h_norm <= 0:
+        return None
+
+    node_vec = vector3_cross((0.0, 0.0, 1.0), h_vec)
+    node_norm = vector3_norm(node_vec)
+    eccentricity_vec = vector3_sub(
+        vector3_scale(vector3_cross(relative_velocity_km_s, h_vec), 1.0 / central_mu_km3_s2),
+        vector3_scale(relative_position_km, 1.0 / r_norm),
+    )
+    eccentricity = vector3_norm(eccentricity_vec)
+    specific_energy = (v_norm * v_norm) / 2.0 - central_mu_km3_s2 / r_norm
+    semi_major_axis_km = -central_mu_km3_s2 / (2.0 * specific_energy) if abs(specific_energy) > 1e-12 else None
+    semi_latus_rectum_km = (h_norm * h_norm) / central_mu_km3_s2
+
+    inclination_deg = angle_0_360_deg(math.acos(clamp_float(h_vec[2] / h_norm, -1.0, 1.0)))
+    longitude_of_ascending_node_deg = angle_0_360_deg(math.atan2(node_vec[1], node_vec[0])) if node_norm > 1e-9 else None
+
+    argument_of_periapsis_deg = None
+    if node_norm > 1e-9 and eccentricity > 1e-9:
+        argument = math.acos(clamp_float(vector3_dot(node_vec, eccentricity_vec) / (node_norm * eccentricity), -1.0, 1.0))
+        if eccentricity_vec[2] < 0:
+            argument = (2.0 * math.pi) - argument
+        argument_of_periapsis_deg = angle_0_360_deg(argument)
+
+    true_anomaly_deg = None
+    if eccentricity > 1e-9:
+        anomaly = math.acos(clamp_float(vector3_dot(eccentricity_vec, relative_position_km) / (eccentricity * r_norm), -1.0, 1.0))
+        if vector3_dot(relative_position_km, relative_velocity_km_s) < 0:
+            anomaly = (2.0 * math.pi) - anomaly
+        true_anomaly_deg = angle_0_360_deg(anomaly)
+    elif node_norm > 1e-9:
+        argument_latitude = math.acos(clamp_float(vector3_dot(node_vec, relative_position_km) / (node_norm * r_norm), -1.0, 1.0))
+        if relative_position_km[2] < 0:
+            argument_latitude = (2.0 * math.pi) - argument_latitude
+        true_anomaly_deg = angle_0_360_deg(argument_latitude)
+
+    periapsis_km = semi_latus_rectum_km / (1.0 + eccentricity) if eccentricity > -1.0 else None
+    apoapsis_km = None
+    orbital_period_days = None
+    mean_motion_deg_per_day = None
+    if semi_major_axis_km is not None and semi_major_axis_km > 0 and eccentricity < 1.0:
+        apoapsis_km = semi_major_axis_km * (1.0 + eccentricity)
+        orbital_period_seconds = 2.0 * math.pi * math.sqrt((semi_major_axis_km**3) / central_mu_km3_s2)
+        orbital_period_days = orbital_period_seconds / SECONDS_PER_DAY
+        mean_motion_deg_per_day = 360.0 / orbital_period_days if orbital_period_days > 0 else None
+
+    notes: list[str] = [
+        "Osculating elements are derived from the instantaneous parent-relative state vector at this epoch.",
+        "They are not stored catalog elements and will change with epoch, perturbations, and reference frame.",
+    ]
+    if eccentricity < 1e-4:
+        notes.append("Argument of periapsis is weakly defined for near-circular orbits.")
+    if node_norm <= 1e-9:
+        notes.append("Ascending node is weakly defined for near-zero inclination orbits.")
+
+    return {
+        "source": "derived_from_state_vector",
+        "semi_major_axis_km": safe_float(semi_major_axis_km),
+        "eccentricity": float(eccentricity),
+        "inclination_deg": safe_float(inclination_deg),
+        "longitude_of_ascending_node_deg": safe_float(longitude_of_ascending_node_deg),
+        "argument_of_periapsis_deg": safe_float(argument_of_periapsis_deg),
+        "true_anomaly_deg": safe_float(true_anomaly_deg),
+        "periapsis_km": safe_float(periapsis_km),
+        "apoapsis_km": safe_float(apoapsis_km),
+        "orbital_period_days": safe_float(orbital_period_days),
+        "mean_motion_deg_per_day": safe_float(mean_motion_deg_per_day),
+        "specific_orbital_energy_km2_s2": float(specific_energy),
+        "specific_angular_momentum_km2_s": float(h_norm),
+        "orbit_class": orbit_class(eccentricity, semi_major_axis_km),
+        "notes": notes,
+    }
+
+
+def orbit_payload_for_item(
+    item: dict[str, Any],
+    timestamp: datetime,
+    cache: dict[tuple[str, str], dict[str, Any]],
+) -> dict[str, Any] | None:
+    parent_key = item.get("parent_key")
+    if not parent_key:
+        return None
+
+    state = body_state(item["key"], timestamp, cache)
+    parent_state = body_state(parent_key, timestamp, cache)
+    relative_position = vector3_sub(state["position_km"], parent_state["position_km"])
+    relative_velocity = vector3_sub(state["velocity_km_s"], parent_state["velocity_km_s"])
+    central_mu = float(parent_state["mu_km3_s2"])
+    elements = osculating_elements_from_state(relative_position, relative_velocity, central_mu)
+    if elements is None:
+        return None
+
+    return {
+        "epoch_utc": isoformat_utc(timestamp),
+        "central_body_key": parent_key,
+        "central_body_name": parent_state["name"],
+        "central_mu_km3_s2": central_mu,
+        **elements,
+    }
 
 
 def state_event(kind: str, state: dict[str, Any], offset_days: float) -> dict[str, Any]:
@@ -1118,6 +1295,7 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
     catalog_objects = catalog_objects_for_groups(selected_groups)
 
     bodies: list[dict[str, Any]] = []
+    state_cache: dict[tuple[str, str], dict[str, Any]] = {}
     earth_position = vector_payload((earth - sun).at(time))
     positions_by_key: dict[str, dict[str, float]] = {
         "sun": {
@@ -1175,6 +1353,8 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
                 "catalog_group": item["catalog_group"],
                 "catalog": catalog_object_payload(item),
                 "position": position,
+                "state_vector": body_state_vector_payload(item, timestamp, state_cache),
+                "orbit": orbit_payload_for_item(item, timestamp, state_cache),
                 "distance_from_earth_km": earth_distance_km,
             }
         )
@@ -1184,11 +1364,58 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
         "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
         "data_source": EPHEMERIS_SOURCE,
         "coordinate_frame": "Heliocentric ecliptic Cartesian coordinates, projected top-down as x/y; z retained for distance calculations",
-        "units": {"distance": "kilometers", "position": "astronomical units and kilometers"},
+        "units": {
+            "distance": "kilometers",
+            "position": "astronomical units and kilometers",
+            "velocity": "kilometers per second",
+            "angle": "degrees",
+            "time": "UTC ISO-8601 and days",
+        },
         "au_km": AU_KM,
         "catalog": catalog_summary_payload(selected_groups, catalog_objects),
         "earth_position": earth_position,
         "bodies": bodies,
+    }
+
+
+def orbits_payload(timestamp: datetime, groups: list[str] | None = None) -> dict[str, Any]:
+    selected_groups = groups or list(DEFAULT_CATALOG_GROUPS)
+    catalog_objects = catalog_objects_for_groups(selected_groups)
+    state_cache: dict[tuple[str, str], dict[str, Any]] = {}
+    bodies: list[dict[str, Any]] = []
+
+    for item in catalog_objects:
+        bodies.append(
+            {
+                "key": item["key"],
+                "name": item["name"],
+                "object_type": item["object_type"],
+                "parent_key": item.get("parent_key"),
+                "catalog_group": item["catalog_group"],
+                "catalog": catalog_object_payload(item),
+                "state_vector": body_state_vector_payload(item, timestamp, state_cache),
+                "orbit": orbit_payload_for_item(item, timestamp, state_cache),
+            }
+        )
+
+    return {
+        "timestamp_utc": isoformat_utc(timestamp),
+        "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
+        "data_source": EPHEMERIS_SOURCE,
+        "coordinate_frame": "Parent-relative ecliptic Cartesian state vectors with derived osculating orbital elements",
+        "units": {
+            "distance": "kilometers",
+            "velocity": "kilometers per second",
+            "angle": "degrees",
+            "time": "UTC ISO-8601 and days",
+        },
+        "catalog": catalog_summary_payload(selected_groups, catalog_objects),
+        "bodies": bodies,
+        "limitations": [
+            "Elements are osculating values derived from one epoch state vector; they are not permanent catalog orbits.",
+            "Planet entries that use barycenter ephemeris targets describe the barycenter orbit around the Sun.",
+            "The top-down map still projects x/y only; inclination and z motion are represented numerically.",
+        ],
     }
 
 
@@ -1297,6 +1524,21 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(catalog_summary_payload(groups, objects))
             except QueryInputError as exc:
                 payload = {"error": str(exc)}
+                if exc.details is not None:
+                    payload["details"] = exc.details
+                self.respond(payload, status=HTTPStatus.BAD_REQUEST)
+            except Exception as exc:
+                self.respond({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if parsed.path == "/api/orbits":
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                timestamp = parse_timestamp(query.get("timestamp", [None])[0])
+                groups = parse_catalog_groups(query)
+                self.respond(orbits_payload(timestamp, groups))
+            except QueryInputError as exc:
+                payload: dict[str, Any] = {"error": str(exc)}
                 if exc.details is not None:
                     payload["details"] = exc.details
                 self.respond(payload, status=HTTPStatus.BAD_REQUEST)
