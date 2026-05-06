@@ -66,7 +66,7 @@
 
 ## P2 — Science/storytelling layer
 
-- [ ] Add guided tours for Messier highlights, nearby stars, galaxies, nebulae, clusters, and Local Group scale objects.
-- [ ] Add a scale ladder that explains whether the current zoom is Solar System, nearby-star, Milky Way, Local Group, or deep-sky scale.
-- [ ] Add light-time/lookback-time copy for interstellar and deep-sky targets so long-distance travel feels scientifically meaningful.
-- [ ] Update README with the new catalog sources, coordinate assumptions, visual scaling, and known accuracy limits.
+- [x] Add guided tours for Messier highlights, nearby stars, galaxies, nebulae, clusters, and Local Group scale objects.
+- [x] Add a scale ladder that explains whether the current zoom is Solar System, nearby-star, Milky Way, Local Group, or deep-sky scale.
+- [x] Add light-time/lookback-time copy for interstellar and deep-sky targets so long-distance travel feels scientifically meaningful.
+- [x] Update README with the new catalog sources, coordinate assumptions, visual scaling, and known accuracy limits.

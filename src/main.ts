@@ -66,6 +66,14 @@ type BodyFilter = (typeof BODY_FILTERS)[number];
 type InteractionMode = "pan" | "target" | "measure";
 type DisplayLayer = "labels" | "orbits" | "route" | "trails";
 type ZoomPreset = "inner" | "outer" | "local" | "all";
+type ScaleBandKey = "planetary" | "solar" | "nearby_stars" | "milky_way" | "local_group" | "deep_sky";
+
+type GuidedTour = {
+  id: string;
+  label: string;
+  description: string;
+  keys: string[];
+};
 
 const BODY_FILTER_LABELS: Record<BodyFilter, string> = {
   all: "All",
@@ -104,6 +112,45 @@ const COMPACT_SATELLITE_PARENT_KEYS: Record<string, string> = {
   titan: "saturn",
   iapetus: "saturn"
 };
+
+const GUIDED_TOURS: GuidedTour[] = [
+  {
+    id: "messier-highlights",
+    label: "Messier highlights",
+    description: "Bright, famous deep-sky targets with known catalog distances.",
+    keys: ["m31", "m42", "m45", "m13", "m1"]
+  },
+  {
+    id: "galaxies",
+    label: "Galaxies",
+    description: "Nearby island universes in the Messier catalog.",
+    keys: ["m31", "m33", "m51", "m81", "m104"]
+  },
+  {
+    id: "nebulae",
+    label: "Nebulae",
+    description: "Star-forming regions, remnants, and glowing shells.",
+    keys: ["m42", "m8", "m16", "m17", "m57"]
+  },
+  {
+    id: "clusters",
+    label: "Star clusters",
+    description: "Young open clusters and ancient globular clusters.",
+    keys: ["m45", "m13", "m22", "m5", "m11"]
+  },
+  {
+    id: "nearby-stars",
+    label: "Nearby stars",
+    description: "Closest loaded exoplanet-host systems.",
+    keys: ["proxima-cen", "barnards-star", "eps-eri", "ross-128", "tau-cet"]
+  },
+  {
+    id: "local-group",
+    label: "Local Group",
+    description: "The Andromeda system and companions.",
+    keys: ["m31", "m32", "m110"]
+  }
+];
 
 type TargetKey = string;
 
@@ -440,6 +487,7 @@ const canvas = requiredElement<HTMLCanvasElement>("#map");
 const hudValues = requiredElement<HTMLElement>("#hud-values");
 const loadState = requiredElement<HTMLElement>("#load-state");
 const targetButtons = requiredElement<HTMLElement>("#target-buttons");
+const guidedTours = requiredElement<HTMLElement>("#guided-tours");
 const destinationSearch = requiredElement<HTMLInputElement>("#destination-search");
 const bodyPicker = requiredElement<HTMLElement>("#body-picker");
 const bodyFilterButtons = requiredElement<HTMLElement>("#body-filter-buttons");
@@ -469,6 +517,7 @@ const zoomPresets = requiredElement<HTMLElement>("#zoom-presets");
 const bodyPopover = requiredElement<HTMLElement>("#body-popover");
 const measurePanel = requiredElement<HTMLElement>("#measure-panel");
 const onboardingPanel = requiredElement<HTMLElement>("#onboarding-panel");
+const scaleLadder = requiredElement<HTMLElement>("#scale-ladder");
 const ctx = requiredCanvasContext(canvas);
 
 const keys = new Set<string>();
@@ -613,6 +662,12 @@ routeMemory.addEventListener("click", (event) => {
   const key = button?.dataset.recentDestination;
   if (!key) return;
   setTarget(key, { inspect: true });
+});
+guidedTours.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-tour-target]");
+  const key = button?.dataset.tourTarget;
+  if (!key) return;
+  setTarget(key, { inspect: true, center: true });
 });
 journey.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-trajectory-candidate]");
@@ -2109,6 +2164,7 @@ function updateHud(force = false) {
   appendDefinition("Frame", "heliocentric ecliptic x/y");
 
   updateFlightValues(shipSpeedKmS, scaleKm, navigation);
+  updateScaleLadder(scaleKm);
   updateBodyInfo();
   updateJourney(target, shipTargetKm);
 }
@@ -2227,6 +2283,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
       <div class="journey-grid detail-grid">
         <span>${escapeHtml(directRouteLabel)}</span><strong data-journey-field="route-distance"></strong>
         <span>Earth-target light time</span><strong data-journey-field="earth-target-light-time"></strong>
+        <span>Light story</span><strong data-journey-field="light-story"></strong>
         <span>Comparison</span><strong data-journey-field="comparison"></strong>
         <span>Distance flown</span><strong data-journey-field="distance-flown"></strong>
         <span>Max speed</span><strong data-journey-field="max-speed"></strong>
@@ -2250,6 +2307,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
   updateJourneyField("arrival-zone", formatDistance(thresholdKm));
   updateJourneyField("route-distance", formatDistance(routeDistanceKm));
   updateJourneyField("earth-target-light-time", formatDuration(targetLightSeconds));
+  updateJourneyField("light-story", lightStoryText(target, shipTargetKm));
   updateJourneyField("comparison", comparisonText);
   updateJourneyField("distance-flown", formatDistance(journeyStats.distanceTraveledKm));
   updateJourneyField("max-speed", `${formatNumber(journeyStats.maxSpeedKmS)} km/s`);
@@ -2393,6 +2451,66 @@ function updateFlightValues(shipSpeedKmS: number, scaleKm: number, navigation: R
       <strong>${shortScaleText(scaleKm, ephemeris?.au_km ?? AU_KM_FALLBACK)}</strong>
     </div>
   `;
+}
+
+function updateScaleLadder(kmPerPx: number) {
+  const viewportKm = kmPerPx * Math.max(window.innerWidth, window.innerHeight);
+  const activeBand = scaleBandForViewport(viewportKm);
+  const bands: { key: ScaleBandKey; label: string }[] = [
+    { key: "planetary", label: "Planet" },
+    { key: "solar", label: "Solar System" },
+    { key: "nearby_stars", label: "Nearby stars" },
+    { key: "milky_way", label: "Milky Way" },
+    { key: "local_group", label: "Local Group" },
+    { key: "deep_sky", label: "Deep sky" }
+  ];
+  scaleLadder.innerHTML = `
+    <div class="scale-ladder-head">
+      <span>Scale ladder</span>
+      <strong>${escapeHtml(scaleBandTitle(activeBand))}</strong>
+    </div>
+    <div class="scale-ladder-track" aria-hidden="true">
+      ${bands.map((band) => `<span class="${band.key === activeBand ? "active" : ""}"></span>`).join("")}
+    </div>
+    <div class="scale-ladder-labels">
+      ${bands.map((band) => `<span>${escapeHtml(band.label)}</span>`).join("")}
+    </div>
+    <p>${escapeHtml(scaleBandDescription(activeBand, viewportKm))}</p>
+  `;
+}
+
+function scaleBandForViewport(viewportKm: number): ScaleBandKey {
+  if (viewportKm < 1_000_000) return "planetary";
+  if (viewportKm < AU_KM_FALLBACK * 80) return "solar";
+  if (viewportKm < LIGHT_YEAR_KM * 80) return "nearby_stars";
+  if (viewportKm < LIGHT_YEAR_KM * 120_000) return "milky_way";
+  if (viewportKm < LIGHT_YEAR_KM * 8_000_000) return "local_group";
+  return "deep_sky";
+}
+
+function scaleBandTitle(band: ScaleBandKey) {
+  const labels: Record<ScaleBandKey, string> = {
+    planetary: "planetary close-up",
+    solar: "Solar System scale",
+    nearby_stars: "nearby-star scale",
+    milky_way: "Milky Way scale",
+    local_group: "Local Group scale",
+    deep_sky: "deep-sky scale"
+  };
+  return labels[band];
+}
+
+function scaleBandDescription(band: ScaleBandKey, viewportKm: number) {
+  const span = compactDistance(viewportKm);
+  const descriptions: Record<ScaleBandKey, string> = {
+    planetary: `${span} across this viewport: moon systems and planet close approaches are readable here.`,
+    solar: `${span} across this viewport: planets, moons, and transfer paths fit in the same coordinate space.`,
+    nearby_stars: `${span} across this viewport: the hidden depth axis matters as much as the top-down position.`,
+    milky_way: `${span} across this viewport: catalog objects are static sky positions with distance estimates.`,
+    local_group: `${span} across this viewport: light-time becomes historical lookback time.`,
+    deep_sky: `${span} across this viewport: this is an atlas scale, not a mission-planning scale.`
+  };
+  return descriptions[band];
 }
 
 function depthMetricText(navigation: ReturnType<typeof navigationMetrics>) {
@@ -2958,6 +3076,16 @@ function distanceComparisonText(distanceKm: number) {
   return `${formatNumber(distanceKm / EARTH_MOON_AVG_KM)} Earth-Moon distances`;
 }
 
+function lightStoryText(target: Body, shipTargetKm: number) {
+  if (target.deep_sky?.distance_ly) {
+    return `You see it as it was ${formatLookbackTime(target.deep_sky.distance_ly)} ago.`;
+  }
+  if (isStaticStellarCatalogBody(target)) {
+    return `Target light takes ${formatLightYears(shipTargetKm / LIGHT_YEAR_KM)} to reach the ship.`;
+  }
+  return `Current ship-target light time is ${formatDuration(shipTargetKm / LIGHT_SPEED_KM_S)}.`;
+}
+
 function centerOnBody(key: string) {
   const body = bodyByKey.get(key);
   if (!body) return;
@@ -2992,6 +3120,7 @@ function populateCatalogControls() {
   syncDestinationSearch();
   renderBodyPicker();
   renderRouteMemory();
+  renderGuidedTours();
   updateTargetButtons();
 }
 
@@ -3126,6 +3255,43 @@ function renderRouteMemory() {
         .join("")}
     </div>
   `;
+}
+
+function renderGuidedTours() {
+  const availableTours = GUIDED_TOURS.map((tour) => ({
+    ...tour,
+    bodies: tour.keys.map((key) => bodyByKey.get(key)).filter((body): body is Body => Boolean(body))
+  })).filter((tour) => tour.bodies.length > 0);
+
+  guidedTours.innerHTML = availableTours
+    .map(
+      (tour) => `
+        <article class="tour-card">
+          <div>
+            <strong>${escapeHtml(tour.label)}</strong>
+            <span>${escapeHtml(tour.description)}</span>
+          </div>
+          <div class="tour-targets">
+            ${tour.bodies
+              .map(
+                (body) => `
+                  <button type="button" data-tour-target="${escapeHtml(body.key)}" title="${escapeHtml(body.name)}">
+                    ${bodyOrbHtml(body)}
+                    <span>${escapeHtml(tourTargetLabel(body))}</span>
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function tourTargetLabel(body: Body) {
+  if (body.deep_sky?.common_name) return body.deep_sky.common_name;
+  return body.name;
 }
 
 function updateModeButtons() {

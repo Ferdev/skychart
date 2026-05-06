@@ -4,9 +4,10 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 
 ## What Is Included
 
-- Sun, Mercury, Venus, Earth, Moon, Mars, Phobos, Deimos, Jupiter, Io, Europa, Ganymede, Callisto, Saturn, Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Iapetus, Uranus, Neptune, Pluto, and a first nearby exoplanet-host star slice.
+- Sun, Mercury, Venus, Earth, Moon, Mars, Phobos, Deimos, Jupiter, Io, Europa, Ganymede, Callisto, Saturn, Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Iapetus, Uranus, Neptune, Pluto, a first nearby exoplanet-host star slice, and the full Messier deep-sky catalog.
 - Real current-date Solar System body positions from Skyfield using NASA/JPL DE440s, the NAIF Mars satellite SPK, and NASA/JPL Horizons vectors for Jupiter and Saturn moons.
 - Static nearby exoplanet-host star positions projected from NASA Exoplanet Archive right ascension, declination, and distance.
+- Static Messier deep-sky positions projected from catalog right ascension, declination, and distance estimates, with NGC/IC aliases where listed.
 - Catalog-first object metadata for each loaded body: object type, parent body, source kernel, catalog group, and dynamic/static position model.
 - Top-down osculating orbit overlays drawn from the current parent-relative state vectors.
 - 2D top-down canvas map using heliocentric ecliptic x/y coordinates.
@@ -22,6 +23,9 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 - Basic ship controls: `W` thrust, `S` reverse thrust, `A`/`D` rotate, `Space` toggle warp. Thrust also drives an invisible z-axis component toward the selected target so top-down travel still closes true 3D distance.
 - Mouse wheel zoom, pointer drag pan, and simple center buttons.
 - Viewport-side nearest-object references that update while panning and show each off-screen body's glyph, name, and distance from the current map center.
+- Guided tours for Messier highlights, galaxies, nebulae, star clusters, nearby stars, and Local Group scale objects.
+- A scale ladder showing whether the current viewport is planetary, Solar System, nearby-star, Milky Way, Local Group, or deep-sky scale.
+- Deep-sky object details: apparent magnitude, angular size, constellation, viewing season, recommended observing equipment, and lookback time.
 - Reset controls for placing the ship back near Earth and restarting the current journey.
 
 ## Install
@@ -76,12 +80,14 @@ The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL 
 
 Nearby exoplanet-host stars are a curated static slice from the NASA Exoplanet Archive. Their catalog right ascension, declination, and distance are converted into heliocentric ecliptic Cartesian coordinates so they can be searched, targeted, centered, measured, and rendered in the same map coordinate space. These stars are not JPL-propagated dynamic ephemeris bodies.
 
+Messier objects are loaded from a generated snapshot in `data/catalogs/deep_sky_catalog.json`. The generator script `scripts/build_deep_sky_catalog.py` pulls the AstroPixels Messier table for RA/Dec, distance estimates, apparent magnitude, angular size, constellation, season, and common names, and records NASA HEASARC Messier table notes as catalog context. Distance-known Messier entries are targetable and measured with the same x/y/z distance math, but they remain static catalog positions rather than propagated ephemerides.
+
 The API now exposes a catalog layer:
 
 - `/api/catalog` returns loaded object metadata without positions.
 - `/api/ephemeris` returns the same catalog metadata alongside current positions.
 - `/api/orbits` returns parent-relative state vectors and osculating orbital elements derived from the current epoch.
-- Catalog groups are explicit (`core`, `mars_moons`, `jupiter_major_moons`, `saturn_major_moons`, `nearby_exoplanet_systems`) so future object slices can be loaded by group instead of becoming another hardcoded UI list.
+- Catalog groups are explicit (`core`, `mars_moons`, `jupiter_major_moons`, `saturn_major_moons`, `nearby_exoplanet_systems`, `messier_deep_sky`) so future object slices can be loaded by group instead of becoming another hardcoded UI list.
 
 ## Coordinate System
 
@@ -110,8 +116,10 @@ The timestamp input is treated as UTC. Changing time recomputes every celestial 
 - Mars, Jupiter, Saturn, Uranus, Neptune, and Pluto use barycenter targets from the planetary ephemeris.
 - Phobos and Deimos use the official NAIF MAR099s satellite SPK. The Galilean moons and included Saturn moons use NASA/JPL Horizons parent-relative vectors. Many smaller or newly cataloged satellites are still missing.
 - Nearby exoplanet-host stars use static NASA Exoplanet Archive catalog positions. Proper motion, radial velocity, binary motion, and future/past epoch propagation are not implemented yet.
+- Messier deep-sky objects use static catalog RA/Dec and distance estimates. Their distances are educational catalog values, not mission-grade astrometric solutions. Proper motion, expansion, radial velocity, and catalog uncertainty propagation are not implemented.
+- NGC/IC support currently comes through aliases attached to Messier objects, not the full NGC/IC catalog. Objects without reliable distances are intentionally not placed at fake depths.
 - The app now has catalog group metadata, but the frontend still loads all default Solar System groups at startup. True viewport/lazy catalog streaming is a future scaling step.
-- Interstellar targets can be selected and measured, but the route planner is intentionally disabled for static stellar catalog targets until there is an interstellar navigation model.
+- Interstellar and deep-sky targets can be selected and measured, but the route planner is intentionally disabled for static catalog targets until there is a credible non-Solar-System navigation model.
 - Osculating orbital elements are computed from a single instantaneous state vector. They are useful for inspection and rough comparison, but they are not permanent catalog elements or mission-grade propagated orbits.
 - Gravity-assist plans are patched-conic planning estimates. They use real ephemeris positions and velocities, but they are not full Lambert/n-body mission optimizations.
 - Flyby feasibility is estimated from idealized turn angle, periapsis altitude, and incoming/outgoing excess velocity. It does not include launch vehicle constraints, finite burns, perturbations, or navigation margins.

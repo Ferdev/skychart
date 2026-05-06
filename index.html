@@ -54,6 +54,14 @@
           <div class="target-row" id="target-buttons"></div>
         </div>
 
+        <details class="tour-controls" aria-label="Guided tours">
+          <summary>
+            <span>Guided tours</span>
+            <strong>Science routes</strong>
+          </summary>
+          <div id="guided-tours"></div>
+        </details>
+
         <div class="body-row inspect-card">
           <label for="body-select">Inspect body</label>
           <select id="body-select" aria-label="Selected body"></select>
@@ -142,6 +150,7 @@
       <div class="body-popover" id="body-popover" hidden></div>
       <div class="measure-panel" id="measure-panel" hidden></div>
       <div class="onboarding-panel" id="onboarding-panel" hidden></div>
+      <div class="scale-ladder" id="scale-ladder" aria-label="Current scale ladder"></div>
       <div class="scale-note">Visual radii exaggerated. Orbit overlays are osculating references.</div>
       <div class="error-panel" id="error-panel" hidden></div>
     </main>

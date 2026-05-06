@@ -564,6 +564,17 @@ dd {
   font-size: 13px;
 }
 
+.tour-controls {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(244, 241, 232, 0.095);
+  border-radius: 7px;
+  padding: 10px;
+  background: rgba(244, 241, 232, 0.032);
+  font-size: 13px;
+}
+
 .time-controls summary {
   display: flex;
   align-items: center;
@@ -583,6 +594,80 @@ dd {
   color: var(--accent);
   font-family: var(--font-data);
   font-size: 11px;
+}
+
+.tour-controls summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  list-style: none;
+}
+
+.tour-controls summary::-webkit-details-marker {
+  display: none;
+}
+
+.tour-controls summary strong {
+  color: var(--accent);
+  font-family: var(--font-data);
+  font-size: 11px;
+}
+
+#guided-tours {
+  display: grid;
+  gap: 8px;
+  max-height: 238px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.tour-card {
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid rgba(244, 241, 232, 0.08);
+  padding-top: 8px;
+}
+
+.tour-card:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.tour-card > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.tour-card strong {
+  font-size: 12px;
+}
+
+.tour-card span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.tour-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tour-targets button {
+  min-height: 30px;
+  gap: 6px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.tour-targets .body-orb {
+  width: 17px;
+  height: 17px;
 }
 
 .time-header,
@@ -1091,6 +1176,75 @@ dd {
   color: var(--muted);
 }
 
+.scale-ladder {
+  position: absolute;
+  z-index: 3;
+  left: 16px;
+  bottom: 188px;
+  width: min(430px, calc(100vw - 556px));
+  min-width: 360px;
+  border: 1px solid rgba(244, 241, 232, 0.14);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(10, 14, 15, 0.78);
+  box-shadow: 0 14px 30px var(--shadow);
+  color: rgba(244, 241, 232, 0.76);
+  font-size: 11px;
+}
+
+.scale-ladder-head,
+.scale-ladder-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scale-ladder-head span {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.scale-ladder-head strong {
+  color: var(--text);
+  font-family: var(--font-data);
+  font-size: 11px;
+}
+
+.scale-ladder-track {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  margin: 8px 0 5px;
+}
+
+.scale-ladder-track span {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(244, 241, 232, 0.14);
+}
+
+.scale-ladder-track span.active {
+  background: var(--accent);
+  box-shadow: 0 0 14px rgba(217, 184, 111, 0.34);
+}
+
+.scale-ladder-labels span {
+  overflow: hidden;
+  color: var(--quiet);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scale-ladder p {
+  margin: 8px 0 0;
+  line-height: 1.3;
+}
+
 .scale-note {
   position: absolute;
   z-index: 3;
@@ -1423,6 +1577,10 @@ kbd:has(+ kbd) {
 
   #journey {
     gap: 8px;
+  }
+
+  .scale-ladder {
+    display: none;
   }
 
   .scale-note {
