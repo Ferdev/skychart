@@ -4,6 +4,32 @@ const AU_KM_FALLBACK = 149_597_870.7;
 const LIGHT_SPEED_KM_S = 299_792.458;
 const EARTH_MOON_AVG_KM = 384_400;
 const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
+const ICONS: Record<string, string> = {
+  target:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg>',
+  locate:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path><circle cx="12" cy="12" r="5"></circle></svg>',
+  center:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h5M15 12h5M12 4v5M12 15v5"></path><circle cx="12" cy="12" r="2"></circle></svg>',
+  check:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>',
+  minus:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"></path></svg>',
+  plus:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"></path></svg>',
+  sun:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg>',
+  ship:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 18-7-4-7 4 7-18Z"></path></svg>',
+  back:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>',
+  forward:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>',
+  reset:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h7a6 6 0 1 1-5.2 9"></path><path d="M7 3v4h4"></path></svg>',
+  restart:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20V5"></path><path d="M6 5h10l-2 4 2 4H6"></path></svg>'
+};
 
 type TargetKey = string;
 
@@ -100,13 +126,16 @@ let dragStart = { x: 0, y: 0, cameraXAu: 0, cameraYAu: 0 };
 for (const target of QUICK_TARGETS) {
   const button = document.createElement("button");
   button.type = "button";
+  button.className = "target-card";
   button.dataset.target = target;
-  button.textContent = labelForKey(target);
+  button.setAttribute("aria-label", `Set target to ${labelForKey(target)}`);
+  button.innerHTML = quickTargetMarkup(target);
   button.addEventListener("click", () => {
     setTarget(target, { inspect: true, center: false });
   });
   targetButtons.appendChild(button);
 }
+decorateStaticControls();
 updateTargetButtons();
 
 window.addEventListener("resize", resizeCanvas);
@@ -597,14 +626,33 @@ function updateJourney(target: Body, shipTargetKm: number) {
         ? "closing"
         : "not closing";
   const statusLabel = journeyStats.arrived ? "Arrival confirmed" : status;
+  const routeProgress = clamp(progressPercent, 0, 100);
 
   journey.innerHTML = `
     <div class="journey-hero">
       <div>
         <span class="eyebrow">Journey</span>
-        <h2>Earth → ${target.name}</h2>
+        <h2>Earth to ${escapeHtml(target.name)}</h2>
       </div>
       <span class="status-token">${statusLabel}</span>
+    </div>
+    <div class="route-card">
+      <div class="route-body origin">
+        ${bodyOrbHtml(earth, "large")}
+        <span>Origin</span>
+        <strong>${escapeHtml(earth.name)}</strong>
+      </div>
+      <div class="route-vector" aria-label="Route progress from Earth to ${escapeHtml(target.name)}">
+        <div class="route-track">
+          <span class="route-progress-dot" style="left: ${routeProgress.toFixed(2)}%"></span>
+        </div>
+        <span>${formatDistance(target.distance_from_earth_km)}</span>
+      </div>
+      <div class="route-body destination">
+        ${bodyOrbHtml(target, "large")}
+        <span>Destination</span>
+        <strong>${escapeHtml(target.name)}</strong>
+      </div>
     </div>
     <div class="distance-focus">
       <span>Distance remaining</span>
@@ -674,8 +722,13 @@ function updateBodyInfo() {
 
   bodyInfo.innerHTML = `
     <div class="body-info-title">
-      <span class="eyebrow">Inspected body</span>
-      <strong>${body.name}</strong>
+      <div class="body-title-main">
+        ${bodyOrbHtml(body)}
+        <div>
+          <span class="eyebrow">Inspected body</span>
+          <strong>${escapeHtml(body.name)}</strong>
+        </div>
+      </div>
     </div>
     <div class="body-grid">
       <span>From Sun</span><strong>${formatDistance(body.position.heliocentric_distance_km)}</strong>
@@ -840,11 +893,56 @@ function syncBodySelect() {
   }
 }
 
+function decorateStaticControls() {
+  setButtonContent(setDestination, "target", "Target");
+  setButtonContent(jumpDestination, "locate", "Center", { compact: true });
+  setButtonContent(targetSelected, "target", "Set as target", { compact: true });
+  setButtonContent(centerSelected, "center", "Center map", { compact: true });
+  setButtonContent(applyTime, "check", "Apply timestamp", { compact: true });
+  setButtonContent(zoomOut, "minus", "Zoom out", { compact: true });
+  setButtonContent(zoomIn, "plus", "Zoom in", { compact: true });
+  setButtonContent(centerSun, "sun", "Center on Sun", { compact: true });
+  setButtonContent(centerShip, "ship", "Center on ship", { compact: true });
+  setButtonContent(resetShipButton, "reset", "Reset ship", { compact: true });
+  setButtonContent(restartJourneyButton, "restart", "Restart journey", { compact: true });
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-step-days]")) {
+    const days = Number(button.dataset.stepDays ?? "0");
+    const label = `${Math.abs(days)}d`;
+    button.classList.add("time-step");
+    button.classList.toggle("past", days < 0);
+    button.classList.toggle("future", days > 0);
+    button.innerHTML = `${icon(days < 0 ? "back" : "forward")}<span>${label}</span>`;
+  }
+}
+
+function setButtonContent(button: HTMLButtonElement, iconName: string, label: string, options: { compact?: boolean } = {}) {
+  const labelClass = options.compact ? "sr-only" : "button-label";
+  button.innerHTML = `${icon(iconName)}<span class="${labelClass}">${escapeHtml(label)}</span>`;
+}
+
 function updateTargetButtons() {
   for (const button of targetButtons.querySelectorAll<HTMLButtonElement>("button")) {
-    button.classList.toggle("active", button.dataset.target === selectedTarget);
-    button.disabled = Boolean(button.dataset.target && !bodyByKey.has(button.dataset.target));
+    const key = button.dataset.target;
+    if (!key) continue;
+    const body = bodyByKey.get(key);
+    button.classList.toggle("active", key === selectedTarget);
+    button.disabled = !bodyByKey.has(key);
+    button.setAttribute("aria-label", `Set target to ${body?.name ?? labelForKey(key)}`);
+    button.innerHTML = quickTargetMarkup(key, body);
   }
+}
+
+function quickTargetMarkup(key: string, body?: Body) {
+  const name = body?.name ?? labelForKey(key);
+  const distance = body ? compactDistance(body.distance_from_earth_km) : "loading";
+  return `
+    ${bodyOrbHtml(body ?? key)}
+    <span class="target-copy">
+      <strong>${escapeHtml(name)}</strong>
+      <small>${distance}</small>
+    </span>
+  `;
 }
 
 function setTarget(key: string, options: { inspect?: boolean; center?: boolean } = {}) {
@@ -890,6 +988,59 @@ function flashSearchError() {
 
 function bodySearchLabel(body: Body) {
   return body.name;
+}
+
+function bodyOrbHtml(bodyOrKey: Body | string, size: "large" | "" = "") {
+  const key = typeof bodyOrKey === "string" ? bodyOrKey : bodyOrKey.key;
+  const color = typeof bodyOrKey === "string" ? fallbackBodyColor(key) : safeCssColor(bodyOrKey.color);
+  const classKey = key.replace(/[^a-z0-9_-]/gi, "");
+  const className = ["body-orb", `body-${classKey}`, size].filter(Boolean).join(" ");
+  return `<span class="${className}" style="--body-color: ${color};" aria-hidden="true"></span>`;
+}
+
+function fallbackBodyColor(key: string) {
+  const colors: Record<string, string> = {
+    sun: "#ffd166",
+    mercury: "#b8a48a",
+    venus: "#d8b26f",
+    earth: "#62a8ff",
+    moon: "#c8c8c8",
+    mars: "#df6b43",
+    jupiter: "#d9b382",
+    saturn: "#d8c28a",
+    uranus: "#83d8d8",
+    neptune: "#6f8cff"
+  };
+  return colors[key] ?? "#d9b86f";
+}
+
+function safeCssColor(color: string) {
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : "#d9b86f";
+}
+
+function icon(name: string) {
+  return ICONS[name] ?? "";
+}
+
+function compactDistance(km: number) {
+  if (!Number.isFinite(km)) return "distance pending";
+  const abs = Math.abs(km);
+  if (abs >= AU_KM_FALLBACK * 0.1) return `${formatAu(km / AU_KM_FALLBACK)} AU`;
+  if (abs >= 1_000_000) {
+    const millions = km / 1_000_000;
+    return `${millions >= 10 ? millions.toFixed(0) : millions.toFixed(1)}M km`;
+  }
+  if (abs >= 100_000) return `${(km / 1_000).toFixed(0)}k km`;
+  return `${formatNumber(km)} km`;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function syncDestinationSearch() {

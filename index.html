@@ -35,54 +35,69 @@
       <section class="panel controls mission-panel" id="controls" aria-label="Destination controls">
         <div class="panel-head">
           <p class="eyebrow">Destination</p>
-          <h2>Where do you want to go?</h2>
+          <h2>Plot a route</h2>
         </div>
-        <div class="destination-row">
-          <label for="destination-search">Search loaded bodies</label>
-          <input id="destination-search" type="search" list="body-options" autocomplete="off" placeholder="Search loaded body" />
-          <datalist id="body-options"></datalist>
-          <button id="set-destination" type="button">Target</button>
-          <button id="jump-destination" type="button">Jump</button>
+        <div class="destination-card">
+          <label for="destination-search">Destination body</label>
+          <div class="search-control">
+            <input id="destination-search" type="search" list="body-options" autocomplete="off" placeholder="Search loaded body" />
+            <datalist id="body-options"></datalist>
+            <button id="set-destination" class="primary-action" type="button" aria-label="Set destination as target">Target</button>
+            <button id="jump-destination" class="icon-button" type="button" title="Center on destination" aria-label="Center on destination">Center</button>
+          </div>
         </div>
 
         <div class="quick-targets">
-          <span>Quick targets</span>
+          <span>Frequent routes</span>
           <div class="target-row" id="target-buttons"></div>
         </div>
 
-        <div class="body-row">
+        <div class="body-row inspect-card">
           <label for="body-select">Inspect body</label>
           <select id="body-select" aria-label="Selected body"></select>
-          <button id="target-selected" type="button" title="Set selected body as target">Target</button>
-          <button id="center-selected" type="button" title="Center on selected body">Center</button>
+          <div class="icon-cluster">
+            <button id="target-selected" class="icon-button" type="button" title="Set selected body as target" aria-label="Set selected body as target">Target</button>
+            <button id="center-selected" class="icon-button" type="button" title="Center on selected body" aria-label="Center on selected body">Center</button>
+          </div>
         </div>
 
         <div class="time-controls" aria-label="Time controls">
-          <label for="time-input">UTC</label>
-          <input id="time-input" type="datetime-local" step="1" />
-          <button id="apply-time" type="button">Apply</button>
+          <div class="time-header">
+            <label for="time-input">UTC timestamp</label>
+            <button id="time-now" class="text-action" type="button">Now</button>
+          </div>
+          <div class="time-input-row">
+            <input id="time-input" type="datetime-local" step="1" />
+            <button id="apply-time" class="icon-button" type="button" title="Apply timestamp" aria-label="Apply timestamp">Apply</button>
+          </div>
           <div class="time-step-row">
-            <button type="button" data-step-days="-30">−30d</button>
-            <button type="button" data-step-days="-7">−7d</button>
-            <button type="button" data-step-days="-1">−1d</button>
-            <button id="time-now" type="button">Now</button>
-            <button type="button" data-step-days="1">+1d</button>
-            <button type="button" data-step-days="7">+7d</button>
-            <button type="button" data-step-days="30">+30d</button>
+            <button type="button" data-step-days="-30" aria-label="Move timestamp back 30 days">30d</button>
+            <button type="button" data-step-days="-7" aria-label="Move timestamp back 7 days">7d</button>
+            <button type="button" data-step-days="-1" aria-label="Move timestamp back 1 day">1d</button>
+            <button type="button" data-step-days="1" aria-label="Move timestamp forward 1 day">1d</button>
+            <button type="button" data-step-days="7" aria-label="Move timestamp forward 7 days">7d</button>
+            <button type="button" data-step-days="30" aria-label="Move timestamp forward 30 days">30d</button>
           </div>
         </div>
-        <div class="zoom-row">
-          <button id="zoom-out" type="button" title="Zoom out">−</button>
-          <button id="zoom-in" type="button" title="Zoom in">+</button>
-          <button id="center-sun" type="button" title="Center on Sun">Sun</button>
-          <button id="center-ship" type="button" title="Center on ship">Ship</button>
+      </section>
+
+      <section class="panel map-tools" aria-label="Map tools">
+        <span>Map tools</span>
+        <div class="icon-cluster">
+          <button id="zoom-out" class="icon-button" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+          <button id="zoom-in" class="icon-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+          <button id="center-sun" class="icon-button" type="button" title="Center on Sun" aria-label="Center on Sun">Sun</button>
+          <button id="center-ship" class="icon-button" type="button" title="Center on ship" aria-label="Center on ship">Ship</button>
         </div>
       </section>
 
       <aside class="panel journey-panel" aria-label="Journey panel">
         <div class="reset-row">
-          <button id="reset-ship" type="button">Reset ship near Earth</button>
-          <button id="restart-journey" type="button">Restart journey</button>
+          <span>Ship controls</span>
+          <div class="icon-cluster">
+            <button id="reset-ship" class="icon-button" type="button" title="Reset ship near Earth" aria-label="Reset ship near Earth">Reset ship</button>
+            <button id="restart-journey" class="icon-button" type="button" title="Restart journey" aria-label="Restart journey">Restart</button>
+          </div>
         </div>
         <div id="journey"></div>
         <div id="body-info"></div>

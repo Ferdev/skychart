@@ -1,27 +1,35 @@
-# TODO — Cosmic Atlas v0.2
+# TODO — Cosmic Atlas product backlog
 
-> Generated from product planning session on 2026-05-06
+> Updated on 2026-05-06 after the navigation UI redesign pass.
 
-## P0 — Must Have
+## P0 — Make navigation feel natural
 
-- [x] Make the map easier to explore: select any rendered body, center on selected body, and show a concise selected-body info panel.
-- [x] Add time exploration controls: now, manual UTC timestamp, and step backward/forward by day, week, and month.
-- [x] Improve navigation feedback: target heading indicator, route line clarity, ETA at current speed, and arrival/closest-approach status.
-- [x] Add journey reset controls: reset ship near Earth and restart the current Earth-to-target journey.
+- [ ] Replace the datalist destination field with a rich body picker showing object icons, current Earth distance, body type, and recent/frequent destinations.
+- [ ] Add a click/tap body popover on the map with the primary actions: target, center, inspect, and measure from here.
+- [ ] Turn the journey card into the main guidance surface: show route endpoints, heading alignment, distance remaining, progress, and next recommended action without requiring the user to read multiple panels.
+- [ ] Add a collapsible "time travel" control so timestamp changes stay available but no longer dominate the route plotting workflow.
+- [ ] Add a compact tool mode switcher for pan/target/measure so map interactions have clear affordance.
+- [ ] Add first-run guidance that teaches the core loop in place: pick a destination, center it, fly toward it, toggle warp.
 
-## P1 — Should Have
+## P1 — Improve spatial understanding
 
-- [x] Add destination search and quick jump so users can choose any loaded body as a navigation target.
-- [x] Generalize the target system beyond Moon/Mars/Jupiter/Saturn so every loaded catalog body can be inspected, targeted, centered, and navigated to.
-- [x] Add catalog-friendly result handling: arrival/closest-approach summaries should work for any destination, not a preset mission list.
-- [ ] Add a measurement/ruler mode for checking distances between any two bodies or map points.
-- [ ] Add real ephemeris orbit trails for selected bodies, clearly marked as sampled reference paths.
+- [ ] Add a measurement/ruler mode for distances between any two bodies or map points.
+- [ ] Add inner/outer Solar System zoom presets with clear labels and icons.
 - [ ] Add display toggles for labels, AU rings, route lines, orbit trails, and educational overlays.
-- [ ] Add inner/outer Solar System zoom presets.
+- [ ] Add sampled real-ephemeris orbit trails for selected bodies, clearly labeled as time-sampled reference paths.
+- [ ] Add a minimap or scale strip that helps users understand where they are while zoomed in.
+- [ ] Add body search filters for planets, moons, dwarf planets, asteroids, spacecraft, and other catalog classes once the catalog expands.
 
-## P2 — Nice To Have
+## P2 — Make journeys feel rewarding
 
-- [ ] Add educational layers for light minutes, AU scale, and Earth-Moon-distance comparisons.
-- [ ] Add richer journey summary: distance traveled, closest approach, max speed, elapsed real/simulated time.
-- [ ] Add a future 2D/3D view switch plan to the UI once 3D provides user value.
-- [ ] Add saved destinations or route bookmarks only after freeform navigation feels useful.
+- [ ] Add an arrival summary with distance traveled, closest approach, max speed, elapsed time, and target light-time.
+- [ ] Add optional waypoints so users can build freeform routes without relying on preset journeys.
+- [ ] Add route bookmarks or saved destinations after freeform navigation feels useful.
+- [ ] Add richer educational comparisons for selected distances: light time, Earth-Moon distances, AU, and familiar mission distances.
+- [ ] Add a clearer warp state: stronger ship cue, speed multiplier label, and "course correcting / drifting away" feedback.
+
+## Future — Prepare for 3D without building it yet
+
+- [ ] Keep coordinate and rendering code separated so a future 3D view can reuse the same ephemeris and navigation state.
+- [ ] Define a future 2D/3D view switch only when the 3D mode has a concrete user benefit beyond visual spectacle.
+- [ ] Preserve all current 2D workflows when 3D is introduced: search, inspect, target, measure, route progress, and time controls.
