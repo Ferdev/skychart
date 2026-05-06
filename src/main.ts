@@ -141,6 +141,24 @@ type RoutePoint = {
   zAu: number;
 };
 
+type ScreenPoint = {
+  x: number;
+  y: number;
+};
+
+type LabelRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type LabelPlacement = {
+  dx: number;
+  dy: number;
+  align?: "left" | "center" | "right";
+};
+
 type TrajectoryEvent = {
   kind: "departure" | "flyby" | "arrival";
   body_key: string;
@@ -827,6 +845,7 @@ function drawRouteGuide() {
   ctx.stroke();
 
   ctx.setLineDash([]);
+  const occupiedLabels = displayLayers.labels ? bodyLabelRects() : [];
   if (activePlan) {
     for (const event of activePlan.events) {
       const screen = worldToScreen(event.x_au, event.y_au);
@@ -837,9 +856,9 @@ function drawRouteGuide() {
       ctx.arc(screen.x, screen.y, event.kind === "flyby" ? 6 : 4.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = "rgba(244, 241, 232, 0.82)";
-      ctx.font = "700 11px ui-sans-serif, system-ui";
-      ctx.fillText(`${event.kind}: ${event.body_name}`, screen.x + 9, screen.y - 7);
+      drawMapCallout(`${event.kind}: ${event.body_name}`, screen, eventLabelPlacements(event.kind), occupiedLabels, {
+        color: event.kind === "flyby" ? "rgba(255, 230, 169, 0.94)" : "rgba(201, 234, 255, 0.94)"
+      });
     }
   } else {
     for (const body of routeBodies) {
@@ -852,13 +871,166 @@ function drawRouteGuide() {
     }
   }
 
-  const labelPoint = routeScreens[Math.floor(routeScreens.length * 0.5)];
+  const labelPoint = routeLabelAnchor(routeScreens, activePlan?.events ?? []);
   if (labelPoint) {
-    ctx.fillStyle = activePlan?.kind === "gravity_assist" ? "rgba(217, 184, 111, 0.9)" : "rgba(116, 196, 255, 0.82)";
-    ctx.font = "700 11px ui-sans-serif, system-ui";
-    ctx.fillText(activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : "transfer plan", labelPoint.x + 10, labelPoint.y - 8);
+    drawMapCallout(
+      activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : "transfer plan",
+      labelPoint,
+      routeLabelPlacements(),
+      occupiedLabels,
+      {
+        color: activePlan?.kind === "gravity_assist" ? "rgba(255, 225, 153, 0.94)" : "rgba(187, 226, 255, 0.94)",
+        background: "rgba(10, 14, 15, 0.88)",
+        border: activePlan?.kind === "gravity_assist" ? "rgba(217, 184, 111, 0.5)" : "rgba(116, 196, 255, 0.44)"
+      }
+    );
   }
   ctx.restore();
+}
+
+function eventLabelPlacements(kind: TrajectoryEvent["kind"]): LabelPlacement[] {
+  if (kind === "flyby") {
+    return [
+      { dx: 16, dy: -42 },
+      { dx: 16, dy: 20 },
+      { dx: -18, dy: -42, align: "right" },
+      { dx: -18, dy: 20, align: "right" },
+      { dx: 0, dy: -58, align: "center" }
+    ];
+  }
+  return [
+    { dx: 14, dy: -34 },
+    { dx: 14, dy: 18 },
+    { dx: -16, dy: -34, align: "right" },
+    { dx: -16, dy: 18, align: "right" },
+    { dx: 0, dy: -52, align: "center" }
+  ];
+}
+
+function routeLabelPlacements(): LabelPlacement[] {
+  return [
+    { dx: 18, dy: -34 },
+    { dx: 18, dy: 18 },
+    { dx: -18, dy: -34, align: "right" },
+    { dx: -18, dy: 18, align: "right" },
+    { dx: 0, dy: -52, align: "center" }
+  ];
+}
+
+function routeLabelAnchor(routeScreens: ScreenPoint[], events: TrajectoryEvent[]) {
+  const eventScreens = events.map((event) => worldToScreen(event.x_au, event.y_au));
+  const candidates = [0.5, 0.62, 0.38, 0.74, 0.26, 0.86, 0.14]
+    .map((fraction) => routeScreens[Math.max(0, Math.min(routeScreens.length - 1, Math.floor(routeScreens.length * fraction)))])
+    .filter((point): point is ScreenPoint => Boolean(point));
+  return (
+    candidates.find((point) => {
+      if (!isScreenPointVisible(point, 80)) return false;
+      return eventScreens.every((eventPoint) => Math.hypot(point.x - eventPoint.x, point.y - eventPoint.y) > 96);
+    }) ??
+    candidates.find((point) => isScreenPointVisible(point, 80)) ??
+    candidates[0] ??
+    null
+  );
+}
+
+function drawMapCallout(
+  text: string,
+  anchor: ScreenPoint,
+  placements: LabelPlacement[],
+  occupied: LabelRect[],
+  options: { color?: string; background?: string; border?: string } = {}
+) {
+  ctx.save();
+  ctx.font = "700 11px ui-sans-serif, system-ui";
+  ctx.textBaseline = "middle";
+
+  const paddingX = 7;
+  const paddingY = 4;
+  const width = Math.ceil(ctx.measureText(text).width + paddingX * 2);
+  const height = 20 + paddingY;
+  const viewportWidth = canvas.width / devicePixelRatio;
+  const viewportHeight = canvas.height / devicePixelRatio;
+  const placement = placements
+    .map((candidate) => labelRectForPlacement(anchor, candidate, width, height, viewportWidth, viewportHeight))
+    .find((rect) => occupied.every((existing) => !rectsOverlap(rect, existing, 7))) ??
+    labelRectForPlacement(anchor, placements[0] ?? { dx: 12, dy: -28 }, width, height, viewportWidth, viewportHeight);
+
+  if (Math.hypot(anchor.x - (placement.x + placement.width / 2), anchor.y - (placement.y + placement.height / 2)) > 24) {
+    ctx.strokeStyle = options.border ?? "rgba(244, 241, 232, 0.2)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(anchor.x, anchor.y);
+    ctx.lineTo(placement.x + placement.width / 2, placement.y + placement.height / 2);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = options.background ?? "rgba(6, 8, 9, 0.88)";
+  ctx.strokeStyle = options.border ?? "rgba(244, 241, 232, 0.22)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(placement.x, placement.y, placement.width, placement.height, 5);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = options.color ?? "rgba(244, 241, 232, 0.9)";
+  ctx.fillText(text, placement.x + paddingX, placement.y + placement.height / 2);
+  ctx.restore();
+
+  occupied.push(placement);
+}
+
+function labelRectForPlacement(
+  anchor: ScreenPoint,
+  placement: LabelPlacement,
+  width: number,
+  height: number,
+  viewportWidth: number,
+  viewportHeight: number
+): LabelRect {
+  let x = anchor.x + placement.dx;
+  if (placement.align === "center") x -= width / 2;
+  if (placement.align === "right") x -= width;
+  return {
+    x: clamp(x, 8, Math.max(8, viewportWidth - width - 8)),
+    y: clamp(anchor.y + placement.dy, 8, Math.max(8, viewportHeight - height - 8)),
+    width,
+    height
+  };
+}
+
+function bodyLabelRects() {
+  if (!ephemeris) return [];
+  const rects: LabelRect[] = [];
+  ctx.save();
+  for (const body of ephemeris.bodies) {
+    const screen = worldToScreen(body.position.x_au, body.position.y_au);
+    if (!isScreenPointVisible(screen, 80)) continue;
+    const radius = displayRadius(body);
+    ctx.font = body.key === selectedTarget || body.key === selectedBodyKey ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
+    rects.push({
+      x: screen.x + radius + 5,
+      y: screen.y - 9,
+      width: Math.ceil(ctx.measureText(body.name).width + 10),
+      height: 18
+    });
+  }
+  ctx.restore();
+  return rects;
+}
+
+function rectsOverlap(a: LabelRect, b: LabelRect, padding = 0) {
+  return !(
+    a.x + a.width + padding < b.x ||
+    b.x + b.width + padding < a.x ||
+    a.y + a.height + padding < b.y ||
+    b.y + b.height + padding < a.y
+  );
+}
+
+function isScreenPointVisible(point: ScreenPoint, margin = 0) {
+  const width = canvas.width / devicePixelRatio;
+  const height = canvas.height / devicePixelRatio;
+  return point.x >= -margin && point.x <= width + margin && point.y >= -margin && point.y <= height + margin;
 }
 
 function drawBodyTrails() {
