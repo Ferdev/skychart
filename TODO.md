@@ -53,9 +53,9 @@
 
 > Added on 2026-05-07 for the first science/interest expansion beyond nearby stars.
 
-- [ ] Add a generated Messier deep-sky catalog snapshot with real RA/Dec, distance, magnitude, angular size, constellation, season, and NGC/IC aliases.
-- [ ] Load deep-sky objects through the backend catalog layer with explicit source metadata and no fake circular/orbital positions.
-- [ ] Keep distance-known deep-sky objects targetable in the existing 3D distance model, while clearly disabling trajectory planning for static catalog targets.
+- [x] Add a generated Messier deep-sky catalog snapshot with real RA/Dec, distance, magnitude, angular size, constellation, season, and NGC/IC aliases.
+- [x] Load deep-sky objects through the backend catalog layer with explicit source metadata and no fake circular/orbital positions.
+- [x] Keep distance-known deep-sky objects targetable in the existing 3D distance model, while clearly disabling trajectory planning for static catalog targets.
 
 ## P1 — Deep-sky discovery UX
 

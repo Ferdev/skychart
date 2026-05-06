@@ -17,6 +17,7 @@ from skyfield.framelib import ecliptic_frame
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data" / "skyfield"
+DEEP_SKY_CATALOG_PATH = ROOT / "data" / "catalogs" / "deep_sky_catalog.json"
 HOST = "127.0.0.1"
 PORT = 8765
 AU_KM = 149_597_870.700
@@ -25,7 +26,8 @@ LIGHT_YEAR_KM = 9_460_730_472_580.8
 SUN_MU_KM3_S2 = 132_712_440_018.0
 SECONDS_PER_DAY = 86_400.0
 EPHEMERIS_SOURCE = (
-    "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK; NASA/JPL Horizons vectors; NASA Exoplanet Archive host-star catalog"
+    "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK; NASA/JPL Horizons vectors; "
+    "NASA Exoplanet Archive host-star catalog; generated Messier deep-sky catalog snapshot"
 )
 TRAJECTORY_SOURCE = f"{EPHEMERIS_SOURCE}; patched-conic launch-window and single-flyby estimator"
 SATELLITE_KERNEL_URLS = {
@@ -53,8 +55,13 @@ CATALOG_GROUPS = {
         "label": "Nearby exoplanet systems",
         "description": "Nearby confirmed exoplanet host stars from NASA Exoplanet Archive coordinates and distances.",
     },
+    "messier_deep_sky": {
+        "label": "Messier deep-sky catalog",
+        "description": "Distance-known Messier objects with NGC/IC aliases, RA/Dec, magnitudes, angular sizes, and viewing metadata.",
+    },
 }
 DEFAULT_CATALOG_GROUPS = tuple(CATALOG_GROUPS.keys())
+STATIC_CATALOG_SOURCE_TYPES = {"stellar_catalog", "deep_sky_catalog"}
 HORIZONS_PARENT_CENTERS = {
     "jupiter": "@5",
     "saturn": "@6",
@@ -81,6 +88,21 @@ def catalog_object(
     exoplanet_count: int | None = None,
     stellar_radius_solar: float | None = None,
     stellar_teff_k: float | None = None,
+    aliases: list[str] | None = None,
+    distance_ly: float | None = None,
+    distance_quality: str | None = None,
+    messier: int | None = None,
+    ngc: str | None = None,
+    ic: str | None = None,
+    deep_sky_type: str | None = None,
+    deep_sky_type_label: str | None = None,
+    apparent_magnitude: float | None = None,
+    angular_size_arcmin: str | None = None,
+    constellation: str | None = None,
+    viewing_season: str | None = None,
+    common_name: str | None = None,
+    observing_equipment: str | None = None,
+    why_interesting: str | None = None,
 ) -> dict[str, Any]:
     return {
         "key": key,
@@ -101,6 +123,21 @@ def catalog_object(
         "exoplanet_count": exoplanet_count,
         "stellar_radius_solar": stellar_radius_solar,
         "stellar_teff_k": stellar_teff_k,
+        "aliases": aliases or [],
+        "distance_ly": distance_ly,
+        "distance_quality": distance_quality,
+        "messier": messier,
+        "ngc": ngc,
+        "ic": ic,
+        "deep_sky_type": deep_sky_type,
+        "deep_sky_type_label": deep_sky_type_label,
+        "apparent_magnitude": apparent_magnitude,
+        "angular_size_arcmin": angular_size_arcmin,
+        "constellation": constellation,
+        "viewing_season": viewing_season,
+        "common_name": common_name,
+        "observing_equipment": observing_equipment,
+        "why_interesting": why_interesting,
     }
 
 
@@ -146,7 +183,50 @@ CATALOG_OBJECTS = [
     catalog_object(key="gj-876", name="GJ 876", ephemeris="GJ 876", source_type="stellar_catalog", radius_km=208_710, mu_km3_s2=0.0, color="#f4a078", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=343.3239737, dec_deg=-14.2665958, distance_pc=4.67517, exoplanet_count=4, stellar_radius_solar=0.3),
     catalog_object(key="gj-411", name="GJ 411", ephemeris="GJ 411", source_type="stellar_catalog", radius_km=256_394, mu_km3_s2=0.0, color="#f5aa80", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=165.834471, dec_deg=35.972317, distance_pc=5.675773, exoplanet_count=2, stellar_radius_solar=0.3685, stellar_teff_k=3719),
 ]
-BODIES = CATALOG_OBJECTS
+
+
+def load_deep_sky_catalog_objects() -> list[dict[str, Any]]:
+    if not DEEP_SKY_CATALOG_PATH.exists():
+        return []
+
+    payload = json.loads(DEEP_SKY_CATALOG_PATH.read_text(encoding="utf-8"))
+    objects: list[dict[str, Any]] = []
+    for entry in payload.get("objects", []):
+        objects.append(
+            catalog_object(
+                key=str(entry["key"]),
+                name=str(entry["name"]),
+                ephemeris=f"Messier {entry['messier']}",
+                radius_km=0.0,
+                mu_km3_s2=0.0,
+                color=str(entry.get("color") or "#d9b86f"),
+                object_type=str(entry["object_type"]),
+                catalog_group="messier_deep_sky",
+                source_type="deep_sky_catalog",
+                ra_deg=float(entry["ra_deg"]),
+                dec_deg=float(entry["dec_deg"]),
+                aliases=[str(value) for value in entry.get("aliases", [])],
+                distance_ly=float(entry["distance_ly"]),
+                distance_quality=str(entry.get("distance_quality") or "catalog_estimate"),
+                messier=int(entry["messier"]),
+                ngc=str(entry["ngc"]) if entry.get("ngc") else None,
+                ic=str(entry["ic"]) if entry.get("ic") else None,
+                deep_sky_type=str(entry.get("deep_sky_type") or ""),
+                deep_sky_type_label=str(entry.get("deep_sky_type_label") or "Deep-sky object"),
+                apparent_magnitude=float(entry["apparent_magnitude"]) if entry.get("apparent_magnitude") is not None else None,
+                angular_size_arcmin=str(entry.get("angular_size_arcmin") or ""),
+                constellation=str(entry.get("constellation") or ""),
+                viewing_season=str(entry.get("viewing_season") or ""),
+                common_name=str(entry["common_name"]) if entry.get("common_name") else None,
+                observing_equipment=str(entry.get("observing_equipment") or ""),
+                why_interesting=str(entry.get("why_interesting") or ""),
+            )
+        )
+    return objects
+
+
+DEEP_SKY_CATALOG_OBJECTS = load_deep_sky_catalog_objects()
+BODIES = [*CATALOG_OBJECTS, *DEEP_SKY_CATALOG_OBJECTS]
 BODY_BY_KEY = {item["key"]: item for item in BODIES}
 MOON_BODY_KEYS = {item["key"] for item in BODIES if item["object_type"] == "moon"}
 DEFAULT_TRAIL_BODIES = ("earth", "mars", "jupiter")
@@ -245,12 +325,15 @@ def horizons_center_for_item(item: dict[str, Any]) -> str:
     return HORIZONS_PARENT_CENTERS.get(parent_key, "@sun")
 
 
-def stellar_catalog_position_payload(item: dict[str, Any]) -> dict[str, float]:
+def radec_distance_position_payload(item: dict[str, Any]) -> dict[str, float]:
     ra_deg = item.get("ra_deg")
     dec_deg = item.get("dec_deg")
     distance_pc = item.get("distance_pc")
+    distance_ly = item.get("distance_ly")
+    if distance_pc is None and distance_ly is not None:
+        distance_pc = float(distance_ly) / 3.261563777
     if ra_deg is None or dec_deg is None or distance_pc is None:
-        raise RuntimeError(f"Stellar catalog object {item['name']} requires RA, Dec, and distance")
+        raise RuntimeError(f"Static catalog object {item['name']} requires RA, Dec, and distance")
 
     distance_au = float(distance_pc) * PARSEC_AU
     ra_rad = math.radians(float(ra_deg))
@@ -279,6 +362,10 @@ def stellar_catalog_position_payload(item: dict[str, Any]) -> dict[str, float]:
     }
 
 
+def stellar_catalog_position_payload(item: dict[str, Any]) -> dict[str, float]:
+    return radec_distance_position_payload(item)
+
+
 def stellar_catalog_payload(item: dict[str, Any]) -> dict[str, float | int | None]:
     distance_pc = item.get("distance_pc")
     return {
@@ -289,6 +376,32 @@ def stellar_catalog_payload(item: dict[str, Any]) -> dict[str, float | int | Non
         "exoplanet_count": item.get("exoplanet_count"),
         "stellar_radius_solar": item.get("stellar_radius_solar"),
         "stellar_teff_k": item.get("stellar_teff_k"),
+    }
+
+
+def deep_sky_catalog_position_payload(item: dict[str, Any]) -> dict[str, float]:
+    return radec_distance_position_payload(item)
+
+
+def deep_sky_catalog_payload(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "messier": item.get("messier"),
+        "ngc": item.get("ngc"),
+        "ic": item.get("ic"),
+        "aliases": item.get("aliases", []),
+        "ra_deg": item.get("ra_deg"),
+        "dec_deg": item.get("dec_deg"),
+        "distance_ly": item.get("distance_ly"),
+        "distance_quality": item.get("distance_quality"),
+        "deep_sky_type": item.get("deep_sky_type"),
+        "deep_sky_type_label": item.get("deep_sky_type_label"),
+        "apparent_magnitude": item.get("apparent_magnitude"),
+        "angular_size_arcmin": item.get("angular_size_arcmin"),
+        "constellation": item.get("constellation"),
+        "viewing_season": item.get("viewing_season"),
+        "common_name": item.get("common_name"),
+        "observing_equipment": item.get("observing_equipment"),
+        "why_interesting": item.get("why_interesting"),
     }
 
 
@@ -439,6 +552,10 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
         ephemeris_kernel = "NASA Exoplanet Archive"
         ephemeris_source = "NASA Exoplanet Archive confirmed planet host catalog"
         position_model = "stellar_catalog_coordinates"
+    elif source_type == "deep_sky_catalog":
+        ephemeris_kernel = "generated Messier deep-sky snapshot"
+        ephemeris_source = "AstroPixels Messier table with NASA HEASARC catalog context"
+        position_model = "deep_sky_catalog_coordinates"
     else:
         ephemeris_kernel = item.get("kernel") or "de440s.bsp"
         ephemeris_source = "NAIF satellite SPK" if item.get("kernel") else "NASA/JPL DE440s"
@@ -454,15 +571,29 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
         "ephemeris_id": str(item.get("horizons_id") or item["ephemeris"]),
         "ephemeris_kernel": ephemeris_kernel,
         "ephemeris_source": ephemeris_source,
-        "ephemeris_center": horizons_center_for_item(item) if source_type == "horizons" else "Sun" if source_type == "stellar_catalog" else "solar-system barycenter",
+        "ephemeris_center": horizons_center_for_item(item) if source_type == "horizons" else "Sun" if source_type in STATIC_CATALOG_SOURCE_TYPES else "solar-system barycenter",
         "position_model": position_model,
-        "dynamic_position": source_type != "stellar_catalog",
+        "dynamic_position": source_type not in STATIC_CATALOG_SOURCE_TYPES,
+        "aliases": item.get("aliases", []),
         "ra_deg": item.get("ra_deg"),
         "dec_deg": item.get("dec_deg"),
         "distance_pc": item.get("distance_pc"),
+        "distance_ly": item.get("distance_ly"),
         "exoplanet_count": item.get("exoplanet_count"),
         "stellar_radius_solar": item.get("stellar_radius_solar"),
         "stellar_teff_k": item.get("stellar_teff_k"),
+        "messier": item.get("messier"),
+        "ngc": item.get("ngc"),
+        "ic": item.get("ic"),
+        "deep_sky_type": item.get("deep_sky_type"),
+        "deep_sky_type_label": item.get("deep_sky_type_label"),
+        "apparent_magnitude": item.get("apparent_magnitude"),
+        "angular_size_arcmin": item.get("angular_size_arcmin"),
+        "constellation": item.get("constellation"),
+        "viewing_season": item.get("viewing_season"),
+        "common_name": item.get("common_name"),
+        "observing_equipment": item.get("observing_equipment"),
+        "why_interesting": item.get("why_interesting"),
     }
 
 
@@ -472,6 +603,8 @@ def catalog_summary_payload(groups: list[str], objects: list[dict[str, Any]]) ->
         or (
             "JPL Horizons vectors"
             if item.get("source_type") == "horizons"
+            else "Messier deep-sky snapshot"
+            if item.get("source_type") == "deep_sky_catalog"
             else "NASA Exoplanet Archive"
             if item.get("source_type") == "stellar_catalog"
             else "de440s.bsp"
@@ -754,8 +887,8 @@ def body_state(
         position_au = (0.0, 0.0, 0.0)
         position_km = (0.0, 0.0, 0.0)
         velocity_km_s = (0.0, 0.0, 0.0)
-    elif item.get("source_type") == "stellar_catalog":
-        position = stellar_catalog_position_payload(item)
+    elif item.get("source_type") in STATIC_CATALOG_SOURCE_TYPES:
+        position = radec_distance_position_payload(item)
         position_au = (float(position["x_au"]), float(position["y_au"]), float(position["z_au"]))
         position_km = (float(position["x_km"]), float(position["y_km"]), float(position["z_km"]))
         velocity_km_s = (0.0, 0.0, 0.0)
@@ -1056,7 +1189,7 @@ def departure_offsets(scan_days: float, step_days: float) -> list[float]:
 def candidate_assist_keys(destination_key: str, requested_assist: str) -> list[str]:
     if requested_assist == "direct":
         return []
-    if BODY_BY_KEY[destination_key].get("source_type") == "stellar_catalog":
+    if BODY_BY_KEY[destination_key].get("source_type") in STATIC_CATALOG_SOURCE_TYPES:
         return []
     if requested_assist != "auto":
         return [requested_assist]
@@ -1288,6 +1421,9 @@ def trajectory_payload(
     step_days: float,
     request_meta: dict[str, Any],
 ) -> dict[str, Any]:
+    if BODY_BY_KEY[destination_key].get("source_type") in STATIC_CATALOG_SOURCE_TYPES:
+        raise QueryInputError("Trajectory planner is disabled for static catalog targets")
+
     state_cache: dict[tuple[str, str], dict[str, Any]] = {}
     current_earth = body_state("earth", timestamp, state_cache)
     current_target = body_state(destination_key, timestamp, state_cache)
@@ -1431,8 +1567,8 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
                 "heliocentric_distance_km": 0.0,
             }
             earth_distance_km = float((sun - earth).at(time).distance().km)
-        elif item.get("source_type") == "stellar_catalog":
-            position = stellar_catalog_position_payload(item)
+        elif item.get("source_type") in STATIC_CATALOG_SOURCE_TYPES:
+            position = radec_distance_position_payload(item)
             earth_distance_km = math.sqrt(
                 (position["x_km"] - earth_position["x_km"]) ** 2
                 + (position["y_km"] - earth_position["y_km"]) ** 2
@@ -1472,6 +1608,7 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
                 "state_vector": body_state_vector_payload(item, timestamp, state_cache),
                 "orbit": orbit_payload_for_item(item, timestamp, state_cache),
                 "stellar": stellar_catalog_payload(item) if item.get("source_type") == "stellar_catalog" else None,
+                "deep_sky": deep_sky_catalog_payload(item) if item.get("source_type") == "deep_sky_catalog" else None,
                 "distance_from_earth_km": earth_distance_km,
             }
         )
@@ -1513,6 +1650,7 @@ def orbits_payload(timestamp: datetime, groups: list[str] | None = None) -> dict
                 "state_vector": body_state_vector_payload(item, timestamp, state_cache),
                 "orbit": orbit_payload_for_item(item, timestamp, state_cache),
                 "stellar": stellar_catalog_payload(item) if item.get("source_type") == "stellar_catalog" else None,
+                "deep_sky": deep_sky_catalog_payload(item) if item.get("source_type") == "deep_sky_catalog" else None,
             }
         )
 

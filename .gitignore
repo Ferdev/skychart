@@ -4,5 +4,7 @@ dist/
 .venv/
 __pycache__/
 *.pyc
-data/
+data/*
+!data/catalogs/
+!data/catalogs/**
 *.log
