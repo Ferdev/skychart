@@ -3729,12 +3729,15 @@ function formatSpeed(kmPerSecond: number) {
 }
 
 function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds)) return "unavailable";
   if (seconds < 90) return `${seconds.toFixed(1)} s`;
   const minutes = seconds / 60;
   if (minutes < 90) return `${minutes.toFixed(1)} min`;
   const hours = minutes / 60;
   if (hours < 48) return `${hours.toFixed(2)} h`;
-  return `${(hours / 24).toFixed(2)} d`;
+  const days = hours / 24;
+  if (days >= 365.25 * 2) return `${formatNumber(days / 365.25)} yr`;
+  return `${days.toFixed(2)} d`;
 }
 
 function formatOrbitPeriod(days: number | null) {

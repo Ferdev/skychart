@@ -624,6 +624,7 @@ export function formatPickerDistance(
 
   if (abs >= LIGHT_YEAR_KM * 0.1) {
     const lightYears = value / LIGHT_YEAR_KM;
+    if (Math.abs(lightYears) >= 100) return `${formatWholeNumber(lightYears)} ly`;
     if (Math.abs(lightYears) >= 10) return `${lightYears.toFixed(1)} ly`;
     return `${lightYears.toFixed(2)} ly`;
   }

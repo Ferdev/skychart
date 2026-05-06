@@ -520,13 +520,19 @@ function formatDuration(seconds: number): string {
   if (Math.abs(minutes) < 90) return `${minutes.toFixed(1)} min`;
   const hours = minutes / 60;
   if (Math.abs(hours) < 48) return `${hours.toFixed(2)} h`;
-  return `${(hours / 24).toFixed(2)} d`;
+  const days = hours / 24;
+  if (Math.abs(days) >= 365.25 * 2) return `${formatRatio(days / 365.25)} yr`;
+  return `${days.toFixed(2)} d`;
 }
 
 function formatRatio(value: number): string {
   if (!Number.isFinite(value)) return "unavailable";
   const abs = Math.abs(value);
-  if (abs >= 100) return value.toFixed(0);
+  if (abs >= 100) {
+    return new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 0
+    }).format(value);
+  }
   if (abs >= 10) return value.toFixed(1);
   if (abs >= 1) return value.toFixed(2);
   if (abs >= 0.01) return value.toFixed(3);
