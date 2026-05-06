@@ -3,9 +3,9 @@ import "./styles.css";
 const AU_KM_FALLBACK = 149_597_870.7;
 const LIGHT_SPEED_KM_S = 299_792.458;
 const EARTH_MOON_AVG_KM = 384_400;
-const TARGETS = ["moon", "mars", "jupiter", "saturn"] as const;
+const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
 
-type TargetKey = (typeof TARGETS)[number];
+type TargetKey = string;
 
 type BodyPosition = {
   x_au: number;
@@ -56,6 +56,10 @@ const canvas = requiredElement<HTMLCanvasElement>("#map");
 const hudValues = requiredElement<HTMLElement>("#hud-values");
 const loadState = requiredElement<HTMLElement>("#load-state");
 const targetButtons = requiredElement<HTMLElement>("#target-buttons");
+const destinationSearch = requiredElement<HTMLInputElement>("#destination-search");
+const bodyOptions = requiredElement<HTMLDataListElement>("#body-options");
+const setDestination = requiredElement<HTMLButtonElement>("#set-destination");
+const jumpDestination = requiredElement<HTMLButtonElement>("#jump-destination");
 const bodySelect = requiredElement<HTMLSelectElement>("#body-select");
 const journey = requiredElement<HTMLElement>("#journey");
 const bodyInfo = requiredElement<HTMLElement>("#body-info");
@@ -65,6 +69,7 @@ const zoomOut = requiredElement<HTMLButtonElement>("#zoom-out");
 const centerSun = requiredElement<HTMLButtonElement>("#center-sun");
 const centerShip = requiredElement<HTMLButtonElement>("#center-ship");
 const centerSelected = requiredElement<HTMLButtonElement>("#center-selected");
+const targetSelected = requiredElement<HTMLButtonElement>("#target-selected");
 const timeInput = requiredElement<HTMLInputElement>("#time-input");
 const applyTime = requiredElement<HTMLButtonElement>("#apply-time");
 const timeNow = requiredElement<HTMLButtonElement>("#time-now");
@@ -81,7 +86,7 @@ const camera = {
 
 let ephemeris: Ephemeris | null = null;
 let bodyByKey = new Map<string, Body>();
-let selectedTarget: TargetKey = "jupiter";
+let selectedTarget = "jupiter";
 let selectedBodyKey = "jupiter";
 let ship: Ship | null = null;
 let journeyStats: JourneyStats = createJourneyStats(selectedTarget);
@@ -91,18 +96,13 @@ let isDragging = false;
 let dragMoved = false;
 let dragStart = { x: 0, y: 0, cameraXAu: 0, cameraYAu: 0 };
 
-for (const target of TARGETS) {
+for (const target of QUICK_TARGETS) {
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.target = target;
   button.textContent = labelForKey(target);
   button.addEventListener("click", () => {
-    selectedTarget = target;
-    selectedBodyKey = target;
-    syncBodySelect();
-    resetJourneyStats();
-    updateTargetButtons();
-    updateHud();
+    setTarget(target, { inspect: true, center: false });
   });
   targetButtons.appendChild(button);
 }
@@ -168,9 +168,31 @@ centerShip.addEventListener("click", () => {
   camera.yAu = ship.yAu;
 });
 centerSelected.addEventListener("click", () => centerOnBody(selectedBodyKey));
+targetSelected.addEventListener("click", () => setTarget(selectedBodyKey, { inspect: true }));
 bodySelect.addEventListener("change", () => {
   selectedBodyKey = bodySelect.value;
   updateHud();
+});
+destinationSearch.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    setDestination.click();
+  }
+});
+setDestination.addEventListener("click", () => {
+  const body = bodyFromSearchValue(destinationSearch.value);
+  if (!body) {
+    flashSearchError();
+    return;
+  }
+  setTarget(body.key, { inspect: true });
+});
+jumpDestination.addEventListener("click", () => {
+  const body = bodyFromSearchValue(destinationSearch.value) ?? bodyByKey.get(selectedTarget);
+  if (!body) {
+    flashSearchError();
+    return;
+  }
+  centerOnBody(body.key);
 });
 applyTime.addEventListener("click", () => {
   const timestamp = datetimeLocalToIso(timeInput.value);
@@ -218,8 +240,8 @@ async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: 
 
     ephemeris = (await response.json()) as Ephemeris;
     bodyByKey = new Map(ephemeris.bodies.map((body) => [body.key, body]));
-    ensureSelectedBodyExists();
-    populateBodySelect();
+    ensureSelectedKeysExist();
+    populateCatalogControls();
     setTimeInputFromTimestamp(ephemeris.timestamp_utc);
     initializeShip();
     resetJourneyStats();
@@ -734,26 +756,38 @@ function centerOnBody(key: string) {
   camera.yAu = body.position.y_au;
 }
 
-function ensureSelectedBodyExists() {
+function ensureSelectedKeysExist() {
+  const loadedKeys = Array.from(bodyByKey.keys());
+  if (!bodyByKey.has(selectedTarget)) {
+    selectedTarget = bodyByKey.has(selectedBodyKey) ? selectedBodyKey : bodyByKey.has("jupiter") ? "jupiter" : (loadedKeys[0] ?? "");
+  }
   if (!bodyByKey.has(selectedBodyKey)) {
     selectedBodyKey = selectedTarget;
   }
 }
 
-function populateBodySelect() {
+function populateCatalogControls() {
   if (!ephemeris) return;
   const previous = bodySelect.value || selectedBodyKey;
   bodySelect.innerHTML = "";
+  bodyOptions.innerHTML = "";
 
   for (const body of ephemeris.bodies) {
     const option = document.createElement("option");
     option.value = body.key;
     option.textContent = body.name;
     bodySelect.appendChild(option);
+
+    const searchOption = document.createElement("option");
+    searchOption.value = bodySearchLabel(body);
+    searchOption.label = body.name;
+    bodyOptions.appendChild(searchOption);
   }
 
   selectedBodyKey = bodyByKey.has(previous) ? previous : selectedBodyKey;
   syncBodySelect();
+  syncDestinationSearch();
+  updateTargetButtons();
 }
 
 function syncBodySelect() {
@@ -765,6 +799,59 @@ function syncBodySelect() {
 function updateTargetButtons() {
   for (const button of targetButtons.querySelectorAll<HTMLButtonElement>("button")) {
     button.classList.toggle("active", button.dataset.target === selectedTarget);
+    button.disabled = Boolean(button.dataset.target && !bodyByKey.has(button.dataset.target));
+  }
+}
+
+function setTarget(key: string, options: { inspect?: boolean; center?: boolean } = {}) {
+  const body = bodyByKey.get(key);
+  if (!body) return;
+
+  selectedTarget = body.key;
+  if (options.inspect) {
+    selectedBodyKey = body.key;
+    syncBodySelect();
+  }
+  syncDestinationSearch();
+  resetJourneyStats();
+  updateTargetButtons();
+  if (options.center) {
+    centerOnBody(body.key);
+  }
+  updateHud();
+}
+
+function bodyFromSearchValue(value: string) {
+  const query = value.trim().toLowerCase();
+  if (!query) return null;
+
+  const bracketedKey = query.match(/\[([^\]]+)\]$/)?.[1];
+  if (bracketedKey) {
+    const keyedBody = Array.from(bodyByKey.values()).find((body) => body.key.toLowerCase() === bracketedKey);
+    if (keyedBody) return keyedBody;
+  }
+
+  return (
+    Array.from(bodyByKey.values()).find((body) => {
+      return body.key.toLowerCase() === query || body.name.toLowerCase() === query || bodySearchLabel(body).toLowerCase() === query;
+    }) ?? null
+  );
+}
+
+function flashSearchError() {
+  destinationSearch.setCustomValidity("No loaded body matches this destination.");
+  destinationSearch.reportValidity();
+  window.setTimeout(() => destinationSearch.setCustomValidity(""), 1800);
+}
+
+function bodySearchLabel(body: Body) {
+  return `${body.name} [${body.key}]`;
+}
+
+function syncDestinationSearch() {
+  const target = bodyByKey.get(selectedTarget);
+  if (target) {
+    destinationSearch.value = bodySearchLabel(target);
   }
 }
 

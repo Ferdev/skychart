@@ -11,9 +11,9 @@
 
 ## P1 — Should Have
 
-- [ ] Add destination search and quick jump so users can choose any loaded body as a navigation target.
-- [ ] Generalize the target system beyond Moon/Mars/Jupiter/Saturn so every loaded catalog body can be inspected, targeted, centered, and navigated to.
-- [ ] Add catalog-friendly result handling: arrival/closest-approach summaries should work for any destination, not a preset mission list.
+- [x] Add destination search and quick jump so users can choose any loaded body as a navigation target.
+- [x] Generalize the target system beyond Moon/Mars/Jupiter/Saturn so every loaded catalog body can be inspected, targeted, centered, and navigated to.
+- [x] Add catalog-friendly result handling: arrival/closest-approach summaries should work for any destination, not a preset mission list.
 - [ ] Add a measurement/ruler mode for checking distances between any two bodies or map points.
 - [ ] Add real ephemeris orbit trails for selected bodies, clearly marked as sampled reference paths.
 - [ ] Add display toggles for labels, AU rings, route lines, orbit trails, and educational overlays.

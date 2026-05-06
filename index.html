@@ -20,9 +20,17 @@
 
       <section class="panel controls" aria-label="Target and journey controls">
         <div class="target-row" id="target-buttons"></div>
+        <div class="destination-row">
+          <label for="destination-search">Destination</label>
+          <input id="destination-search" type="search" list="body-options" autocomplete="off" placeholder="Search loaded body" />
+          <datalist id="body-options"></datalist>
+          <button id="set-destination" type="button">Target</button>
+          <button id="jump-destination" type="button">Jump</button>
+        </div>
         <div class="body-row">
           <label for="body-select">Inspect</label>
           <select id="body-select" aria-label="Selected body"></select>
+          <button id="target-selected" type="button" title="Set selected body as target">Target</button>
           <button id="center-selected" type="button" title="Center on selected body">Center</button>
         </div>
         <div class="time-controls" aria-label="Time controls">

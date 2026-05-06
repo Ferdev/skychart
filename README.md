@@ -7,8 +7,10 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 - Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, and Neptune.
 - Real current-date body positions from Skyfield using NASA/JPL DE440s.
 - 2D top-down canvas map using heliocentric ecliptic x/y coordinates.
-- Target selection for Moon, Mars, Jupiter, and Saturn.
+- Quick target shortcuts for Moon, Mars, Jupiter, and Saturn.
+- Destination search for targeting and jumping to any loaded body.
 - Inspect and center on any rendered body.
+- Set any inspected body as the current navigation target.
 - UTC time controls: apply a timestamp, jump to now, or step by days/weeks/months.
 - Real Earth-to-target distance, ship-to-target distance, light travel time, zoom scale, and a journey progress panel.
 - Navigation feedback: target heading arrow, closing speed, ETA, closest approach, and arrival status.

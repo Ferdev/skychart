@@ -134,6 +134,7 @@ dd {
 .zoom-row,
 .reset-row,
 .body-row,
+.destination-row,
 .time-controls,
 .time-step-row {
   display: grid;
@@ -145,13 +146,21 @@ dd {
   margin-bottom: 10px;
 }
 
-.body-row {
-  grid-template-columns: auto minmax(0, 1fr) 88px;
+.destination-row {
+  grid-template-columns: auto minmax(0, 1fr) 68px 64px;
   align-items: center;
   margin-bottom: 10px;
   font-size: 13px;
 }
 
+.body-row {
+  grid-template-columns: auto minmax(0, 1fr) 68px 76px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.destination-row label,
 .body-row label,
 .time-controls > label {
   color: rgba(243, 240, 232, 0.64);
@@ -294,6 +303,18 @@ dd {
 
   .time-step-row {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .destination-row,
+  .body-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .destination-row label,
+  .body-row label,
+  .destination-row input,
+  .body-row select {
+    grid-column: 1 / -1;
   }
 
   dl {
