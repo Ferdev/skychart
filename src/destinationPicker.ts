@@ -39,8 +39,22 @@ export type DestinationBody = {
   object_type?: DestinationBodyType;
   parent_key?: string | null;
   catalog_group?: string;
+  aliases?: readonly string[];
+  catalog?: { aliases?: readonly string[] } | null;
+  deep_sky?: DestinationDeepSkyInfo | null;
   position: DestinationBodyPosition;
   distance_from_earth_km: number;
+};
+
+export type DestinationDeepSkyInfo = {
+  aliases?: readonly string[];
+  deep_sky_type_label?: string | null;
+  apparent_magnitude?: number | null;
+  angular_size_arcmin?: string | null;
+  constellation?: string | null;
+  viewing_season?: string | null;
+  common_name?: string | null;
+  observing_equipment?: string | null;
 };
 
 export type DestinationBodyType =
@@ -48,6 +62,11 @@ export type DestinationBodyType =
   | "planet"
   | "moon"
   | "dwarf_planet"
+  | "galaxy"
+  | "nebula"
+  | "star_cluster"
+  | "asterism"
+  | "milky_way_patch"
   | "asteroid"
   | "comet"
   | "spacecraft"
@@ -59,6 +78,9 @@ export type DestinationIconKey =
   | "planet"
   | "moon"
   | "dwarf"
+  | "galaxy"
+  | "nebula"
+  | "cluster"
   | "asteroid"
   | "comet"
   | "spacecraft"
@@ -98,6 +120,7 @@ export type DestinationPickerItem = {
   color: string;
   radiusKm: number;
   radiusLabel: string;
+  metaLabel: string;
   distanceFromEarthKm: number;
   distanceLabel: string;
   heliocentricDistanceKm: number;
@@ -223,6 +246,11 @@ const TYPE_LABELS: Record<DestinationBodyType, string> = {
   planet: "Planet",
   moon: "Moon",
   dwarf_planet: "Dwarf planet",
+  galaxy: "Galaxy",
+  nebula: "Nebula",
+  star_cluster: "Star cluster",
+  asterism: "Asterism",
+  milky_way_patch: "Milky Way patch",
   asteroid: "Asteroid",
   comet: "Comet",
   spacecraft: "Spacecraft",
@@ -235,6 +263,11 @@ const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
   planet: "planet",
   moon: "moon",
   dwarf_planet: "dwarf",
+  galaxy: "galaxy",
+  nebula: "nebula",
+  star_cluster: "cluster",
+  asterism: "cluster",
+  milky_way_patch: "cluster",
   asteroid: "asteroid",
   comet: "comet",
   spacecraft: "spacecraft",
@@ -247,11 +280,16 @@ const TYPE_SORT_GROUPS: Record<DestinationBodyType, number> = {
   planet: 1,
   moon: 2,
   dwarf_planet: 3,
-  asteroid: 4,
-  comet: 5,
-  spacecraft: 6,
-  small_body: 7,
-  unknown: 8
+  galaxy: 4,
+  nebula: 5,
+  star_cluster: 6,
+  asterism: 7,
+  milky_way_patch: 8,
+  asteroid: 9,
+  comet: 10,
+  spacecraft: 11,
+  small_body: 12,
+  unknown: 13
 };
 
 export function classifyBody(body: Pick<DestinationBody, "key" | "name" | "radius_km" | "object_type">): BodyClassification {
@@ -390,7 +428,8 @@ export function findDestinationBody<T extends DestinationBody>(bodies: readonly 
       return (
         normalizeBodyKey(body.key) === normalizeBodyKey(value) ||
         normalizeText(body.name) === query ||
-        normalizeText(item.searchLabel) === query
+        normalizeText(item.searchLabel) === query ||
+        bodyAliases(body).some((alias) => normalizeText(alias) === query || normalizeBodyKey(alias) === normalizeBodyKey(value))
       );
     }) ?? null
   );
@@ -413,6 +452,7 @@ export function createDestinationPickerItem(
   const key = normalizeBodyKey(body.key);
   const distanceLabel = formatPickerDistance(body.distance_from_earth_km, options.auKm);
   const radiusLabel = formatPickerDistance(body.radius_km, options.auKm, { preferCompact: false });
+  const metaLabel = destinationMetaLabel(body, classification, radiusLabel);
   const heliocentricDistanceLabel = formatPickerDistance(body.position.heliocentric_distance_km, options.auKm);
   const selectedKey = options.selectedKey ? normalizeBodyKey(options.selectedKey) : null;
   const currentTargetKey = options.currentTargetKey ? normalizeBodyKey(options.currentTargetKey) : null;
@@ -446,6 +486,7 @@ export function createDestinationPickerItem(
     color: safeCssColor(body.color),
     radiusKm: finiteNumber(body.radius_km, 0),
     radiusLabel,
+    metaLabel,
     distanceFromEarthKm: finiteNumber(body.distance_from_earth_km, 0),
     distanceLabel,
     heliocentricDistanceKm: finiteNumber(body.position.heliocentric_distance_km, 0),
@@ -613,6 +654,9 @@ function inferBodyType(key: string, normalizedName: string, radiusKm: number): D
   if (PLANET_KEYS.has(key)) return "planet";
   if (MOON_KEYS.has(key) || normalizedName === "moon") return "moon";
   if (DWARF_PLANET_KEYS.has(key)) return "dwarf_planet";
+  if (normalizedName.includes("galaxy")) return "galaxy";
+  if (normalizedName.includes("nebula")) return "nebula";
+  if (normalizedName.includes("cluster")) return "star_cluster";
   if (ASTEROID_KEYS.has(key)) return "asteroid";
   if (COMET_KEYS.has(key) || normalizedName.includes("comet")) return "comet";
   if (SPACECRAFT_KEYS.has(key) || normalizedName.includes("probe") || normalizedName.includes("voyager")) return "spacecraft";
@@ -622,15 +666,40 @@ function inferBodyType(key: string, normalizedName: string, radiusKm: number): D
   return "unknown";
 }
 
+function destinationMetaLabel(body: DestinationBody, classification: BodyClassification, radiusLabel: string): string {
+  const deepSky = body.deep_sky;
+  if (!deepSky) return `${classification.label} · ${radiusLabel} radius`;
+
+  const parts = [deepSky.deep_sky_type_label || classification.label];
+  if (typeof deepSky.apparent_magnitude === "number") parts.push(`mag ${formatMagnitude(deepSky.apparent_magnitude)}`);
+  if (deepSky.constellation) parts.push(deepSky.constellation);
+  if (deepSky.observing_equipment) parts.push(deepSky.observing_equipment);
+  return parts.join(" · ");
+}
+
 function destinationSearchTokens(body: DestinationBody, classification: BodyClassification): string[] {
   return uniqueStrings([
     normalizeBodyKey(body.key),
     normalizeText(body.name),
     normalizeText(classification.type),
     normalizeText(classification.label),
+    ...bodyAliases(body).map(normalizeText),
+    normalizeText(body.deep_sky?.deep_sky_type_label ?? ""),
+    normalizeText(body.deep_sky?.common_name ?? ""),
+    normalizeText(body.deep_sky?.constellation ?? ""),
     ...splitWords(body.name),
-    ...splitWords(body.key)
+    ...splitWords(body.key),
+    ...bodyAliases(body).flatMap(splitWords)
   ]).filter(Boolean);
+}
+
+function bodyAliases(body: DestinationBody): string[] {
+  return [
+    ...(body.aliases ?? []),
+    ...(body.catalog?.aliases ?? []),
+    ...(body.deep_sky?.aliases ?? []),
+    body.deep_sky?.common_name ?? ""
+  ].filter(Boolean);
 }
 
 function scoreItemForQuery(item: DestinationPickerItem, query: string): number | null {
@@ -841,6 +910,10 @@ function formatWholeNumber(value: number): string {
   return new Intl.NumberFormat("en-US", {
     maximumFractionDigits: value >= 100 ? 0 : 2
   }).format(value);
+}
+
+function formatMagnitude(value: number): string {
+  return value.toFixed(1).replace(/\.0$/, "");
 }
 
 function formatAu(au: number): string {

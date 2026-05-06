@@ -762,6 +762,36 @@ dd {
     var(--body-color);
 }
 
+.body-orb.type-galaxy {
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 246, 214, 0.95) 0 9%, transparent 10%),
+    radial-gradient(ellipse at 50% 50%, color-mix(in srgb, var(--body-color) 74%, transparent) 0 39%, transparent 40%),
+    linear-gradient(135deg, transparent 0 22%, rgba(255, 255, 255, 0.26) 23% 29%, transparent 30% 100%),
+    rgba(217, 184, 111, 0.1);
+  transform: rotate(-18deg);
+}
+
+.body-orb.type-nebula {
+  border-radius: 42% 58% 47% 53%;
+  background:
+    radial-gradient(circle at 43% 38%, rgba(255, 255, 255, 0.74), transparent 0 12%, transparent 24%),
+    radial-gradient(circle at 35% 50%, color-mix(in srgb, var(--body-color) 70%, transparent) 0 38%, transparent 39%),
+    radial-gradient(circle at 64% 42%, rgba(116, 196, 255, 0.36) 0 26%, transparent 27%),
+    rgba(217, 184, 111, 0.08);
+}
+
+.body-orb.type-star_cluster,
+.body-orb.type-asterism,
+.body-orb.type-milky_way_patch {
+  background:
+    radial-gradient(circle at 50% 48%, #fff4c9 0 7%, transparent 8%),
+    radial-gradient(circle at 28% 34%, #fff4c9 0 6%, transparent 7%),
+    radial-gradient(circle at 68% 32%, #d7ecff 0 5%, transparent 6%),
+    radial-gradient(circle at 33% 70%, #fff4c9 0 5%, transparent 6%),
+    radial-gradient(circle at 70% 68%, #ffe1a6 0 4%, transparent 5%),
+    rgba(244, 241, 232, 0.08);
+}
+
 .body-grid {
   display: grid;
   grid-template-columns: 1fr auto;

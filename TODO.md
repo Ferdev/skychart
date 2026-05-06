@@ -59,10 +59,10 @@
 
 ## P1 — Deep-sky discovery UX
 
-- [ ] Add destination filters for galaxies, nebulae, clusters, and deep-sky objects so users can browse beyond planets/moons/stars.
-- [ ] Make destination rows and inspected-body cards show useful deep-sky facts instead of physical radius placeholders.
-- [ ] Add visual glyphs for galaxies, nebulae, clusters, and supernova remnants in map labels, picker rows, viewport references, and journey endpoints.
-- [ ] Surface observability data: apparent magnitude, angular size, constellation, viewing season, and suggested observing equipment.
+- [x] Add destination filters for galaxies, nebulae, clusters, and deep-sky objects so users can browse beyond planets/moons/stars.
+- [x] Make destination rows and inspected-body cards show useful deep-sky facts instead of physical radius placeholders.
+- [x] Add visual glyphs for galaxies, nebulae, clusters, and supernova remnants in map labels, picker rows, viewport references, and journey endpoints.
+- [x] Surface observability data: apparent magnitude, angular size, constellation, viewing season, and suggested observing equipment.
 
 ## P2 — Science/storytelling layer
 

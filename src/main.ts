@@ -19,7 +19,7 @@ const LIGHT_SPEED_KM_S = 299_792.458;
 const LIGHT_YEAR_KM = 9_460_730_472_580.8;
 const EARTH_MOON_AVG_KM = 384_400;
 const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
-const BODY_FILTERS = ["all", "planet", "moon", "dwarf_planet", "star"] as const;
+const BODY_FILTERS = ["all", "planet", "moon", "dwarf_planet", "star", "galaxy", "nebula", "star_cluster"] as const;
 const ONBOARDING_DISMISSED_KEY = "cosmic-atlas.onboarding-dismissed";
 const TRANSFER_PATH_SAMPLES = 96;
 const ORBIT_PATH_SAMPLES = 192;
@@ -72,7 +72,10 @@ const BODY_FILTER_LABELS: Record<BodyFilter, string> = {
   planet: "Planets",
   moon: "Moons",
   dwarf_planet: "Dwarf",
-  star: "Stars"
+  star: "Stars",
+  galaxy: "Galaxies",
+  nebula: "Nebulae",
+  star_cluster: "Clusters"
 };
 
 const BODY_FILTER_SECTION_LABELS: Record<BodyFilter, string> = {
@@ -80,7 +83,10 @@ const BODY_FILTER_SECTION_LABELS: Record<BodyFilter, string> = {
   planet: "Planets",
   moon: "Moons",
   dwarf_planet: "Dwarf planets",
-  star: "Stars"
+  star: "Stars",
+  galaxy: "Galaxies",
+  nebula: "Nebulae",
+  star_cluster: "Star clusters"
 };
 
 const COMPACT_SATELLITE_PARENT_KEYS: Record<string, string> = {
@@ -161,6 +167,26 @@ type StellarInfo = {
   stellar_teff_k: number | null;
 };
 
+type DeepSkyInfo = {
+  messier: number | null;
+  ngc: string | null;
+  ic: string | null;
+  aliases: string[];
+  ra_deg: number | null;
+  dec_deg: number | null;
+  distance_ly: number | null;
+  distance_quality: string | null;
+  deep_sky_type: string | null;
+  deep_sky_type_label: string | null;
+  apparent_magnitude: number | null;
+  angular_size_arcmin: string | null;
+  constellation: string | null;
+  viewing_season: string | null;
+  common_name: string | null;
+  observing_equipment: string | null;
+  why_interesting: string | null;
+};
+
 type Body = {
   key: string;
   name: string;
@@ -174,6 +200,7 @@ type Body = {
   state_vector?: BodyStateVector;
   orbit?: BodyOrbit | null;
   stellar?: StellarInfo | null;
+  deep_sky?: DeepSkyInfo | null;
   distance_from_earth_km: number;
 };
 
@@ -189,12 +216,26 @@ type CatalogObject = {
   ephemeris_source: string;
   position_model: string;
   dynamic_position: boolean;
+  aliases?: string[];
   ra_deg?: number | null;
   dec_deg?: number | null;
   distance_pc?: number | null;
+  distance_ly?: number | null;
   exoplanet_count?: number | null;
   stellar_radius_solar?: number | null;
   stellar_teff_k?: number | null;
+  messier?: number | null;
+  ngc?: string | null;
+  ic?: string | null;
+  deep_sky_type?: string | null;
+  deep_sky_type_label?: string | null;
+  apparent_magnitude?: number | null;
+  angular_size_arcmin?: string | null;
+  constellation?: string | null;
+  viewing_season?: string | null;
+  common_name?: string | null;
+  observing_equipment?: string | null;
+  why_interesting?: string | null;
 };
 
 type CatalogSummary = {
@@ -1731,6 +1772,73 @@ function drawViewportReferenceCard(reference: ViewportReference, rect: LabelRect
 function drawReferenceBodyImage(body: Body, x: number, y: number, size: number) {
   const radius = size / 2;
   ctx.save();
+  if (body.object_type === "galaxy") {
+    const glow = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius * 1.1);
+    glow.addColorStop(0, "rgba(255, 244, 212, 0.95)");
+    glow.addColorStop(0.42, hexToRgba(body.color, 0.72));
+    glow.addColorStop(1, "rgba(217, 184, 111, 0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.ellipse(x, y, radius * 1.24, radius * 0.48, -0.42, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = hexToRgba(body.color, 0.8);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.ellipse(x, y, radius * 0.94, radius * 0.34, -0.42, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#fff0bc";
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  if (body.object_type === "nebula") {
+    const glow = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius * 1.15);
+    glow.addColorStop(0, "rgba(255, 255, 255, 0.82)");
+    glow.addColorStop(0.42, hexToRgba(body.color, 0.68));
+    glow.addColorStop(1, "rgba(215, 155, 220, 0)");
+    ctx.fillStyle = glow;
+    for (const blob of [
+      { dx: -0.18, dy: 0.02, rx: 0.82, ry: 0.52, rot: -0.4 },
+      { dx: 0.26, dy: -0.1, rx: 0.54, ry: 0.36, rot: 0.45 }
+    ]) {
+      ctx.beginPath();
+      ctx.ellipse(x + radius * blob.dx, y + radius * blob.dy, radius * blob.rx, radius * blob.ry, blob.rot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "#fff4c7";
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  if (body.object_type === "star_cluster" || body.object_type === "asterism" || body.object_type === "milky_way_patch") {
+    ctx.strokeStyle = hexToRgba(body.color, 0.5);
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.82, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#fff3cf";
+    const points = [
+      [0, 0, 0.12],
+      [-0.34, -0.2, 0.09],
+      [0.32, -0.25, 0.08],
+      [-0.12, 0.35, 0.07],
+      [0.4, 0.24, 0.06],
+      [-0.42, 0.26, 0.06]
+    ];
+    for (const [dx, dy, r] of points) {
+      ctx.beginPath();
+      ctx.arc(x + radius * dx, y + radius * dy, radius * r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
   if (body.object_type === "star") {
     const glow = ctx.createRadialGradient(x, y, radius * 0.15, x, y, radius * 1.35);
     glow.addColorStop(0, body.color);
@@ -1910,6 +2018,17 @@ function drawBody(body: Body) {
   const isSelectedBody = body.key === selectedBodyKey;
 
   ctx.save();
+  if (isDeepSkyBody(body)) {
+    drawReferenceBodyImage(body, screen.x, screen.y, Math.max(22, radius * 3.6));
+    ctx.strokeStyle = isTarget ? "#f3f0e8" : isSelectedBody ? "#74c4ff" : hexToRgba(body.color, 0.38);
+    ctx.lineWidth = isTarget || isSelectedBody ? 2 : 1;
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, radius + (isTarget || isSelectedBody ? 6 : 3), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   if (body.key === "saturn") {
     ctx.strokeStyle = "rgba(216, 194, 138, 0.74)";
     ctx.lineWidth = 2;
@@ -2015,10 +2134,10 @@ function updateJourney(target: Body, shipTargetKm: number) {
   const targetLightSeconds = target.distance_from_earth_km / LIGHT_SPEED_KM_S;
   const activePlan = activeTrajectoryCandidate();
   const routeDistanceKm = routeTotalDistanceKm(earth, target);
-  const isInterstellarTarget = isStaticStellarCatalogBody(target);
+  const isStaticCatalogTarget = isStaticStellarCatalogBody(target);
   const directRouteLabel = activePlan
     ? `${activePlan.label} path distance`
-    : isInterstellarTarget
+    : isStaticCatalogTarget
       ? "Straight-line catalog distance"
     : routeWaypoints.length
       ? `Transfer preview via ${routeWaypoints.length} waypoint${routeWaypoints.length === 1 ? "" : "s"}`
@@ -2034,7 +2153,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
         : "not closing";
   const statusLabel = journeyStats.arrived ? "Arrival confirmed" : status;
   const routeProgress = clamp(progressPercent, 0, 100);
-  const progressLabel = activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : isInterstellarTarget ? "straight-line reference" : "transfer preview";
+  const progressLabel = activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : isStaticCatalogTarget ? "straight-line reference" : "transfer preview";
   const structuralKey = [
     ephemeris.timestamp_utc,
     target.key,
@@ -2119,7 +2238,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
   updateJourneyField("status", statusLabel);
   updateJourneyField(
     "route-summary",
-    `${activePlan?.kind === "gravity_assist" ? "gravity assist" : isInterstellarTarget ? "reference" : "transfer"} · ${formatDistance(routeDistanceKm)}`
+    `${activePlan?.kind === "gravity_assist" ? "gravity assist" : isStaticCatalogTarget ? "reference" : "transfer"} · ${formatDistance(routeDistanceKm)}`
   );
   updateJourneyField("next-action", nextAction);
   updateJourneyField("ship-target-distance", formatDistance(shipTargetKm));
@@ -2152,7 +2271,7 @@ function routeNoteText(candidate: TrajectoryCandidate | null) {
   if (!candidate) {
     const target = bodyByKey.get(selectedTarget);
     if (target && isStaticStellarCatalogBody(target)) {
-      return "Interstellar catalog target: straight-line reference distance only. No interstellar trajectory model is active yet.";
+      return `${target.deep_sky ? "Deep-sky" : "Interstellar"} catalog target: straight-line reference distance only. No mission trajectory model is active yet.`;
     }
     return "Approximate Sun-centered trajectory preview. It uses real current positions, but it is not a full mission-grade gravity solve yet.";
   }
@@ -2294,6 +2413,7 @@ function updateBodyInfo() {
   const parent = body.parent_key ? bodyByKey.get(body.parent_key) : null;
   const source = body.catalog?.ephemeris_kernel ?? body.catalog_group ?? "loaded catalog";
   const stellarRows = stellarInfoRows(body);
+  const deepSkyRows = deepSkyInfoRows(body);
   const orbitRows = orbitInfoRows(body);
 
   bodyInfo.innerHTML = `
@@ -2312,9 +2432,10 @@ function updateBodyInfo() {
       <span>From Sun</span><strong>${formatDistance(body.position.heliocentric_distance_km)}</strong>
       <span>From Earth</span><strong>${formatDistance(body.distance_from_earth_km)}</strong>
       <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
-      <span>Mean radius</span><strong>${formatDistance(body.radius_km)}</strong>
+      <span>${body.deep_sky ? "Physical radius" : "Mean radius"}</span><strong>${body.deep_sky ? "not represented" : formatDistance(body.radius_km)}</strong>
       <span>Source</span><strong>${escapeHtml(source)}</strong>
       ${stellarRows}
+      ${deepSkyRows}
       ${orbitRows}
     </div>
   `;
@@ -2333,6 +2454,31 @@ function stellarInfoRows(body: Body) {
     <span>Exoplanets</span><strong>${escapeHtml(exoplanetText)}</strong>
     <span>Sky position</span><strong>${escapeHtml(coordinates)}</strong>
     <span>Stellar temp</span><strong>${stellar.stellar_teff_k ? `${formatNumber(stellar.stellar_teff_k)} K` : "not listed"}</strong>
+  `;
+}
+
+function deepSkyInfoRows(body: Body) {
+  const deepSky = body.deep_sky;
+  if (!deepSky) return "";
+  const aliases = [deepSky.ngc ? `NGC ${deepSky.ngc}` : "", deepSky.ic ? deepSky.ic.replace(/^IC/, "IC ") : "", deepSky.common_name ?? ""]
+    .filter(Boolean)
+    .join(" · ");
+  const coordinates =
+    deepSky.ra_deg === null || deepSky.dec_deg === null
+      ? "not listed"
+      : `${deepSky.ra_deg.toFixed(2)}° RA / ${deepSky.dec_deg.toFixed(2)}° Dec`;
+  return `
+    <span>Catalog ID</span><strong>${escapeHtml([deepSky.messier ? `M${deepSky.messier}` : "", aliases].filter(Boolean).join(" · "))}</strong>
+    <span>Deep-sky type</span><strong>${escapeHtml(deepSky.deep_sky_type_label ?? "Deep-sky object")}</strong>
+    <span>Catalog distance</span><strong>${formatLightYears(deepSky.distance_ly)}</strong>
+    <span>Lookback time</span><strong>${formatLookbackTime(deepSky.distance_ly)}</strong>
+    <span>Apparent mag</span><strong>${deepSky.apparent_magnitude === null ? "not listed" : formatMagnitude(deepSky.apparent_magnitude)}</strong>
+    <span>Angular size</span><strong>${escapeHtml(deepSky.angular_size_arcmin ? `${deepSky.angular_size_arcmin} arcmin` : "not listed")}</strong>
+    <span>Constellation</span><strong>${escapeHtml(deepSky.constellation || "not listed")}</strong>
+    <span>Best season</span><strong>${escapeHtml(deepSky.viewing_season || "not listed")}</strong>
+    <span>Observe with</span><strong>${escapeHtml(deepSky.observing_equipment || "not listed")}</strong>
+    <span>Sky position</span><strong>${escapeHtml(coordinates)}</strong>
+    <span>Why it matters</span><strong>${escapeHtml(deepSky.why_interesting || "catalog highlight")}</strong>
   `;
 }
 
@@ -2945,10 +3091,10 @@ function renderDestinationPickerItem(item: DestinationPickerItem) {
       data-active="${item.isCurrentTarget}"
       aria-label="${escapeHtml(item.ariaLabel)}"
     >
-      <span class="destination-picker__orb body-${escapeHtml(item.key)}" style="--destination-color: ${escapeHtml(item.color)}"></span>
+      <span class="destination-picker__orb body-${escapeHtml(item.key)} type-${escapeHtml(item.type)}" style="--destination-color: ${escapeHtml(item.color)}"></span>
       <span class="destination-picker__copy">
         <strong class="destination-picker__name">${escapeHtml(item.name)}</strong>
-        <span class="destination-picker__meta">${escapeHtml(item.typeLabel)} · ${escapeHtml(item.radiusLabel)} radius</span>
+        <span class="destination-picker__meta">${escapeHtml(item.metaLabel)}</span>
       </span>
       <span class="destination-picker__distance">${escapeHtml(item.distanceLabel)}</span>
       ${badges ? `<span class="destination-picker__badges">${badges}</span>` : ""}
@@ -3084,8 +3230,9 @@ function bodySearchLabel(body: Body) {
 function bodyOrbHtml(bodyOrKey: Body | string, size: "large" | "" = "") {
   const key = typeof bodyOrKey === "string" ? bodyOrKey : bodyOrKey.key;
   const color = typeof bodyOrKey === "string" ? fallbackBodyColor(key) : safeCssColor(bodyOrKey.color);
+  const typeClass = typeof bodyOrKey === "string" ? "" : `type-${bodyOrKey.object_type ?? "unknown"}`;
   const classKey = key.replace(/[^a-z0-9_-]/gi, "");
-  const className = ["body-orb", `body-${classKey}`, size].filter(Boolean).join(" ");
+  const className = ["body-orb", `body-${classKey}`, typeClass, size].filter(Boolean).join(" ");
   return `<span class="${className}" style="--body-color: ${color};" aria-hidden="true"></span>`;
 }
 
@@ -3301,7 +3448,11 @@ function localViewRadiusAu(body: Body) {
 }
 
 function isStaticStellarCatalogBody(body: Body) {
-  return body.catalog?.position_model === "stellar_catalog_coordinates";
+  return body.catalog?.position_model === "stellar_catalog_coordinates" || body.catalog?.position_model === "deep_sky_catalog_coordinates";
+}
+
+function isDeepSkyBody(body: Body) {
+  return Boolean(body.deep_sky);
 }
 
 function pickGridAu() {
@@ -3390,6 +3541,17 @@ function formatLightYears(lightYears: number | null) {
   if (abs >= 100) return `${formatNumber(lightYears)} ly`;
   if (abs >= 10) return `${lightYears.toFixed(1)} ly`;
   return `${lightYears.toFixed(2)} ly`;
+}
+
+function formatLookbackTime(lightYears: number | null) {
+  if (lightYears === null || !Number.isFinite(lightYears)) return "not listed";
+  if (lightYears >= 1_000_000) return `${formatNumber(lightYears / 1_000_000)} million years`;
+  if (lightYears >= 1_000) return `${formatNumber(lightYears / 1_000)} thousand years`;
+  return `${formatNumber(lightYears)} years`;
+}
+
+function formatMagnitude(value: number) {
+  return value.toFixed(1).replace(/\.0$/, "");
 }
 
 function formatNullableDistance(km: number | null) {
