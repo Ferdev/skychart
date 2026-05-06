@@ -48,3 +48,25 @@
 - [ ] Keep coordinate and rendering code separated so a future 3D view can reuse the same ephemeris and navigation state.
 - [ ] Define a future 2D/3D view switch only when the 3D mode has a concrete user benefit beyond visual spectacle.
 - [ ] Preserve all current 2D workflows when 3D is introduced: search, inspect, target, measure, route progress, and time controls.
+
+## P0 — Deep-sky catalog MVP
+
+> Added on 2026-05-07 for the first science/interest expansion beyond nearby stars.
+
+- [ ] Add a generated Messier deep-sky catalog snapshot with real RA/Dec, distance, magnitude, angular size, constellation, season, and NGC/IC aliases.
+- [ ] Load deep-sky objects through the backend catalog layer with explicit source metadata and no fake circular/orbital positions.
+- [ ] Keep distance-known deep-sky objects targetable in the existing 3D distance model, while clearly disabling trajectory planning for static catalog targets.
+
+## P1 — Deep-sky discovery UX
+
+- [ ] Add destination filters for galaxies, nebulae, clusters, and deep-sky objects so users can browse beyond planets/moons/stars.
+- [ ] Make destination rows and inspected-body cards show useful deep-sky facts instead of physical radius placeholders.
+- [ ] Add visual glyphs for galaxies, nebulae, clusters, and supernova remnants in map labels, picker rows, viewport references, and journey endpoints.
+- [ ] Surface observability data: apparent magnitude, angular size, constellation, viewing season, and suggested observing equipment.
+
+## P2 — Science/storytelling layer
+
+- [ ] Add guided tours for Messier highlights, nearby stars, galaxies, nebulae, clusters, and Local Group scale objects.
+- [ ] Add a scale ladder that explains whether the current zoom is Solar System, nearby-star, Milky Way, Local Group, or deep-sky scale.
+- [ ] Add light-time/lookback-time copy for interstellar and deep-sky targets so long-distance travel feels scientifically meaningful.
+- [ ] Update README with the new catalog sources, coordinate assumptions, visual scaling, and known accuracy limits.
