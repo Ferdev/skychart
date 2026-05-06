@@ -22,11 +22,11 @@
 
 ## P2 — Make journeys feel rewarding
 
-- [ ] Add an arrival summary with distance traveled, closest approach, max speed, elapsed time, and target light-time.
-- [ ] Add optional waypoints so users can build freeform routes without relying on preset journeys.
-- [ ] Add route bookmarks or saved destinations after freeform navigation feels useful.
-- [ ] Add richer educational comparisons for selected distances: light time, Earth-Moon distances, AU, and familiar mission distances.
-- [ ] Add a clearer warp state: stronger ship cue, speed multiplier label, and "course correcting / drifting away" feedback.
+- [x] Add an arrival summary with distance traveled, closest approach, max speed, elapsed time, and target light-time.
+- [x] Add optional waypoints so users can build freeform routes without relying on preset journeys.
+- [x] Add route bookmarks or saved destinations after freeform navigation feels useful.
+- [x] Add richer educational comparisons for selected distances: light time, Earth-Moon distances, AU, and familiar mission distances.
+- [x] Add a clearer warp state: stronger ship cue, speed multiplier label, and "course correcting / drifting away" feedback.
 
 ## Future — Prepare for 3D without building it yet
 
