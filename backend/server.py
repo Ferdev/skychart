@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.request import urlretrieve
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import urlopen, urlretrieve
 
 from skyfield.api import Loader, load_file
 from skyfield.framelib import ecliptic_frame
@@ -21,29 +22,98 @@ PORT = 8765
 AU_KM = 149_597_870.700
 SUN_MU_KM3_S2 = 132_712_440_018.0
 SECONDS_PER_DAY = 86_400.0
-EPHEMERIS_SOURCE = "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK for Phobos and Deimos"
+EPHEMERIS_SOURCE = (
+    "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK; NASA/JPL Horizons vectors"
+)
 TRAJECTORY_SOURCE = f"{EPHEMERIS_SOURCE}; patched-conic launch-window and single-flyby estimator"
 SATELLITE_KERNEL_URLS = {
     "mar099s.bsp": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/mar099s.bsp",
 }
 
-BODIES = [
-    {"key": "sun", "name": "Sun", "ephemeris": "sun", "radius_km": 695_700, "mu_km3_s2": SUN_MU_KM3_S2, "color": "#ffd166"},
-    {"key": "mercury", "name": "Mercury", "ephemeris": "mercury", "radius_km": 2_439.7, "mu_km3_s2": 22_031.78, "color": "#b8a48a"},
-    {"key": "venus", "name": "Venus", "ephemeris": "venus", "radius_km": 6_051.8, "mu_km3_s2": 324_858.592, "color": "#d8b26f"},
-    {"key": "earth", "name": "Earth", "ephemeris": "earth", "radius_km": 6_371.0, "mu_km3_s2": 398_600.4418, "color": "#62a8ff"},
-    {"key": "moon", "name": "Moon", "ephemeris": "moon", "radius_km": 1_737.4, "mu_km3_s2": 4_902.800066, "color": "#c8c8c8"},
-    {"key": "mars", "name": "Mars", "ephemeris": "mars barycenter", "radius_km": 3_389.5, "mu_km3_s2": 42_828.375214, "color": "#df6b43"},
-    {"key": "phobos", "name": "Phobos", "ephemeris": 401, "kernel": "mar099s.bsp", "radius_km": 11.27, "mu_km3_s2": 0.0007087, "color": "#9b8066"},
-    {"key": "deimos", "name": "Deimos", "ephemeris": 402, "kernel": "mar099s.bsp", "radius_km": 6.2, "mu_km3_s2": 0.0000985, "color": "#b19a82"},
-    {"key": "jupiter", "name": "Jupiter", "ephemeris": "jupiter barycenter", "radius_km": 69_911, "mu_km3_s2": 126_686_534.0, "color": "#d9b382"},
-    {"key": "saturn", "name": "Saturn", "ephemeris": "saturn barycenter", "radius_km": 58_232, "mu_km3_s2": 37_931_187.0, "color": "#d8c28a"},
-    {"key": "uranus", "name": "Uranus", "ephemeris": "uranus barycenter", "radius_km": 25_362, "mu_km3_s2": 5_793_939.0, "color": "#83d8d8"},
-    {"key": "neptune", "name": "Neptune", "ephemeris": "neptune barycenter", "radius_km": 24_622, "mu_km3_s2": 6_836_529.0, "color": "#6f8cff"},
-    {"key": "pluto", "name": "Pluto", "ephemeris": "pluto barycenter", "radius_km": 1_188.3, "mu_km3_s2": 869.61, "color": "#c9a27c"},
+CATALOG_GROUPS = {
+    "core": {
+        "label": "Core Solar System",
+        "description": "Sun, planets, Earth's Moon, and Pluto barycenter from DE440s.",
+    },
+    "mars_moons": {
+        "label": "Mars moons",
+        "description": "Phobos and Deimos from the NAIF MAR099s satellite SPK.",
+    },
+    "jupiter_major_moons": {
+        "label": "Jupiter major moons",
+        "description": "Galilean moons from NASA/JPL Horizons parent-relative vectors.",
+    },
+    "saturn_major_moons": {
+        "label": "Saturn major moons",
+        "description": "Major Saturnian moons from NASA/JPL Horizons parent-relative vectors.",
+    },
+}
+DEFAULT_CATALOG_GROUPS = tuple(CATALOG_GROUPS.keys())
+HORIZONS_PARENT_CENTERS = {
+    "jupiter": "@5",
+    "saturn": "@6",
+}
+
+
+def catalog_object(
+    *,
+    key: str,
+    name: str,
+    ephemeris: str | int,
+    radius_km: float,
+    mu_km3_s2: float,
+    color: str,
+    object_type: str,
+    catalog_group: str,
+    parent_key: str | None = None,
+    kernel: str | None = None,
+    horizons_id: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "key": key,
+        "name": name,
+        "ephemeris": ephemeris,
+        "kernel": kernel,
+        "radius_km": radius_km,
+        "mu_km3_s2": mu_km3_s2,
+        "color": color,
+        "object_type": object_type,
+        "catalog_group": catalog_group,
+        "parent_key": parent_key,
+        "horizons_id": horizons_id,
+        "source_type": "horizons" if horizons_id else "spk",
+    }
+
+
+CATALOG_OBJECTS = [
+    catalog_object(key="sun", name="Sun", ephemeris="sun", radius_km=695_700, mu_km3_s2=SUN_MU_KM3_S2, color="#ffd166", object_type="star", catalog_group="core"),
+    catalog_object(key="mercury", name="Mercury", ephemeris="mercury", radius_km=2_439.7, mu_km3_s2=22_031.78, color="#b8a48a", object_type="planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="venus", name="Venus", ephemeris="venus", radius_km=6_051.8, mu_km3_s2=324_858.592, color="#d8b26f", object_type="planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="earth", name="Earth", ephemeris="earth", radius_km=6_371.0, mu_km3_s2=398_600.4418, color="#62a8ff", object_type="planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="moon", name="Moon", ephemeris="moon", radius_km=1_737.4, mu_km3_s2=4_902.800066, color="#c8c8c8", object_type="moon", parent_key="earth", catalog_group="core"),
+    catalog_object(key="mars", name="Mars", ephemeris="mars barycenter", radius_km=3_389.5, mu_km3_s2=42_828.375214, color="#df6b43", object_type="planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="jupiter", name="Jupiter", ephemeris="jupiter barycenter", radius_km=69_911, mu_km3_s2=126_686_534.0, color="#d9b382", object_type="planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="saturn", name="Saturn", ephemeris="saturn barycenter", radius_km=58_232, mu_km3_s2=37_931_187.0, color="#d8c28a", object_type="planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="uranus", name="Uranus", ephemeris="uranus barycenter", radius_km=25_362, mu_km3_s2=5_793_939.0, color="#83d8d8", object_type="planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="neptune", name="Neptune", ephemeris="neptune barycenter", radius_km=24_622, mu_km3_s2=6_836_529.0, color="#6f8cff", object_type="planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="pluto", name="Pluto", ephemeris="pluto barycenter", radius_km=1_188.3, mu_km3_s2=869.61, color="#c9a27c", object_type="dwarf_planet", parent_key="sun", catalog_group="core"),
+    catalog_object(key="phobos", name="Phobos", ephemeris=401, kernel="mar099s.bsp", radius_km=11.27, mu_km3_s2=0.0007087, color="#9b8066", object_type="moon", parent_key="mars", catalog_group="mars_moons"),
+    catalog_object(key="deimos", name="Deimos", ephemeris=402, kernel="mar099s.bsp", radius_km=6.2, mu_km3_s2=0.0000985, color="#b19a82", object_type="moon", parent_key="mars", catalog_group="mars_moons"),
+    catalog_object(key="io", name="Io", ephemeris=501, horizons_id="501", radius_km=1_821.6, mu_km3_s2=5_959.916, color="#e5c45f", object_type="moon", parent_key="jupiter", catalog_group="jupiter_major_moons"),
+    catalog_object(key="europa", name="Europa", ephemeris=502, horizons_id="502", radius_km=1_560.8, mu_km3_s2=3_202.739, color="#d8c7a8", object_type="moon", parent_key="jupiter", catalog_group="jupiter_major_moons"),
+    catalog_object(key="ganymede", name="Ganymede", ephemeris=503, horizons_id="503", radius_km=2_634.1, mu_km3_s2=9_887.834, color="#a89980", object_type="moon", parent_key="jupiter", catalog_group="jupiter_major_moons"),
+    catalog_object(key="callisto", name="Callisto", ephemeris=504, horizons_id="504", radius_km=2_410.3, mu_km3_s2=7_179.289, color="#7b6a58", object_type="moon", parent_key="jupiter", catalog_group="jupiter_major_moons"),
+    catalog_object(key="mimas", name="Mimas", ephemeris=601, horizons_id="601", radius_km=198.2, mu_km3_s2=2.503, color="#b9b7ad", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
+    catalog_object(key="enceladus", name="Enceladus", ephemeris=602, horizons_id="602", radius_km=252.1, mu_km3_s2=7.209, color="#dfe9ef", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
+    catalog_object(key="tethys", name="Tethys", ephemeris=603, horizons_id="603", radius_km=531.1, mu_km3_s2=41.21, color="#c9c7bd", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
+    catalog_object(key="dione", name="Dione", ephemeris=604, horizons_id="604", radius_km=561.4, mu_km3_s2=73.11, color="#c6c7c2", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
+    catalog_object(key="rhea", name="Rhea", ephemeris=605, horizons_id="605", radius_km=763.8, mu_km3_s2=153.94, color="#b9b5aa", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
+    catalog_object(key="titan", name="Titan", ephemeris=606, horizons_id="606", radius_km=2_574.73, mu_km3_s2=8_978.14, color="#d6a657", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
+    catalog_object(key="iapetus", name="Iapetus", ephemeris=608, horizons_id="608", radius_km=734.5, mu_km3_s2=120.5, color="#8d8070", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
 ]
+BODIES = CATALOG_OBJECTS
 BODY_BY_KEY = {item["key"]: item for item in BODIES}
-MOON_BODY_KEYS = {"moon", "phobos", "deimos"}
+MOON_BODY_KEYS = {item["key"] for item in BODIES if item["object_type"] == "moon"}
 DEFAULT_TRAIL_BODIES = ("earth", "mars", "jupiter")
 DEFAULT_TRAIL_DAYS = 365.0
 DEFAULT_TRAIL_STEP_DAYS = 14.0
@@ -63,6 +133,7 @@ _loader: Loader | None = None
 _timescale: Any | None = None
 _ephemeris: Any | None = None
 _satellite_kernels: dict[str, Any] = {}
+_horizons_vectors: dict[tuple[str, str], dict[str, float]] = {}
 
 
 class QueryInputError(ValueError):
@@ -130,6 +201,94 @@ def vector_payload(vector: Any) -> dict[str, float]:
     }
 
 
+def horizons_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y-%b-%d %H:%M:%S")
+
+
+def horizons_center_for_item(item: dict[str, Any]) -> str:
+    parent_key = item.get("parent_key")
+    return HORIZONS_PARENT_CENTERS.get(parent_key, "@sun")
+
+
+def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[str, float]:
+    horizons_id = item.get("horizons_id")
+    if not horizons_id:
+        raise RuntimeError(f"{item['key']} is not configured for Horizons vectors")
+
+    timestamp_key = timestamp.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+    center = horizons_center_for_item(item)
+    cache_key = (f"{horizons_id}@{center}", timestamp_key)
+    cached = _horizons_vectors.get(cache_key)
+    if cached is not None:
+        return cached
+
+    stop_timestamp = timestamp + timedelta(minutes=1)
+    query = urlencode(
+        {
+            "format": "json",
+            "COMMAND": f"'{horizons_id}'",
+            "EPHEM_TYPE": "VECTORS",
+            "CENTER": f"'{center}'",
+            "REF_PLANE": "ECLIPTIC",
+            "REF_SYSTEM": "ICRF",
+            "OUT_UNITS": "KM-S",
+            "VEC_TABLE": "2",
+            "START_TIME": f"'{horizons_timestamp(timestamp)}'",
+            "STOP_TIME": f"'{horizons_timestamp(stop_timestamp)}'",
+            "STEP_SIZE": "'1 d'",
+        }
+    )
+    url = f"https://ssd.jpl.nasa.gov/api/horizons.api?{query}"
+    with urlopen(url, timeout=30) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    if payload.get("error"):
+        raise RuntimeError(f"Horizons API error for {item['name']}: {payload['error']}")
+
+    result = str(payload.get("result", ""))
+    x_match = re.search(r"X\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
+    y_match = re.search(r"Y\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
+    z_match = re.search(r"Z\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
+    vx_match = re.search(r"VX\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
+    vy_match = re.search(r"VY\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
+    vz_match = re.search(r"VZ\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
+    if not x_match or not y_match or not z_match or not vx_match or not vy_match or not vz_match:
+        raise RuntimeError(f"Horizons API did not return vector coordinates for {item['name']}")
+
+    x_km = float(x_match.group(1))
+    y_km = float(y_match.group(1))
+    z_km = float(z_match.group(1))
+    position = {
+        "x_au": x_km / AU_KM,
+        "y_au": y_km / AU_KM,
+        "z_au": z_km / AU_KM,
+        "x_km": x_km,
+        "y_km": y_km,
+        "z_km": z_km,
+        "vx_km_s": float(vx_match.group(1)),
+        "vy_km_s": float(vy_match.group(1)),
+        "vz_km_s": float(vz_match.group(1)),
+        "heliocentric_distance_km": math.sqrt(x_km * x_km + y_km * y_km + z_km * z_km),
+    }
+    _horizons_vectors[cache_key] = position
+    return position
+
+
+def add_relative_position(origin: dict[str, float], relative: dict[str, float]) -> dict[str, float]:
+    x_km = origin["x_km"] + relative["x_km"]
+    y_km = origin["y_km"] + relative["y_km"]
+    z_km = origin["z_km"] + relative["z_km"]
+    return {
+        "x_au": x_km / AU_KM,
+        "y_au": y_km / AU_KM,
+        "z_au": z_km / AU_KM,
+        "x_km": x_km,
+        "y_km": y_km,
+        "z_km": z_km,
+        "heliocentric_distance_km": math.sqrt(x_km * x_km + y_km * y_km + z_km * z_km),
+    }
+
+
 def isoformat_utc(value: datetime) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
@@ -148,6 +307,90 @@ def parse_float_param(query: dict[str, list[str]], name: str, default: float) ->
         raise QueryInputError(f"{name} must be a finite number")
 
     return value
+
+
+def parse_catalog_groups(query: dict[str, list[str]]) -> list[str]:
+    raw_values = query.get("groups")
+    if raw_values is None:
+        return list(DEFAULT_CATALOG_GROUPS)
+
+    groups = [
+        part.strip().lower()
+        for value in raw_values
+        for part in value.split(",")
+        if part.strip()
+    ]
+    if not groups:
+        return list(DEFAULT_CATALOG_GROUPS)
+
+    invalid_groups = [group for group in groups if group not in CATALOG_GROUPS]
+    if invalid_groups:
+        raise QueryInputError(
+            "Unknown catalog group",
+            details={
+                "invalid_groups": invalid_groups,
+                "valid_groups": list(CATALOG_GROUPS.keys()),
+            },
+        )
+
+    selected_groups: list[str] = []
+    seen_groups: set[str] = set()
+    for group in groups:
+        if group not in seen_groups:
+            selected_groups.append(group)
+            seen_groups.add(group)
+    return selected_groups
+
+
+def catalog_objects_for_groups(groups: list[str]) -> list[dict[str, Any]]:
+    group_set = set(groups)
+    return [item for item in BODIES if item["catalog_group"] in group_set]
+
+
+def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
+    source_type = item.get("source_type") or "spk"
+    if source_type == "horizons":
+        ephemeris_kernel = "JPL Horizons vectors"
+        ephemeris_source = "NASA/JPL Horizons API"
+        position_model = "horizons_vectors"
+    else:
+        ephemeris_kernel = item.get("kernel") or "de440s.bsp"
+        ephemeris_source = "NAIF satellite SPK" if item.get("kernel") else "NASA/JPL DE440s"
+        position_model = "spice_spk"
+
+    return {
+        "key": item["key"],
+        "name": item["name"],
+        "object_type": item["object_type"],
+        "parent_key": item.get("parent_key"),
+        "catalog_group": item["catalog_group"],
+        "catalog_group_label": CATALOG_GROUPS[item["catalog_group"]]["label"],
+        "ephemeris_id": str(item.get("horizons_id") or item["ephemeris"]),
+        "ephemeris_kernel": ephemeris_kernel,
+        "ephemeris_source": ephemeris_source,
+        "ephemeris_center": horizons_center_for_item(item) if source_type == "horizons" else "solar-system barycenter",
+        "position_model": position_model,
+        "dynamic_position": True,
+    }
+
+
+def catalog_summary_payload(groups: list[str], objects: list[dict[str, Any]]) -> dict[str, Any]:
+    kernels = sorted({item.get("kernel") or ("JPL Horizons vectors" if item.get("source_type") == "horizons" else "de440s.bsp") for item in objects})
+    return {
+        "schema_version": 1,
+        "groups": groups,
+        "available_groups": [
+            {"key": key, "label": value["label"], "description": value["description"]}
+            for key, value in CATALOG_GROUPS.items()
+        ],
+        "object_count": len(objects),
+        "kernels": kernels,
+        "objects": [catalog_object_payload(item) for item in objects],
+        "notes": [
+            "Catalog records are separate from rendered ephemeris state so future object classes can be lazy-loaded.",
+            "Loaded Solar System records use dynamic SPK or Horizons vector positions.",
+        ],
+    }
 
 
 def clamp_float(value: float, minimum: float, maximum: float) -> float:
@@ -382,13 +625,30 @@ def body_state(
     time = timescale.from_datetime(timestamp)
     item = BODY_BY_KEY[body_key]
     sun = ephemeris["sun"]
-    target = target_for_body(item, ephemeris)
 
     if body_key == "sun":
         position_au = (0.0, 0.0, 0.0)
         position_km = (0.0, 0.0, 0.0)
         velocity_km_s = (0.0, 0.0, 0.0)
+    elif item.get("source_type") == "horizons":
+        parent_key = item.get("parent_key")
+        if not parent_key:
+            raise RuntimeError(f"Horizons object {item['name']} requires a parent")
+        parent_state = body_state(parent_key, timestamp, cache)
+        vector = horizons_vector_payload(item, timestamp)
+        position_km = (
+            float(parent_state["position_km"][0] + vector["x_km"]),
+            float(parent_state["position_km"][1] + vector["y_km"]),
+            float(parent_state["position_km"][2] + vector["z_km"]),
+        )
+        position_au = tuple(component / AU_KM for component in position_km)
+        velocity_km_s = (
+            float(parent_state["velocity_km_s"][0] + vector["vx_km_s"]),
+            float(parent_state["velocity_km_s"][1] + vector["vy_km_s"]),
+            float(parent_state["velocity_km_s"][2] + vector["vz_km_s"]),
+        )
     else:
+        target = target_for_body(item, ephemeris)
         xyz, velocity = (target - sun).at(time).frame_xyz_and_velocity(ecliptic_frame)
         position_au = (float(xyz.au[0]), float(xyz.au[1]), float(xyz.au[2]))
         position_km = tuple(component * AU_KM for component in position_au)
@@ -849,18 +1109,30 @@ def trajectory_payload(
     }
 
 
-def ephemeris_payload(timestamp: datetime) -> dict[str, Any]:
+def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> dict[str, Any]:
     timescale, ephemeris = skyfield_context()
     time = timescale.from_datetime(timestamp)
     sun = ephemeris["sun"]
     earth = ephemeris["earth"]
+    selected_groups = groups or list(DEFAULT_CATALOG_GROUPS)
+    catalog_objects = catalog_objects_for_groups(selected_groups)
 
     bodies: list[dict[str, Any]] = []
-    earth_position = None
+    earth_position = vector_payload((earth - sun).at(time))
+    positions_by_key: dict[str, dict[str, float]] = {
+        "sun": {
+            "x_au": 0.0,
+            "y_au": 0.0,
+            "z_au": 0.0,
+            "x_km": 0.0,
+            "y_km": 0.0,
+            "z_km": 0.0,
+            "heliocentric_distance_km": 0.0,
+        },
+        "earth": earth_position,
+    }
 
-    for item in BODIES:
-        target = target_for_body(item, ephemeris)
-
+    for item in catalog_objects:
         if item["key"] == "sun":
             position = {
                 "x_au": 0.0,
@@ -872,13 +1144,25 @@ def ephemeris_payload(timestamp: datetime) -> dict[str, Any]:
                 "heliocentric_distance_km": 0.0,
             }
             earth_distance_km = float((sun - earth).at(time).distance().km)
+        elif item.get("source_type") == "horizons":
+            parent_key = item.get("parent_key")
+            parent_position = positions_by_key.get(parent_key or "")
+            if parent_position is None:
+                raise RuntimeError(f"Horizons object {item['name']} requires loaded parent {parent_key}")
+            relative_position = horizons_vector_payload(item, timestamp)
+            position = add_relative_position(parent_position, relative_position)
+            earth_distance_km = math.sqrt(
+                (position["x_km"] - earth_position["x_km"]) ** 2
+                + (position["y_km"] - earth_position["y_km"]) ** 2
+                + (position["z_km"] - earth_position["z_km"]) ** 2
+            )
         else:
+            target = target_for_body(item, ephemeris)
             helio_vector = (target - sun).at(time)
             position = vector_payload(helio_vector)
             earth_distance_km = 0.0 if item["key"] == "earth" else float((target - earth).at(time).distance().km)
 
-        if item["key"] == "earth":
-            earth_position = position
+        positions_by_key[item["key"]] = position
 
         bodies.append(
             {
@@ -886,6 +1170,10 @@ def ephemeris_payload(timestamp: datetime) -> dict[str, Any]:
                 "name": item["name"],
                 "radius_km": item["radius_km"],
                 "color": item["color"],
+                "object_type": item["object_type"],
+                "parent_key": item.get("parent_key"),
+                "catalog_group": item["catalog_group"],
+                "catalog": catalog_object_payload(item),
                 "position": position,
                 "distance_from_earth_km": earth_distance_km,
             }
@@ -898,6 +1186,7 @@ def ephemeris_payload(timestamp: datetime) -> dict[str, Any]:
         "coordinate_frame": "Heliocentric ecliptic Cartesian coordinates, projected top-down as x/y; z retained for distance calculations",
         "units": {"distance": "kilometers", "position": "astronomical units and kilometers"},
         "au_km": AU_KM,
+        "catalog": catalog_summary_payload(selected_groups, catalog_objects),
         "earth_position": earth_position,
         "bodies": bodies,
     }
@@ -987,9 +1276,30 @@ class Handler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/ephemeris":
             try:
-                query = parse_qs(parsed.query)
+                query = parse_qs(parsed.query, keep_blank_values=True)
                 timestamp = parse_timestamp(query.get("timestamp", [None])[0])
-                self.respond(ephemeris_payload(timestamp))
+                groups = parse_catalog_groups(query)
+                self.respond(ephemeris_payload(timestamp, groups))
+            except QueryInputError as exc:
+                payload: dict[str, Any] = {"error": str(exc)}
+                if exc.details is not None:
+                    payload["details"] = exc.details
+                self.respond(payload, status=HTTPStatus.BAD_REQUEST)
+            except Exception as exc:
+                self.respond({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if parsed.path == "/api/catalog":
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                groups = parse_catalog_groups(query)
+                objects = catalog_objects_for_groups(groups)
+                self.respond(catalog_summary_payload(groups, objects))
+            except QueryInputError as exc:
+                payload = {"error": str(exc)}
+                if exc.details is not None:
+                    payload["details"] = exc.details
+                self.respond(payload, status=HTTPStatus.BAD_REQUEST)
             except Exception as exc:
                 self.respond({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
             return

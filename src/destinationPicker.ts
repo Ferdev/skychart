@@ -35,6 +35,9 @@ export type DestinationBody = {
   name: string;
   radius_km: number;
   color: string;
+  object_type?: DestinationBodyType;
+  parent_key?: string | null;
+  catalog_group?: string;
   position: DestinationBodyPosition;
   distance_from_earth_km: number;
 };
@@ -196,7 +199,18 @@ const SOLAR_ORDER = new Map<string, number>([
   ["deimos", 42],
   ["ceres", 45],
   ["jupiter", 50],
+  ["io", 51],
+  ["europa", 52],
+  ["ganymede", 53],
+  ["callisto", 54],
   ["saturn", 60],
+  ["mimas", 61],
+  ["enceladus", 62],
+  ["tethys", 63],
+  ["dione", 64],
+  ["rhea", 65],
+  ["titan", 66],
+  ["iapetus", 67],
   ["uranus", 70],
   ["neptune", 80],
   ["pluto", 90],
@@ -239,10 +253,10 @@ const TYPE_SORT_GROUPS: Record<DestinationBodyType, number> = {
   unknown: 8
 };
 
-export function classifyBody(body: Pick<DestinationBody, "key" | "name" | "radius_km">): BodyClassification {
+export function classifyBody(body: Pick<DestinationBody, "key" | "name" | "radius_km" | "object_type">): BodyClassification {
   const key = normalizeBodyKey(body.key);
   const name = normalizeText(body.name);
-  const type = inferBodyType(key, name, body.radius_km);
+  const type = body.object_type ?? inferBodyType(key, name, body.radius_km);
 
   return {
     type,

@@ -4,8 +4,9 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 
 ## What Is Included
 
-- Sun, Mercury, Venus, Earth, Moon, Mars, Phobos, Deimos, Jupiter, Saturn, Uranus, Neptune, and Pluto.
-- Real current-date body positions from Skyfield using NASA/JPL DE440s plus the NAIF MAR099s Mars satellite SPK for Phobos and Deimos.
+- Sun, Mercury, Venus, Earth, Moon, Mars, Phobos, Deimos, Jupiter, Io, Europa, Ganymede, Callisto, Saturn, Mimas, Enceladus, Tethys, Dione, Rhea, Titan, Iapetus, Uranus, Neptune, and Pluto.
+- Real current-date body positions from Skyfield using NASA/JPL DE440s, the NAIF Mars satellite SPK, and NASA/JPL Horizons vectors for Jupiter and Saturn moons.
+- Catalog-first object metadata for each loaded body: object type, parent body, source kernel, catalog group, and dynamic/static position model.
 - 2D top-down canvas map using heliocentric ecliptic x/y coordinates.
 - Quick target shortcuts for Moon, Mars, Jupiter, and Saturn.
 - Destination search for targeting and jumping to any loaded body.
@@ -57,6 +58,8 @@ The first backend request downloads the required kernels into `data/skyfield/`, 
 - `de440s.bsp` for the Sun, planets, Earth's Moon, and Pluto barycenter.
 - `mar099s.bsp` for Phobos and Deimos.
 
+The first Jupiter/Saturn moon positions are fetched from the NASA/JPL Horizons API rather than downloaded as very large local kernels.
+
 You can also run the two processes separately:
 
 ```bash
@@ -66,7 +69,13 @@ npm run dev
 
 ## Data Source
 
-The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL `de440s.bsp` planetary ephemeris kernel. It also loads the NAIF `mar099s.bsp` satellite SPK for Mars' moons Phobos and Deimos. Kernels are downloaded on first use and cached under `data/skyfield/`.
+The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL `de440s.bsp` planetary ephemeris kernel. It also loads the NAIF `mar099s.bsp` satellite SPK for Mars' moons. Jupiter and Saturn major moons are fetched from the NASA/JPL Horizons API as parent-relative vectors and then placed into the same heliocentric ecliptic coordinate space as the Skyfield bodies.
+
+The API now exposes a catalog layer:
+
+- `/api/catalog` returns loaded object metadata without positions.
+- `/api/ephemeris` returns the same catalog metadata alongside current positions.
+- Catalog groups are explicit (`core`, `mars_moons`, `jupiter_major_moons`, `saturn_major_moons`) so future object slices can be loaded by group instead of becoming another hardcoded UI list.
 
 ## Coordinate System
 
@@ -91,7 +100,8 @@ The timestamp input is treated as UTC. Changing time recomputes every celestial 
 
 - Planet positions come from the JPL ephemeris through Skyfield, not circular orbit approximations.
 - Mars, Jupiter, Saturn, Uranus, Neptune, and Pluto use barycenter targets from the planetary ephemeris.
-- Phobos and Deimos use the official NAIF MAR099s satellite SPK. Other moon systems are not included yet because they require additional satellite kernels, some of which are much larger.
+- Phobos and Deimos use the official NAIF MAR099s satellite SPK. The Galilean moons and included Saturn moons use NASA/JPL Horizons parent-relative vectors. Many smaller or newly cataloged satellites are still missing.
+- The app now has catalog group metadata, but the frontend still loads all default Solar System groups at startup. True viewport/lazy catalog streaming is a future scaling step.
 - Gravity-assist plans are patched-conic planning estimates. They use real ephemeris positions and velocities, but they are not full Lambert/n-body mission optimizations.
 - Flyby feasibility is estimated from idealized turn angle, periapsis altitude, and incoming/outgoing excess velocity. It does not include launch vehicle constraints, finite burns, perturbations, or navigation margins.
 - The map is a top-down ecliptic projection, so it does not show vertical displacement visually.

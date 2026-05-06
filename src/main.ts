@@ -79,7 +79,18 @@ const BODY_FILTER_SECTION_LABELS: Record<BodyFilter, string> = {
 
 const COMPACT_SATELLITE_PARENT_KEYS: Record<string, string> = {
   phobos: "mars",
-  deimos: "mars"
+  deimos: "mars",
+  io: "jupiter",
+  europa: "jupiter",
+  ganymede: "jupiter",
+  callisto: "jupiter",
+  mimas: "saturn",
+  enceladus: "saturn",
+  tethys: "saturn",
+  dione: "saturn",
+  rhea: "saturn",
+  titan: "saturn",
+  iapetus: "saturn"
 };
 
 type TargetKey = string;
@@ -99,8 +110,34 @@ type Body = {
   name: string;
   radius_km: number;
   color: string;
+  object_type?: DestinationBodyType;
+  parent_key?: string | null;
+  catalog_group?: string;
+  catalog?: CatalogObject;
   position: BodyPosition;
   distance_from_earth_km: number;
+};
+
+type CatalogObject = {
+  key: string;
+  name: string;
+  object_type: DestinationBodyType;
+  parent_key: string | null;
+  catalog_group: string;
+  catalog_group_label: string;
+  ephemeris_id: string;
+  ephemeris_kernel: string;
+  ephemeris_source: string;
+  position_model: string;
+  dynamic_position: boolean;
+};
+
+type CatalogSummary = {
+  schema_version: number;
+  groups: string[];
+  object_count: number;
+  kernels: string[];
+  objects: CatalogObject[];
 };
 
 type Ephemeris = {
@@ -110,6 +147,7 @@ type Ephemeris = {
   coordinate_frame: string;
   units: Record<string, string>;
   au_km: number;
+  catalog?: CatalogSummary;
   earth_position: BodyPosition;
   bodies: Body[];
 };
@@ -649,7 +687,7 @@ async function loadTrails() {
   trailsError = "";
   try {
     const bodyKeys = ephemeris.bodies
-      .filter((body) => body.key !== "sun")
+      .filter((body) => body.key !== "sun" && body.catalog?.position_model !== "horizons_vectors")
       .map((body) => body.key)
       .join(",");
     const query = new URLSearchParams({
@@ -1121,7 +1159,7 @@ function shouldDrawBodyLabel(body: Body, screen: ScreenPoint) {
   if (body.key === selectedTarget || body.key === selectedBodyKey) return true;
   if (bodyHasFutureEvent(body) && hasNearbyLargerBody(body, screen, 96)) return false;
 
-  const parentKey = COMPACT_SATELLITE_PARENT_KEYS[body.key];
+  const parentKey = body.parent_key ?? COMPACT_SATELLITE_PARENT_KEYS[body.key];
   if (!parentKey) return true;
 
   const parent = bodyByKey.get(parentKey);
@@ -1393,6 +1431,7 @@ function updateHud(force = false) {
   appendDefinition("UTC", formatTimestamp(ephemeris.timestamp_utc));
   appendDefinition("Target", target.name);
   appendDefinition("Inspecting", inspectedBody?.name ?? "none");
+  appendDefinition("Catalog", `${ephemeris.catalog?.object_count ?? ephemeris.bodies.length} loaded objects`);
   appendDefinition("Data", ephemeris.data_source.replace("NASA/JPL ", "JPL "));
   appendDefinition("Frame", "heliocentric ecliptic x/y");
 
@@ -1677,6 +1716,10 @@ function updateBodyInfo() {
     return;
   }
 
+  const classification = classifyBody(body);
+  const parent = body.parent_key ? bodyByKey.get(body.parent_key) : null;
+  const source = body.catalog?.ephemeris_kernel ?? body.catalog_group ?? "loaded catalog";
+
   bodyInfo.innerHTML = `
     <div class="body-info-title">
       <div class="body-title-main">
@@ -1688,10 +1731,13 @@ function updateBodyInfo() {
       </div>
     </div>
     <div class="body-grid">
+      <span>Type</span><strong>${escapeHtml(classification.label)}</strong>
+      <span>Parent</span><strong>${escapeHtml(parent?.name ?? (body.parent_key ? labelForKey(body.parent_key) : "none"))}</strong>
       <span>From Sun</span><strong>${formatDistance(body.position.heliocentric_distance_km)}</strong>
       <span>From Earth</span><strong>${formatDistance(body.distance_from_earth_km)}</strong>
       <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
       <span>Mean radius</span><strong>${formatDistance(body.radius_km)}</strong>
+      <span>Source</span><strong>${escapeHtml(source)}</strong>
     </div>
   `;
 }
@@ -2427,7 +2473,18 @@ function fallbackBodyColor(key: string) {
     phobos: "#9b8066",
     deimos: "#b19a82",
     jupiter: "#d9b382",
+    io: "#e5c45f",
+    europa: "#d8c7a8",
+    ganymede: "#a89980",
+    callisto: "#7b6a58",
     saturn: "#d8c28a",
+    mimas: "#b9b7ad",
+    enceladus: "#dfe9ef",
+    tethys: "#c9c7bd",
+    dione: "#c6c7c2",
+    rhea: "#b9b5aa",
+    titan: "#d6a657",
+    iapetus: "#8d8070",
     uranus: "#83d8d8",
     neptune: "#6f8cff",
     pluto: "#c9a27c"
@@ -2575,6 +2632,7 @@ function displayRadius(body: Body) {
   if (body.key === "pluto") return 4.5;
   if (body.key === "moon") return 3.5;
   if (body.key === "phobos" || body.key === "deimos") return 3;
+  if (body.object_type === "moon") return body.radius_km > 1000 ? 4.5 : 3.2;
   return 5.5;
 }
 
