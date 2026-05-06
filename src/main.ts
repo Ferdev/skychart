@@ -223,6 +223,7 @@ type Ship = {
   zAu: number;
   vxAuPerSec: number;
   vyAuPerSec: number;
+  vzAuPerSec: number;
   angleRad: number;
 };
 
@@ -235,6 +236,7 @@ type JourneyStats = {
   maxSpeedKmS: number;
   lastShipXAu: number | null;
   lastShipYAu: number | null;
+  lastShipZAu: number | null;
 };
 
 type MeasurePoint = {
@@ -812,6 +814,7 @@ function initializeShip(force = false) {
     zAu: earth.position.z_au,
     vxAuPerSec: 0,
     vyAuPerSec: 0,
+    vzAuPerSec: 0,
     angleRad: tangent
   };
 }
@@ -845,6 +848,8 @@ function updateShip(dt: number) {
   if (!ship) return;
   const previousX = ship.xAu;
   const previousY = ship.yAu;
+  const previousZ = ship.zAu;
+  const target = bodyByKey.get(selectedTarget);
 
   const rotationSpeed = warpEnabled ? 1.45 : 1.9;
   if (keys.has("KeyA")) ship.angleRad += rotationSpeed * dt;
@@ -860,28 +865,47 @@ function updateShip(dt: number) {
   if (thrust !== 0) {
     ship.vxAuPerSec += Math.cos(ship.angleRad) * accelerationAu * thrust * dt;
     ship.vyAuPerSec += Math.sin(ship.angleRad) * accelerationAu * thrust * dt;
+    const depth = target ? targetDepthVector(target) : null;
+    if (depth && depth.direction !== 0) {
+      ship.vzAuPerSec += depth.direction * accelerationAu * thrust * depth.blend * dt;
+    }
   }
 
   if (!warpEnabled) {
     ship.vxAuPerSec *= 0.9995;
     ship.vyAuPerSec *= 0.9995;
+    ship.vzAuPerSec *= 0.9995;
   }
 
-  const speed = Math.hypot(ship.vxAuPerSec, ship.vyAuPerSec);
+  const speed = Math.hypot(ship.vxAuPerSec, ship.vyAuPerSec, ship.vzAuPerSec);
   if (speed > maxSpeedAu) {
     const ratio = maxSpeedAu / speed;
     ship.vxAuPerSec *= ratio;
     ship.vyAuPerSec *= ratio;
+    ship.vzAuPerSec *= ratio;
   }
 
   ship.xAu += ship.vxAuPerSec * dt;
   ship.yAu += ship.vyAuPerSec * dt;
+  ship.zAu += ship.vzAuPerSec * dt;
 
-  const target = bodyByKey.get(selectedTarget);
   if (target) {
-    updateJourneyStats(shipTargetDistanceKm(target), target, dt, previousX, previousY);
+    updateJourneyStats(shipTargetDistanceKm(target), target, dt, previousX, previousY, previousZ);
   }
   updateHud();
+}
+
+function targetDepthVector(target: Body) {
+  if (!ship) return null;
+  const dx = target.position.x_au - ship.xAu;
+  const dy = target.position.y_au - ship.yAu;
+  const dz = target.position.z_au - ship.zAu;
+  const distanceAu = Math.hypot(dx, dy, dz);
+  if (distanceAu <= 0) return null;
+  return {
+    direction: Math.abs(dz) < 1e-12 ? 0 : Math.sign(dz),
+    blend: clamp(Math.abs(dz) / distanceAu, 0, 0.92)
+  };
 }
 
 function draw() {
@@ -2242,10 +2266,20 @@ function updateFlightValues(shipSpeedKmS: number, scaleKm: number, navigation: R
       <strong>${navigation.closingSpeedKmS > 0 ? `${formatNumber(navigation.closingSpeedKmS)} km/s` : "not closing"}</strong>
     </div>
     <div class="flight-metric">
+      <span>Depth</span>
+      <strong>${depthMetricText(navigation)}</strong>
+    </div>
+    <div class="flight-metric">
       <span>Scale</span>
       <strong>${shortScaleText(scaleKm, ephemeris?.au_km ?? AU_KM_FALLBACK)}</strong>
     </div>
   `;
+}
+
+function depthMetricText(navigation: ReturnType<typeof navigationMetrics>) {
+  if (navigation.depthOffsetKm < 1) return "on plane";
+  const closing = navigation.depthClosingSpeedKmS > 0.001;
+  return `${compactDistance(navigation.depthOffsetKm)}${closing ? " closing" : ""}`;
 }
 
 function updateBodyInfo() {
@@ -2335,43 +2369,46 @@ function shipTargetDistanceKm(target: Body) {
 
 function shipSpeedKmPerSecond() {
   if (!ephemeris || !ship) return 0;
-  return Math.hypot(ship.vxAuPerSec, ship.vyAuPerSec) * ephemeris.au_km;
+  return Math.hypot(ship.vxAuPerSec, ship.vyAuPerSec, ship.vzAuPerSec) * ephemeris.au_km;
 }
 
 function navigationMetrics(target: Body, shipTargetKm: number) {
   if (!ephemeris || !ship) {
-    return { closingSpeedKmS: 0, etaText: "unavailable", headingErrorDeg: 0 };
+    return { closingSpeedKmS: 0, etaText: "unavailable", headingErrorDeg: 0, depthOffsetKm: 0, depthClosingSpeedKmS: 0 };
   }
 
   const dx = target.position.x_au - ship.xAu;
   const dy = target.position.y_au - ship.yAu;
   const dz = target.position.z_au - ship.zAu;
   const distanceAu = Math.hypot(dx, dy, dz);
+  const depthOffsetKm = Math.abs(dz) * ephemeris.au_km;
+  const depthClosingSpeedKmS = Math.abs(dz) < 1e-12 ? 0 : ship.vzAuPerSec * Math.sign(dz) * ephemeris.au_km;
   if (distanceAu === 0) {
-    return { closingSpeedKmS: 0, etaText: "arrived", headingErrorDeg: 0 };
+    return { closingSpeedKmS: 0, etaText: "arrived", headingErrorDeg: 0, depthOffsetKm, depthClosingSpeedKmS };
   }
 
-  const closingSpeedAuS = (ship.vxAuPerSec * dx + ship.vyAuPerSec * dy) / distanceAu;
+  const closingSpeedAuS = (ship.vxAuPerSec * dx + ship.vyAuPerSec * dy + ship.vzAuPerSec * dz) / distanceAu;
   const closingSpeedKmS = closingSpeedAuS * ephemeris.au_km;
   const etaText = closingSpeedKmS > 0.001 ? formatDuration(shipTargetKm / closingSpeedKmS) : "not closing";
   const targetBearing = Math.atan2(dy, dx);
   const headingErrorDeg = Math.abs(radToDeg(normalizeAngle(targetBearing - ship.angleRad)));
 
-  return { closingSpeedKmS, etaText, headingErrorDeg };
+  return { closingSpeedKmS, etaText, headingErrorDeg, depthOffsetKm, depthClosingSpeedKmS };
 }
 
-function updateJourneyStats(shipTargetKm: number, target: Body, dt = 0, previousXAu?: number, previousYAu?: number) {
+function updateJourneyStats(shipTargetKm: number, target: Body, dt = 0, previousXAu?: number, previousYAu?: number, previousZAu?: number) {
   if (journeyStats.targetKey !== selectedTarget) {
     resetJourneyStats();
   }
 
-  if (ship && previousXAu !== undefined && previousYAu !== undefined && ephemeris) {
-    const segmentKm = Math.hypot(ship.xAu - previousXAu, ship.yAu - previousYAu) * ephemeris.au_km;
+  if (ship && previousXAu !== undefined && previousYAu !== undefined && previousZAu !== undefined && ephemeris) {
+    const segmentKm = Math.hypot(ship.xAu - previousXAu, ship.yAu - previousYAu, ship.zAu - previousZAu) * ephemeris.au_km;
     journeyStats.distanceTraveledKm += segmentKm;
     journeyStats.elapsedSeconds += dt;
     journeyStats.maxSpeedKmS = Math.max(journeyStats.maxSpeedKmS, shipSpeedKmPerSecond());
     journeyStats.lastShipXAu = ship.xAu;
     journeyStats.lastShipYAu = ship.yAu;
+    journeyStats.lastShipZAu = ship.zAu;
   }
 
   journeyStats.closestKm = Math.min(journeyStats.closestKm, shipTargetKm);
@@ -2388,6 +2425,7 @@ function resetJourneyStats() {
     journeyStats.arrived = journeyStats.closestKm <= arrivalThresholdKm(target);
     journeyStats.lastShipXAu = ship.xAu;
     journeyStats.lastShipYAu = ship.yAu;
+    journeyStats.lastShipZAu = ship.zAu;
   }
 }
 
@@ -2400,7 +2438,8 @@ function createJourneyStats(targetKey: TargetKey): JourneyStats {
     distanceTraveledKm: 0,
     maxSpeedKmS: 0,
     lastShipXAu: null,
-    lastShipYAu: null
+    lastShipYAu: null,
+    lastShipZAu: null
   };
 }
 

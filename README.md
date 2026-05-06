@@ -19,7 +19,7 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 - Navigation feedback: target heading arrow, closing speed, ETA, closest approach, and arrival status.
 - Gravity-assist planning panel with direct-transfer and single-flyby patched-conic candidate comparisons.
 - Launch-window scanning using real JPL ephemeris states at departure, flyby, and arrival events.
-- Basic ship controls: `W` thrust, `S` reverse thrust, `A`/`D` rotate, `Space` toggle warp.
+- Basic ship controls: `W` thrust, `S` reverse thrust, `A`/`D` rotate, `Space` toggle warp. Thrust also drives an invisible z-axis component toward the selected target so top-down travel still closes true 3D distance.
 - Mouse wheel zoom, pointer drag pan, and simple center buttons.
 - Viewport-side nearest-object references that update while panning and show each off-screen body's glyph, name, and distance from the current map center.
 - Reset controls for placing the ship back near Earth and restarting the current journey.
@@ -117,5 +117,5 @@ The timestamp input is treated as UTC. Changing time recomputes every celestial 
 - Flyby feasibility is estimated from idealized turn angle, periapsis altitude, and incoming/outgoing excess velocity. It does not include launch vehicle constraints, finite burns, perturbations, or navigation margins.
 - The map is a top-down ecliptic projection, so it does not show vertical displacement visually.
 - The spacecraft movement is fictional arcade motion. It is integrated in the same heliocentric AU coordinate space, but it is not orbital mechanics.
-- Ship-to-target distance includes the target body's retained ecliptic z coordinate while the ship stays in its starting z plane.
+- Ship-to-target distance and speed use x/y/z. The map renders x/y only, so the HUD includes a depth offset for the hidden ecliptic z component.
 - Light travel time uses distance divided by `299,792.458 km/s`.
