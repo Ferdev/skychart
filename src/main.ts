@@ -21,6 +21,8 @@ const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
 const BODY_FILTERS = ["all", "planet", "moon", "dwarf_planet", "star"] as const;
 const ONBOARDING_DISMISSED_KEY = "cosmic-atlas.onboarding-dismissed";
 const TRANSFER_PATH_SAMPLES = 96;
+const MIN_PX_PER_AU = 4;
+const MAX_PX_PER_AU = 24_000_000;
 const ICONS: Record<string, string> = {
   target:
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg>',
@@ -57,7 +59,7 @@ const ICONS: Record<string, string> = {
 type BodyFilter = (typeof BODY_FILTERS)[number];
 type InteractionMode = "pan" | "target" | "measure";
 type DisplayLayer = "labels" | "rings" | "route" | "trails";
-type ZoomPreset = "inner" | "outer" | "all";
+type ZoomPreset = "inner" | "outer" | "local" | "all";
 
 const BODY_FILTER_LABELS: Record<BodyFilter, string> = {
   all: "All",
@@ -526,12 +528,13 @@ displayToggles.addEventListener("change", (event) => {
   }
   updateHud();
 });
-zoomPresets.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-zoom-preset]");
-  const preset = button?.dataset.zoomPreset as ZoomPreset | undefined;
-  if (!preset) return;
-  applyZoomPreset(preset);
-});
+for (const button of zoomPresets.querySelectorAll<HTMLButtonElement>("[data-zoom-preset]")) {
+  button.addEventListener("click", () => {
+    const preset = button.dataset.zoomPreset as ZoomPreset | undefined;
+    if (!preset) return;
+    applyZoomPreset(preset);
+  });
+}
 bodyPopover.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-popover-action]");
   if (!button || !activePopoverBodyKey) return;
@@ -2478,18 +2481,34 @@ function resizeCanvas() {
 
 function zoomAt(clientX: number, clientY: number, factor: number) {
   const before = screenToWorld(clientX, clientY);
-  camera.pxPerAu = clamp(camera.pxPerAu * factor, 4, 240_000);
+  camera.pxPerAu = clamp(camera.pxPerAu * factor, MIN_PX_PER_AU, MAX_PX_PER_AU);
   const after = screenToWorld(clientX, clientY);
   camera.xAu += before.xAu - after.xAu;
   camera.yAu += before.yAu - after.yAu;
-  updateHud();
+  updateHud(true);
 }
 
 function applyZoomPreset(preset: ZoomPreset) {
   if (!ephemeris) return;
+  if (preset === "local") {
+    const body = bodyByKey.get(selectedBodyKey) ?? bodyByKey.get(selectedTarget);
+    if (!body) return;
+    const viewRadiusAu = localViewRadiusAu(body);
+    camera.xAu = body.position.x_au;
+    camera.yAu = body.position.y_au;
+    camera.pxPerAu = clamp(
+      Math.min(window.innerWidth, window.innerHeight) / (viewRadiusAu * 2.15),
+      MIN_PX_PER_AU,
+      MAX_PX_PER_AU
+    );
+    updateHud(true);
+    return;
+  }
+
   const keysByPreset: Record<ZoomPreset, string[]> = {
     inner: ["mercury", "venus", "earth", "moon", "mars", "phobos", "deimos"],
     outer: ["jupiter", "saturn", "uranus", "neptune", "pluto"],
+    local: [],
     all: ephemeris.bodies.map((body) => body.key)
   };
   const bodies = keysByPreset[preset].map((key) => bodyByKey.get(key)).filter((body): body is Body => Boolean(body));
@@ -2497,8 +2516,8 @@ function applyZoomPreset(preset: ZoomPreset) {
   const maxAu = Math.max(...bodies.map((body) => Math.hypot(body.position.x_au, body.position.y_au)), 0.5);
   camera.xAu = 0;
   camera.yAu = 0;
-  camera.pxPerAu = clamp(Math.min(window.innerWidth, window.innerHeight) / (maxAu * 2.4), 4, 240_000);
-  updateHud();
+  camera.pxPerAu = clamp(Math.min(window.innerWidth, window.innerHeight) / (maxAu * 2.4), MIN_PX_PER_AU, MAX_PX_PER_AU);
+  updateHud(true);
 }
 
 function updateTimeSummary() {
@@ -2559,22 +2578,71 @@ function displayRadius(body: Body) {
   return 5.5;
 }
 
+function localViewRadiusAu(body: Body) {
+  const systemRadiusAu: Record<string, number> = {
+    sun: 0.04,
+    mercury: 0.00035,
+    venus: 0.00035,
+    earth: 0.0032,
+    moon: 0.00035,
+    mars: 0.00024,
+    phobos: 0.00008,
+    deimos: 0.00008,
+    jupiter: 0.017,
+    saturn: 0.035,
+    uranus: 0.008,
+    neptune: 0.006,
+    pluto: 0.0012
+  };
+  const configuredRadius = systemRadiusAu[body.key];
+  if (configuredRadius) return configuredRadius;
+
+  const auKm = ephemeris?.au_km ?? AU_KM_FALLBACK;
+  const bodyRadiusAu = body.radius_km / auKm;
+  return clamp(bodyRadiusAu * 180, 0.00008, 0.04);
+}
+
 function pickGridAu() {
   const targetPx = 88;
   const rawAu = targetPx / camera.pxPerAu;
-  const powers = [0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10];
+  const powers = [
+    0.000001,
+    0.000002,
+    0.000005,
+    0.00001,
+    0.00002,
+    0.00005,
+    0.0001,
+    0.0002,
+    0.0005,
+    0.001,
+    0.002,
+    0.005,
+    0.01,
+    0.02,
+    0.05,
+    0.1,
+    0.25,
+    0.5,
+    1,
+    2,
+    5,
+    10
+  ];
   return powers.find((value) => value >= rawAu) ?? 20;
 }
 
 function scaleText(kmPerPx: number, auKm: number) {
   const auPerPx = kmPerPx / auKm;
   if (auPerPx >= 0.001) return `1 px = ${formatNumber(kmPerPx)} km / ${formatAu(auPerPx)} AU`;
+  if (kmPerPx < 1) return `1 px = ${formatNumber(kmPerPx * 1000)} m`;
   return `1 px = ${formatNumber(kmPerPx)} km`;
 }
 
 function shortScaleText(kmPerPx: number, auKm: number) {
   const auPerPx = kmPerPx / auKm;
   if (auPerPx >= 0.001) return `${formatAu(auPerPx)} AU/px`;
+  if (kmPerPx < 1) return `${formatNumber(kmPerPx * 1000)} m/px`;
   return `${formatNumber(kmPerPx)} km/px`;
 }
 
