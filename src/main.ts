@@ -59,7 +59,7 @@ const ICONS: Record<string, string> = {
 
 type BodyFilter = (typeof BODY_FILTERS)[number];
 type InteractionMode = "pan" | "target" | "measure";
-type DisplayLayer = "labels" | "rings" | "orbits" | "route" | "trails";
+type DisplayLayer = "labels" | "orbits" | "route" | "trails";
 type ZoomPreset = "inner" | "outer" | "local" | "all";
 
 const BODY_FILTER_LABELS: Record<BodyFilter, string> = {
@@ -425,7 +425,6 @@ let selectedTrajectoryCandidateId: string | null = null;
 let trajectoryRequestId = 0;
 const displayLayers: Record<DisplayLayer, boolean> = {
   labels: true,
-  rings: true,
   orbits: true,
   route: true,
   trails: false
@@ -853,9 +852,6 @@ function draw() {
   ctx.scale(devicePixelRatio, devicePixelRatio);
   ctx.clearRect(0, 0, width, height);
   drawStarfield(width, height);
-  if (displayLayers.rings) {
-    drawDistanceRings();
-  }
 
   if (ephemeris) {
     if (displayLayers.orbits) {
@@ -906,27 +902,6 @@ function drawStarfield(width: number, height: number) {
     ctx.lineTo(width, p.y);
   }
   ctx.stroke();
-}
-
-function drawDistanceRings() {
-  const rings = [0.39, 0.72, 1, 1.52, 5.2, 9.58, 19.2, 30.1];
-  const sun = worldToScreen(0, 0);
-  ctx.save();
-  ctx.strokeStyle = "rgba(243, 240, 232, 0.12)";
-  ctx.fillStyle = "rgba(243, 240, 232, 0.46)";
-  ctx.font = "11px ui-sans-serif, system-ui";
-
-  for (const au of rings) {
-    const radius = au * camera.pxPerAu;
-    if (radius < 6 || radius > Math.max(canvas.width, canvas.height) / devicePixelRatio * 2) continue;
-    ctx.beginPath();
-    ctx.arc(sun.x, sun.y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-    if (radius > 26) {
-      ctx.fillText(`${formatAu(au)} AU`, sun.x + radius + 5, sun.y - 4);
-    }
-  }
-  ctx.restore();
 }
 
 function drawOrbitPaths() {

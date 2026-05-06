@@ -94,7 +94,7 @@ Positions are computed as heliocentric ecliptic Cartesian coordinates:
 
 Distances are never numerically compressed or altered. Zoom only changes the map transform from AU to pixels.
 
-Planet and Moon display radii are deliberately exaggerated so bodies remain visible. AU rings are distance guides. The Orbits layer draws current osculating orbit references from the epoch state vectors; these are visual guides, not n-body propagated paths.
+Planet and Moon display radii are deliberately exaggerated so bodies remain visible. The Orbits layer draws current osculating orbit references from the epoch state vectors; these are visual guides, not n-body propagated paths.
 
 ## Time Controls
 
