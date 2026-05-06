@@ -75,6 +75,11 @@ const BODY_FILTER_SECTION_LABELS: Record<BodyFilter, string> = {
   star: "Stars"
 };
 
+const COMPACT_SATELLITE_PARENT_KEYS: Record<string, string> = {
+  phobos: "mars",
+  deimos: "mars"
+};
+
 type TargetKey = string;
 
 type BodyPosition = {
@@ -174,6 +179,14 @@ type LabelPlacement = {
   dx: number;
   dy: number;
   align?: "left" | "center" | "right";
+};
+
+type BodyLabelLayout = {
+  body: Body;
+  text: string;
+  rect: LabelRect;
+  font: string;
+  color: string;
 };
 
 type TrajectoryEvent = {
@@ -336,6 +349,7 @@ const displayLayers: Record<DisplayLayer, boolean> = {
 let warpEnabled = false;
 let lastFrame = performance.now();
 let lastHudRender = 0;
+let journeyStructuralKey = "";
 let isDragging = false;
 let dragMoved = false;
 let dragStart = { x: 0, y: 0, cameraXAu: 0, cameraYAu: 0 };
@@ -769,6 +783,7 @@ function draw() {
     for (const body of ephemeris.bodies) {
       drawBody(body);
     }
+    drawBodyLabels();
   }
 
   drawMeasurement();
@@ -1005,7 +1020,7 @@ function drawMapCallout(
   const viewportHeight = canvas.height / devicePixelRatio;
   const placement = placements
     .map((candidate) => labelRectForPlacement(anchor, candidate, width, height, viewportWidth, viewportHeight))
-    .find((rect) => occupied.every((existing) => !rectsOverlap(rect, existing, 7))) ??
+    .find((rect) => occupied.every((existing) => !rectsOverlap(rect, existing, 12))) ??
     labelRectForPlacement(anchor, placements[0] ?? { dx: 12, dy: -28 }, width, height, viewportWidth, viewportHeight);
 
   if (Math.hypot(anchor.x - (placement.x + placement.width / 2), anchor.y - (placement.y + placement.height / 2)) > 24) {
@@ -1052,30 +1067,115 @@ function labelRectForPlacement(
 }
 
 function bodyLabelRects() {
+  return bodyLabelLayouts().map((layout) => layout.rect);
+}
+
+function bodyLabelLayouts(): BodyLabelLayout[] {
   if (!ephemeris) return [];
-  const rects: LabelRect[] = [];
+  const bodies = ephemeris.bodies;
+  const occupied: LabelRect[] = [];
+  const layouts: BodyLabelLayout[] = [];
   ctx.save();
-  for (const body of ephemeris.bodies) {
+  for (const body of [...bodies].sort((a, b) => bodyLabelPriority(b) - bodyLabelPriority(a))) {
     const screen = worldToScreen(body.position.x_au, body.position.y_au);
     if (!isScreenPointVisible(screen, 80)) continue;
+    if (!shouldDrawBodyLabel(body, screen)) continue;
+
     const radius = displayRadius(body);
     const label = bodyDisplayLabel(body);
-    ctx.font = body.key === selectedTarget || body.key === selectedBodyKey ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
-    rects.push({
-      x: screen.x + radius + 5,
-      y: screen.y - 9,
-      width: Math.ceil(ctx.measureText(label).width + 10),
-      height: 18
+    const isEmphasized = body.key === selectedTarget || body.key === selectedBodyKey;
+    const font = isEmphasized ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
+    ctx.font = font;
+    const width = Math.ceil(ctx.measureText(label).width + 10);
+    const height = isEmphasized ? 19 : 18;
+    const rect = bodyLabelPlacements(radius, body)
+      .map((placement) => labelRectForPlacement(screen, placement, width, height, canvas.width / devicePixelRatio, canvas.height / devicePixelRatio))
+      .find((candidate) => occupied.every((existing) => !rectsOverlap(candidate, existing, 14)));
+    if (!rect) continue;
+
+    occupied.push(rect);
+    layouts.push({
+      body,
+      text: label,
+      rect,
+      font,
+      color: body.key === "sun" ? "#ffe8a3" : "#f3f0e8"
     });
   }
   ctx.restore();
-  return rects;
+  return layouts.sort((a, b) => bodies.indexOf(a.body) - bodies.indexOf(b.body));
+}
+
+function bodyLabelPriority(body: Body) {
+  if (body.key === selectedTarget) return 1000;
+  if (body.key === selectedBodyKey) return 900;
+  if (body.key === "sun") return 800;
+  if (body.radius_km > 1000) return 600 + Math.min(body.radius_km, 100_000) / 1000;
+  return 100 + body.radius_km;
+}
+
+function shouldDrawBodyLabel(body: Body, screen: ScreenPoint) {
+  if (body.key === selectedTarget || body.key === selectedBodyKey) return true;
+  if (bodyHasFutureEvent(body) && hasNearbyLargerBody(body, screen, 96)) return false;
+
+  const parentKey = COMPACT_SATELLITE_PARENT_KEYS[body.key];
+  if (!parentKey) return true;
+
+  const parent = bodyByKey.get(parentKey);
+  if (!parent) return true;
+
+  const parentScreen = worldToScreen(parent.position.x_au, parent.position.y_au);
+  if (Math.hypot(screen.x - parentScreen.x, screen.y - parentScreen.y) <= 34) return false;
+
+  return true;
+}
+
+function hasNearbyLargerBody(body: Body, screen: ScreenPoint, minDistancePx: number) {
+  for (const other of bodyByKey.values()) {
+    if (other.key === body.key || other.radius_km < body.radius_km) continue;
+    const otherScreen = worldToScreen(other.position.x_au, other.position.y_au);
+    if (Math.hypot(screen.x - otherScreen.x, screen.y - otherScreen.y) < minDistancePx) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function bodyLabelPlacements(radius: number, body?: Body): LabelPlacement[] {
+  const placements: LabelPlacement[] = [
+    { dx: radius + 12, dy: -10 },
+    { dx: radius + 12, dy: 14 },
+    { dx: -radius - 12, dy: -10, align: "right" },
+    { dx: -radius - 12, dy: 14, align: "right" },
+    { dx: 0, dy: -radius - 31, align: "center" },
+    { dx: 0, dy: radius + 14, align: "center" }
+  ];
+  if (body && bodyHasFutureEvent(body)) {
+    return [placements[4], placements[5], placements[2], placements[3], placements[0], placements[1]];
+  }
+  return placements;
+}
+
+function drawBodyLabels() {
+  if (!displayLayers.labels) return;
+  const layouts = bodyLabelLayouts();
+  ctx.save();
+  ctx.textBaseline = "middle";
+  for (const layout of layouts) {
+    ctx.font = layout.font;
+    ctx.fillStyle = layout.color;
+    ctx.fillText(layout.text, layout.rect.x + 5, layout.rect.y + layout.rect.height / 2);
+  }
+  ctx.restore();
 }
 
 function bodyDisplayLabel(body: Body) {
+  return bodyHasFutureEvent(body) ? `${body.name} now` : body.name;
+}
+
+function bodyHasFutureEvent(body: Body) {
   const candidate = activeTrajectoryCandidate();
-  const hasFutureEvent = candidate?.events.some((event) => event.body_key === body.key && Math.abs(event.offset_days) >= 0.5);
-  return hasFutureEvent ? `${body.name} now` : body.name;
+  return Boolean(candidate?.events.some((event) => event.body_key === body.key && Math.abs(event.offset_days) >= 0.5));
 }
 
 function rectsOverlap(a: LabelRect, b: LabelRect, padding = 0) {
@@ -1238,13 +1338,6 @@ function drawBody(body: Body) {
     ctx.stroke();
   }
 
-  if (displayLayers.labels) {
-    const label = bodyDisplayLabel(body);
-    ctx.fillStyle = body.key === "sun" ? "#ffe8a3" : "#f3f0e8";
-    ctx.font = isTarget || isSelectedBody ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, screen.x + radius + 7, screen.y);
-  }
   ctx.restore();
 }
 
@@ -1343,73 +1436,114 @@ function updateJourney(target: Body, shipTargetKm: number) {
   const statusLabel = journeyStats.arrived ? "Arrival confirmed" : status;
   const routeProgress = clamp(progressPercent, 0, 100);
   const progressLabel = activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : "transfer preview";
+  const structuralKey = [
+    ephemeris.timestamp_utc,
+    target.key,
+    selectedBodyKey,
+    trajectoryLoading ? "loading" : "ready",
+    trajectoryError,
+    trajectoryPlan?.generated_at_utc ?? "no-plan",
+    activePlan?.id ?? "no-active-plan",
+    routeWaypoints.map((waypoint) => waypoint.key).join(",")
+  ].join("|");
 
-  journey.innerHTML = `
-    <div class="journey-hero">
-      <div>
-        <span class="eyebrow">Journey</span>
-        <h2>Earth to ${escapeHtml(target.name)}</h2>
-      </div>
-      <span class="status-token">${statusLabel}</span>
-    </div>
-    <div class="route-card">
-      <div class="route-body origin">
-        ${bodyOrbHtml(earth, "large")}
-        <span>Origin</span>
-        <strong>${escapeHtml(earth.name)}</strong>
-      </div>
-      <div class="route-vector" aria-label="Route progress from Earth to ${escapeHtml(target.name)}">
-        <div class="route-track">
-          <span class="route-progress-dot" style="left: ${routeProgress.toFixed(2)}%"></span>
+  if (journeyStructuralKey !== structuralKey) {
+    journeyStructuralKey = structuralKey;
+    journey.innerHTML = `
+      <div class="journey-hero">
+        <div>
+          <span class="eyebrow">Journey</span>
+          <h2>Earth to ${escapeHtml(target.name)}</h2>
         </div>
-        <span>${activePlan?.kind === "gravity_assist" ? "gravity assist" : "transfer"} · ${formatDistance(routeDistanceKm)}</span>
+        <span class="status-token" data-journey-field="status"></span>
       </div>
-      <div class="route-body destination">
-        ${bodyOrbHtml(target, "large")}
-        <span>Destination</span>
-        <strong>${escapeHtml(target.name)}</strong>
+      <div class="route-card">
+        <div class="route-body origin">
+          ${bodyOrbHtml(earth, "large")}
+          <span>Origin</span>
+          <strong>${escapeHtml(earth.name)}</strong>
+        </div>
+        <div class="route-vector" aria-label="Route progress from Earth to ${escapeHtml(target.name)}">
+          <div class="route-track">
+            <span class="route-progress-dot" data-journey-field="route-dot"></span>
+          </div>
+          <span data-journey-field="route-summary"></span>
+        </div>
+        <div class="route-body destination">
+          ${bodyOrbHtml(target, "large")}
+          <span>Destination</span>
+          <strong>${escapeHtml(target.name)}</strong>
+        </div>
       </div>
-    </div>
-    <p class="route-note">${escapeHtml(routeNoteText(activePlan))}</p>
-    ${renderTrajectoryPlanner(activePlan)}
-    <div class="distance-focus">
-      <span>${nextAction}</span>
-      <strong>${formatDistance(shipTargetKm)}</strong>
-    </div>
-    <div class="progress-track" aria-label="Journey progress">
-      <div class="progress-fill" style="width: ${progressPercent.toFixed(2)}%"></div>
-    </div>
-    <div class="progress-caption">
-      <span>${progressPercent.toFixed(2)}% along ${progressLabel}</span>
-      <span>${formatDuration(remainingLightSeconds)} light time remaining</span>
-    </div>
-    <div class="metric-tiles">
-      <article>
-        <span>ETA now</span>
-        <strong>${navigation.etaText}</strong>
-      </article>
-      <article>
-        <span>Heading error</span>
-        <strong>${formatDegrees(navigation.headingErrorDeg)}</strong>
-      </article>
-      <article>
-        <span>Closest approach</span>
-        <strong>${Number.isFinite(journeyStats.closestKm) ? formatDistance(journeyStats.closestKm) : "not recorded"}</strong>
-      </article>
-      <article>
-        <span>Arrival zone</span>
-        <strong>${formatDistance(thresholdKm)}</strong>
-      </article>
-    </div>
-    <div class="journey-grid detail-grid">
-      <span>${directRouteLabel}</span><strong>${formatDistance(routeDistanceKm)}</strong>
-      <span>Earth-target light time</span><strong>${formatDuration(targetLightSeconds)}</strong>
-      <span>Comparison</span><strong>${comparisonText}</strong>
-      <span>Distance flown</span><strong>${formatDistance(journeyStats.distanceTraveledKm)}</strong>
-      <span>Max speed</span><strong>${formatNumber(journeyStats.maxSpeedKmS)} km/s</strong>
-      <span>Elapsed flight time</span><strong>${formatDuration(journeyStats.elapsedSeconds)}</strong>
-    </div>
-  `;
+      <p class="route-note">${escapeHtml(routeNoteText(activePlan))}</p>
+      ${renderTrajectoryPlanner(activePlan)}
+      <div class="distance-focus">
+        <span data-journey-field="next-action"></span>
+        <strong data-journey-field="ship-target-distance"></strong>
+      </div>
+      <div class="progress-track" aria-label="Journey progress">
+        <div class="progress-fill" data-journey-field="progress-fill"></div>
+      </div>
+      <div class="progress-caption">
+        <span data-journey-field="progress-label"></span>
+        <span data-journey-field="light-time-remaining"></span>
+      </div>
+      <div class="metric-tiles">
+        <article>
+          <span>ETA now</span>
+          <strong data-journey-field="eta"></strong>
+        </article>
+        <article>
+          <span>Heading error</span>
+          <strong data-journey-field="heading-error"></strong>
+        </article>
+        <article>
+          <span>Closest approach</span>
+          <strong data-journey-field="closest-approach"></strong>
+        </article>
+        <article>
+          <span>Arrival zone</span>
+          <strong data-journey-field="arrival-zone"></strong>
+        </article>
+      </div>
+      <div class="journey-grid detail-grid">
+        <span>${escapeHtml(directRouteLabel)}</span><strong data-journey-field="route-distance"></strong>
+        <span>Earth-target light time</span><strong data-journey-field="earth-target-light-time"></strong>
+        <span>Comparison</span><strong data-journey-field="comparison"></strong>
+        <span>Distance flown</span><strong data-journey-field="distance-flown"></strong>
+        <span>Max speed</span><strong data-journey-field="max-speed"></strong>
+        <span>Elapsed flight time</span><strong data-journey-field="elapsed-flight-time"></strong>
+      </div>
+    `;
+  }
+
+  updateJourneyField("status", statusLabel);
+  updateJourneyField("route-summary", `${activePlan?.kind === "gravity_assist" ? "gravity assist" : "transfer"} · ${formatDistance(routeDistanceKm)}`);
+  updateJourneyField("next-action", nextAction);
+  updateJourneyField("ship-target-distance", formatDistance(shipTargetKm));
+  updateJourneyField("progress-label", `${progressPercent.toFixed(2)}% along ${progressLabel}`);
+  updateJourneyField("light-time-remaining", `${formatDuration(remainingLightSeconds)} light time remaining`);
+  updateJourneyField("eta", navigation.etaText);
+  updateJourneyField("heading-error", formatDegrees(navigation.headingErrorDeg));
+  updateJourneyField("closest-approach", Number.isFinite(journeyStats.closestKm) ? formatDistance(journeyStats.closestKm) : "not recorded");
+  updateJourneyField("arrival-zone", formatDistance(thresholdKm));
+  updateJourneyField("route-distance", formatDistance(routeDistanceKm));
+  updateJourneyField("earth-target-light-time", formatDuration(targetLightSeconds));
+  updateJourneyField("comparison", comparisonText);
+  updateJourneyField("distance-flown", formatDistance(journeyStats.distanceTraveledKm));
+  updateJourneyField("max-speed", `${formatNumber(journeyStats.maxSpeedKmS)} km/s`);
+  updateJourneyField("elapsed-flight-time", formatDuration(journeyStats.elapsedSeconds));
+  const progressFill = journey.querySelector<HTMLElement>('[data-journey-field="progress-fill"]');
+  if (progressFill) progressFill.style.width = `${progressPercent.toFixed(2)}%`;
+  const progressDot = journey.querySelector<HTMLElement>('[data-journey-field="route-dot"]');
+  if (progressDot) progressDot.style.left = `${routeProgress.toFixed(2)}%`;
+}
+
+function updateJourneyField(field: string, value: string) {
+  const element = journey.querySelector<HTMLElement>(`[data-journey-field="${field}"]`);
+  if (element && element.textContent !== value) {
+    element.textContent = value;
+  }
 }
 
 function routeNoteText(candidate: TrajectoryCandidate | null) {
@@ -1485,10 +1619,13 @@ function renderTrajectoryPlanner(activePlan: TrajectoryCandidate | null) {
 function renderTrajectoryCandidateCard(candidate: TrajectoryCandidate, active: boolean) {
   const feasible = candidate.metrics.feasible;
   const flybyLabel = candidate.kind === "gravity_assist" ? "flyby" : "direct";
+  const departure = offsetLabel(candidate.metrics.departure_offset_days);
+  const arrival = offsetLabel(candidate.metrics.arrival_offset_days);
   return `
     <button type="button" class="trajectory-card${active ? " active" : ""}" data-trajectory-candidate="${escapeHtml(candidate.id)}">
       <span>${escapeHtml(flybyLabel)}</span>
       <strong>${escapeHtml(candidate.label)}</strong>
+      <small>depart ${departure} · arrive ${arrival}</small>
       <small>${formatDeltaV(candidate.metrics.total_delta_v_km_s)} · ${formatDuration(candidate.metrics.total_time_days * 86_400)}</small>
       <em>${feasible ? "feasible" : "needs burn"}</em>
     </button>

@@ -712,6 +712,28 @@ def build_assist_candidate(
     }
 
 
+def display_candidate_key(candidate: dict[str, Any]) -> tuple[str, str]:
+    if candidate["kind"] == "gravity_assist":
+        return (candidate["kind"], candidate["assist_body_key"] or candidate["label"])
+    return (candidate["kind"], "direct")
+
+
+def display_candidates(candidates: list[dict[str, Any]], *pinned: dict[str, Any] | None) -> list[dict[str, Any]]:
+    display: list[dict[str, Any]] = []
+    seen_routes: set[tuple[str, str]] = set()
+
+    for candidate in [item for item in pinned if item is not None] + sorted(candidates, key=lambda item: item["metrics"]["score"]):
+        route_key = display_candidate_key(candidate)
+        if route_key in seen_routes:
+            continue
+        display.append(candidate)
+        seen_routes.add(route_key)
+        if len(display) >= 8:
+            break
+
+    return display
+
+
 def trajectory_payload(
     timestamp: datetime,
     destination_key: str,
@@ -791,17 +813,7 @@ def trajectory_payload(
     best_assist = min(best_assist_pool, key=lambda item: item["metrics"]["score"]) if best_assist_pool else None
     selected = best_assist or best_direct or min(candidates, key=lambda item: item["metrics"]["score"])
 
-    ranked_candidates = sorted(
-        [candidate for candidate in [best_direct, best_assist] if candidate is not None]
-        + sorted(candidates, key=lambda item: item["metrics"]["score"])[:6],
-        key=lambda item: item["metrics"]["score"],
-    )
-    unique_candidates: list[dict[str, Any]] = []
-    seen_ids: set[str] = set()
-    for candidate in ranked_candidates:
-        if candidate["id"] not in seen_ids:
-            unique_candidates.append(candidate)
-            seen_ids.add(candidate["id"])
+    unique_candidates = display_candidates(candidates, selected, best_direct, best_assist)
 
     return {
         "timestamp_utc": isoformat_utc(timestamp),
@@ -828,7 +840,7 @@ def trajectory_payload(
         "selected_candidate_id": selected["id"],
         "best_direct_candidate_id": best_direct["id"] if best_direct else None,
         "best_gravity_assist_candidate_id": best_assist["id"] if best_assist else None,
-        "candidates": unique_candidates[:8],
+        "candidates": unique_candidates,
         "limitations": [
             "This is a patched-conic planning estimate, not a final mission trajectory.",
             "The search evaluates direct and single-flyby windows from real JPL ephemeris states.",
