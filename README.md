@@ -14,6 +14,8 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 - UTC time controls: apply a timestamp, jump to now, or step by days/weeks/months.
 - Real Earth-to-target distance, ship-to-target distance, light travel time, zoom scale, and a journey progress panel.
 - Navigation feedback: target heading arrow, closing speed, ETA, closest approach, and arrival status.
+- Gravity-assist planning panel with direct-transfer and single-flyby patched-conic candidate comparisons.
+- Launch-window scanning using real JPL ephemeris states at departure, flyby, and arrival events.
 - Basic ship controls: `W` thrust, `S` reverse thrust, `A`/`D` rotate, `Space` toggle warp.
 - Mouse wheel zoom, pointer drag pan, and simple center buttons.
 - Reset controls for placing the ship back near Earth and restarting the current journey.
@@ -86,6 +88,8 @@ The timestamp input is treated as UTC. Changing time recomputes every celestial 
 
 - Planet positions come from the JPL ephemeris through Skyfield, not circular orbit approximations.
 - Mars, Jupiter, Saturn, Uranus, and Neptune use barycenter targets from the ephemeris.
+- Gravity-assist plans are patched-conic planning estimates. They use real ephemeris positions and velocities, but they are not full Lambert/n-body mission optimizations.
+- Flyby feasibility is estimated from idealized turn angle, periapsis altitude, and incoming/outgoing excess velocity. It does not include launch vehicle constraints, finite burns, perturbations, or navigation margins.
 - The map is a top-down ecliptic projection, so it does not show vertical displacement visually.
 - The spacecraft movement is fictional arcade motion. It is integrated in the same heliocentric AU coordinate space, but it is not orbital mechanics.
 - Ship-to-target distance includes the target body's retained ecliptic z coordinate while the ship stays in its starting z plane.

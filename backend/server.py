@@ -18,18 +18,20 @@ DATA_DIR = ROOT / "data" / "skyfield"
 HOST = "127.0.0.1"
 PORT = 8765
 AU_KM = 149_597_870.700
+SUN_MU_KM3_S2 = 132_712_440_018.0
+SECONDS_PER_DAY = 86_400.0
 
 BODIES = [
-    {"key": "sun", "name": "Sun", "ephemeris": "sun", "radius_km": 695_700, "color": "#ffd166"},
-    {"key": "mercury", "name": "Mercury", "ephemeris": "mercury", "radius_km": 2_439.7, "color": "#b8a48a"},
-    {"key": "venus", "name": "Venus", "ephemeris": "venus", "radius_km": 6_051.8, "color": "#d8b26f"},
-    {"key": "earth", "name": "Earth", "ephemeris": "earth", "radius_km": 6_371.0, "color": "#62a8ff"},
-    {"key": "moon", "name": "Moon", "ephemeris": "moon", "radius_km": 1_737.4, "color": "#c8c8c8"},
-    {"key": "mars", "name": "Mars", "ephemeris": "mars barycenter", "radius_km": 3_389.5, "color": "#df6b43"},
-    {"key": "jupiter", "name": "Jupiter", "ephemeris": "jupiter barycenter", "radius_km": 69_911, "color": "#d9b382"},
-    {"key": "saturn", "name": "Saturn", "ephemeris": "saturn barycenter", "radius_km": 58_232, "color": "#d8c28a"},
-    {"key": "uranus", "name": "Uranus", "ephemeris": "uranus barycenter", "radius_km": 25_362, "color": "#83d8d8"},
-    {"key": "neptune", "name": "Neptune", "ephemeris": "neptune barycenter", "radius_km": 24_622, "color": "#6f8cff"},
+    {"key": "sun", "name": "Sun", "ephemeris": "sun", "radius_km": 695_700, "mu_km3_s2": SUN_MU_KM3_S2, "color": "#ffd166"},
+    {"key": "mercury", "name": "Mercury", "ephemeris": "mercury", "radius_km": 2_439.7, "mu_km3_s2": 22_031.78, "color": "#b8a48a"},
+    {"key": "venus", "name": "Venus", "ephemeris": "venus", "radius_km": 6_051.8, "mu_km3_s2": 324_858.592, "color": "#d8b26f"},
+    {"key": "earth", "name": "Earth", "ephemeris": "earth", "radius_km": 6_371.0, "mu_km3_s2": 398_600.4418, "color": "#62a8ff"},
+    {"key": "moon", "name": "Moon", "ephemeris": "moon", "radius_km": 1_737.4, "mu_km3_s2": 4_902.800066, "color": "#c8c8c8"},
+    {"key": "mars", "name": "Mars", "ephemeris": "mars barycenter", "radius_km": 3_389.5, "mu_km3_s2": 42_828.375214, "color": "#df6b43"},
+    {"key": "jupiter", "name": "Jupiter", "ephemeris": "jupiter barycenter", "radius_km": 69_911, "mu_km3_s2": 126_686_534.0, "color": "#d9b382"},
+    {"key": "saturn", "name": "Saturn", "ephemeris": "saturn barycenter", "radius_km": 58_232, "mu_km3_s2": 37_931_187.0, "color": "#d8c28a"},
+    {"key": "uranus", "name": "Uranus", "ephemeris": "uranus barycenter", "radius_km": 25_362, "mu_km3_s2": 5_793_939.0, "color": "#83d8d8"},
+    {"key": "neptune", "name": "Neptune", "ephemeris": "neptune barycenter", "radius_km": 24_622, "mu_km3_s2": 6_836_529.0, "color": "#6f8cff"},
 ]
 BODY_BY_KEY = {item["key"]: item for item in BODIES}
 DEFAULT_TRAIL_BODIES = ("earth", "mars", "jupiter")
@@ -39,6 +41,13 @@ MIN_TRAIL_DAYS = 1.0
 MAX_TRAIL_DAYS = 3650.0
 MIN_TRAIL_STEP_DAYS = 1.0
 MAX_TRAIL_STEP_DAYS = 365.0
+DEFAULT_TRAJECTORY_SCAN_DAYS = 900.0
+DEFAULT_TRAJECTORY_STEP_DAYS = 60.0
+MIN_TRAJECTORY_SCAN_DAYS = 0.0
+MAX_TRAJECTORY_SCAN_DAYS = 3650.0
+MIN_TRAJECTORY_STEP_DAYS = 15.0
+MAX_TRAJECTORY_STEP_DAYS = 240.0
+TRAJECTORY_SAMPLE_COUNT = 72
 
 _loader: Loader | None = None
 _timescale: Any | None = None
@@ -170,6 +179,69 @@ def parse_trails_query(
     )
 
 
+def parse_body_key_param(query: dict[str, list[str]], *names: str, default: str) -> str:
+    value = None
+    for name in names:
+        value = query.get(name, [None])[0]
+        if value:
+            break
+
+    key = (value or default).strip().lower()
+    if key not in BODY_BY_KEY:
+        raise QueryInputError(
+            "Unknown body key",
+            details={
+                "invalid_body": key,
+                "valid_bodies": [item["key"] for item in BODIES],
+            },
+        )
+    return key
+
+
+def parse_trajectory_query(query: dict[str, list[str]]) -> tuple[datetime, str, str, float, float, dict[str, Any]]:
+    try:
+        timestamp = parse_timestamp(query.get("timestamp", [None])[0])
+    except ValueError as exc:
+        raise QueryInputError("timestamp must be an ISO-8601 datetime") from exc
+
+    destination_key = parse_body_key_param(query, "destination", "target", default="jupiter")
+    if destination_key in {"sun", "earth"}:
+        raise QueryInputError("destination must be a body other than Sun or Earth")
+
+    assist = (query.get("assist", ["auto"])[0] or "auto").strip().lower()
+    if assist not in {"auto", "direct"} and assist not in BODY_BY_KEY:
+        raise QueryInputError(
+            "Unknown assist body",
+            details={
+                "invalid_body": assist,
+                "valid_assists": ["auto", "direct", *[item["key"] for item in BODIES]],
+            },
+        )
+    if assist in {"sun", "earth", "moon", destination_key}:
+        assist = "auto"
+
+    requested_scan_days = parse_float_param(query, "scan_days", DEFAULT_TRAJECTORY_SCAN_DAYS)
+    scan_days = clamp_float(requested_scan_days, MIN_TRAJECTORY_SCAN_DAYS, MAX_TRAJECTORY_SCAN_DAYS)
+
+    requested_step_days = parse_float_param(query, "step_days", DEFAULT_TRAJECTORY_STEP_DAYS)
+    step_days = clamp_float(requested_step_days, MIN_TRAJECTORY_STEP_DAYS, MAX_TRAJECTORY_STEP_DAYS)
+    if scan_days == 0:
+        step_days = MIN_TRAJECTORY_STEP_DAYS
+
+    return (
+        timestamp,
+        destination_key,
+        assist,
+        scan_days,
+        step_days,
+        {
+            "requested_scan_days": requested_scan_days,
+            "requested_step_days": requested_step_days,
+            "clamped": requested_scan_days != scan_days or requested_step_days != step_days,
+        },
+    )
+
+
 def trail_sample_datetimes(timestamp: datetime, days: float, step_days: float) -> list[tuple[datetime, float]]:
     half_days = days / 2.0
     step_count_each_side = int(math.floor(half_days / step_days))
@@ -224,6 +296,507 @@ def trail_points_from_vector(vector: Any, samples: list[tuple[datetime, float]])
         )
 
     return points
+
+
+def vector3_sub(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+
+def vector3_add(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
+    return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
+
+
+def vector3_scale(value: tuple[float, float, float], scalar: float) -> tuple[float, float, float]:
+    return (value[0] * scalar, value[1] * scalar, value[2] * scalar)
+
+
+def vector3_dot(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def vector3_norm(value: tuple[float, float, float]) -> float:
+    return math.sqrt(vector3_dot(value, value))
+
+
+def vector3_unit(value: tuple[float, float, float]) -> tuple[float, float, float]:
+    norm = vector3_norm(value)
+    if norm == 0:
+        return (0.0, 0.0, 0.0)
+    return (value[0] / norm, value[1] / norm, value[2] / norm)
+
+
+def vector3_angle_deg(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    a_norm = vector3_norm(a)
+    b_norm = vector3_norm(b)
+    if a_norm == 0 or b_norm == 0:
+        return 0.0
+    cosine = clamp_float(vector3_dot(a, b) / (a_norm * b_norm), -1.0, 1.0)
+    return math.degrees(math.acos(cosine))
+
+
+def body_state(
+    body_key: str,
+    timestamp: datetime,
+    cache: dict[tuple[str, str], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    cache_key = (body_key, isoformat_utc(timestamp))
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
+
+    timescale, ephemeris = skyfield_context()
+    time = timescale.from_datetime(timestamp)
+    item = BODY_BY_KEY[body_key]
+    sun = ephemeris["sun"]
+    target = ephemeris[item["ephemeris"]]
+
+    if body_key == "sun":
+        position_au = (0.0, 0.0, 0.0)
+        position_km = (0.0, 0.0, 0.0)
+        velocity_km_s = (0.0, 0.0, 0.0)
+    else:
+        xyz, velocity = (target - sun).at(time).frame_xyz_and_velocity(ecliptic_frame)
+        position_au = (float(xyz.au[0]), float(xyz.au[1]), float(xyz.au[2]))
+        position_km = tuple(component * AU_KM for component in position_au)
+        velocity_km_s = (float(velocity.km_per_s[0]), float(velocity.km_per_s[1]), float(velocity.km_per_s[2]))
+
+    payload = {
+        "key": item["key"],
+        "name": item["name"],
+        "timestamp_utc": isoformat_utc(timestamp),
+        "position_au": position_au,
+        "position_km": position_km,
+        "velocity_km_s": velocity_km_s,
+        "radius_km": float(item["radius_km"]),
+        "mu_km3_s2": float(item["mu_km3_s2"]),
+        "color": item["color"],
+    }
+    if cache is not None:
+        cache[cache_key] = payload
+    return payload
+
+
+def state_event(kind: str, state: dict[str, Any], offset_days: float) -> dict[str, Any]:
+    x_au, y_au, z_au = state["position_au"]
+    return {
+        "kind": kind,
+        "body_key": state["key"],
+        "body_name": state["name"],
+        "timestamp_utc": state["timestamp_utc"],
+        "offset_days": float(offset_days),
+        "x_au": x_au,
+        "y_au": y_au,
+        "z_au": z_au,
+    }
+
+
+def hohmann_time_days(radius_a_km: float, radius_b_km: float) -> float:
+    if radius_a_km <= 0 or radius_b_km <= 0:
+        return 30.0
+    semi_major_km = (radius_a_km + radius_b_km) / 2.0
+    seconds = math.pi * math.sqrt((semi_major_km**3) / SUN_MU_KM3_S2)
+    return seconds / SECONDS_PER_DAY
+
+
+def duration_candidates_days(radius_a_km: float, radius_b_km: float, *, minimum_days: float = 5.0) -> list[float]:
+    base = max(minimum_days, hohmann_time_days(radius_a_km, radius_b_km))
+    candidates = [base * 0.7, base, base * 1.35]
+    unique: list[float] = []
+    for value in candidates:
+        clamped = clamp_float(value, minimum_days, 4200.0)
+        if all(not math.isclose(clamped, existing, rel_tol=0.0, abs_tol=0.5) for existing in unique):
+            unique.append(clamped)
+    return unique
+
+
+def transfer_leg_metrics(start: dict[str, Any], end: dict[str, Any], tof_days: float) -> dict[str, Any] | None:
+    if tof_days <= 0:
+        return None
+    tof_seconds = tof_days * SECONDS_PER_DAY
+    displacement_km = vector3_sub(end["position_km"], start["position_km"])
+    chord_km = vector3_norm(displacement_km)
+    transfer_velocity = vector3_scale(displacement_km, 1.0 / tof_seconds)
+    departure_vinf = vector3_sub(transfer_velocity, start["velocity_km_s"])
+    arrival_vinf = vector3_sub(transfer_velocity, end["velocity_km_s"])
+    path_distance_km = chord_km * 1.16
+
+    return {
+        "from": start["key"],
+        "from_name": start["name"],
+        "to": end["key"],
+        "to_name": end["name"],
+        "tof_days": float(tof_days),
+        "path_distance_km": float(path_distance_km),
+        "transfer_velocity_km_s": transfer_velocity,
+        "departure_vinf_vector_km_s": departure_vinf,
+        "arrival_vinf_vector_km_s": arrival_vinf,
+        "departure_vinf_km_s": float(vector3_norm(departure_vinf)),
+        "arrival_vinf_km_s": float(vector3_norm(arrival_vinf)),
+    }
+
+
+def flyby_metrics(incoming_leg: dict[str, Any], outgoing_leg: dict[str, Any], assist_state: dict[str, Any]) -> dict[str, Any]:
+    incoming = incoming_leg["arrival_vinf_vector_km_s"]
+    outgoing = outgoing_leg["departure_vinf_vector_km_s"]
+    incoming_speed = vector3_norm(incoming)
+    outgoing_speed = vector3_norm(outgoing)
+    mean_speed = max(0.001, (incoming_speed + outgoing_speed) / 2.0)
+    turn_angle_deg = vector3_angle_deg(incoming, outgoing)
+    periapsis_km = assist_state["radius_km"] + max(300.0, assist_state["radius_km"] * 0.12)
+    max_turn_rad = 2.0 * math.asin(clamp_float(1.0 / (1.0 + (periapsis_km * mean_speed**2) / assist_state["mu_km3_s2"]), 0.0, 1.0))
+    max_turn_deg = math.degrees(max_turn_rad)
+    turn_deficit_deg = max(0.0, turn_angle_deg - max_turn_deg)
+    powered_flyby_delta_v_km_s = 2.0 * mean_speed * math.sin(math.radians(turn_deficit_deg) / 2.0) if turn_deficit_deg > 0 else 0.0
+    speed_change_km_s = outgoing_speed - incoming_speed
+
+    return {
+        "body_key": assist_state["key"],
+        "body_name": assist_state["name"],
+        "incoming_vinf_km_s": float(incoming_speed),
+        "outgoing_vinf_km_s": float(outgoing_speed),
+        "speed_change_km_s": float(speed_change_km_s),
+        "turn_angle_deg": float(turn_angle_deg),
+        "max_turn_angle_deg": float(max_turn_deg),
+        "turn_deficit_deg": float(turn_deficit_deg),
+        "periapsis_altitude_km": float(periapsis_km - assist_state["radius_km"]),
+        "powered_flyby_delta_v_km_s": float(powered_flyby_delta_v_km_s),
+        "feasible": turn_deficit_deg <= 0.5,
+    }
+
+
+def departure_offsets(scan_days: float, step_days: float) -> list[float]:
+    offsets = [0.0]
+    if scan_days <= 0:
+        return offsets
+    offset = step_days
+    while offset <= scan_days + 1e-9:
+        offsets.append(float(offset))
+        offset += step_days
+    return offsets
+
+
+def candidate_assist_keys(destination_key: str, requested_assist: str) -> list[str]:
+    if requested_assist == "direct":
+        return []
+    if requested_assist != "auto":
+        return [requested_assist]
+
+    target_radius = {
+        "moon": 1.0,
+        "mars": 1.52,
+        "jupiter": 5.2,
+        "saturn": 9.58,
+        "uranus": 19.2,
+        "neptune": 30.1,
+    }.get(destination_key, 2.0)
+    if target_radius > 6:
+        candidates = ["jupiter", "mars", "venus"]
+    elif target_radius > 2:
+        candidates = ["venus", "mars"]
+    elif destination_key == "mars":
+        candidates = ["venus"]
+    else:
+        candidates = ["venus", "mars"]
+    return [key for key in candidates if key not in {"earth", "moon", destination_key} and key in BODY_BY_KEY]
+
+
+def route_point_from_au(position_au: tuple[float, float, float]) -> dict[str, float]:
+    return {
+        "x_au": float(position_au[0]),
+        "y_au": float(position_au[1]),
+        "z_au": float(position_au[2]),
+    }
+
+
+def prograde_tangent(point: tuple[float, float, float]) -> tuple[float, float, float]:
+    radius = math.hypot(point[0], point[1])
+    if radius == 0:
+        return (0.0, 1.0, 0.0)
+    return (-point[1] / radius, point[0] / radius, 0.0)
+
+
+def cubic_point(
+    a: tuple[float, float, float],
+    b: tuple[float, float, float],
+    c: tuple[float, float, float],
+    d: tuple[float, float, float],
+    t: float,
+) -> tuple[float, float, float]:
+    inv = 1.0 - t
+    inv2 = inv * inv
+    t2 = t * t
+    return (
+        inv2 * inv * a[0] + 3.0 * inv2 * t * b[0] + 3.0 * inv * t2 * c[0] + t2 * t * d[0],
+        inv2 * inv * a[1] + 3.0 * inv2 * t * b[1] + 3.0 * inv * t2 * c[1] + t2 * t * d[1],
+        a[2] + (d[2] - a[2]) * t,
+    )
+
+
+def segment_samples(start_au: tuple[float, float, float], end_au: tuple[float, float, float], count: int) -> list[dict[str, float]]:
+    chord = vector3_norm(vector3_sub(end_au, start_au))
+    if chord == 0:
+        return [route_point_from_au(start_au)]
+
+    start_radius = math.hypot(start_au[0], start_au[1])
+    end_radius = math.hypot(end_au[0], end_au[1])
+    start_tangent = prograde_tangent(start_au)
+    end_tangent = prograde_tangent(end_au)
+    control_au = clamp_float(chord * 0.44 + abs(end_radius - start_radius) * 0.08, 0.001, max(chord, start_radius, end_radius) * 0.8)
+    control_a = vector3_add(start_au, vector3_scale(start_tangent, control_au))
+    control_b = vector3_sub(end_au, vector3_scale(end_tangent, control_au))
+
+    return [
+        route_point_from_au(cubic_point(start_au, control_a, control_b, end_au, index / count))
+        for index in range(count + 1)
+    ]
+
+
+def candidate_samples(events: list[dict[str, Any]]) -> list[dict[str, float]]:
+    samples: list[dict[str, float]] = []
+    for index in range(1, len(events)):
+        start = (events[index - 1]["x_au"], events[index - 1]["y_au"], events[index - 1]["z_au"])
+        end = (events[index]["x_au"], events[index]["y_au"], events[index]["z_au"])
+        segment = segment_samples(start, end, TRAJECTORY_SAMPLE_COUNT)
+        if samples:
+            segment = segment[1:]
+        samples.extend(segment)
+    return samples
+
+
+def slim_leg_payload(leg: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "from": leg["from"],
+        "from_name": leg["from_name"],
+        "to": leg["to"],
+        "to_name": leg["to_name"],
+        "tof_days": leg["tof_days"],
+        "path_distance_km": leg["path_distance_km"],
+        "departure_vinf_km_s": leg["departure_vinf_km_s"],
+        "arrival_vinf_km_s": leg["arrival_vinf_km_s"],
+    }
+
+
+def build_direct_candidate(
+    candidate_id: str,
+    departure_state: dict[str, Any],
+    arrival_state: dict[str, Any],
+    departure_offset_days: float,
+    tof_days: float,
+) -> dict[str, Any] | None:
+    leg = transfer_leg_metrics(departure_state, arrival_state, tof_days)
+    if leg is None:
+        return None
+    events = [
+        state_event("departure", departure_state, departure_offset_days),
+        state_event("arrival", arrival_state, departure_offset_days + tof_days),
+    ]
+    total_delta_v = leg["departure_vinf_km_s"] + leg["arrival_vinf_km_s"]
+    score = total_delta_v + tof_days / 1200.0
+    return {
+        "id": candidate_id,
+        "kind": "direct",
+        "label": "Direct transfer",
+        "body_sequence": ["earth", arrival_state["key"]],
+        "assist_body_key": None,
+        "events": events,
+        "legs": [slim_leg_payload(leg)],
+        "samples": candidate_samples(events),
+        "warnings": ["Direct transfer estimate uses patched-conic scoring, not n-body propagation."],
+        "metrics": {
+            "total_delta_v_km_s": float(total_delta_v),
+            "launch_vinf_km_s": leg["departure_vinf_km_s"],
+            "arrival_vinf_km_s": leg["arrival_vinf_km_s"],
+            "total_time_days": float(tof_days),
+            "departure_offset_days": float(departure_offset_days),
+            "arrival_offset_days": float(departure_offset_days + tof_days),
+            "path_distance_km": float(sum(item["path_distance_km"] for item in [leg])),
+            "score": float(score),
+            "feasible": True,
+        },
+    }
+
+
+def build_assist_candidate(
+    candidate_id: str,
+    departure_state: dict[str, Any],
+    flyby_state: dict[str, Any],
+    arrival_state: dict[str, Any],
+    departure_offset_days: float,
+    first_leg_days: float,
+    second_leg_days: float,
+) -> dict[str, Any] | None:
+    incoming_leg = transfer_leg_metrics(departure_state, flyby_state, first_leg_days)
+    outgoing_leg = transfer_leg_metrics(flyby_state, arrival_state, second_leg_days)
+    if incoming_leg is None or outgoing_leg is None:
+        return None
+
+    flyby = flyby_metrics(incoming_leg, outgoing_leg, flyby_state)
+    events = [
+        state_event("departure", departure_state, departure_offset_days),
+        state_event("flyby", flyby_state, departure_offset_days + first_leg_days),
+        state_event("arrival", arrival_state, departure_offset_days + first_leg_days + second_leg_days),
+    ]
+    total_time_days = first_leg_days + second_leg_days
+    launch_vinf = incoming_leg["departure_vinf_km_s"]
+    arrival_vinf = outgoing_leg["arrival_vinf_km_s"]
+    powered_flyby = flyby["powered_flyby_delta_v_km_s"]
+    total_delta_v = launch_vinf + arrival_vinf + powered_flyby
+    assist_bonus = min(4.0, max(0.0, flyby["speed_change_km_s"]))
+    score = total_delta_v + total_time_days / 1400.0 - assist_bonus
+    warnings: list[str] = ["Single-flyby patched-conic estimate; not optimized with a full Lambert/n-body solver."]
+    if not flyby["feasible"]:
+        warnings.append("Flyby turn exceeds the unpowered estimate; this route would need correction burn or a safer window.")
+
+    return {
+        "id": candidate_id,
+        "kind": "gravity_assist",
+        "label": f"{flyby_state['name']} gravity assist",
+        "body_sequence": ["earth", flyby_state["key"], arrival_state["key"]],
+        "assist_body_key": flyby_state["key"],
+        "events": events,
+        "legs": [slim_leg_payload(incoming_leg), slim_leg_payload(outgoing_leg)],
+        "samples": candidate_samples(events),
+        "warnings": warnings,
+        "flyby": flyby,
+        "metrics": {
+            "total_delta_v_km_s": float(total_delta_v),
+            "launch_vinf_km_s": float(launch_vinf),
+            "arrival_vinf_km_s": float(arrival_vinf),
+            "powered_flyby_delta_v_km_s": float(powered_flyby),
+            "total_time_days": float(total_time_days),
+            "departure_offset_days": float(departure_offset_days),
+            "flyby_offset_days": float(departure_offset_days + first_leg_days),
+            "arrival_offset_days": float(departure_offset_days + total_time_days),
+            "path_distance_km": float(incoming_leg["path_distance_km"] + outgoing_leg["path_distance_km"]),
+            "assist_speed_change_km_s": flyby["speed_change_km_s"],
+            "score": float(score),
+            "feasible": bool(flyby["feasible"]),
+        },
+    }
+
+
+def trajectory_payload(
+    timestamp: datetime,
+    destination_key: str,
+    assist: str,
+    scan_days: float,
+    step_days: float,
+    request_meta: dict[str, Any],
+) -> dict[str, Any]:
+    state_cache: dict[tuple[str, str], dict[str, Any]] = {}
+    current_earth = body_state("earth", timestamp, state_cache)
+    current_target = body_state(destination_key, timestamp, state_cache)
+    direct_duration_options = duration_candidates_days(
+        vector3_norm(current_earth["position_km"]),
+        vector3_norm(current_target["position_km"]),
+        minimum_days=4.0 if destination_key == "moon" else 45.0,
+    )
+
+    candidates: list[dict[str, Any]] = []
+    for departure_offset in departure_offsets(scan_days, step_days):
+        departure_time = timestamp + timedelta(days=departure_offset)
+        departure_state = body_state("earth", departure_time, state_cache)
+        for tof_days in direct_duration_options:
+            arrival_time = departure_time + timedelta(days=tof_days)
+            arrival_state = body_state(destination_key, arrival_time, state_cache)
+            candidate = build_direct_candidate(
+                f"direct-{len(candidates) + 1}",
+                departure_state,
+                arrival_state,
+                departure_offset,
+                tof_days,
+            )
+            if candidate is not None:
+                candidates.append(candidate)
+
+    assist_keys = candidate_assist_keys(destination_key, assist)
+    for assist_key in assist_keys:
+        assist_current = body_state(assist_key, timestamp, state_cache)
+        first_leg_options = duration_candidates_days(
+            vector3_norm(current_earth["position_km"]),
+            vector3_norm(assist_current["position_km"]),
+            minimum_days=40.0,
+        )
+        second_leg_options = duration_candidates_days(
+            vector3_norm(assist_current["position_km"]),
+            vector3_norm(current_target["position_km"]),
+            minimum_days=45.0,
+        )
+        for departure_offset in departure_offsets(scan_days, step_days * 1.5):
+            departure_time = timestamp + timedelta(days=departure_offset)
+            departure_state = body_state("earth", departure_time, state_cache)
+            for first_leg_days in first_leg_options:
+                flyby_time = departure_time + timedelta(days=first_leg_days)
+                flyby_state = body_state(assist_key, flyby_time, state_cache)
+                for second_leg_days in second_leg_options:
+                    arrival_time = flyby_time + timedelta(days=second_leg_days)
+                    arrival_state = body_state(destination_key, arrival_time, state_cache)
+                    candidate = build_assist_candidate(
+                        f"assist-{assist_key}-{len(candidates) + 1}",
+                        departure_state,
+                        flyby_state,
+                        arrival_state,
+                        departure_offset,
+                        first_leg_days,
+                        second_leg_days,
+                    )
+                    if candidate is not None:
+                        candidates.append(candidate)
+
+    if not candidates:
+        raise QueryInputError("Could not produce trajectory candidates for this request")
+
+    direct_candidates = [candidate for candidate in candidates if candidate["kind"] == "direct"]
+    assist_candidates = [candidate for candidate in candidates if candidate["kind"] == "gravity_assist"]
+    best_direct = min(direct_candidates, key=lambda item: item["metrics"]["score"]) if direct_candidates else None
+    feasible_assists = [candidate for candidate in assist_candidates if candidate["metrics"]["feasible"]]
+    best_assist_pool = feasible_assists or assist_candidates
+    best_assist = min(best_assist_pool, key=lambda item: item["metrics"]["score"]) if best_assist_pool else None
+    selected = best_assist or best_direct or min(candidates, key=lambda item: item["metrics"]["score"])
+
+    ranked_candidates = sorted(
+        [candidate for candidate in [best_direct, best_assist] if candidate is not None]
+        + sorted(candidates, key=lambda item: item["metrics"]["score"])[:6],
+        key=lambda item: item["metrics"]["score"],
+    )
+    unique_candidates: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for candidate in ranked_candidates:
+        if candidate["id"] not in seen_ids:
+            unique_candidates.append(candidate)
+            seen_ids.add(candidate["id"])
+
+    return {
+        "timestamp_utc": isoformat_utc(timestamp),
+        "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
+        "data_source": "NASA/JPL DE440s ephemeris via Skyfield; patched-conic launch-window and single-flyby estimator",
+        "coordinate_frame": "Heliocentric ecliptic Cartesian coordinates, projected top-down as x/y; z retained for scoring",
+        "units": {
+            "distance": "kilometers",
+            "position": "astronomical units",
+            "velocity": "kilometers per second",
+            "time": "UTC ISO-8601 and days",
+        },
+        "parameters": {
+            "origin": "earth",
+            "destination": destination_key,
+            "assist": assist,
+            "scan_days": scan_days,
+            "step_days": step_days,
+            "requested_scan_days": request_meta["requested_scan_days"],
+            "requested_step_days": request_meta["requested_step_days"],
+            "clamped": request_meta["clamped"],
+            "candidate_count": len(candidates),
+        },
+        "selected_candidate_id": selected["id"],
+        "best_direct_candidate_id": best_direct["id"] if best_direct else None,
+        "best_gravity_assist_candidate_id": best_assist["id"] if best_assist else None,
+        "candidates": unique_candidates[:8],
+        "limitations": [
+            "This is a patched-conic planning estimate, not a final mission trajectory.",
+            "The search evaluates direct and single-flyby windows from real JPL ephemeris states.",
+            "Flyby feasibility uses idealized turn-angle estimates and does not include n-body perturbations, finite burns, or launch vehicle constraints.",
+        ],
+    }
 
 
 def ephemeris_payload(timestamp: datetime) -> dict[str, Any]:
@@ -375,6 +948,19 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 self.respond(trails_payload(*parse_trails_query(query)))
+            except QueryInputError as exc:
+                payload: dict[str, Any] = {"error": str(exc)}
+                if exc.details is not None:
+                    payload["details"] = exc.details
+                self.respond(payload, status=HTTPStatus.BAD_REQUEST)
+            except Exception as exc:
+                self.respond({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if parsed.path == "/api/trajectory":
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                self.respond(trajectory_payload(*parse_trajectory_query(query)))
             except QueryInputError as exc:
                 payload: dict[str, Any] = {"error": str(exc)}
                 if exc.details is not None:

@@ -141,6 +141,95 @@ type RoutePoint = {
   zAu: number;
 };
 
+type TrajectoryEvent = {
+  kind: "departure" | "flyby" | "arrival";
+  body_key: string;
+  body_name: string;
+  timestamp_utc: string;
+  offset_days: number;
+  x_au: number;
+  y_au: number;
+  z_au: number;
+};
+
+type TrajectorySample = {
+  x_au: number;
+  y_au: number;
+  z_au: number;
+};
+
+type TrajectoryLeg = {
+  from: string;
+  from_name: string;
+  to: string;
+  to_name: string;
+  tof_days: number;
+  path_distance_km: number;
+  departure_vinf_km_s: number;
+  arrival_vinf_km_s: number;
+};
+
+type FlybyMetrics = {
+  body_key: string;
+  body_name: string;
+  incoming_vinf_km_s: number;
+  outgoing_vinf_km_s: number;
+  speed_change_km_s: number;
+  turn_angle_deg: number;
+  max_turn_angle_deg: number;
+  turn_deficit_deg: number;
+  periapsis_altitude_km: number;
+  powered_flyby_delta_v_km_s: number;
+  feasible: boolean;
+};
+
+type TrajectoryCandidate = {
+  id: string;
+  kind: "direct" | "gravity_assist";
+  label: string;
+  body_sequence: string[];
+  assist_body_key: string | null;
+  events: TrajectoryEvent[];
+  legs: TrajectoryLeg[];
+  samples: TrajectorySample[];
+  warnings: string[];
+  flyby?: FlybyMetrics;
+  metrics: {
+    total_delta_v_km_s: number;
+    launch_vinf_km_s: number;
+    arrival_vinf_km_s: number;
+    powered_flyby_delta_v_km_s?: number;
+    total_time_days: number;
+    departure_offset_days: number;
+    flyby_offset_days?: number;
+    arrival_offset_days: number;
+    path_distance_km: number;
+    assist_speed_change_km_s?: number;
+    score: number;
+    feasible: boolean;
+  };
+};
+
+type TrajectoryPlan = {
+  timestamp_utc: string;
+  generated_at_utc: string;
+  data_source: string;
+  coordinate_frame: string;
+  parameters: {
+    origin: string;
+    destination: string;
+    assist: string;
+    scan_days: number;
+    step_days: number;
+    candidate_count: number;
+  };
+  selected_candidate_id: string;
+  best_direct_candidate_id: string | null;
+  best_gravity_assist_candidate_id: string | null;
+  candidates: TrajectoryCandidate[];
+  limitations: string[];
+};
+
 const canvas = requiredElement<HTMLCanvasElement>("#map");
 const hudValues = requiredElement<HTMLElement>("#hud-values");
 const loadState = requiredElement<HTMLElement>("#load-state");
@@ -198,6 +287,11 @@ let activePopoverBodyKey: string | null = null;
 let bodyTrails: BodyTrail[] = [];
 let trailsLoading = false;
 let trailsError = "";
+let trajectoryPlan: TrajectoryPlan | null = null;
+let trajectoryLoading = false;
+let trajectoryError = "";
+let selectedTrajectoryCandidateId: string | null = null;
+let trajectoryRequestId = 0;
 const displayLayers: Record<DisplayLayer, boolean> = {
   labels: true,
   rings: true,
@@ -206,6 +300,7 @@ const displayLayers: Record<DisplayLayer, boolean> = {
 };
 let warpEnabled = false;
 let lastFrame = performance.now();
+let lastHudRender = 0;
 let isDragging = false;
 let dragMoved = false;
 let dragStart = { x: 0, y: 0, cameraXAu: 0, cameraYAu: 0 };
@@ -234,7 +329,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     if (!event.repeat) {
       warpEnabled = !warpEnabled;
-      updateHud();
+      updateHud(true);
     }
     return;
   }
@@ -292,7 +387,7 @@ targetSelected.addEventListener("click", () => setTarget(selectedBodyKey, { insp
 bodySelect.addEventListener("change", () => {
   selectedBodyKey = bodySelect.value;
   renderBodyPicker();
-  updateHud();
+  updateHud(true);
 });
 destinationSearch.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
@@ -311,6 +406,13 @@ routeMemory.addEventListener("click", (event) => {
   const key = button?.dataset.recentDestination;
   if (!key) return;
   setTarget(key, { inspect: true });
+});
+journey.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-trajectory-candidate]");
+  const candidateId = button?.dataset.trajectoryCandidate;
+  if (!candidateId) return;
+  selectedTrajectoryCandidateId = candidateId;
+  updateHud(true);
 });
 setDestination.addEventListener("click", () => {
   const body = bodyFromSearchValue(destinationSearch.value);
@@ -427,6 +529,7 @@ async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: 
     if (displayLayers.trails) {
       loadTrails();
     }
+    void loadTrajectoryPlan();
     loadState.textContent = "live";
     errorPanel.hidden = true;
     updateHud();
@@ -441,6 +544,50 @@ async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: 
       "",
       message
     ].join("\n");
+  }
+}
+
+async function loadTrajectoryPlan() {
+  if (!ephemeris || !selectedTarget || selectedTarget === "earth" || selectedTarget === "sun") {
+    trajectoryPlan = null;
+    selectedTrajectoryCandidateId = null;
+    trajectoryLoading = false;
+    trajectoryError = "";
+    return;
+  }
+
+  const requestId = ++trajectoryRequestId;
+  trajectoryLoading = true;
+  trajectoryError = "";
+  updateHud(true);
+
+  try {
+    const assist = routeWaypoints[0]?.key ?? "auto";
+    const query = new URLSearchParams({
+      timestamp: ephemeris.timestamp_utc,
+      destination: selectedTarget,
+      assist,
+      scan_days: "900",
+      step_days: "60"
+    });
+    const response = await fetch(`/api/trajectory?${query.toString()}`);
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const payload = (await response.json()) as TrajectoryPlan;
+    if (requestId !== trajectoryRequestId) return;
+    trajectoryPlan = payload;
+    selectedTrajectoryCandidateId = payload.selected_candidate_id;
+  } catch (error) {
+    if (requestId !== trajectoryRequestId) return;
+    trajectoryPlan = null;
+    selectedTrajectoryCandidateId = null;
+    trajectoryError = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (requestId === trajectoryRequestId) {
+      trajectoryLoading = false;
+      updateHud(true);
+    }
   }
 }
 
@@ -649,8 +796,9 @@ function drawRouteGuide() {
   const target = bodyByKey.get(selectedTarget);
   if (!earth || !target) return;
 
+  const activePlan = activeTrajectoryCandidate();
   const routeBodies = routeBodySequence(earth, target);
-  const routePoints = routeTrajectoryPoints(earth, target);
+  const routePoints = activeRoutePoints(earth, target);
   if (routePoints.length < 2) return;
   const routeScreens = routePoints.map((point) => worldToScreen(point.xAu, point.yAu));
 
@@ -668,9 +816,9 @@ function drawRouteGuide() {
   });
   ctx.stroke();
 
-  ctx.strokeStyle = routeWaypoints.length ? "rgba(217, 184, 111, 0.72)" : "rgba(116, 196, 255, 0.68)";
+  ctx.strokeStyle = activePlan?.kind === "gravity_assist" ? "rgba(217, 184, 111, 0.78)" : "rgba(116, 196, 255, 0.68)";
   ctx.lineWidth = 2.4;
-  ctx.setLineDash(routeWaypoints.length ? [9, 7] : []);
+  ctx.setLineDash(activePlan?.kind === "gravity_assist" ? [9, 7] : []);
   ctx.beginPath();
   routeScreens.forEach((screen, index) => {
     if (index === 0) ctx.moveTo(screen.x, screen.y);
@@ -679,20 +827,36 @@ function drawRouteGuide() {
   ctx.stroke();
 
   ctx.setLineDash([]);
-  for (const body of routeBodies) {
-    const screen = worldToScreen(body.position.x_au, body.position.y_au);
-    ctx.strokeStyle = body.key === selectedTarget ? "rgba(217, 184, 111, 0.88)" : "rgba(116, 196, 255, 0.58)";
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, Math.max(7, displayRadius(body) + 4), 0, Math.PI * 2);
-    ctx.stroke();
+  if (activePlan) {
+    for (const event of activePlan.events) {
+      const screen = worldToScreen(event.x_au, event.y_au);
+      ctx.fillStyle = event.kind === "flyby" ? "rgba(217, 184, 111, 0.96)" : "rgba(116, 196, 255, 0.92)";
+      ctx.strokeStyle = "rgba(6, 6, 7, 0.86)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, event.kind === "flyby" ? 6 : 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "rgba(244, 241, 232, 0.82)";
+      ctx.font = "700 11px ui-sans-serif, system-ui";
+      ctx.fillText(`${event.kind}: ${event.body_name}`, screen.x + 9, screen.y - 7);
+    }
+  } else {
+    for (const body of routeBodies) {
+      const screen = worldToScreen(body.position.x_au, body.position.y_au);
+      ctx.strokeStyle = body.key === selectedTarget ? "rgba(217, 184, 111, 0.88)" : "rgba(116, 196, 255, 0.58)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, Math.max(7, displayRadius(body) + 4), 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   const labelPoint = routeScreens[Math.floor(routeScreens.length * 0.5)];
   if (labelPoint) {
-    ctx.fillStyle = routeWaypoints.length ? "rgba(217, 184, 111, 0.86)" : "rgba(116, 196, 255, 0.82)";
+    ctx.fillStyle = activePlan?.kind === "gravity_assist" ? "rgba(217, 184, 111, 0.9)" : "rgba(116, 196, 255, 0.82)";
     ctx.font = "700 11px ui-sans-serif, system-ui";
-    ctx.fillText(routeWaypoints.length ? "gravity-assist preview" : "transfer preview", labelPoint.x + 10, labelPoint.y - 8);
+    ctx.fillText(activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : "transfer plan", labelPoint.x + 10, labelPoint.y - 8);
   }
   ctx.restore();
 }
@@ -881,8 +1045,12 @@ function drawShip() {
   ctx.restore();
 }
 
-function updateHud() {
+function updateHud(force = false) {
   if (!ephemeris || !ship) return;
+  const now = performance.now();
+  if (!force && now - lastHudRender < 160) return;
+  lastHudRender = now;
+
   const target = bodyByKey.get(selectedTarget);
   if (!target) return;
 
@@ -923,10 +1091,13 @@ function updateJourney(target: Body, shipTargetKm: number) {
   const navigation = navigationMetrics(target, shipTargetKm);
   const thresholdKm = arrivalThresholdKm(target);
   const targetLightSeconds = target.distance_from_earth_km / LIGHT_SPEED_KM_S;
+  const activePlan = activeTrajectoryCandidate();
   const routeDistanceKm = routeTotalDistanceKm(earth, target);
-  const directRouteLabel = routeWaypoints.length
-    ? `Transfer preview via ${routeWaypoints.length} waypoint${routeWaypoints.length === 1 ? "" : "s"}`
-    : "Approx transfer preview distance";
+  const directRouteLabel = activePlan
+    ? `${activePlan.label} path distance`
+    : routeWaypoints.length
+      ? `Transfer preview via ${routeWaypoints.length} waypoint${routeWaypoints.length === 1 ? "" : "s"}`
+      : "Approx transfer preview distance";
   const nextAction = nextGuidanceText(navigation, shipTargetKm, thresholdKm);
   const comparisonText = distanceComparisonText(target.distance_from_earth_km);
   const status = journeyStats.arrived
@@ -938,6 +1109,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
         : "not closing";
   const statusLabel = journeyStats.arrived ? "Arrival confirmed" : status;
   const routeProgress = clamp(progressPercent, 0, 100);
+  const progressLabel = activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : "transfer preview";
 
   journey.innerHTML = `
     <div class="journey-hero">
@@ -957,7 +1129,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
         <div class="route-track">
           <span class="route-progress-dot" style="left: ${routeProgress.toFixed(2)}%"></span>
         </div>
-        <span>transfer preview · ${formatDistance(routeDistanceKm)}</span>
+        <span>${activePlan?.kind === "gravity_assist" ? "gravity assist" : "transfer"} · ${formatDistance(routeDistanceKm)}</span>
       </div>
       <div class="route-body destination">
         ${bodyOrbHtml(target, "large")}
@@ -965,7 +1137,8 @@ function updateJourney(target: Body, shipTargetKm: number) {
         <strong>${escapeHtml(target.name)}</strong>
       </div>
     </div>
-    <p class="route-note">Approximate Sun-centered trajectory preview. It uses real current positions, but it is not a full mission-grade gravity solve yet.</p>
+    <p class="route-note">${escapeHtml(routeNoteText(activePlan))}</p>
+    ${renderTrajectoryPlanner(activePlan)}
     <div class="distance-focus">
       <span>${nextAction}</span>
       <strong>${formatDistance(shipTargetKm)}</strong>
@@ -974,7 +1147,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
       <div class="progress-fill" style="width: ${progressPercent.toFixed(2)}%"></div>
     </div>
     <div class="progress-caption">
-      <span>${progressPercent.toFixed(2)}% along transfer preview</span>
+      <span>${progressPercent.toFixed(2)}% along ${progressLabel}</span>
       <span>${formatDuration(remainingLightSeconds)} light time remaining</span>
     </div>
     <div class="metric-tiles">
@@ -1003,6 +1176,89 @@ function updateJourney(target: Body, shipTargetKm: number) {
       <span>Max speed</span><strong>${formatNumber(journeyStats.maxSpeedKmS)} km/s</strong>
       <span>Elapsed flight time</span><strong>${formatDuration(journeyStats.elapsedSeconds)}</strong>
     </div>
+  `;
+}
+
+function routeNoteText(candidate: TrajectoryCandidate | null) {
+  if (!candidate) {
+    return "Approximate Sun-centered trajectory preview. It uses real current positions, but it is not a full mission-grade gravity solve yet.";
+  }
+  if (candidate.kind === "gravity_assist") {
+    const flyby = candidate.flyby;
+    const status = flyby?.feasible ? "unpowered turn feasible" : "correction burn likely";
+    return `${candidate.label}: patched-conic single-flyby plan from real JPL ephemeris states; ${status}.`;
+  }
+  return "Direct patched-conic transfer estimate from real JPL ephemeris states.";
+}
+
+function renderTrajectoryPlanner(activePlan: TrajectoryCandidate | null) {
+  if (trajectoryLoading) {
+    return `
+      <section class="trajectory-panel">
+        <div class="trajectory-head">
+          <span>Gravity-assist planner</span>
+          <strong>searching launch windows</strong>
+        </div>
+      </section>
+    `;
+  }
+
+  if (trajectoryError) {
+    return `
+      <section class="trajectory-panel warning">
+        <div class="trajectory-head">
+          <span>Gravity-assist planner</span>
+          <strong>unavailable</strong>
+        </div>
+        <p>${escapeHtml(trajectoryError)}</p>
+      </section>
+    `;
+  }
+
+  if (!trajectoryPlan || !activePlan) {
+    return "";
+  }
+
+  const cards = trajectoryPlan.candidates.slice(0, 5).map((candidate) => renderTrajectoryCandidateCard(candidate, candidate.id === activePlan.id)).join("");
+  const eventText = activePlan.events.map((event) => `${event.kind} ${event.body_name} ${offsetLabel(event.offset_days)}`).join(" · ");
+  const flyby = activePlan.flyby;
+  const flybyMetrics = flyby
+    ? `
+      <span>Flyby turn</span><strong>${formatDegrees(flyby.turn_angle_deg)} / ${formatDegrees(flyby.max_turn_angle_deg)}</strong>
+      <span>Assist gain</span><strong>${formatSignedSpeed(flyby.speed_change_km_s)}</strong>
+      <span>Flyby altitude</span><strong>${formatDistance(flyby.periapsis_altitude_km)}</strong>
+    `
+    : "";
+
+  return `
+    <section class="trajectory-panel">
+      <div class="trajectory-head">
+        <span>Gravity-assist planner</span>
+        <strong>${activePlan.kind === "gravity_assist" ? "single-flyby patched conic" : "direct transfer"}</strong>
+      </div>
+      <div class="trajectory-cards">${cards}</div>
+      <div class="trajectory-detail">
+        <span>Selected plan</span><strong>${escapeHtml(activePlan.label)}</strong>
+        <span>Events</span><strong>${escapeHtml(eventText)}</strong>
+        <span>Total Δv estimate</span><strong>${formatDeltaV(activePlan.metrics.total_delta_v_km_s)}</strong>
+        <span>Flight time</span><strong>${formatDuration(activePlan.metrics.total_time_days * 86_400)}</strong>
+        ${flybyMetrics}
+      </div>
+      <p>${escapeHtml(activePlan.warnings[0] ?? trajectoryPlan.limitations[0] ?? "Patched-conic planning estimate.")}</p>
+    </section>
+  `;
+}
+
+function renderTrajectoryCandidateCard(candidate: TrajectoryCandidate, active: boolean) {
+  const feasible = candidate.metrics.feasible;
+  const flybyLabel = candidate.kind === "gravity_assist" ? "flyby" : "direct";
+  return `
+    <button type="button" class="trajectory-card${active ? " active" : ""}" data-trajectory-candidate="${escapeHtml(candidate.id)}">
+      <span>${escapeHtml(flybyLabel)}</span>
+      <strong>${escapeHtml(candidate.label)}</strong>
+      <small>${formatDeltaV(candidate.metrics.total_delta_v_km_s)} · ${formatDuration(candidate.metrics.total_time_days * 86_400)}</small>
+      <em>${feasible ? "feasible" : "needs burn"}</em>
+    </button>
   `;
 }
 
@@ -1308,6 +1564,10 @@ function measureDistanceKm() {
 function addRouteWaypoint(body: Body) {
   if (body.key === "earth" || body.key === selectedTarget) return;
   routeWaypoints = [...routeWaypoints.filter((waypoint) => waypoint.key !== body.key), { key: body.key, name: body.name }].slice(-4);
+  trajectoryPlan = null;
+  selectedTrajectoryCandidateId = null;
+  trajectoryError = "";
+  void loadTrajectoryPlan();
 }
 
 function routeBodySequence(earth: Body, target: Body) {
@@ -1333,6 +1593,25 @@ function routeTrajectoryPoints(earth: Body, target: Body) {
     points.push(...segment);
   }
   return points;
+}
+
+function activeTrajectoryCandidate() {
+  if (!trajectoryPlan || trajectoryPlan.parameters.destination !== selectedTarget) return null;
+  const plan = trajectoryPlan;
+  return (
+    plan.candidates.find((candidate) => candidate.id === selectedTrajectoryCandidateId) ??
+    plan.candidates.find((candidate) => candidate.id === plan.selected_candidate_id) ??
+    plan.candidates[0] ??
+    null
+  );
+}
+
+function activeRoutePoints(earth: Body, target: Body) {
+  const candidate = activeTrajectoryCandidate();
+  if (candidate?.samples.length) {
+    return candidate.samples.map((point) => ({ xAu: point.x_au, yAu: point.y_au, zAu: point.z_au }));
+  }
+  return routeTrajectoryPoints(earth, target);
 }
 
 function transferSegmentPoints(start: BodyPosition, end: BodyPosition, sampleCount: number) {
@@ -1413,7 +1692,11 @@ function routePointDistanceAu(a: RoutePoint, b: RoutePoint) {
 
 function routeTotalDistanceKm(earth: Body, target: Body) {
   if (!ephemeris) return target.distance_from_earth_km;
-  const points = routeTrajectoryPoints(earth, target);
+  const activePlan = activeTrajectoryCandidate();
+  if (activePlan) {
+    return activePlan.metrics.path_distance_km;
+  }
+  const points = activeRoutePoints(earth, target);
   let totalKm = 0;
   for (let index = 1; index < points.length; index += 1) {
     totalKm += routePointDistanceAu(points[index - 1], points[index]) * ephemeris.au_km;
@@ -1422,7 +1705,7 @@ function routeTotalDistanceKm(earth: Body, target: Body) {
 }
 
 function journeyRouteProgress(earth: Body, target: Body, currentShip: Ship) {
-  const points = routeTrajectoryPoints(earth, target);
+  const points = activeRoutePoints(earth, target);
   if (points.length < 2) return 0;
 
   const shipPoint = { xAu: currentShip.xAu, yAu: currentShip.yAu, zAu: currentShip.zAu };
@@ -1702,6 +1985,9 @@ function setTarget(key: string, options: { inspect?: boolean; center?: boolean }
   if (!body) return;
 
   selectedTarget = body.key;
+  trajectoryPlan = null;
+  selectedTrajectoryCandidateId = null;
+  trajectoryError = "";
   recentDestinations = recordRecentDestination(body.key, { distanceFromEarthKm: body.distance_from_earth_km });
   if (options.inspect) {
     selectedBodyKey = body.key;
@@ -1716,6 +2002,7 @@ function setTarget(key: string, options: { inspect?: boolean; center?: boolean }
     centerOnBody(body.key);
   }
   updateHud();
+  void loadTrajectoryPlan();
 }
 
 function bodyFromSearchValue(value: string) {
@@ -1923,6 +2210,20 @@ function formatDuration(seconds: number) {
 
 function formatDegrees(degrees: number) {
   return `${degrees.toFixed(1)}°`;
+}
+
+function formatDeltaV(value: number) {
+  return `${formatNumber(value)} km/s Δv`;
+}
+
+function formatSignedSpeed(value: number) {
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatNumber(value)} km/s`;
+}
+
+function offsetLabel(days: number) {
+  if (Math.abs(days) < 0.05) return "now";
+  return days > 0 ? `+${formatNumber(days)} d` : `${formatNumber(days)} d`;
 }
 
 function formatAu(au: number) {

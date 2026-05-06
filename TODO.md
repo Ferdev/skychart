@@ -31,10 +31,10 @@
 ## P3 — Make travel paths orbital
 
 - [ ] Replace the straight Earth-destination route guide with route modes: direct reference, transfer trajectory, and gravity-assist plan.
-- [ ] Add launch-window exploration so users can see how departure date changes route shape, flight time, and target intercept.
+- [x] Add launch-window exploration so users can see how departure date changes route shape, flight time, and target intercept.
 - [x] Add planned trajectory previews that curve through real Solar System space instead of drawing a straight chord between bodies.
-- [ ] Add gravity-assist waypoint planning for flybys, with closest approach, assist body, expected speed change, and risk warnings.
-- [ ] Add route comparison cards for fastest, lowest-energy, and gravity-assisted travel options.
+- [x] Add gravity-assist waypoint planning for flybys, with closest approach, assist body, expected speed change, and risk warnings.
+- [x] Add route comparison cards for fastest, lowest-energy, and gravity-assisted travel options.
 - [ ] Let the ship follow a planned trajectory as an assisted autopilot mode while keeping manual arcade flight separate.
 - [x] Clearly label planned paths as approximations until the app supports full mission-grade trajectory solving.
 
