@@ -1,4 +1,5 @@
 const DEFAULT_AU_KM = 149_597_870.7;
+const LIGHT_YEAR_KM = 9_460_730_472_580.8;
 const DEFAULT_COLOR = "#d9b86f";
 const RECENT_DESTINATION_VERSION = 1;
 
@@ -580,6 +581,11 @@ export function formatPickerDistance(
   const abs = Math.abs(value);
   const preferCompact = options.preferCompact ?? true;
 
+  if (abs >= LIGHT_YEAR_KM * 0.1) {
+    const lightYears = value / LIGHT_YEAR_KM;
+    if (Math.abs(lightYears) >= 10) return `${lightYears.toFixed(1)} ly`;
+    return `${lightYears.toFixed(2)} ly`;
+  }
   if (abs >= auKm * 0.1) {
     const au = value / auKm;
     return preferCompact ? `${formatAu(au)} AU` : `${formatWholeNumber(value)} km (${formatAu(au)} AU)`;

@@ -20,10 +20,12 @@ DATA_DIR = ROOT / "data" / "skyfield"
 HOST = "127.0.0.1"
 PORT = 8765
 AU_KM = 149_597_870.700
+PARSEC_AU = 206_264.80624709636
+LIGHT_YEAR_KM = 9_460_730_472_580.8
 SUN_MU_KM3_S2 = 132_712_440_018.0
 SECONDS_PER_DAY = 86_400.0
 EPHEMERIS_SOURCE = (
-    "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK; NASA/JPL Horizons vectors"
+    "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK; NASA/JPL Horizons vectors; NASA Exoplanet Archive host-star catalog"
 )
 TRAJECTORY_SOURCE = f"{EPHEMERIS_SOURCE}; patched-conic launch-window and single-flyby estimator"
 SATELLITE_KERNEL_URLS = {
@@ -47,6 +49,10 @@ CATALOG_GROUPS = {
         "label": "Saturn major moons",
         "description": "Major Saturnian moons from NASA/JPL Horizons parent-relative vectors.",
     },
+    "nearby_exoplanet_systems": {
+        "label": "Nearby exoplanet systems",
+        "description": "Nearby confirmed exoplanet host stars from NASA Exoplanet Archive coordinates and distances.",
+    },
 }
 DEFAULT_CATALOG_GROUPS = tuple(CATALOG_GROUPS.keys())
 HORIZONS_PARENT_CENTERS = {
@@ -68,6 +74,13 @@ def catalog_object(
     parent_key: str | None = None,
     kernel: str | None = None,
     horizons_id: str | None = None,
+    source_type: str | None = None,
+    ra_deg: float | None = None,
+    dec_deg: float | None = None,
+    distance_pc: float | None = None,
+    exoplanet_count: int | None = None,
+    stellar_radius_solar: float | None = None,
+    stellar_teff_k: float | None = None,
 ) -> dict[str, Any]:
     return {
         "key": key,
@@ -81,7 +94,13 @@ def catalog_object(
         "catalog_group": catalog_group,
         "parent_key": parent_key,
         "horizons_id": horizons_id,
-        "source_type": "horizons" if horizons_id else "spk",
+        "source_type": source_type or ("horizons" if horizons_id else "spk"),
+        "ra_deg": ra_deg,
+        "dec_deg": dec_deg,
+        "distance_pc": distance_pc,
+        "exoplanet_count": exoplanet_count,
+        "stellar_radius_solar": stellar_radius_solar,
+        "stellar_teff_k": stellar_teff_k,
     }
 
 
@@ -110,6 +129,22 @@ CATALOG_OBJECTS = [
     catalog_object(key="rhea", name="Rhea", ephemeris=605, horizons_id="605", radius_km=763.8, mu_km3_s2=153.94, color="#b9b5aa", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
     catalog_object(key="titan", name="Titan", ephemeris=606, horizons_id="606", radius_km=2_574.73, mu_km3_s2=8_978.14, color="#d6a657", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
     catalog_object(key="iapetus", name="Iapetus", ephemeris=608, horizons_id="608", radius_km=734.5, mu_km3_s2=120.5, color="#8d8070", object_type="moon", parent_key="saturn", catalog_group="saturn_major_moons"),
+    catalog_object(key="proxima-cen", name="Proxima Cen", ephemeris="Proxima Cen", source_type="stellar_catalog", radius_km=98_124, mu_km3_s2=0.0, color="#f08f6f", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=217.3934657, dec_deg=-62.6761821, distance_pc=1.30119, exoplanet_count=2, stellar_radius_solar=0.141, stellar_teff_k=2900),
+    catalog_object(key="barnards-star", name="Barnard's star", ephemeris="Barnard's star", source_type="stellar_catalog", radius_km=128_705, mu_km3_s2=0.0, color="#f19a75", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=269.4486144, dec_deg=4.7379808, distance_pc=1.82655, exoplanet_count=4, stellar_radius_solar=0.185, stellar_teff_k=3195),
+    catalog_object(key="eps-eri", name="eps Eri", ephemeris="eps Eri", source_type="stellar_catalog", radius_km=512_000, mu_km3_s2=0.0, color="#ffd08a", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=53.2284306, dec_deg=-9.4581715, distance_pc=3.2026, exoplanet_count=1),
+    catalog_object(key="gj-887", name="GJ 887", ephemeris="GJ 887", source_type="stellar_catalog", radius_km=325_588, mu_km3_s2=0.0, color="#f3a078", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=346.5027573, dec_deg=-35.8473489, distance_pc=3.28679, exoplanet_count=4, stellar_radius_solar=0.468, stellar_teff_k=3688),
+    catalog_object(key="ross-128", name="Ross 128", ephemeris="Ross 128", source_type="stellar_catalog", radius_km=136_856, mu_km3_s2=0.0, color="#f19573", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=176.9376036, dec_deg=0.7992898, distance_pc=3.37454, exoplanet_count=1, stellar_radius_solar=0.1967, stellar_teff_k=3192),
+    catalog_object(key="gl-725-a", name="Gl 725 A", ephemeris="Gl 725 A", source_type="stellar_catalog", radius_km=244_291, mu_km3_s2=0.0, color="#f4a67c", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=280.6834312, dec_deg=59.638109, distance_pc=3.5214, exoplanet_count=1, stellar_radius_solar=0.351, stellar_teff_k=3433),
+    catalog_object(key="gj-15-a", name="GJ 15 A", ephemeris="GJ 15 A", source_type="stellar_catalog", radius_km=264_366, mu_km3_s2=0.0, color="#f4a87e", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=4.6126677, dec_deg=44.0247296, distance_pc=3.56228, exoplanet_count=2, stellar_radius_solar=0.38, stellar_teff_k=3607),
+    catalog_object(key="tau-cet", name="tau Cet", ephemeris="tau Cet", source_type="stellar_catalog", radius_km=552_000, mu_km3_s2=0.0, color="#ffd99d", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=26.0093029, dec_deg=-15.9337987, distance_pc=3.60304, exoplanet_count=3),
+    catalog_object(key="eps-ind-a", name="eps Ind A", ephemeris="eps Ind A", source_type="stellar_catalog", radius_km=472_680, mu_km3_s2=0.0, color="#ffd18a", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=330.8714021, dec_deg=-56.7969023, distance_pc=3.63857, exoplanet_count=1, stellar_radius_solar=0.679, stellar_teff_k=4760),
+    catalog_object(key="gj-1061", name="GJ 1061", ephemeris="GJ 1061", source_type="stellar_catalog", radius_km=108_529, mu_km3_s2=0.0, color="#f08f6f", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=54.0032486, dec_deg=-44.5143104, distance_pc=3.67278, exoplanet_count=3, stellar_radius_solar=0.156, stellar_teff_k=2953),
+    catalog_object(key="yz-cet", name="YZ Cet", ephemeris="YZ Cet", source_type="stellar_catalog", radius_km=109_225, mu_km3_s2=0.0, color="#f19573", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=18.1330792, dec_deg=-16.9962434, distance_pc=3.71207, exoplanet_count=3, stellar_radius_solar=0.157, stellar_teff_k=3151),
+    catalog_object(key="teegardens-star", name="Teegarden's Star", ephemeris="Teegarden's Star", source_type="stellar_catalog", radius_km=83_484, mu_km3_s2=0.0, color="#f18e70", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=43.2691449, dec_deg=16.8649024, distance_pc=3.83078, exoplanet_count=3, stellar_radius_solar=0.12, stellar_teff_k=3034),
+    catalog_object(key="kapteyn", name="Kapteyn", ephemeris="Kapteyn", source_type="stellar_catalog", radius_km=202_449, mu_km3_s2=0.0, color="#f5a77e", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=77.9586613, dec_deg=-45.0430198, distance_pc=3.93305, exoplanet_count=1, stellar_radius_solar=0.291, stellar_teff_k=3550),
+    catalog_object(key="wolf-1061", name="Wolf 1061", ephemeris="Wolf 1061", source_type="stellar_catalog", radius_km=213_580, mu_km3_s2=0.0, color="#f4a37b", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=247.5748276, dec_deg=-12.6676866, distance_pc=4.30592, exoplanet_count=3, stellar_radius_solar=0.307, stellar_teff_k=3342),
+    catalog_object(key="gj-876", name="GJ 876", ephemeris="GJ 876", source_type="stellar_catalog", radius_km=208_710, mu_km3_s2=0.0, color="#f4a078", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=343.3239737, dec_deg=-14.2665958, distance_pc=4.67517, exoplanet_count=4, stellar_radius_solar=0.3),
+    catalog_object(key="gj-411", name="GJ 411", ephemeris="GJ 411", source_type="stellar_catalog", radius_km=256_394, mu_km3_s2=0.0, color="#f5aa80", object_type="star", catalog_group="nearby_exoplanet_systems", ra_deg=165.834471, dec_deg=35.972317, distance_pc=5.675773, exoplanet_count=2, stellar_radius_solar=0.3685, stellar_teff_k=3719),
 ]
 BODIES = CATALOG_OBJECTS
 BODY_BY_KEY = {item["key"]: item for item in BODIES}
@@ -208,6 +243,53 @@ def horizons_timestamp(value: datetime) -> str:
 def horizons_center_for_item(item: dict[str, Any]) -> str:
     parent_key = item.get("parent_key")
     return HORIZONS_PARENT_CENTERS.get(parent_key, "@sun")
+
+
+def stellar_catalog_position_payload(item: dict[str, Any]) -> dict[str, float]:
+    ra_deg = item.get("ra_deg")
+    dec_deg = item.get("dec_deg")
+    distance_pc = item.get("distance_pc")
+    if ra_deg is None or dec_deg is None or distance_pc is None:
+        raise RuntimeError(f"Stellar catalog object {item['name']} requires RA, Dec, and distance")
+
+    distance_au = float(distance_pc) * PARSEC_AU
+    ra_rad = math.radians(float(ra_deg))
+    dec_rad = math.radians(float(dec_deg))
+    equatorial_x_au = distance_au * math.cos(dec_rad) * math.cos(ra_rad)
+    equatorial_y_au = distance_au * math.cos(dec_rad) * math.sin(ra_rad)
+    equatorial_z_au = distance_au * math.sin(dec_rad)
+
+    obliquity_rad = math.radians(23.4392911)
+    x_au = equatorial_x_au
+    y_au = equatorial_y_au * math.cos(obliquity_rad) + equatorial_z_au * math.sin(obliquity_rad)
+    z_au = -equatorial_y_au * math.sin(obliquity_rad) + equatorial_z_au * math.cos(obliquity_rad)
+
+    return {
+        "x_au": x_au,
+        "y_au": y_au,
+        "z_au": z_au,
+        "x_km": x_au * AU_KM,
+        "y_km": y_au * AU_KM,
+        "z_km": z_au * AU_KM,
+        "heliocentric_distance_km": distance_au * AU_KM,
+        "distance_pc": float(distance_pc),
+        "distance_ly": distance_au * AU_KM / LIGHT_YEAR_KM,
+        "ra_deg": float(ra_deg),
+        "dec_deg": float(dec_deg),
+    }
+
+
+def stellar_catalog_payload(item: dict[str, Any]) -> dict[str, float | int | None]:
+    distance_pc = item.get("distance_pc")
+    return {
+        "ra_deg": item.get("ra_deg"),
+        "dec_deg": item.get("dec_deg"),
+        "distance_pc": distance_pc,
+        "distance_ly": float(distance_pc) * PARSEC_AU * AU_KM / LIGHT_YEAR_KM if distance_pc is not None else None,
+        "exoplanet_count": item.get("exoplanet_count"),
+        "stellar_radius_solar": item.get("stellar_radius_solar"),
+        "stellar_teff_k": item.get("stellar_teff_k"),
+    }
 
 
 def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[str, float]:
@@ -353,6 +435,10 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
         ephemeris_kernel = "JPL Horizons vectors"
         ephemeris_source = "NASA/JPL Horizons API"
         position_model = "horizons_vectors"
+    elif source_type == "stellar_catalog":
+        ephemeris_kernel = "NASA Exoplanet Archive"
+        ephemeris_source = "NASA Exoplanet Archive confirmed planet host catalog"
+        position_model = "stellar_catalog_coordinates"
     else:
         ephemeris_kernel = item.get("kernel") or "de440s.bsp"
         ephemeris_source = "NAIF satellite SPK" if item.get("kernel") else "NASA/JPL DE440s"
@@ -368,14 +454,30 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
         "ephemeris_id": str(item.get("horizons_id") or item["ephemeris"]),
         "ephemeris_kernel": ephemeris_kernel,
         "ephemeris_source": ephemeris_source,
-        "ephemeris_center": horizons_center_for_item(item) if source_type == "horizons" else "solar-system barycenter",
+        "ephemeris_center": horizons_center_for_item(item) if source_type == "horizons" else "Sun" if source_type == "stellar_catalog" else "solar-system barycenter",
         "position_model": position_model,
-        "dynamic_position": True,
+        "dynamic_position": source_type != "stellar_catalog",
+        "ra_deg": item.get("ra_deg"),
+        "dec_deg": item.get("dec_deg"),
+        "distance_pc": item.get("distance_pc"),
+        "exoplanet_count": item.get("exoplanet_count"),
+        "stellar_radius_solar": item.get("stellar_radius_solar"),
+        "stellar_teff_k": item.get("stellar_teff_k"),
     }
 
 
 def catalog_summary_payload(groups: list[str], objects: list[dict[str, Any]]) -> dict[str, Any]:
-    kernels = sorted({item.get("kernel") or ("JPL Horizons vectors" if item.get("source_type") == "horizons" else "de440s.bsp") for item in objects})
+    kernels = sorted({
+        item.get("kernel")
+        or (
+            "JPL Horizons vectors"
+            if item.get("source_type") == "horizons"
+            else "NASA Exoplanet Archive"
+            if item.get("source_type") == "stellar_catalog"
+            else "de440s.bsp"
+        )
+        for item in objects
+    })
     return {
         "schema_version": 1,
         "groups": groups,
@@ -651,6 +753,11 @@ def body_state(
     if body_key == "sun":
         position_au = (0.0, 0.0, 0.0)
         position_km = (0.0, 0.0, 0.0)
+        velocity_km_s = (0.0, 0.0, 0.0)
+    elif item.get("source_type") == "stellar_catalog":
+        position = stellar_catalog_position_payload(item)
+        position_au = (float(position["x_au"]), float(position["y_au"]), float(position["z_au"]))
+        position_km = (float(position["x_km"]), float(position["y_km"]), float(position["z_km"]))
         velocity_km_s = (0.0, 0.0, 0.0)
     elif item.get("source_type") == "horizons":
         parent_key = item.get("parent_key")
@@ -948,6 +1055,8 @@ def departure_offsets(scan_days: float, step_days: float) -> list[float]:
 
 def candidate_assist_keys(destination_key: str, requested_assist: str) -> list[str]:
     if requested_assist == "direct":
+        return []
+    if BODY_BY_KEY[destination_key].get("source_type") == "stellar_catalog":
         return []
     if requested_assist != "auto":
         return [requested_assist]
@@ -1322,6 +1431,13 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
                 "heliocentric_distance_km": 0.0,
             }
             earth_distance_km = float((sun - earth).at(time).distance().km)
+        elif item.get("source_type") == "stellar_catalog":
+            position = stellar_catalog_position_payload(item)
+            earth_distance_km = math.sqrt(
+                (position["x_km"] - earth_position["x_km"]) ** 2
+                + (position["y_km"] - earth_position["y_km"]) ** 2
+                + (position["z_km"] - earth_position["z_km"]) ** 2
+            )
         elif item.get("source_type") == "horizons":
             parent_key = item.get("parent_key")
             parent_position = positions_by_key.get(parent_key or "")
@@ -1355,6 +1471,7 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
                 "position": position,
                 "state_vector": body_state_vector_payload(item, timestamp, state_cache),
                 "orbit": orbit_payload_for_item(item, timestamp, state_cache),
+                "stellar": stellar_catalog_payload(item) if item.get("source_type") == "stellar_catalog" else None,
                 "distance_from_earth_km": earth_distance_km,
             }
         )
@@ -1395,6 +1512,7 @@ def orbits_payload(timestamp: datetime, groups: list[str] | None = None) -> dict
                 "catalog": catalog_object_payload(item),
                 "state_vector": body_state_vector_payload(item, timestamp, state_cache),
                 "orbit": orbit_payload_for_item(item, timestamp, state_cache),
+                "stellar": stellar_catalog_payload(item) if item.get("source_type") == "stellar_catalog" else None,
             }
         )
 
