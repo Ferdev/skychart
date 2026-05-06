@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Cosmic Atlas</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="map" aria-label="2D heliocentric ecliptic Solar System map"></canvas>
+
+      <section class="panel hud" aria-label="Simulation HUD">
+        <div class="title-row">
+          <h1>Cosmic Atlas</h1>
+          <span id="load-state">loading</span>
+        </div>
+        <dl id="hud-values"></dl>
+      </section>
+
+      <section class="panel controls" aria-label="Target and journey controls">
+        <div class="target-row" id="target-buttons"></div>
+        <div class="zoom-row">
+          <button id="zoom-out" type="button" title="Zoom out">−</button>
+          <button id="zoom-in" type="button" title="Zoom in">+</button>
+          <button id="center-sun" type="button" title="Center on Sun">Sun</button>
+          <button id="center-ship" type="button" title="Center on ship">Ship</button>
+        </div>
+        <div id="journey"></div>
+      </section>
+
+      <div class="scale-note">Visual radii exaggerated. AU rings are distance guides.</div>
+      <div class="error-panel" id="error-panel" hidden></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
