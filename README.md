@@ -4,8 +4,8 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 
 ## What Is Included
 
-- Sun, Mercury, Venus, Earth, Moon, Mars, Jupiter, Saturn, Uranus, and Neptune.
-- Real current-date body positions from Skyfield using NASA/JPL DE440s.
+- Sun, Mercury, Venus, Earth, Moon, Mars, Phobos, Deimos, Jupiter, Saturn, Uranus, Neptune, and Pluto.
+- Real current-date body positions from Skyfield using NASA/JPL DE440s plus the NAIF MAR099s Mars satellite SPK for Phobos and Deimos.
 - 2D top-down canvas map using heliocentric ecliptic x/y coordinates.
 - Quick target shortcuts for Moon, Mars, Jupiter, and Saturn.
 - Destination search for targeting and jumping to any loaded body.
@@ -52,7 +52,10 @@ Then open the Vite URL printed in the terminal, usually:
 http://127.0.0.1:5173/
 ```
 
-The first backend request downloads the `de440s.bsp` kernel into `data/skyfield/`, so first launch can take a moment.
+The first backend request downloads the required kernels into `data/skyfield/`, so first launch can take a moment:
+
+- `de440s.bsp` for the Sun, planets, Earth's Moon, and Pluto barycenter.
+- `mar099s.bsp` for Phobos and Deimos.
 
 You can also run the two processes separately:
 
@@ -63,7 +66,7 @@ npm run dev
 
 ## Data Source
 
-The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL `de440s.bsp` planetary ephemeris kernel. Skyfield downloads the kernel on first use and caches it under `data/skyfield/`.
+The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL `de440s.bsp` planetary ephemeris kernel. It also loads the NAIF `mar099s.bsp` satellite SPK for Mars' moons Phobos and Deimos. Kernels are downloaded on first use and cached under `data/skyfield/`.
 
 ## Coordinate System
 
@@ -87,7 +90,8 @@ The timestamp input is treated as UTC. Changing time recomputes every celestial 
 ## Accuracy Limitations
 
 - Planet positions come from the JPL ephemeris through Skyfield, not circular orbit approximations.
-- Mars, Jupiter, Saturn, Uranus, and Neptune use barycenter targets from the ephemeris.
+- Mars, Jupiter, Saturn, Uranus, Neptune, and Pluto use barycenter targets from the planetary ephemeris.
+- Phobos and Deimos use the official NAIF MAR099s satellite SPK. Other moon systems are not included yet because they require additional satellite kernels, some of which are much larger.
 - Gravity-assist plans are patched-conic planning estimates. They use real ephemeris positions and velocities, but they are not full Lambert/n-body mission optimizations.
 - Flyby feasibility is estimated from idealized turn angle, periapsis altitude, and incoming/outgoing excess velocity. It does not include launch vehicle constraints, finite burns, perturbations, or navigation margins.
 - The map is a top-down ecliptic projection, so it does not show vertical displacement visually.

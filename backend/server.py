@@ -7,9 +7,10 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.request import urlretrieve
 from urllib.parse import parse_qs, urlparse
 
-from skyfield.api import Loader
+from skyfield.api import Loader, load_file
 from skyfield.framelib import ecliptic_frame
 
 
@@ -20,6 +21,11 @@ PORT = 8765
 AU_KM = 149_597_870.700
 SUN_MU_KM3_S2 = 132_712_440_018.0
 SECONDS_PER_DAY = 86_400.0
+EPHEMERIS_SOURCE = "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK for Phobos and Deimos"
+TRAJECTORY_SOURCE = f"{EPHEMERIS_SOURCE}; patched-conic launch-window and single-flyby estimator"
+SATELLITE_KERNEL_URLS = {
+    "mar099s.bsp": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/mar099s.bsp",
+}
 
 BODIES = [
     {"key": "sun", "name": "Sun", "ephemeris": "sun", "radius_km": 695_700, "mu_km3_s2": SUN_MU_KM3_S2, "color": "#ffd166"},
@@ -28,12 +34,16 @@ BODIES = [
     {"key": "earth", "name": "Earth", "ephemeris": "earth", "radius_km": 6_371.0, "mu_km3_s2": 398_600.4418, "color": "#62a8ff"},
     {"key": "moon", "name": "Moon", "ephemeris": "moon", "radius_km": 1_737.4, "mu_km3_s2": 4_902.800066, "color": "#c8c8c8"},
     {"key": "mars", "name": "Mars", "ephemeris": "mars barycenter", "radius_km": 3_389.5, "mu_km3_s2": 42_828.375214, "color": "#df6b43"},
+    {"key": "phobos", "name": "Phobos", "ephemeris": 401, "kernel": "mar099s.bsp", "radius_km": 11.27, "mu_km3_s2": 0.0007087, "color": "#9b8066"},
+    {"key": "deimos", "name": "Deimos", "ephemeris": 402, "kernel": "mar099s.bsp", "radius_km": 6.2, "mu_km3_s2": 0.0000985, "color": "#b19a82"},
     {"key": "jupiter", "name": "Jupiter", "ephemeris": "jupiter barycenter", "radius_km": 69_911, "mu_km3_s2": 126_686_534.0, "color": "#d9b382"},
     {"key": "saturn", "name": "Saturn", "ephemeris": "saturn barycenter", "radius_km": 58_232, "mu_km3_s2": 37_931_187.0, "color": "#d8c28a"},
     {"key": "uranus", "name": "Uranus", "ephemeris": "uranus barycenter", "radius_km": 25_362, "mu_km3_s2": 5_793_939.0, "color": "#83d8d8"},
     {"key": "neptune", "name": "Neptune", "ephemeris": "neptune barycenter", "radius_km": 24_622, "mu_km3_s2": 6_836_529.0, "color": "#6f8cff"},
+    {"key": "pluto", "name": "Pluto", "ephemeris": "pluto barycenter", "radius_km": 1_188.3, "mu_km3_s2": 869.61, "color": "#c9a27c"},
 ]
 BODY_BY_KEY = {item["key"]: item for item in BODIES}
+MOON_BODY_KEYS = {"moon", "phobos", "deimos"}
 DEFAULT_TRAIL_BODIES = ("earth", "mars", "jupiter")
 DEFAULT_TRAIL_DAYS = 365.0
 DEFAULT_TRAIL_STEP_DAYS = 14.0
@@ -52,6 +62,7 @@ TRAJECTORY_SAMPLE_COUNT = 72
 _loader: Loader | None = None
 _timescale: Any | None = None
 _ephemeris: Any | None = None
+_satellite_kernels: dict[str, Any] = {}
 
 
 class QueryInputError(ValueError):
@@ -70,6 +81,30 @@ def skyfield_context() -> tuple[Any, Any]:
     if _ephemeris is None:
         _ephemeris = _loader("de440s.bsp")
     return _timescale, _ephemeris
+
+
+def satellite_kernel(filename: str) -> Any:
+    if filename not in SATELLITE_KERNEL_URLS:
+        raise RuntimeError(f"Unknown satellite kernel: {filename}")
+
+    if filename not in _satellite_kernels:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        path = DATA_DIR / filename
+        if not path.exists():
+            temporary_path = path.with_suffix(f"{path.suffix}.download")
+            if temporary_path.exists():
+                temporary_path.unlink()
+            urlretrieve(SATELLITE_KERNEL_URLS[filename], str(temporary_path))
+            temporary_path.replace(path)
+        _satellite_kernels[filename] = load_file(str(path))
+
+    return _satellite_kernels[filename]
+
+
+def target_for_body(item: dict[str, Any], ephemeris: Any) -> Any:
+    kernel_name = item.get("kernel")
+    kernel = satellite_kernel(kernel_name) if kernel_name else ephemeris
+    return kernel[item["ephemeris"]]
 
 
 def parse_timestamp(value: str | None) -> datetime:
@@ -217,7 +252,7 @@ def parse_trajectory_query(query: dict[str, list[str]]) -> tuple[datetime, str, 
                 "valid_assists": ["auto", "direct", *[item["key"] for item in BODIES]],
             },
         )
-    if assist in {"sun", "earth", "moon", destination_key}:
+    if assist in {"sun", "earth", *MOON_BODY_KEYS, destination_key}:
         assist = "auto"
 
     requested_scan_days = parse_float_param(query, "scan_days", DEFAULT_TRAJECTORY_SCAN_DAYS)
@@ -347,7 +382,7 @@ def body_state(
     time = timescale.from_datetime(timestamp)
     item = BODY_BY_KEY[body_key]
     sun = ephemeris["sun"]
-    target = ephemeris[item["ephemeris"]]
+    target = target_for_body(item, ephemeris)
 
     if body_key == "sun":
         position_au = (0.0, 0.0, 0.0)
@@ -483,10 +518,13 @@ def candidate_assist_keys(destination_key: str, requested_assist: str) -> list[s
     target_radius = {
         "moon": 1.0,
         "mars": 1.52,
+        "phobos": 1.52,
+        "deimos": 1.52,
         "jupiter": 5.2,
         "saturn": 9.58,
         "uranus": 19.2,
         "neptune": 30.1,
+        "pluto": 39.5,
     }.get(destination_key, 2.0)
     if target_radius > 6:
         candidates = ["jupiter", "mars", "venus"]
@@ -496,7 +534,7 @@ def candidate_assist_keys(destination_key: str, requested_assist: str) -> list[s
         candidates = ["venus"]
     else:
         candidates = ["venus", "mars"]
-    return [key for key in candidates if key not in {"earth", "moon", destination_key} and key in BODY_BY_KEY]
+    return [key for key in candidates if key not in {"earth", *MOON_BODY_KEYS, destination_key} and key in BODY_BY_KEY]
 
 
 def route_point_from_au(position_au: tuple[float, float, float]) -> dict[str, float]:
@@ -688,7 +726,7 @@ def trajectory_payload(
     direct_duration_options = duration_candidates_days(
         vector3_norm(current_earth["position_km"]),
         vector3_norm(current_target["position_km"]),
-        minimum_days=4.0 if destination_key == "moon" else 45.0,
+        minimum_days=4.0 if destination_key in MOON_BODY_KEYS else 45.0,
     )
 
     candidates: list[dict[str, Any]] = []
@@ -768,7 +806,7 @@ def trajectory_payload(
     return {
         "timestamp_utc": isoformat_utc(timestamp),
         "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
-        "data_source": "NASA/JPL DE440s ephemeris via Skyfield; patched-conic launch-window and single-flyby estimator",
+        "data_source": TRAJECTORY_SOURCE,
         "coordinate_frame": "Heliocentric ecliptic Cartesian coordinates, projected top-down as x/y; z retained for scoring",
         "units": {
             "distance": "kilometers",
@@ -809,7 +847,7 @@ def ephemeris_payload(timestamp: datetime) -> dict[str, Any]:
     earth_position = None
 
     for item in BODIES:
-        target = ephemeris[item["ephemeris"]]
+        target = target_for_body(item, ephemeris)
 
         if item["key"] == "sun":
             position = {
@@ -844,7 +882,7 @@ def ephemeris_payload(timestamp: datetime) -> dict[str, Any]:
     return {
         "timestamp_utc": isoformat_utc(timestamp),
         "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
-        "data_source": "NASA/JPL DE440s ephemeris via Skyfield",
+        "data_source": EPHEMERIS_SOURCE,
         "coordinate_frame": "Heliocentric ecliptic Cartesian coordinates, projected top-down as x/y; z retained for distance calculations",
         "units": {"distance": "kilometers", "position": "astronomical units and kilometers"},
         "au_km": AU_KM,
@@ -875,7 +913,7 @@ def trails_payload(
                 for sample_timestamp, offset_days in samples
             ]
         else:
-            target = ephemeris[item["ephemeris"]]
+            target = target_for_body(item, ephemeris)
             points = trail_points_from_vector((target - sun).at(time), samples)
 
         bodies.append(
@@ -893,7 +931,7 @@ def trails_payload(
     return {
         "timestamp_utc": isoformat_utc(timestamp),
         "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
-        "data_source": "NASA/JPL DE440s ephemeris via Skyfield",
+        "data_source": EPHEMERIS_SOURCE,
         "coordinate_frame": "Heliocentric ecliptic Cartesian coordinates, projected top-down as x/y; z retained for distance calculations",
         "units": {
             "distance": "kilometers",

@@ -40,6 +40,7 @@
 
 ## Future — Prepare for 3D without building it yet
 
+- [ ] Expand the catalog through explicit ephemeris/kernel adapters for additional moon systems, dwarf planets, asteroids, comets, and spacecraft without changing the destination picker contract.
 - [ ] Keep coordinate and rendering code separated so a future 3D view can reuse the same ephemeris and navigation state.
 - [ ] Define a future 2D/3D view switch only when the 3D mode has a concrete user benefit beyond visual spectacle.
 - [ ] Preserve all current 2D workflows when 3D is introduced: search, inspect, target, measure, route progress, and time controls.

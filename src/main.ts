@@ -5,6 +5,7 @@ import {
   buildDestinationPickerSections,
   classifyBody,
   findDestinationBody,
+  normalizeDestinationQuery,
   readRecentDestinations,
   recordRecentDestination,
   type DestinationBodyType,
@@ -17,7 +18,7 @@ const AU_KM_FALLBACK = 149_597_870.7;
 const LIGHT_SPEED_KM_S = 299_792.458;
 const EARTH_MOON_AVG_KM = 384_400;
 const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
-const BODY_FILTERS = ["all", "planet", "moon", "star"] as const;
+const BODY_FILTERS = ["all", "planet", "moon", "dwarf_planet", "star"] as const;
 const ONBOARDING_DISMISSED_KEY = "cosmic-atlas.onboarding-dismissed";
 const TRANSFER_PATH_SAMPLES = 96;
 const ICONS: Record<string, string> = {
@@ -57,6 +58,22 @@ type BodyFilter = (typeof BODY_FILTERS)[number];
 type InteractionMode = "pan" | "target" | "measure";
 type DisplayLayer = "labels" | "rings" | "route" | "trails";
 type ZoomPreset = "inner" | "outer" | "all";
+
+const BODY_FILTER_LABELS: Record<BodyFilter, string> = {
+  all: "All",
+  planet: "Planets",
+  moon: "Moons",
+  dwarf_planet: "Dwarf",
+  star: "Stars"
+};
+
+const BODY_FILTER_SECTION_LABELS: Record<BodyFilter, string> = {
+  all: "All bodies",
+  planet: "Planets",
+  moon: "Moons",
+  dwarf_planet: "Dwarf planets",
+  star: "Stars"
+};
 
 type TargetKey = string;
 
@@ -2027,7 +2044,7 @@ function syncBodySelect() {
 
 function initializeBodyFilterButtons() {
   bodyFilterButtons.innerHTML = BODY_FILTERS.map((filter) => {
-    const label = filter === "all" ? "All" : labelForKey(filter.replace("_", " "));
+    const label = BODY_FILTER_LABELS[filter];
     return `<button type="button" data-body-filter="${filter}">${escapeHtml(label)}</button>`;
   }).join("");
   bodyFilterButtons.addEventListener("click", (event) => {
@@ -2035,6 +2052,9 @@ function initializeBodyFilterButtons() {
     const filter = button?.dataset.bodyFilter as BodyFilter | undefined;
     if (!filter || !BODY_FILTERS.includes(filter)) return;
     activeBodyFilter = filter;
+    if (isSelectedDestinationSearchValue()) {
+      destinationSearch.value = "";
+    }
     renderBodyPicker();
   });
 }
@@ -2053,16 +2073,17 @@ function initializeModeButtons() {
 function renderBodyPicker() {
   if (!ephemeris) return;
   const includeTypes = activeBodyFilter === "all" ? undefined : [activeBodyFilter as DestinationBodyType];
+  const query = destinationPickerQuery();
   const sections = buildDestinationPickerSections(ephemeris.bodies, {
-    query: destinationSearch.value,
+    query,
     selectedKey: selectedBodyKey,
     currentTargetKey: selectedTarget,
     recentDestinations,
     includeTypes,
-    maxResults: 10,
-    maxFavorites: 4,
-    maxFrequent: 4,
-    maxRecent: 4,
+    maxResults: query ? 12 : undefined,
+    maxFavorites: activeBodyFilter === "all" ? 4 : 0,
+    maxFrequent: activeBodyFilter === "all" ? 4 : 0,
+    maxRecent: activeBodyFilter === "all" ? 4 : 0,
     includeAllSection: true,
     auKm: ephemeris.au_km
   }).filter((section) => section.items.length > 0);
@@ -2073,10 +2094,12 @@ function renderBodyPicker() {
 
   bodyPicker.innerHTML = sections
     .map((section) => {
-      const items = section.items.slice(0, section.kind === "all" ? 8 : 4);
+      const allSectionLimit = activeBodyFilter === "all" ? 10 : 16;
+      const items = section.items.slice(0, section.kind === "all" ? allSectionLimit : 4);
+      const label = section.kind === "all" && activeBodyFilter !== "all" ? BODY_FILTER_SECTION_LABELS[activeBodyFilter] : section.label;
       return `
         <section class="destination-picker__section">
-          <span class="destination-picker__section-title">${escapeHtml(section.label)}</span>
+          <span class="destination-picker__section-title">${escapeHtml(label)}</span>
           <div class="destination-picker__list">
             ${items.map(renderDestinationPickerItem).join("")}
           </div>
@@ -2084,6 +2107,16 @@ function renderBodyPicker() {
       `;
     })
     .join("");
+}
+
+function destinationPickerQuery() {
+  return isSelectedDestinationSearchValue() ? "" : destinationSearch.value;
+}
+
+function isSelectedDestinationSearchValue(value = destinationSearch.value) {
+  const target = bodyByKey.get(selectedTarget);
+  if (!target) return false;
+  return normalizeDestinationQuery(value) === normalizeDestinationQuery(bodySearchLabel(target));
 }
 
 function renderDestinationPickerItem(item: DestinationPickerItem) {
@@ -2251,10 +2284,13 @@ function fallbackBodyColor(key: string) {
     earth: "#62a8ff",
     moon: "#c8c8c8",
     mars: "#df6b43",
+    phobos: "#9b8066",
+    deimos: "#b19a82",
     jupiter: "#d9b382",
     saturn: "#d8c28a",
     uranus: "#83d8d8",
-    neptune: "#6f8cff"
+    neptune: "#6f8cff",
+    pluto: "#c9a27c"
   };
   return colors[key] ?? "#d9b86f";
 }
@@ -2315,8 +2351,8 @@ function zoomAt(clientX: number, clientY: number, factor: number) {
 function applyZoomPreset(preset: ZoomPreset) {
   if (!ephemeris) return;
   const keysByPreset: Record<ZoomPreset, string[]> = {
-    inner: ["mercury", "venus", "earth", "moon", "mars"],
-    outer: ["jupiter", "saturn", "uranus", "neptune"],
+    inner: ["mercury", "venus", "earth", "moon", "mars", "phobos", "deimos"],
+    outer: ["jupiter", "saturn", "uranus", "neptune", "pluto"],
     all: ephemeris.bodies.map((body) => body.key)
   };
   const bodies = keysByPreset[preset].map((key) => bodyByKey.get(key)).filter((body): body is Body => Boolean(body));
@@ -2380,7 +2416,9 @@ function displayRadius(body: Body) {
   if (body.key === "jupiter") return 10;
   if (body.key === "saturn") return 9;
   if (body.key === "uranus" || body.key === "neptune") return 7;
+  if (body.key === "pluto") return 4.5;
   if (body.key === "moon") return 3.5;
+  if (body.key === "phobos" || body.key === "deimos") return 3;
   return 5.5;
 }
 

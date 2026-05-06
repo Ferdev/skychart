@@ -156,7 +156,30 @@ type StoredRecentDestinations = {
 };
 
 const PLANET_KEYS = new Set(["mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"]);
-const MOON_KEYS = new Set(["moon", "luna"]);
+const MOON_KEYS = new Set([
+  "moon",
+  "luna",
+  "phobos",
+  "deimos",
+  "charon",
+  "io",
+  "europa",
+  "ganymede",
+  "callisto",
+  "titan",
+  "enceladus",
+  "iapetus",
+  "mimas",
+  "rhea",
+  "dione",
+  "tethys",
+  "triton",
+  "miranda",
+  "ariel",
+  "umbriel",
+  "titania",
+  "oberon"
+]);
 const DWARF_PLANET_KEYS = new Set(["pluto", "ceres", "eris", "haumea", "makemake"]);
 const ASTEROID_KEYS = new Set(["vesta", "pallas", "hygiea", "psyche", "bennu", "ryugu", "eros", "ida", "gaspra"]);
 const COMET_KEYS = new Set(["halley", "borrelly", "tempel", "churyumov", "gerasimenko"]);
@@ -169,12 +192,15 @@ const SOLAR_ORDER = new Map<string, number>([
   ["earth", 30],
   ["moon", 31],
   ["mars", 40],
+  ["phobos", 41],
+  ["deimos", 42],
   ["ceres", 45],
   ["jupiter", 50],
   ["saturn", 60],
   ["uranus", 70],
   ["neptune", 80],
-  ["pluto", 90]
+  ["pluto", 90],
+  ["charon", 91]
 ]);
 
 const TYPE_LABELS: Record<DestinationBodyType, string> = {
