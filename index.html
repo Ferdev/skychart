@@ -21,29 +21,42 @@
     <main id="app">
       <canvas id="map" aria-label="2D heliocentric ecliptic Solar System map"></canvas>
 
-      <aside class="panel hud" aria-label="Simulation HUD">
+      <aside class="panel hud status-panel" aria-label="Simulation HUD">
         <div class="title-row">
-          <h1>Cosmic Atlas</h1>
+          <div>
+            <p class="eyebrow">Live heliocentric atlas</p>
+            <h1>Cosmic Atlas</h1>
+          </div>
           <span id="load-state">loading</span>
         </div>
         <dl id="hud-values"></dl>
       </aside>
 
-      <section class="panel controls" id="controls" aria-label="Target and journey controls">
-        <div class="target-row" id="target-buttons"></div>
+      <section class="panel controls mission-panel" id="controls" aria-label="Destination controls">
+        <div class="panel-head">
+          <p class="eyebrow">Destination</p>
+          <h2>Where do you want to go?</h2>
+        </div>
         <div class="destination-row">
-          <label for="destination-search">Destination</label>
+          <label for="destination-search">Search loaded bodies</label>
           <input id="destination-search" type="search" list="body-options" autocomplete="off" placeholder="Search loaded body" />
           <datalist id="body-options"></datalist>
           <button id="set-destination" type="button">Target</button>
           <button id="jump-destination" type="button">Jump</button>
         </div>
+
+        <div class="quick-targets">
+          <span>Quick targets</span>
+          <div class="target-row" id="target-buttons"></div>
+        </div>
+
         <div class="body-row">
-          <label for="body-select">Inspect</label>
+          <label for="body-select">Inspect body</label>
           <select id="body-select" aria-label="Selected body"></select>
           <button id="target-selected" type="button" title="Set selected body as target">Target</button>
           <button id="center-selected" type="button" title="Center on selected body">Center</button>
         </div>
+
         <div class="time-controls" aria-label="Time controls">
           <label for="time-input">UTC</label>
           <input id="time-input" type="datetime-local" step="1" />
@@ -64,12 +77,23 @@
           <button id="center-sun" type="button" title="Center on Sun">Sun</button>
           <button id="center-ship" type="button" title="Center on ship">Ship</button>
         </div>
+      </section>
+
+      <aside class="panel journey-panel" aria-label="Journey panel">
         <div class="reset-row">
           <button id="reset-ship" type="button">Reset ship near Earth</button>
           <button id="restart-journey" type="button">Restart journey</button>
         </div>
-        <div id="body-info"></div>
         <div id="journey"></div>
+        <div id="body-info"></div>
+      </aside>
+
+      <section class="panel flight-deck" aria-label="Flight controls">
+        <div class="flight-copy">
+          <p class="eyebrow">Flight deck</p>
+          <strong>W/S thrust · A/D rotate · Space warp</strong>
+        </div>
+        <div id="flight-values"></div>
       </section>
 
       <div class="scale-note">Visual radii exaggerated. AU rings are distance guides.</div>

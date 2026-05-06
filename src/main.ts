@@ -63,6 +63,7 @@ const jumpDestination = requiredElement<HTMLButtonElement>("#jump-destination");
 const bodySelect = requiredElement<HTMLSelectElement>("#body-select");
 const journey = requiredElement<HTMLElement>("#journey");
 const bodyInfo = requiredElement<HTMLElement>("#body-info");
+const flightValues = requiredElement<HTMLElement>("#flight-values");
 const errorPanel = requiredElement<HTMLElement>("#error-panel");
 const zoomIn = requiredElement<HTMLButtonElement>("#zoom-in");
 const zoomOut = requiredElement<HTMLButtonElement>("#zoom-out");
@@ -553,24 +554,17 @@ function updateHud() {
   const shipTargetKm = shipTargetDistanceKm(target);
   const shipSpeedKmS = shipSpeedKmPerSecond();
   const scaleKm = ephemeris.au_km / camera.pxPerAu;
-  const lightTimeSeconds = target.distance_from_earth_km / LIGHT_SPEED_KM_S;
   const navigation = navigationMetrics(target, shipTargetKm);
+  const inspectedBody = bodyByKey.get(selectedBodyKey);
 
   hudValues.innerHTML = "";
-  appendDefinition("UTC timestamp", ephemeris.timestamp_utc);
-  appendDefinition("Selected target", target.name);
-  appendDefinition("Inspected body", bodyByKey.get(selectedBodyKey)?.name ?? "none");
-  appendDefinition("Earth-target", formatDistance(target.distance_from_earth_km));
-  appendDefinition("Earth-target light", formatDuration(lightTimeSeconds));
-  appendDefinition("Ship-target", formatDistance(shipTargetKm));
-  appendDefinition("Ship speed", `${formatNumber(shipSpeedKmS)} km/s`);
-  appendDefinition("Closing speed", navigation.closingSpeedKmS > 0 ? `${formatNumber(navigation.closingSpeedKmS)} km/s` : "not closing");
-  appendDefinition("ETA", navigation.etaText);
-  appendDefinition("Warp", warpEnabled ? "on, 250x thrust/speed cap" : "off");
-  appendDefinition("Scale", scaleText(scaleKm, ephemeris.au_km));
-  appendDefinition("Data source", ephemeris.data_source);
+  appendDefinition("UTC", formatTimestamp(ephemeris.timestamp_utc));
+  appendDefinition("Target", target.name);
+  appendDefinition("Inspecting", inspectedBody?.name ?? "none");
+  appendDefinition("Data", ephemeris.data_source.replace("NASA/JPL ", "JPL "));
   appendDefinition("Frame", "heliocentric ecliptic x/y");
 
+  updateFlightValues(shipSpeedKmS, scaleKm, navigation);
   updateBodyInfo();
   updateJourney(target, shipTargetKm);
 }
@@ -594,6 +588,7 @@ function updateJourney(target: Body, shipTargetKm: number) {
   const comparison = target.distance_from_earth_km / EARTH_MOON_AVG_KM;
   const navigation = navigationMetrics(target, shipTargetKm);
   const thresholdKm = arrivalThresholdKm(target);
+  const targetLightSeconds = target.distance_from_earth_km / LIGHT_SPEED_KM_S;
   const status = journeyStats.arrived
     ? "arrived"
     : shipTargetKm <= thresholdKm
@@ -601,26 +596,70 @@ function updateJourney(target: Body, shipTargetKm: number) {
       : navigation.closingSpeedKmS > 0
         ? "closing"
         : "not closing";
+  const statusLabel = journeyStats.arrived ? "Arrival confirmed" : status;
 
   journey.innerHTML = `
-    <div class="journey-title">
-      <span>Earth → ${target.name}</span>
-      <span>${progressPercent.toFixed(2)}%</span>
+    <div class="journey-hero">
+      <div>
+        <span class="eyebrow">Journey</span>
+        <h2>Earth → ${target.name}</h2>
+      </div>
+      <span class="status-token">${statusLabel}</span>
+    </div>
+    <div class="distance-focus">
+      <span>Distance remaining</span>
+      <strong>${formatDistance(shipTargetKm)}</strong>
     </div>
     <div class="progress-track" aria-label="Journey progress">
       <div class="progress-fill" style="width: ${progressPercent.toFixed(2)}%"></div>
     </div>
-    <div class="journey-grid">
-      <span>Origin</span><strong>Earth</strong>
-      <span>Destination</span><strong>${target.name}</strong>
-      <span>Distance remaining</span><strong>${formatDistance(shipTargetKm)}</strong>
-      <span>Remaining light time</span><strong>${formatDuration(remainingLightSeconds)}</strong>
-      <span>ETA at closing speed</span><strong>${navigation.etaText}</strong>
-      <span>Heading error</span><strong>${formatDegrees(navigation.headingErrorDeg)}</strong>
-      <span>Closest approach</span><strong>${Number.isFinite(journeyStats.closestKm) ? formatDistance(journeyStats.closestKm) : "not recorded"}</strong>
-      <span>Arrival zone</span><strong>${formatDistance(thresholdKm)}</strong>
-      <span>Status</span><strong>${status}</strong>
+    <div class="progress-caption">
+      <span>${progressPercent.toFixed(2)}% along Earth-target vector</span>
+      <span>${formatDuration(remainingLightSeconds)} light time remaining</span>
+    </div>
+    <div class="metric-tiles">
+      <article>
+        <span>ETA now</span>
+        <strong>${navigation.etaText}</strong>
+      </article>
+      <article>
+        <span>Heading error</span>
+        <strong>${formatDegrees(navigation.headingErrorDeg)}</strong>
+      </article>
+      <article>
+        <span>Closest approach</span>
+        <strong>${Number.isFinite(journeyStats.closestKm) ? formatDistance(journeyStats.closestKm) : "not recorded"}</strong>
+      </article>
+      <article>
+        <span>Arrival zone</span>
+        <strong>${formatDistance(thresholdKm)}</strong>
+      </article>
+    </div>
+    <div class="journey-grid detail-grid">
+      <span>Earth-target distance</span><strong>${formatDistance(target.distance_from_earth_km)}</strong>
+      <span>Earth-target light time</span><strong>${formatDuration(targetLightSeconds)}</strong>
       <span>Comparison</span><strong>${formatNumber(comparison)} Earth-Moon distances</strong>
+    </div>
+  `;
+}
+
+function updateFlightValues(shipSpeedKmS: number, scaleKm: number, navigation: ReturnType<typeof navigationMetrics>) {
+  flightValues.innerHTML = `
+    <div class="flight-metric">
+      <span>Speed</span>
+      <strong>${formatNumber(shipSpeedKmS)} km/s</strong>
+    </div>
+    <div class="flight-metric">
+      <span>Warp</span>
+      <strong>${warpEnabled ? "on · 250x" : "off"}</strong>
+    </div>
+    <div class="flight-metric">
+      <span>Closing</span>
+      <strong>${navigation.closingSpeedKmS > 0 ? `${formatNumber(navigation.closingSpeedKmS)} km/s` : "not closing"}</strong>
+    </div>
+    <div class="flight-metric">
+      <span>Scale</span>
+      <strong>${shortScaleText(scaleKm, ephemeris?.au_km ?? AU_KM_FALLBACK)}</strong>
     </div>
   `;
 }
@@ -634,11 +673,16 @@ function updateBodyInfo() {
   }
 
   bodyInfo.innerHTML = `
-    <div class="body-info-title">Inspecting ${body.name}</div>
-    <span>From Sun</span><strong>${formatDistance(body.position.heliocentric_distance_km)}</strong>
-    <span>From Earth</span><strong>${formatDistance(body.distance_from_earth_km)}</strong>
-    <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
-    <span>Mean radius</span><strong>${formatDistance(body.radius_km)}</strong>
+    <div class="body-info-title">
+      <span class="eyebrow">Inspected body</span>
+      <strong>${body.name}</strong>
+    </div>
+    <div class="body-grid">
+      <span>From Sun</span><strong>${formatDistance(body.position.heliocentric_distance_km)}</strong>
+      <span>From Earth</span><strong>${formatDistance(body.distance_from_earth_km)}</strong>
+      <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
+      <span>Mean radius</span><strong>${formatDistance(body.radius_km)}</strong>
+    </div>
   `;
 }
 
@@ -780,7 +824,7 @@ function populateCatalogControls() {
 
     const searchOption = document.createElement("option");
     searchOption.value = bodySearchLabel(body);
-    searchOption.label = body.name;
+    searchOption.label = body.key;
     bodyOptions.appendChild(searchOption);
   }
 
@@ -845,7 +889,7 @@ function flashSearchError() {
 }
 
 function bodySearchLabel(body: Body) {
-  return `${body.name} [${body.key}]`;
+  return body.name;
 }
 
 function syncDestinationSearch() {
@@ -906,6 +950,16 @@ function scaleText(kmPerPx: number, auKm: number) {
   const auPerPx = kmPerPx / auKm;
   if (auPerPx >= 0.001) return `1 px = ${formatNumber(kmPerPx)} km / ${formatAu(auPerPx)} AU`;
   return `1 px = ${formatNumber(kmPerPx)} km`;
+}
+
+function shortScaleText(kmPerPx: number, auKm: number) {
+  const auPerPx = kmPerPx / auKm;
+  if (auPerPx >= 0.001) return `${formatAu(auPerPx)} AU/px`;
+  return `${formatNumber(kmPerPx)} km/px`;
+}
+
+function formatTimestamp(timestampUtc: string) {
+  return timestampUtc.replace("T", " ").replace(/\.\d+Z$/, " UTC").replace("Z", " UTC");
 }
 
 function formatDistance(km: number) {
