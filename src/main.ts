@@ -46,16 +46,30 @@ type Ship = {
   angleRad: number;
 };
 
+type JourneyStats = {
+  targetKey: TargetKey;
+  closestKm: number;
+  arrived: boolean;
+};
+
 const canvas = requiredElement<HTMLCanvasElement>("#map");
 const hudValues = requiredElement<HTMLElement>("#hud-values");
 const loadState = requiredElement<HTMLElement>("#load-state");
 const targetButtons = requiredElement<HTMLElement>("#target-buttons");
+const bodySelect = requiredElement<HTMLSelectElement>("#body-select");
 const journey = requiredElement<HTMLElement>("#journey");
+const bodyInfo = requiredElement<HTMLElement>("#body-info");
 const errorPanel = requiredElement<HTMLElement>("#error-panel");
 const zoomIn = requiredElement<HTMLButtonElement>("#zoom-in");
 const zoomOut = requiredElement<HTMLButtonElement>("#zoom-out");
 const centerSun = requiredElement<HTMLButtonElement>("#center-sun");
 const centerShip = requiredElement<HTMLButtonElement>("#center-ship");
+const centerSelected = requiredElement<HTMLButtonElement>("#center-selected");
+const timeInput = requiredElement<HTMLInputElement>("#time-input");
+const applyTime = requiredElement<HTMLButtonElement>("#apply-time");
+const timeNow = requiredElement<HTMLButtonElement>("#time-now");
+const resetShipButton = requiredElement<HTMLButtonElement>("#reset-ship");
+const restartJourneyButton = requiredElement<HTMLButtonElement>("#restart-journey");
 const ctx = requiredCanvasContext(canvas);
 
 const keys = new Set<string>();
@@ -68,10 +82,13 @@ const camera = {
 let ephemeris: Ephemeris | null = null;
 let bodyByKey = new Map<string, Body>();
 let selectedTarget: TargetKey = "jupiter";
+let selectedBodyKey = "jupiter";
 let ship: Ship | null = null;
+let journeyStats: JourneyStats = createJourneyStats(selectedTarget);
 let warpEnabled = false;
 let lastFrame = performance.now();
 let isDragging = false;
+let dragMoved = false;
 let dragStart = { x: 0, y: 0, cameraXAu: 0, cameraYAu: 0 };
 
 for (const target of TARGETS) {
@@ -81,6 +98,9 @@ for (const target of TARGETS) {
   button.textContent = labelForKey(target);
   button.addEventListener("click", () => {
     selectedTarget = target;
+    selectedBodyKey = target;
+    syncBodySelect();
+    resetJourneyStats();
     updateTargetButtons();
     updateHud();
   });
@@ -109,6 +129,7 @@ canvas.addEventListener("wheel", (event) => {
 
 canvas.addEventListener("pointerdown", (event) => {
   isDragging = true;
+  dragMoved = false;
   canvas.setPointerCapture(event.pointerId);
   dragStart = {
     x: event.clientX,
@@ -120,6 +141,9 @@ canvas.addEventListener("pointerdown", (event) => {
 
 canvas.addEventListener("pointermove", (event) => {
   if (!isDragging) return;
+  if (Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) > 4) {
+    dragMoved = true;
+  }
   camera.xAu = dragStart.cameraXAu - (event.clientX - dragStart.x) / camera.pxPerAu;
   camera.yAu = dragStart.cameraYAu + (event.clientY - dragStart.y) / camera.pxPerAu;
 });
@@ -127,6 +151,9 @@ canvas.addEventListener("pointermove", (event) => {
 canvas.addEventListener("pointerup", (event) => {
   isDragging = false;
   canvas.releasePointerCapture(event.pointerId);
+  if (!dragMoved) {
+    selectBodyAt(event.clientX, event.clientY);
+  }
 });
 
 zoomIn.addEventListener("click", () => zoomAt(window.innerWidth / 2, window.innerHeight / 2, 1.25));
@@ -140,15 +167,50 @@ centerShip.addEventListener("click", () => {
   camera.xAu = ship.xAu;
   camera.yAu = ship.yAu;
 });
+centerSelected.addEventListener("click", () => centerOnBody(selectedBodyKey));
+bodySelect.addEventListener("change", () => {
+  selectedBodyKey = bodySelect.value;
+  updateHud();
+});
+applyTime.addEventListener("click", () => {
+  const timestamp = datetimeLocalToIso(timeInput.value);
+  if (timestamp) {
+    loadEphemeris(timestamp, { preserveCamera: true });
+  }
+});
+timeInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    applyTime.click();
+  }
+});
+timeNow.addEventListener("click", () => loadEphemeris(new Date().toISOString(), { preserveCamera: true }));
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-step-days]")) {
+  button.addEventListener("click", () => {
+    if (!ephemeris) return;
+    const days = Number(button.dataset.stepDays ?? "0");
+    const next = new Date(ephemeris.timestamp_utc);
+    next.setUTCDate(next.getUTCDate() + days);
+    loadEphemeris(next.toISOString(), { preserveCamera: true });
+  });
+}
+resetShipButton.addEventListener("click", () => {
+  resetShipNearEarth(false);
+  updateHud();
+});
+restartJourneyButton.addEventListener("click", () => {
+  resetShipNearEarth(true);
+  updateHud();
+});
 
 resizeCanvas();
 loadEphemeris();
 requestAnimationFrame(loop);
 
-async function loadEphemeris() {
+async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: boolean } = {}) {
   try {
     loadState.textContent = "loading";
-    const response = await fetch("/api/ephemeris");
+    const query = timestampUtc ? `?timestamp=${encodeURIComponent(timestampUtc)}` : "";
+    const response = await fetch(`/api/ephemeris${query}`);
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Ephemeris API returned ${response.status}.\n${text}`);
@@ -156,8 +218,14 @@ async function loadEphemeris() {
 
     ephemeris = (await response.json()) as Ephemeris;
     bodyByKey = new Map(ephemeris.bodies.map((body) => [body.key, body]));
+    ensureSelectedBodyExists();
+    populateBodySelect();
+    setTimeInputFromTimestamp(ephemeris.timestamp_utc);
     initializeShip();
-    fitInitialView();
+    resetJourneyStats();
+    if (!options.preserveCamera) {
+      fitInitialView();
+    }
     loadState.textContent = "live";
     errorPanel.hidden = true;
     updateHud();
@@ -175,9 +243,9 @@ async function loadEphemeris() {
   }
 }
 
-function initializeShip() {
+function initializeShip(force = false) {
   const earth = bodyByKey.get("earth");
-  if (!earth || ship) return;
+  if (!earth || (ship && !force)) return;
 
   const earthAngle = Math.atan2(earth.position.y_au, earth.position.x_au);
   const tangent = earthAngle + Math.PI / 2;
@@ -189,6 +257,13 @@ function initializeShip() {
     vyAuPerSec: 0,
     angleRad: tangent
   };
+}
+
+function resetShipNearEarth(resetStats: boolean) {
+  initializeShip(true);
+  if (resetStats) {
+    resetJourneyStats();
+  }
 }
 
 function fitInitialView() {
@@ -243,6 +318,10 @@ function updateShip(dt: number) {
   ship.xAu += ship.vxAuPerSec * dt;
   ship.yAu += ship.vyAuPerSec * dt;
 
+  const target = bodyByKey.get(selectedTarget);
+  if (target) {
+    updateJourneyStats(shipTargetDistanceKm(target), target);
+  }
   updateHud();
 }
 
@@ -258,6 +337,7 @@ function draw() {
 
   if (ephemeris) {
     drawTargetLines();
+    drawTargetHeadingIndicator();
     for (const body of ephemeris.bodies) {
       drawBody(body);
     }
@@ -327,7 +407,7 @@ function drawTargetLines() {
   const shipScreen = worldToScreen(ship.xAu, ship.yAu);
 
   ctx.save();
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.setLineDash([7, 7]);
   ctx.strokeStyle = "rgba(116, 196, 255, 0.44)";
   ctx.beginPath();
@@ -344,10 +424,43 @@ function drawTargetLines() {
   ctx.restore();
 }
 
+function drawTargetHeadingIndicator() {
+  if (!ship) return;
+  const target = bodyByKey.get(selectedTarget);
+  if (!target) return;
+
+  const shipScreen = worldToScreen(ship.xAu, ship.yAu);
+  const direction = Math.atan2(target.position.y_au - ship.yAu, target.position.x_au - ship.xAu);
+  const forward = { x: Math.cos(direction), y: -Math.sin(direction) };
+  const side = { x: -forward.y, y: forward.x };
+  const start = 28;
+  const end = 74;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 209, 102, 0.78)";
+  ctx.fillStyle = "rgba(255, 209, 102, 0.92)";
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(shipScreen.x + forward.x * start, shipScreen.y + forward.y * start);
+  ctx.lineTo(shipScreen.x + forward.x * end, shipScreen.y + forward.y * end);
+  ctx.stroke();
+
+  const tipX = shipScreen.x + forward.x * end;
+  const tipY = shipScreen.y + forward.y * end;
+  ctx.beginPath();
+  ctx.moveTo(tipX, tipY);
+  ctx.lineTo(tipX - forward.x * 11 + side.x * 6, tipY - forward.y * 11 + side.y * 6);
+  ctx.lineTo(tipX - forward.x * 11 - side.x * 6, tipY - forward.y * 11 - side.y * 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawBody(body: Body) {
   const screen = worldToScreen(body.position.x_au, body.position.y_au);
   const radius = displayRadius(body);
   const isTarget = body.key === selectedTarget;
+  const isSelectedBody = body.key === selectedBodyKey;
 
   ctx.save();
   if (body.key === "saturn") {
@@ -359,15 +472,22 @@ function drawBody(body: Body) {
   }
 
   ctx.fillStyle = body.color;
-  ctx.strokeStyle = isTarget ? "#f3f0e8" : "rgba(0, 0, 0, 0.38)";
-  ctx.lineWidth = isTarget ? 2 : 1;
+  ctx.strokeStyle = isTarget ? "#f3f0e8" : isSelectedBody ? "#74c4ff" : "rgba(0, 0, 0, 0.38)";
+  ctx.lineWidth = isTarget || isSelectedBody ? 2 : 1;
   ctx.beginPath();
   ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
+  if (isSelectedBody && !isTarget) {
+    ctx.strokeStyle = "rgba(116, 196, 255, 0.72)";
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, radius + 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.fillStyle = body.key === "sun" ? "#ffe8a3" : "#f3f0e8";
-  ctx.font = isTarget ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
+  ctx.font = isTarget || isSelectedBody ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
   ctx.textBaseline = "middle";
   ctx.fillText(body.name, screen.x + radius + 7, screen.y);
   ctx.restore();
@@ -409,22 +529,27 @@ function updateHud() {
   if (!target) return;
 
   const shipTargetKm = shipTargetDistanceKm(target);
-  const shipSpeedKmS = Math.hypot(ship.vxAuPerSec, ship.vyAuPerSec) * ephemeris.au_km;
+  const shipSpeedKmS = shipSpeedKmPerSecond();
   const scaleKm = ephemeris.au_km / camera.pxPerAu;
   const lightTimeSeconds = target.distance_from_earth_km / LIGHT_SPEED_KM_S;
+  const navigation = navigationMetrics(target, shipTargetKm);
 
   hudValues.innerHTML = "";
   appendDefinition("UTC timestamp", ephemeris.timestamp_utc);
   appendDefinition("Selected target", target.name);
+  appendDefinition("Inspected body", bodyByKey.get(selectedBodyKey)?.name ?? "none");
   appendDefinition("Earth-target", formatDistance(target.distance_from_earth_km));
   appendDefinition("Earth-target light", formatDuration(lightTimeSeconds));
   appendDefinition("Ship-target", formatDistance(shipTargetKm));
   appendDefinition("Ship speed", `${formatNumber(shipSpeedKmS)} km/s`);
+  appendDefinition("Closing speed", navigation.closingSpeedKmS > 0 ? `${formatNumber(navigation.closingSpeedKmS)} km/s` : "not closing");
+  appendDefinition("ETA", navigation.etaText);
   appendDefinition("Warp", warpEnabled ? "on, 250x thrust/speed cap" : "off");
   appendDefinition("Scale", scaleText(scaleKm, ephemeris.au_km));
   appendDefinition("Data source", ephemeris.data_source);
   appendDefinition("Frame", "heliocentric ecliptic x/y");
 
+  updateBodyInfo();
   updateJourney(target, shipTargetKm);
 }
 
@@ -445,6 +570,15 @@ function updateJourney(target: Body, shipTargetKm: number) {
   const progressPercent = progress * 100;
   const remainingLightSeconds = shipTargetKm / LIGHT_SPEED_KM_S;
   const comparison = target.distance_from_earth_km / EARTH_MOON_AVG_KM;
+  const navigation = navigationMetrics(target, shipTargetKm);
+  const thresholdKm = arrivalThresholdKm(target);
+  const status = journeyStats.arrived
+    ? "arrived"
+    : shipTargetKm <= thresholdKm
+      ? "inside arrival zone"
+      : navigation.closingSpeedKmS > 0
+        ? "closing"
+        : "not closing";
 
   journey.innerHTML = `
     <div class="journey-title">
@@ -459,8 +593,30 @@ function updateJourney(target: Body, shipTargetKm: number) {
       <span>Destination</span><strong>${target.name}</strong>
       <span>Distance remaining</span><strong>${formatDistance(shipTargetKm)}</strong>
       <span>Remaining light time</span><strong>${formatDuration(remainingLightSeconds)}</strong>
+      <span>ETA at closing speed</span><strong>${navigation.etaText}</strong>
+      <span>Heading error</span><strong>${formatDegrees(navigation.headingErrorDeg)}</strong>
+      <span>Closest approach</span><strong>${Number.isFinite(journeyStats.closestKm) ? formatDistance(journeyStats.closestKm) : "not recorded"}</strong>
+      <span>Arrival zone</span><strong>${formatDistance(thresholdKm)}</strong>
+      <span>Status</span><strong>${status}</strong>
       <span>Comparison</span><strong>${formatNumber(comparison)} Earth-Moon distances</strong>
     </div>
+  `;
+}
+
+function updateBodyInfo() {
+  if (!ephemeris) return;
+  const body = bodyByKey.get(selectedBodyKey) ?? bodyByKey.get(selectedTarget);
+  if (!body) {
+    bodyInfo.textContent = "";
+    return;
+  }
+
+  bodyInfo.innerHTML = `
+    <div class="body-info-title">Inspecting ${body.name}</div>
+    <span>From Sun</span><strong>${formatDistance(body.position.heliocentric_distance_km)}</strong>
+    <span>From Earth</span><strong>${formatDistance(body.distance_from_earth_km)}</strong>
+    <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
+    <span>Mean radius</span><strong>${formatDistance(body.radius_km)}</strong>
   `;
 }
 
@@ -492,6 +648,118 @@ function shipTargetDistanceKm(target: Body) {
   const dy = ship.yAu - target.position.y_au;
   const dz = ship.zAu - target.position.z_au;
   return Math.hypot(dx, dy, dz) * ephemeris.au_km;
+}
+
+function shipSpeedKmPerSecond() {
+  if (!ephemeris || !ship) return 0;
+  return Math.hypot(ship.vxAuPerSec, ship.vyAuPerSec) * ephemeris.au_km;
+}
+
+function navigationMetrics(target: Body, shipTargetKm: number) {
+  if (!ephemeris || !ship) {
+    return { closingSpeedKmS: 0, etaText: "unavailable", headingErrorDeg: 0 };
+  }
+
+  const dx = target.position.x_au - ship.xAu;
+  const dy = target.position.y_au - ship.yAu;
+  const dz = target.position.z_au - ship.zAu;
+  const distanceAu = Math.hypot(dx, dy, dz);
+  if (distanceAu === 0) {
+    return { closingSpeedKmS: 0, etaText: "arrived", headingErrorDeg: 0 };
+  }
+
+  const closingSpeedAuS = (ship.vxAuPerSec * dx + ship.vyAuPerSec * dy) / distanceAu;
+  const closingSpeedKmS = closingSpeedAuS * ephemeris.au_km;
+  const etaText = closingSpeedKmS > 0.001 ? formatDuration(shipTargetKm / closingSpeedKmS) : "not closing";
+  const targetBearing = Math.atan2(dy, dx);
+  const headingErrorDeg = Math.abs(radToDeg(normalizeAngle(targetBearing - ship.angleRad)));
+
+  return { closingSpeedKmS, etaText, headingErrorDeg };
+}
+
+function updateJourneyStats(shipTargetKm: number, target: Body) {
+  if (journeyStats.targetKey !== selectedTarget) {
+    resetJourneyStats();
+  }
+
+  journeyStats.closestKm = Math.min(journeyStats.closestKm, shipTargetKm);
+  if (shipTargetKm <= arrivalThresholdKm(target)) {
+    journeyStats.arrived = true;
+  }
+}
+
+function resetJourneyStats() {
+  journeyStats = createJourneyStats(selectedTarget);
+  const target = bodyByKey.get(selectedTarget);
+  if (target && ship) {
+    journeyStats.closestKm = shipTargetDistanceKm(target);
+    journeyStats.arrived = journeyStats.closestKm <= arrivalThresholdKm(target);
+  }
+}
+
+function createJourneyStats(targetKey: TargetKey): JourneyStats {
+  return {
+    targetKey,
+    closestKm: Number.POSITIVE_INFINITY,
+    arrived: false
+  };
+}
+
+function arrivalThresholdKm(target: Body) {
+  return Math.max(25_000, target.radius_km * 8);
+}
+
+function selectBodyAt(clientX: number, clientY: number) {
+  if (!ephemeris) return;
+
+  const hit = ephemeris.bodies
+    .map((body) => {
+      const screen = worldToScreen(body.position.x_au, body.position.y_au);
+      const distancePx = Math.hypot(screen.x - clientX, screen.y - clientY);
+      return { body, distancePx, hitRadius: Math.max(14, displayRadius(body) + 8) };
+    })
+    .filter((candidate) => candidate.distancePx <= candidate.hitRadius)
+    .sort((a, b) => a.distancePx - b.distancePx)[0];
+
+  if (!hit) return;
+  selectedBodyKey = hit.body.key;
+  syncBodySelect();
+  updateHud();
+}
+
+function centerOnBody(key: string) {
+  const body = bodyByKey.get(key);
+  if (!body) return;
+  camera.xAu = body.position.x_au;
+  camera.yAu = body.position.y_au;
+}
+
+function ensureSelectedBodyExists() {
+  if (!bodyByKey.has(selectedBodyKey)) {
+    selectedBodyKey = selectedTarget;
+  }
+}
+
+function populateBodySelect() {
+  if (!ephemeris) return;
+  const previous = bodySelect.value || selectedBodyKey;
+  bodySelect.innerHTML = "";
+
+  for (const body of ephemeris.bodies) {
+    const option = document.createElement("option");
+    option.value = body.key;
+    option.textContent = body.name;
+    bodySelect.appendChild(option);
+  }
+
+  selectedBodyKey = bodyByKey.has(previous) ? previous : selectedBodyKey;
+  syncBodySelect();
+}
+
+function syncBodySelect() {
+  if (bodySelect.value !== selectedBodyKey) {
+    bodySelect.value = selectedBodyKey;
+  }
 }
 
 function updateTargetButtons() {
@@ -570,6 +838,10 @@ function formatDuration(seconds: number) {
   return `${(hours / 24).toFixed(2)} d`;
 }
 
+function formatDegrees(degrees: number) {
+  return `${degrees.toFixed(1)}°`;
+}
+
 function formatAu(au: number) {
   const abs = Math.abs(au);
   if (abs >= 10) return au.toFixed(1);
@@ -590,6 +862,30 @@ function labelForKey(key: string) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function normalizeAngle(radians: number) {
+  let angle = radians;
+  while (angle <= -Math.PI) angle += Math.PI * 2;
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  return angle;
+}
+
+function radToDeg(radians: number) {
+  return (radians * 180) / Math.PI;
+}
+
+function datetimeLocalToIso(value: string) {
+  if (!value) return null;
+  const parsed = new Date(`${value.endsWith("Z") ? value.slice(0, -1) : value}Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
+function setTimeInputFromTimestamp(timestampUtc: string) {
+  const parsed = new Date(timestampUtc);
+  if (Number.isNaN(parsed.getTime())) return;
+  timeInput.value = parsed.toISOString().slice(0, 19);
 }
 
 function requiredElement<T extends Element>(selector: string) {

@@ -4,10 +4,10 @@
 
 ## P0 — Must Have
 
-- [ ] Make the map easier to explore: select any rendered body, center on selected body, and show a concise selected-body info panel.
-- [ ] Add time exploration controls: now, manual UTC timestamp, and step backward/forward by day, week, and month.
-- [ ] Improve navigation feedback: target heading indicator, route line clarity, ETA at current speed, and arrival/closest-approach status.
-- [ ] Add journey reset controls: reset ship near Earth and restart the current Earth-to-target journey.
+- [x] Make the map easier to explore: select any rendered body, center on selected body, and show a concise selected-body info panel.
+- [x] Add time exploration controls: now, manual UTC timestamp, and step backward/forward by day, week, and month.
+- [x] Improve navigation feedback: target heading indicator, route line clarity, ETA at current speed, and arrival/closest-approach status.
+- [x] Add journey reset controls: reset ship near Earth and restart the current Earth-to-target journey.
 
 ## P1 — Should Have
 

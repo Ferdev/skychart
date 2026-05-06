@@ -20,12 +20,36 @@
 
       <section class="panel controls" aria-label="Target and journey controls">
         <div class="target-row" id="target-buttons"></div>
+        <div class="body-row">
+          <label for="body-select">Inspect</label>
+          <select id="body-select" aria-label="Selected body"></select>
+          <button id="center-selected" type="button" title="Center on selected body">Center</button>
+        </div>
+        <div class="time-controls" aria-label="Time controls">
+          <label for="time-input">UTC</label>
+          <input id="time-input" type="datetime-local" step="1" />
+          <button id="apply-time" type="button">Apply</button>
+          <div class="time-step-row">
+            <button type="button" data-step-days="-30">−30d</button>
+            <button type="button" data-step-days="-7">−7d</button>
+            <button type="button" data-step-days="-1">−1d</button>
+            <button id="time-now" type="button">Now</button>
+            <button type="button" data-step-days="1">+1d</button>
+            <button type="button" data-step-days="7">+7d</button>
+            <button type="button" data-step-days="30">+30d</button>
+          </div>
+        </div>
         <div class="zoom-row">
           <button id="zoom-out" type="button" title="Zoom out">−</button>
           <button id="zoom-in" type="button" title="Zoom in">+</button>
           <button id="center-sun" type="button" title="Center on Sun">Sun</button>
           <button id="center-ship" type="button" title="Center on ship">Ship</button>
         </div>
+        <div class="reset-row">
+          <button id="reset-ship" type="button">Reset ship near Earth</button>
+          <button id="restart-journey" type="button">Restart journey</button>
+        </div>
+        <div id="body-info"></div>
         <div id="journey"></div>
       </section>
 

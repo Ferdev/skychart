@@ -8,9 +8,13 @@ An ultra-basic 2D top-down Solar System navigation MVP. It renders the current S
 - Real current-date body positions from Skyfield using NASA/JPL DE440s.
 - 2D top-down canvas map using heliocentric ecliptic x/y coordinates.
 - Target selection for Moon, Mars, Jupiter, and Saturn.
+- Inspect and center on any rendered body.
+- UTC time controls: apply a timestamp, jump to now, or step by days/weeks/months.
 - Real Earth-to-target distance, ship-to-target distance, light travel time, zoom scale, and a journey progress panel.
+- Navigation feedback: target heading arrow, closing speed, ETA, closest approach, and arrival status.
 - Basic ship controls: `W` thrust, `S` reverse thrust, `A`/`D` rotate, `Space` toggle warp.
 - Mouse wheel zoom, pointer drag pan, and simple center buttons.
+- Reset controls for placing the ship back near Earth and restarting the current journey.
 
 ## Install
 
@@ -71,6 +75,10 @@ Positions are computed as heliocentric ecliptic Cartesian coordinates:
 Distances are never numerically compressed or altered. Zoom only changes the map transform from AU to pixels.
 
 Planet and Moon display radii are deliberately exaggerated so bodies remain visible. AU rings are distance guides, not generated orbit paths.
+
+## Time Controls
+
+The timestamp input is treated as UTC. Changing time recomputes every celestial body from the ephemeris source. The spacecraft remains in the same heliocentric coordinate space until you reset or restart the journey.
 
 ## Accuracy Limitations
 
