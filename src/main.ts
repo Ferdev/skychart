@@ -847,6 +847,7 @@ function drawRouteGuide() {
   ctx.setLineDash([]);
   const occupiedLabels = displayLayers.labels ? bodyLabelRects() : [];
   if (activePlan) {
+    drawFutureBodyMotion(activePlan.events);
     for (const event of activePlan.events) {
       const screen = worldToScreen(event.x_au, event.y_au);
       ctx.fillStyle = event.kind === "flyby" ? "rgba(217, 184, 111, 0.96)" : "rgba(116, 196, 255, 0.92)";
@@ -856,7 +857,7 @@ function drawRouteGuide() {
       ctx.arc(screen.x, screen.y, event.kind === "flyby" ? 6 : 4.5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      drawMapCallout(`${event.kind}: ${event.body_name}`, screen, eventLabelPlacements(event.kind), occupiedLabels, {
+      drawMapCallout(trajectoryEventLabel(event), screen, eventLabelPlacements(event.kind), occupiedLabels, {
         color: event.kind === "flyby" ? "rgba(255, 230, 169, 0.94)" : "rgba(201, 234, 255, 0.94)"
       });
     }
@@ -886,6 +887,41 @@ function drawRouteGuide() {
     );
   }
   ctx.restore();
+}
+
+function drawFutureBodyMotion(events: TrajectoryEvent[]) {
+  ctx.save();
+  for (const event of events) {
+    if (Math.abs(event.offset_days) < 0.5) continue;
+    const currentBody = bodyByKey.get(event.body_key);
+    if (!currentBody) continue;
+
+    const currentScreen = worldToScreen(currentBody.position.x_au, currentBody.position.y_au);
+    const eventScreen = worldToScreen(event.x_au, event.y_au);
+    if (!isScreenPointVisible(currentScreen, 140) && !isScreenPointVisible(eventScreen, 140)) continue;
+
+    ctx.setLineDash([2, 8]);
+    ctx.strokeStyle = event.kind === "flyby" ? "rgba(217, 184, 111, 0.24)" : "rgba(116, 196, 255, 0.18)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(currentScreen.x, currentScreen.y);
+    ctx.lineTo(eventScreen.x, eventScreen.y);
+    ctx.stroke();
+
+    ctx.setLineDash([]);
+    ctx.strokeStyle = event.kind === "flyby" ? "rgba(217, 184, 111, 0.46)" : "rgba(116, 196, 255, 0.34)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(eventScreen.x, eventScreen.y, event.kind === "flyby" ? 13 : 10, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function trajectoryEventLabel(event: TrajectoryEvent) {
+  if (event.kind === "departure") return `${event.body_name} departure ${offsetLabel(event.offset_days)}`;
+  if (event.kind === "flyby") return `${event.body_name} at flyby ${offsetLabel(event.offset_days)}`;
+  return `${event.body_name} at arrival ${offsetLabel(event.offset_days)}`;
 }
 
 function eventLabelPlacements(kind: TrajectoryEvent["kind"]): LabelPlacement[] {
@@ -1006,16 +1042,23 @@ function bodyLabelRects() {
     const screen = worldToScreen(body.position.x_au, body.position.y_au);
     if (!isScreenPointVisible(screen, 80)) continue;
     const radius = displayRadius(body);
+    const label = bodyDisplayLabel(body);
     ctx.font = body.key === selectedTarget || body.key === selectedBodyKey ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
     rects.push({
       x: screen.x + radius + 5,
       y: screen.y - 9,
-      width: Math.ceil(ctx.measureText(body.name).width + 10),
+      width: Math.ceil(ctx.measureText(label).width + 10),
       height: 18
     });
   }
   ctx.restore();
   return rects;
+}
+
+function bodyDisplayLabel(body: Body) {
+  const candidate = activeTrajectoryCandidate();
+  const hasFutureEvent = candidate?.events.some((event) => event.body_key === body.key && Math.abs(event.offset_days) >= 0.5);
+  return hasFutureEvent ? `${body.name} now` : body.name;
 }
 
 function rectsOverlap(a: LabelRect, b: LabelRect, padding = 0) {
@@ -1179,10 +1222,11 @@ function drawBody(body: Body) {
   }
 
   if (displayLayers.labels) {
+    const label = bodyDisplayLabel(body);
     ctx.fillStyle = body.key === "sun" ? "#ffe8a3" : "#f3f0e8";
     ctx.font = isTarget || isSelectedBody ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
     ctx.textBaseline = "middle";
-    ctx.fillText(body.name, screen.x + radius + 7, screen.y);
+    ctx.fillText(label, screen.x + radius + 7, screen.y);
   }
   ctx.restore();
 }
@@ -1358,9 +1402,9 @@ function routeNoteText(candidate: TrajectoryCandidate | null) {
   if (candidate.kind === "gravity_assist") {
     const flyby = candidate.flyby;
     const status = flyby?.feasible ? "unpowered turn feasible" : "correction burn likely";
-    return `${candidate.label}: patched-conic single-flyby plan from real JPL ephemeris states; ${status}.`;
+    return `${candidate.label}: event markers show future body positions; patched-conic single-flyby estimate; ${status}.`;
   }
-  return "Direct patched-conic transfer estimate from real JPL ephemeris states.";
+  return "Direct patched-conic transfer estimate; arrival marker shows the target's future position.";
 }
 
 function renderTrajectoryPlanner(activePlan: TrajectoryCandidate | null) {
