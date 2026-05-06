@@ -11,7 +11,9 @@
 
 ## P1 — Should Have
 
-- [ ] Add preset journeys: Earth to Moon, Mars, Jupiter, and Saturn with a mission start state and simple completion result.
+- [ ] Add destination search and quick jump so users can choose any loaded body as a navigation target.
+- [ ] Generalize the target system beyond Moon/Mars/Jupiter/Saturn so every loaded catalog body can be inspected, targeted, centered, and navigated to.
+- [ ] Add catalog-friendly result handling: arrival/closest-approach summaries should work for any destination, not a preset mission list.
 - [ ] Add a measurement/ruler mode for checking distances between any two bodies or map points.
 - [ ] Add real ephemeris orbit trails for selected bodies, clearly marked as sampled reference paths.
 - [ ] Add display toggles for labels, AU rings, route lines, orbit trails, and educational overlays.
@@ -20,7 +22,6 @@
 ## P2 — Nice To Have
 
 - [ ] Add educational layers for light minutes, AU scale, and Earth-Moon-distance comparisons.
-- [ ] Add body search and quick jump.
 - [ ] Add richer journey summary: distance traveled, closest approach, max speed, elapsed real/simulated time.
 - [ ] Add a future 2D/3D view switch plan to the UI once 3D provides user value.
-- [ ] Add saved scenarios only after journeys feel useful.
+- [ ] Add saved destinations or route bookmarks only after freeform navigation feels useful.
