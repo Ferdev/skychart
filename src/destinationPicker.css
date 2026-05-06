@@ -1,0 +1,112 @@
+.destination-picker {
+  display: grid;
+  gap: 8px;
+  min-width: min(360px, 100%);
+}
+
+.destination-picker__search {
+  width: 100%;
+}
+
+.destination-picker__section {
+  display: grid;
+  gap: 6px;
+}
+
+.destination-picker__section-title {
+  color: var(--muted, rgba(244, 241, 232, 0.62));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.destination-picker__list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.destination-picker__item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid rgba(244, 241, 232, 0.12);
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: rgba(244, 241, 232, 0.038);
+  color: var(--text, #f4f1e8);
+  text-align: left;
+}
+
+.destination-picker__item[data-active="true"],
+.destination-picker__item:hover {
+  border-color: rgba(217, 184, 111, 0.48);
+  background: rgba(217, 184, 111, 0.08);
+}
+
+.destination-picker__orb {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.82), transparent 0 19%, rgba(255, 255, 255, 0.12) 20%, transparent 38%),
+    var(--destination-color, #d9b86f);
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--destination-color, #d9b86f) 38%, transparent),
+    inset -5px -5px 11px rgba(0, 0, 0, 0.3);
+}
+
+.destination-picker__copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.destination-picker__name,
+.destination-picker__meta,
+.destination-picker__distance {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.destination-picker__name {
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.destination-picker__meta {
+  color: var(--muted, rgba(244, 241, 232, 0.62));
+  font-size: 11px;
+}
+
+.destination-picker__distance {
+  color: var(--text, #f4f1e8);
+  font-family: var(--font-data, ui-monospace, monospace);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.destination-picker__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  grid-column: 2 / -1;
+}
+
+.destination-picker__badge {
+  border: 1px solid rgba(217, 184, 111, 0.22);
+  border-radius: 4px;
+  padding: 2px 5px;
+  background: rgba(217, 184, 111, 0.09);
+  color: #efd89e;
+  font-size: 10px;
+  font-weight: 680;
+}

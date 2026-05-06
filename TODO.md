@@ -4,12 +4,12 @@
 
 ## P0 — Make navigation feel natural
 
-- [ ] Replace the datalist destination field with a rich body picker showing object icons, current Earth distance, body type, and recent/frequent destinations.
-- [ ] Add a click/tap body popover on the map with the primary actions: target, center, inspect, and measure from here.
-- [ ] Turn the journey card into the main guidance surface: show route endpoints, heading alignment, distance remaining, progress, and next recommended action without requiring the user to read multiple panels.
-- [ ] Add a collapsible "time travel" control so timestamp changes stay available but no longer dominate the route plotting workflow.
-- [ ] Add a compact tool mode switcher for pan/target/measure so map interactions have clear affordance.
-- [ ] Add first-run guidance that teaches the core loop in place: pick a destination, center it, fly toward it, toggle warp.
+- [x] Replace the datalist destination field with a rich body picker showing object icons, current Earth distance, body type, and recent/frequent destinations.
+- [x] Add a click/tap body popover on the map with the primary actions: target, center, inspect, and measure from here.
+- [x] Turn the journey card into the main guidance surface: show route endpoints, heading alignment, distance remaining, progress, and next recommended action without requiring the user to read multiple panels.
+- [x] Add a collapsible "time travel" control so timestamp changes stay available but no longer dominate the route plotting workflow.
+- [x] Add a compact tool mode switcher for pan/target/measure so map interactions have clear affordance.
+- [x] Add first-run guidance that teaches the core loop in place: pick a destination, center it, fly toward it, toggle warp.
 
 ## P1 — Improve spatial understanding
 
