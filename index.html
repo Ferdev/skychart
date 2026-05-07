@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Cosmic Atlas is a 2D Solar System navigation prototype using live NASA/JPL ephemeris data."
+      content="Cosmic Atlas is a scientific 2D map of Solar System, nearby-star, and Messier catalog objects using real ephemeris and catalog data."
     />
-    <meta name="theme-color" content="#0b0f12" />
+    <meta name="theme-color" content="#080a09" />
     <meta property="og:title" content="Cosmic Atlas" />
     <meta
       property="og:description"
-      content="A scientifically grounded 2D Solar System map and spacecraft navigation prototype."
+      content="A scientifically grounded 2D celestial atlas for inspecting, measuring, and comparing loaded objects."
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Cosmic Atlas</title>
@@ -19,17 +19,15 @@
   <body>
     <a class="skip-link" href="#controls">Skip to controls</a>
     <main id="app">
-      <canvas id="map" aria-label="2D heliocentric ecliptic Solar System map"></canvas>
+      <canvas id="map" aria-label="2D heliocentric ecliptic celestial atlas"></canvas>
 
       <section class="loading-screen" id="loading-screen" role="status" aria-live="polite" aria-label="Loading Cosmic Atlas">
         <div class="loading-panel">
-          <div class="loading-orbit" aria-hidden="true">
-            <span></span>
-          </div>
+          <div class="loading-orbit" aria-hidden="true"><span></span></div>
           <div class="loading-copy">
-            <p class="eyebrow">Boot sequence</p>
+            <p class="eyebrow">Data pipeline</p>
             <h2>Loading Cosmic Atlas</h2>
-            <p id="loading-detail">Starting the local ephemeris pipeline.</p>
+            <p id="loading-detail">Starting the local ephemeris API.</p>
           </div>
           <div class="loading-progress" aria-hidden="true">
             <span id="loading-progress-fill"></span>
@@ -41,159 +39,155 @@
           </div>
           <ol class="loading-steps" id="loading-steps">
             <li data-loading-step="api">Connect to local API</li>
-            <li data-loading-step="download">Download ephemeris payload</li>
-            <li data-loading-step="parse">Parse catalog objects</li>
-            <li data-loading-step="render">Prepare map and controls</li>
+            <li data-loading-step="download">Load ephemeris payload</li>
+            <li data-loading-step="parse">Index catalog objects</li>
+            <li data-loading-step="render">Prepare scientific map</li>
           </ol>
-          <p class="loading-source">JPL DE440s/Skyfield data, Horizons vectors, and generated Messier catalog snapshot.</p>
+          <p class="loading-source">JPL DE440s/Skyfield data, Horizons vectors, nearby-star catalog, and Messier catalog snapshot.</p>
         </div>
       </section>
 
-      <div class="left-rail" aria-label="Atlas controls">
-        <aside class="panel hud status-panel" aria-label="Simulation HUD">
-          <div class="title-row">
-            <div>
-              <p class="eyebrow">Live heliocentric atlas</p>
-              <h1>Cosmic Atlas</h1>
+      <header class="atlas-bar" aria-label="Atlas status">
+        <div>
+          <p class="eyebrow">Scientific celestial atlas</p>
+          <h1>Cosmic Atlas</h1>
+        </div>
+        <dl id="atlas-stats"></dl>
+        <span id="load-state">loading</span>
+      </header>
+
+      <section class="atlas-shell" id="controls" aria-label="Atlas controls">
+        <div class="focus-command">
+          <label for="body-search">Focus object</label>
+          <div class="search-control">
+            <input id="body-search" type="search" autocomplete="off" placeholder="Search planets, moons, stars, Messier objects" />
+            <button id="focus-body" class="primary-action" type="button">Focus</button>
+          </div>
+          <div class="quick-focus" id="quick-focus-buttons" aria-label="Featured objects"></div>
+        </div>
+
+        <nav class="tab-bar" aria-label="Atlas sections">
+          <button type="button" data-tab="explore">Explore</button>
+          <button type="button" data-tab="inspect">Inspect</button>
+          <button type="button" data-tab="measure">Measure</button>
+          <button type="button" data-tab="time">Time</button>
+          <button type="button" data-tab="view">View</button>
+        </nav>
+
+        <div class="tab-panels">
+          <section class="tab-panel" id="tab-explore" data-tab-panel="explore" aria-label="Explore catalog">
+            <div class="panel-head compact">
+              <div>
+                <p class="eyebrow">Catalog</p>
+                <h2>Loaded objects</h2>
+              </div>
+              <span id="catalog-count"></span>
             </div>
-            <span id="load-state">loading</span>
-          </div>
-          <dl id="hud-values"></dl>
-        </aside>
+            <div class="body-picker-filters" id="body-filter-buttons" aria-label="Object filters"></div>
+            <div class="body-picker" id="body-picker" role="listbox" aria-label="Loaded celestial objects"></div>
+            <div class="tour-grid" id="guided-tours" aria-label="Guided object sets"></div>
+          </section>
 
-        <section class="panel map-tools" aria-label="Map tools">
-          <div class="map-tool-row">
-            <span>Mode</span>
-            <div class="segmented" id="mode-buttons" aria-label="Interaction mode">
-              <button type="button" data-mode="pan">Pan</button>
-              <button type="button" data-mode="target">Target</button>
-              <button type="button" data-mode="measure">Measure</button>
+          <section class="tab-panel" id="tab-inspect" data-tab-panel="inspect" aria-label="Inspect selected object">
+            <div class="panel-head compact">
+              <div>
+                <p class="eyebrow">Selection</p>
+                <h2 id="selected-heading">No object selected</h2>
+              </div>
+              <div class="icon-cluster">
+                <button id="center-selected" class="icon-button" type="button" title="Center selected object" aria-label="Center selected object">Center</button>
+                <button id="zoom-selected" class="icon-button" type="button" title="Zoom selected object" aria-label="Zoom selected object">Zoom</button>
+              </div>
             </div>
-          </div>
-          <div class="map-tool-row">
-            <span>Map</span>
-            <div class="icon-cluster">
-              <button id="zoom-out" class="icon-button" type="button" title="Zoom out" aria-label="Zoom out">−</button>
-              <button id="zoom-in" class="icon-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
-              <button id="center-sun" class="icon-button" type="button" title="Center on Sun" aria-label="Center on Sun">Sun</button>
-              <button id="center-ship" class="icon-button" type="button" title="Center on ship" aria-label="Center on ship">Ship</button>
+            <div id="body-info"></div>
+          </section>
+
+          <section class="tab-panel" id="tab-measure" data-tab-panel="measure" aria-label="Measure distances">
+            <div class="panel-head compact">
+              <div>
+                <p class="eyebrow">Distance</p>
+                <h2>Measure two points</h2>
+              </div>
+              <button id="clear-measure" class="text-action" type="button">Clear</button>
             </div>
-          </div>
-          <div class="zoom-presets" id="zoom-presets" aria-label="Zoom presets">
-            <button type="button" data-zoom-preset="inner">Inner</button>
-            <button type="button" data-zoom-preset="outer">Outer</button>
-            <button type="button" data-zoom-preset="local">Focus</button>
-            <button type="button" data-zoom-preset="group">Group</button>
-            <button type="button" data-zoom-preset="deep">Deep</button>
-            <button type="button" data-zoom-preset="all">All</button>
-          </div>
-          <div class="map-tool-row size-mode-row">
-            <span>Size</span>
-            <div class="segmented size-modes" id="size-mode-buttons" aria-label="Object size mode">
-              <button type="button" data-size-mode="readable">Readable</button>
-              <button type="button" data-size-mode="hybrid">Hybrid</button>
-              <button type="button" data-size-mode="true">True</button>
+            <div class="measure-actions">
+              <button id="measure-from-selected" type="button">Set A</button>
+              <button id="measure-to-selected" type="button">Set B</button>
+              <button id="measure-click-mode" type="button">Pick on map</button>
             </div>
-          </div>
-          <div class="display-toggles" id="display-toggles" aria-label="Display toggles">
-            <label><input type="checkbox" data-layer="labels" checked /> Labels</label>
-            <label><input type="checkbox" data-layer="orbits" checked /> Orbits</label>
-            <label><input type="checkbox" data-layer="route" checked /> Transfer path</label>
-            <label><input type="checkbox" data-layer="trails" /> Trails</label>
-          </div>
-        </section>
+            <div id="measure-panel" class="measure-panel"></div>
+          </section>
 
-        <div class="measure-panel" id="measure-panel" hidden></div>
-        <div class="onboarding-panel" id="onboarding-panel" hidden></div>
-        <div class="scale-ladder" id="scale-ladder" aria-label="Current scale ladder"></div>
-        <div class="scale-note" id="scale-note">Size mode: hybrid. True radii render when they are large enough; markers remain for navigation.</div>
-      </div>
-
-      <div class="right-rail" aria-label="Destination and flight state">
-        <section class="panel controls mission-panel" id="controls" aria-label="Destination controls">
-          <div class="panel-head">
-            <p class="eyebrow">Destination</p>
-            <h2>Plot a route</h2>
-          </div>
-          <div class="destination-card">
-            <label for="destination-search">Destination body</label>
-            <div class="search-control">
-              <input id="destination-search" type="search" autocomplete="off" placeholder="Search loaded body" />
-              <button id="set-destination" class="primary-action" type="button" aria-label="Set destination as target">Target</button>
-              <button id="jump-destination" class="icon-button" type="button" title="Center on destination" aria-label="Center on destination">Center</button>
-            </div>
-            <div class="body-picker-filters" id="body-filter-buttons" aria-label="Body filters"></div>
-            <div class="body-picker" id="body-picker" role="listbox" aria-label="Loaded celestial bodies"></div>
-            <div class="route-memory" id="route-memory"></div>
-          </div>
-
-          <div class="quick-targets">
-            <span>Frequent routes</span>
-            <div class="target-row" id="target-buttons"></div>
-          </div>
-
-          <details class="tour-controls" aria-label="Guided tours">
-            <summary>
-              <span>Guided tours</span>
-              <strong>Science routes</strong>
-            </summary>
-            <div id="guided-tours"></div>
-          </details>
-
-          <div class="body-row inspect-card">
-            <label for="body-select">Inspect body</label>
-            <select id="body-select" aria-label="Selected body"></select>
-            <div class="icon-cluster">
-              <button id="target-selected" class="icon-button" type="button" title="Set selected body as target" aria-label="Set selected body as target">Target</button>
-              <button id="center-selected" class="icon-button" type="button" title="Center on selected body" aria-label="Center on selected body">Center</button>
-              <button id="zoom-selected" class="icon-button" type="button" title="Zoom to selected body" aria-label="Zoom to selected body">Zoom</button>
-            </div>
-          </div>
-
-          <details class="time-controls" aria-label="Time controls">
-            <summary>
-              <span>Time travel</span>
-              <strong id="time-summary">current UTC</strong>
-            </summary>
-            <div class="time-header">
-              <label for="time-input">UTC timestamp</label>
+          <section class="tab-panel" id="tab-time" data-tab-panel="time" aria-label="Time controls">
+            <div class="panel-head compact">
+              <div>
+                <p class="eyebrow">Epoch</p>
+                <h2 id="time-summary">Current UTC</h2>
+              </div>
               <button id="time-now" class="text-action" type="button">Now</button>
             </div>
+            <label class="field-label" for="time-input">UTC timestamp</label>
             <div class="time-input-row">
               <input id="time-input" type="datetime-local" step="1" />
-              <button id="apply-time" class="icon-button" type="button" title="Apply timestamp" aria-label="Apply timestamp">Apply</button>
+              <button id="apply-time" class="primary-action" type="button">Apply</button>
             </div>
-            <div class="time-step-row">
-              <button type="button" data-step-days="-30" aria-label="Move timestamp back 30 days">30d</button>
-              <button type="button" data-step-days="-7" aria-label="Move timestamp back 7 days">7d</button>
-              <button type="button" data-step-days="-1" aria-label="Move timestamp back 1 day">1d</button>
-              <button type="button" data-step-days="1" aria-label="Move timestamp forward 1 day">1d</button>
-              <button type="button" data-step-days="7" aria-label="Move timestamp forward 7 days">7d</button>
-              <button type="button" data-step-days="30" aria-label="Move timestamp forward 30 days">30d</button>
+            <div class="time-step-row" aria-label="Step timestamp">
+              <button type="button" data-step-days="-30">-30d</button>
+              <button type="button" data-step-days="-7">-7d</button>
+              <button type="button" data-step-days="-1">-1d</button>
+              <button type="button" data-step-days="1">+1d</button>
+              <button type="button" data-step-days="7">+7d</button>
+              <button type="button" data-step-days="30">+30d</button>
             </div>
-          </details>
-        </section>
+          </section>
 
-        <aside class="panel journey-panel" aria-label="Journey panel">
-          <div class="reset-row">
-            <span>Ship controls</span>
-            <div class="icon-cluster">
-              <button id="reset-ship" class="icon-button" type="button" title="Reset ship near Earth" aria-label="Reset ship near Earth">Reset ship</button>
-              <button id="restart-journey" class="icon-button" type="button" title="Restart journey" aria-label="Restart journey">Restart</button>
+          <section class="tab-panel" id="tab-view" data-tab-panel="view" aria-label="View settings">
+            <div class="panel-head compact">
+              <div>
+                <p class="eyebrow">Projection</p>
+                <h2>Map view</h2>
+              </div>
+              <button id="center-sun" class="text-action" type="button">Sun</button>
             </div>
-          </div>
-          <div id="journey"></div>
-          <div id="body-info"></div>
-        </aside>
-      </div>
-
-      <section class="panel flight-deck" aria-label="Flight controls">
-        <div class="flight-copy">
-          <p class="eyebrow">Flight deck</p>
-          <strong>Ship controls</strong>
+            <div class="zoom-presets" id="zoom-presets" aria-label="Zoom presets">
+              <button type="button" data-zoom-preset="inner">Inner</button>
+              <button type="button" data-zoom-preset="solar">Solar</button>
+              <button type="button" data-zoom-preset="nearby">Nearby</button>
+              <button type="button" data-zoom-preset="messier">Messier</button>
+              <button type="button" data-zoom-preset="all">All</button>
+            </div>
+            <div class="map-tool-row">
+              <span>Zoom</span>
+              <div class="icon-cluster">
+                <button id="zoom-out" class="icon-button" type="button" title="Zoom out" aria-label="Zoom out">-</button>
+                <button id="zoom-in" class="icon-button" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+              </div>
+            </div>
+            <div class="map-tool-row size-mode-row">
+              <span>Size</span>
+              <div class="segmented size-modes" id="size-mode-buttons" aria-label="Object size mode">
+                <button type="button" data-size-mode="readable">Readable</button>
+                <button type="button" data-size-mode="hybrid">Hybrid</button>
+                <button type="button" data-size-mode="true">True</button>
+              </div>
+            </div>
+            <div class="display-toggles" id="display-toggles" aria-label="Display toggles">
+              <label><input type="checkbox" data-layer="labels" checked /> Labels</label>
+              <label><input type="checkbox" data-layer="orbits" checked /> Orbit guides</label>
+              <label><input type="checkbox" data-layer="grid" checked /> Scale grid</label>
+              <label><input type="checkbox" data-layer="references" checked /> Edge references</label>
+            </div>
+            <div class="scale-ladder" id="scale-ladder" aria-label="Current scale ladder"></div>
+            <p class="scale-note" id="scale-note">Hybrid size mode keeps real radii where visible and uses compact markers where true sizes fall below a pixel.</p>
+          </section>
         </div>
-        <div id="flight-values"></div>
       </section>
+
+      <div class="map-toolbar" aria-label="Map shortcuts">
+        <button id="toolbar-center-selected" type="button">Center</button>
+        <button id="toolbar-measure" type="button">Measure</button>
+        <button id="toolbar-reset-view" type="button">Reset view</button>
+      </div>
 
       <div class="body-popover" id="body-popover" hidden></div>
       <div class="error-panel" id="error-panel" hidden></div>

@@ -69,7 +69,6 @@ export type DestinationBodyType =
   | "milky_way_patch"
   | "asteroid"
   | "comet"
-  | "spacecraft"
   | "small_body"
   | "unknown";
 
@@ -83,7 +82,6 @@ export type DestinationIconKey =
   | "cluster"
   | "asteroid"
   | "comet"
-  | "spacecraft"
   | "target";
 
 export type BodyClassification = {
@@ -210,8 +208,6 @@ const MOON_KEYS = new Set([
 const DWARF_PLANET_KEYS = new Set(["pluto", "ceres", "eris", "haumea", "makemake"]);
 const ASTEROID_KEYS = new Set(["vesta", "pallas", "hygiea", "psyche", "bennu", "ryugu", "eros", "ida", "gaspra"]);
 const COMET_KEYS = new Set(["halley", "borrelly", "tempel", "churyumov", "gerasimenko"]);
-const SPACECRAFT_KEYS = new Set(["voyager-1", "voyager-2", "new-horizons", "parker-solar-probe"]);
-
 const SOLAR_ORDER = new Map<string, number>([
   ["sun", 0],
   ["mercury", 10],
@@ -253,7 +249,6 @@ const TYPE_LABELS: Record<DestinationBodyType, string> = {
   milky_way_patch: "Milky Way patch",
   asteroid: "Asteroid",
   comet: "Comet",
-  spacecraft: "Spacecraft",
   small_body: "Small body",
   unknown: "Object"
 };
@@ -270,7 +265,6 @@ const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
   milky_way_patch: "cluster",
   asteroid: "asteroid",
   comet: "comet",
-  spacecraft: "spacecraft",
   small_body: "asteroid",
   unknown: "target"
 };
@@ -287,9 +281,8 @@ const TYPE_SORT_GROUPS: Record<DestinationBodyType, number> = {
   milky_way_patch: 8,
   asteroid: 9,
   comet: 10,
-  spacecraft: 11,
-  small_body: 12,
-  unknown: 13
+  small_body: 11,
+  unknown: 12
 };
 
 export function classifyBody(body: Pick<DestinationBody, "key" | "name" | "radius_km" | "object_type">): BodyClassification {
@@ -660,7 +653,6 @@ function inferBodyType(key: string, normalizedName: string, radiusKm: number): D
   if (normalizedName.includes("cluster")) return "star_cluster";
   if (ASTEROID_KEYS.has(key)) return "asteroid";
   if (COMET_KEYS.has(key) || normalizedName.includes("comet")) return "comet";
-  if (SPACECRAFT_KEYS.has(key) || normalizedName.includes("probe") || normalizedName.includes("voyager")) return "spacecraft";
   if (radiusKm > 50_000) return "planet";
   if (radiusKm > 1_000) return "planet";
   if (radiusKm > 0) return "small_body";

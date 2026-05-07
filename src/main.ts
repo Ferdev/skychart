@@ -1,200 +1,26 @@
-import "./styles.css";
 import "./destinationPicker.css";
+import "./styles.css";
 import {
-  buildDestinationPickerItems,
   buildDestinationPickerSections,
   classifyBody,
+  destinationPickerColorStyle,
   findDestinationBody,
-  normalizeDestinationQuery,
+  formatPickerDistance,
+  normalizeBodyKey,
   readRecentDestinations,
   recordRecentDestination,
+  type DestinationBody,
   type DestinationBodyType,
-  type DestinationPickerItem
+  type DestinationPickerItem,
+  type RecentDestination
 } from "./destinationPicker";
-import { educationalComparisons } from "./navigationMetrics";
-import { firstRunSteps, keyboardControls, modeCopy } from "./onboardingContent";
+import { LIGHT_SPEED_KM_PER_SECOND, educationalComparisons } from "./navigationMetrics";
 
-const AU_KM_FALLBACK = 149_597_870.7;
-const LIGHT_SPEED_KM_S = 299_792.458;
-const LIGHT_YEAR_KM = 9_460_730_472_580.8;
-const EARTH_MOON_AVG_KM = 384_400;
-const QUICK_TARGETS = ["moon", "mars", "jupiter", "saturn"];
-const BODY_FILTERS = ["all", "planet", "moon", "dwarf_planet", "star", "galaxy", "nebula", "star_cluster"] as const;
-const ONBOARDING_DISMISSED_KEY = "cosmic-atlas.onboarding-dismissed";
-const TRANSFER_PATH_SAMPLES = 96;
-const ORBIT_PATH_SAMPLES = 192;
-const MIN_PX_PER_AU = 0.0000000001;
-const MAX_PX_PER_AU = 24_000_000;
-const VIEWPORT_REFERENCE_SIDES: ViewportReferenceSide[] = ["top", "right", "bottom", "left"];
-const VIEWPORT_REFERENCE_CARD_WIDTH = 190;
-const VIEWPORT_REFERENCE_CARD_HEIGHT = 56;
-const VIEWPORT_REFERENCE_MARGIN = 14;
-const ICONS: Record<string, string> = {
-  target:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path></svg>',
-  locate:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path><circle cx="12" cy="12" r="5"></circle></svg>',
-  center:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h5M15 12h5M12 4v5M12 15v5"></path><circle cx="12" cy="12" r="2"></circle></svg>',
-  check:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>',
-  minus:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"></path></svg>',
-  plus:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"></path></svg>',
-  sun:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg>',
-  ship:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 7 18-7-4-7 4 7-18Z"></path></svg>',
-  back:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg>',
-  forward:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>',
-  reset:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h7a6 6 0 1 1-5.2 9"></path><path d="M7 3v4h4"></path></svg>',
-  restart:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20V5"></path><path d="M6 5h10l-2 4 2 4H6"></path></svg>',
-  waypoint:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"></path><circle cx="12" cy="10" r="2"></circle></svg>',
-  ruler:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17 17 4l3 3L7 20l-3-3Z"></path><path d="m13 8 3 3M10 11l2 2M7 14l3 3"></path></svg>',
-  zoom:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 5 5M10.5 8v5M8 10.5h5"></path></svg>',
-  close:
-    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>'
-};
-
-type BodyFilter = (typeof BODY_FILTERS)[number];
-type InteractionMode = "pan" | "target" | "measure";
-type DisplayLayer = "labels" | "orbits" | "route" | "trails";
-type ZoomPreset = "inner" | "outer" | "local" | "group" | "deep" | "all";
+type AtlasTab = "explore" | "inspect" | "measure" | "time" | "view";
 type SizeMode = "readable" | "hybrid" | "true";
-type ScaleBandKey = "planetary" | "solar" | "nearby_stars" | "milky_way" | "local_group" | "deep_sky";
-type LoadingStepKey = "api" | "download" | "parse" | "render";
-
-type CameraAnimation = {
-  startedAt: number;
-  durationMs: number;
-  fromXAu: number;
-  fromYAu: number;
-  fromPxPerAu: number;
-  toXAu: number;
-  toYAu: number;
-  toPxPerAu: number;
-};
-
-type GuidedTour = {
-  id: string;
-  label: string;
-  description: string;
-  keys: string[];
-};
-
-const BODY_FILTER_LABELS: Record<BodyFilter, string> = {
-  all: "All",
-  planet: "Planets",
-  moon: "Moons",
-  dwarf_planet: "Dwarf",
-  star: "Stars",
-  galaxy: "Galaxies",
-  nebula: "Nebulae",
-  star_cluster: "Clusters"
-};
-
-const BODY_FILTER_SECTION_LABELS: Record<BodyFilter, string> = {
-  all: "All bodies",
-  planet: "Planets",
-  moon: "Moons",
-  dwarf_planet: "Dwarf planets",
-  star: "Stars",
-  galaxy: "Galaxies",
-  nebula: "Nebulae",
-  star_cluster: "Star clusters"
-};
-
-const SCALE_LADDER_STOPS: { key: ScaleBandKey; label: string; maxViewportKm: number }[] = [
-  { key: "planetary", label: "Planet", maxViewportKm: 1_000_000 },
-  { key: "solar", label: "Solar System", maxViewportKm: AU_KM_FALLBACK * 80 },
-  { key: "nearby_stars", label: "Nearby stars", maxViewportKm: LIGHT_YEAR_KM * 80 },
-  { key: "milky_way", label: "Milky Way", maxViewportKm: LIGHT_YEAR_KM * 120_000 },
-  { key: "local_group", label: "Local Group", maxViewportKm: LIGHT_YEAR_KM * 15_000_000 },
-  { key: "deep_sky", label: "Deep sky", maxViewportKm: LIGHT_YEAR_KM * 120_000_000 }
-];
-
-const LOADING_STEPS: LoadingStepKey[] = ["api", "download", "parse", "render"];
-
-const SIZE_MODE_COPY: Record<SizeMode, string> = {
-  readable: "Size mode: readable. Body markers are deliberately exaggerated; numerical distances and radii remain real.",
-  hybrid: "Size mode: hybrid. True radii render when they are large enough; markers remain for navigation.",
-  true: "Size mode: true. Body disks use real radius-to-pixel scale; selection rings mark sub-pixel objects."
-};
-
-const COMPACT_SATELLITE_PARENT_KEYS: Record<string, string> = {
-  phobos: "mars",
-  deimos: "mars",
-  io: "jupiter",
-  europa: "jupiter",
-  ganymede: "jupiter",
-  callisto: "jupiter",
-  mimas: "saturn",
-  enceladus: "saturn",
-  tethys: "saturn",
-  dione: "saturn",
-  rhea: "saturn",
-  titan: "saturn",
-  iapetus: "saturn"
-};
-
-const GUIDED_TOURS: GuidedTour[] = [
-  {
-    id: "messier-highlights",
-    label: "Messier highlights",
-    description: "Bright, famous deep-sky targets with known catalog distances.",
-    keys: ["m31", "m42", "m45", "m13", "m1"]
-  },
-  {
-    id: "galaxies",
-    label: "Galaxies",
-    description: "Nearby island universes in the Messier catalog.",
-    keys: ["m31", "m33", "m51", "m81", "m104"]
-  },
-  {
-    id: "nebulae",
-    label: "Nebulae",
-    description: "Star-forming regions, remnants, and glowing shells.",
-    keys: ["m42", "m8", "m16", "m17", "m57"]
-  },
-  {
-    id: "clusters",
-    label: "Star clusters",
-    description: "Young open clusters and ancient globular clusters.",
-    keys: ["m45", "m13", "m22", "m5", "m11"]
-  },
-  {
-    id: "nearby-stars",
-    label: "Nearby stars",
-    description: "Closest loaded exoplanet-host systems.",
-    keys: ["proxima-cen", "barnards-star", "eps-eri", "ross-128", "tau-cet"]
-  },
-  {
-    id: "local-group",
-    label: "Local Group",
-    description: "The Andromeda system and companions.",
-    keys: ["m31", "m32", "m110"]
-  }
-];
-
-type TargetKey = string;
-
-type BodyPosition = {
-  x_au: number;
-  y_au: number;
-  z_au: number;
-  x_km: number;
-  y_km: number;
-  z_km: number;
-  heliocentric_distance_km: number;
-};
+type ZoomPreset = "inner" | "solar" | "nearby" | "messier" | "all";
+type BodyFilter = "all" | "planet" | "moon" | "star" | "dwarf_planet" | "galaxy" | "nebula" | "star_cluster";
+type DisplayLayer = "labels" | "orbits" | "grid" | "references";
 
 type VectorComponents = {
   x: number;
@@ -202,26 +28,31 @@ type VectorComponents = {
   z: number;
 };
 
+type BodyPosition = DestinationBody["position"];
+
+type BodyCatalog = {
+  source_type?: string | null;
+  position_model?: string | null;
+  dynamic_position?: boolean;
+  aliases?: readonly string[];
+  parent_key?: string | null;
+  catalog_group?: string;
+};
+
 type BodyStateVector = {
-  frame: string;
-  relative_to_key: string | null;
-  relative_to_name: string | null;
   position_km: VectorComponents;
   velocity_km_s: VectorComponents;
   distance_km: number;
   speed_km_s: number;
-  heliocentric_velocity_km_s: VectorComponents;
+  heliocentric_distance_km: number;
   heliocentric_speed_km_s: number;
 };
 
 type BodyOrbit = {
-  epoch_utc: string;
   central_body_key: string;
   central_body_name: string;
-  central_mu_km3_s2: number;
-  source: string;
   semi_major_axis_km: number | null;
-  eccentricity: number;
+  eccentricity: number | null;
   inclination_deg: number | null;
   longitude_of_ascending_node_deg: number | null;
   argument_of_periapsis_deg: number | null;
@@ -229,110 +60,39 @@ type BodyOrbit = {
   periapsis_km: number | null;
   apoapsis_km: number | null;
   orbital_period_days: number | null;
-  mean_motion_deg_per_day: number | null;
-  specific_orbital_energy_km2_s2: number;
-  specific_angular_momentum_km2_s: number;
   orbit_class: string;
-  notes: string[];
+  notes?: readonly string[];
 };
 
-type StellarInfo = {
-  ra_deg: number | null;
-  dec_deg: number | null;
-  distance_pc: number | null;
-  distance_ly: number | null;
-  exoplanet_count: number | null;
-  stellar_radius_solar: number | null;
-  stellar_teff_k: number | null;
-};
-
-type DeepSkyInfo = {
-  messier: number | null;
-  ngc: string | null;
-  ic: string | null;
-  aliases: string[];
-  ra_deg: number | null;
-  dec_deg: number | null;
-  distance_ly: number | null;
-  distance_quality: string | null;
-  deep_sky_type: string | null;
-  deep_sky_type_label: string | null;
-  apparent_magnitude: number | null;
-  angular_size_arcmin: string | null;
-  angular_major_arcmin: number | null;
-  angular_minor_arcmin: number | null;
-  physical_diameter_ly: number | null;
-  physical_minor_diameter_ly: number | null;
-  physical_size_note: string | null;
-  constellation: string | null;
-  viewing_season: string | null;
-  common_name: string | null;
-  observing_equipment: string | null;
-  why_interesting: string | null;
-};
-
-type Body = {
-  key: string;
-  name: string;
-  radius_km: number;
-  color: string;
-  object_type?: DestinationBodyType;
-  parent_key?: string | null;
-  catalog_group?: string;
-  catalog?: CatalogObject;
-  position: BodyPosition;
-  state_vector?: BodyStateVector;
-  orbit?: BodyOrbit | null;
-  stellar?: StellarInfo | null;
-  deep_sky?: DeepSkyInfo | null;
-  distance_from_earth_km: number;
-};
-
-type CatalogObject = {
-  key: string;
-  name: string;
-  object_type: DestinationBodyType;
-  parent_key: string | null;
-  catalog_group: string;
-  catalog_group_label: string;
-  ephemeris_id: string;
-  ephemeris_kernel: string;
-  ephemeris_source: string;
-  position_model: string;
-  dynamic_position: boolean;
-  aliases?: string[];
-  ra_deg?: number | null;
-  dec_deg?: number | null;
+type BodyStellar = {
   distance_pc?: number | null;
   distance_ly?: number | null;
   exoplanet_count?: number | null;
   stellar_radius_solar?: number | null;
   stellar_teff_k?: number | null;
-  messier?: number | null;
-  ngc?: string | null;
-  ic?: string | null;
-  deep_sky_type?: string | null;
+};
+
+type BodyDeepSky = {
+  aliases?: readonly string[];
   deep_sky_type_label?: string | null;
   apparent_magnitude?: number | null;
   angular_size_arcmin?: string | null;
-  angular_major_arcmin?: number | null;
-  angular_minor_arcmin?: number | null;
-  physical_diameter_ly?: number | null;
-  physical_minor_diameter_ly?: number | null;
-  physical_size_note?: string | null;
   constellation?: string | null;
   viewing_season?: string | null;
   common_name?: string | null;
   observing_equipment?: string | null;
   why_interesting?: string | null;
+  physical_diameter_ly?: number | null;
+  physical_minor_diameter_ly?: number | null;
+  physical_size_note?: string | null;
 };
 
-type CatalogSummary = {
-  schema_version: number;
-  groups: string[];
-  object_count: number;
-  kernels: string[];
-  objects: CatalogObject[];
+type Body = DestinationBody & {
+  catalog?: BodyCatalog | null;
+  state_vector?: BodyStateVector | null;
+  orbit?: BodyOrbit | null;
+  stellar?: BodyStellar | null;
+  deep_sky?: BodyDeepSky | null;
 };
 
 type Ephemeris = {
@@ -340,33 +100,23 @@ type Ephemeris = {
   generated_at_utc: string;
   data_source: string;
   coordinate_frame: string;
-  units: Record<string, string>;
   au_km: number;
-  catalog?: CatalogSummary;
-  earth_position: BodyPosition;
   bodies: Body[];
+  catalog?: {
+    groups?: Record<string, { label: string; description?: string }>;
+    object_count?: number;
+  };
 };
 
-type Ship = {
+type Camera = {
   xAu: number;
   yAu: number;
-  zAu: number;
-  vxAuPerSec: number;
-  vyAuPerSec: number;
-  vzAuPerSec: number;
-  angleRad: number;
+  pxPerAu: number;
 };
 
-type JourneyStats = {
-  targetKey: TargetKey;
-  closestKm: number;
-  arrived: boolean;
-  elapsedSeconds: number;
-  distanceTraveledKm: number;
-  maxSpeedKmS: number;
-  lastShipXAu: number | null;
-  lastShipYAu: number | null;
-  lastShipZAu: number | null;
+type ScreenPoint = {
+  x: number;
+  y: number;
 };
 
 type MeasurePoint = {
@@ -377,3788 +127,1382 @@ type MeasurePoint = {
   bodyKey?: string;
 };
 
-type RouteWaypoint = {
-  key: string;
-  name: string;
-};
-
-type TrailPoint = {
-  x_au: number;
-  y_au: number;
-  z_au: number;
-};
-
-type BodyTrail = {
-  key: string;
-  name: string;
-  points: TrailPoint[];
-};
-
-type RoutePoint = {
-  xAu: number;
-  yAu: number;
-  zAu: number;
-};
-
-type ScreenPoint = {
-  x: number;
-  y: number;
-};
-
-type ViewportReferenceSide = "left" | "right" | "top" | "bottom";
-
-type ViewportReference = {
-  side: ViewportReferenceSide;
-  body: Body;
-  distanceKm: number;
-  screen: ScreenPoint;
-  anchor: ScreenPoint;
-};
-
-type LabelRect = {
-  x: number;
-  y: number;
+type Rect = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
   width: number;
   height: number;
 };
 
-type LabelPlacement = {
-  dx: number;
-  dy: number;
-  align?: "left" | "center" | "right";
-};
+type LoadingStep = "api" | "download" | "parse" | "render";
 
-type BodyLabelLayout = {
-  body: Body;
-  text: string;
-  rect: LabelRect;
-  font: string;
-  color: string;
-};
+const AU_KM_FALLBACK = 149_597_870.7;
+const LIGHT_YEAR_KM = 9_460_730_472_580.8;
+const MIN_ZOOM = 1e-10;
+const MAX_ZOOM = 3_200;
+const FEATURED_KEYS = ["earth", "moon", "mars", "jupiter", "saturn", "proxima-cen", "m31", "m42"];
+const BODY_FILTERS: { key: BodyFilter; label: string; types?: DestinationBodyType[] }[] = [
+  { key: "all", label: "All" },
+  { key: "planet", label: "Planets", types: ["planet"] },
+  { key: "moon", label: "Moons", types: ["moon"] },
+  { key: "star", label: "Stars", types: ["star"] },
+  { key: "dwarf_planet", label: "Dwarf", types: ["dwarf_planet"] },
+  { key: "galaxy", label: "Galaxies", types: ["galaxy"] },
+  { key: "nebula", label: "Nebulae", types: ["nebula"] },
+  { key: "star_cluster", label: "Clusters", types: ["star_cluster"] }
+];
+const GUIDED_SETS: { id: string; label: string; keys: string[] }[] = [
+  { id: "solar-neighborhood", label: "Solar neighborhood", keys: ["sun", "earth", "moon", "mars", "jupiter", "saturn"] },
+  { id: "nearby-stars", label: "Nearby stars", keys: ["proxima-cen", "barnards-star", "eps-eri", "tau-cet", "gj-411"] },
+  { id: "deep-sky", label: "Messier highlights", keys: ["m1", "m13", "m31", "m42", "m45", "m57"] },
+  { id: "galaxies", label: "Galaxies", keys: ["m31", "m33", "m51", "m81", "m82", "m87"] },
+  { id: "nebulae", label: "Nebulae", keys: ["m1", "m8", "m16", "m17", "m20", "m42", "m57"] }
+];
+const SCALE_STOPS = [
+  { key: "planetary", label: "Planetary", maxAu: 0.08 },
+  { key: "inner", label: "Inner Solar System", maxAu: 3 },
+  { key: "outer", label: "Outer Solar System", maxAu: 60 },
+  { key: "nearby", label: "Nearby stars", maxAu: 1_500_000 },
+  { key: "milky-way", label: "Milky Way", maxAu: 2_500_000_000 },
+  { key: "local-group", label: "Local Group", maxAu: Number.POSITIVE_INFINITY }
+];
 
-type TrajectoryEvent = {
-  kind: "departure" | "flyby" | "arrival";
-  body_key: string;
-  body_name: string;
-  timestamp_utc: string;
-  offset_days: number;
-  x_au: number;
-  y_au: number;
-  z_au: number;
-};
-
-type TrajectorySample = {
-  x_au: number;
-  y_au: number;
-  z_au: number;
-};
-
-type TrajectoryLeg = {
-  from: string;
-  from_name: string;
-  to: string;
-  to_name: string;
-  tof_days: number;
-  path_distance_km: number;
-  departure_vinf_km_s: number;
-  arrival_vinf_km_s: number;
-};
-
-type FlybyMetrics = {
-  body_key: string;
-  body_name: string;
-  incoming_vinf_km_s: number;
-  outgoing_vinf_km_s: number;
-  speed_change_km_s: number;
-  turn_angle_deg: number;
-  max_turn_angle_deg: number;
-  turn_deficit_deg: number;
-  periapsis_altitude_km: number;
-  powered_flyby_delta_v_km_s: number;
-  feasible: boolean;
-};
-
-type TrajectoryCandidate = {
-  id: string;
-  kind: "direct" | "gravity_assist";
-  label: string;
-  body_sequence: string[];
-  assist_body_key: string | null;
-  events: TrajectoryEvent[];
-  legs: TrajectoryLeg[];
-  samples: TrajectorySample[];
-  warnings: string[];
-  flyby?: FlybyMetrics;
-  metrics: {
-    total_delta_v_km_s: number;
-    launch_vinf_km_s: number;
-    arrival_vinf_km_s: number;
-    powered_flyby_delta_v_km_s?: number;
-    total_time_days: number;
-    departure_offset_days: number;
-    flyby_offset_days?: number;
-    arrival_offset_days: number;
-    path_distance_km: number;
-    assist_speed_change_km_s?: number;
-    score: number;
-    feasible: boolean;
-  };
-};
-
-type TrajectoryPlan = {
-  timestamp_utc: string;
-  generated_at_utc: string;
-  data_source: string;
-  coordinate_frame: string;
-  parameters: {
-    origin: string;
-    destination: string;
-    assist: string;
-    scan_days: number;
-    step_days: number;
-    candidate_count: number;
-  };
-  selected_candidate_id: string;
-  best_direct_candidate_id: string | null;
-  best_gravity_assist_candidate_id: string | null;
-  candidates: TrajectoryCandidate[];
-  limitations: string[];
-};
+function requiredElement<T extends HTMLElement>(selector: string): T {
+  const element = document.querySelector<T>(selector);
+  if (!element) throw new Error(`Missing required element: ${selector}`);
+  return element;
+}
 
 const canvas = requiredElement<HTMLCanvasElement>("#map");
-const hudValues = requiredElement<HTMLElement>("#hud-values");
-const loadState = requiredElement<HTMLElement>("#load-state");
-const targetButtons = requiredElement<HTMLElement>("#target-buttons");
-const guidedTours = requiredElement<HTMLElement>("#guided-tours");
-const destinationSearch = requiredElement<HTMLInputElement>("#destination-search");
-const bodyPicker = requiredElement<HTMLElement>("#body-picker");
-const bodyFilterButtons = requiredElement<HTMLElement>("#body-filter-buttons");
-const routeMemory = requiredElement<HTMLElement>("#route-memory");
-const setDestination = requiredElement<HTMLButtonElement>("#set-destination");
-const jumpDestination = requiredElement<HTMLButtonElement>("#jump-destination");
-const bodySelect = requiredElement<HTMLSelectElement>("#body-select");
-const journey = requiredElement<HTMLElement>("#journey");
-const bodyInfo = requiredElement<HTMLElement>("#body-info");
-const flightValues = requiredElement<HTMLElement>("#flight-values");
-const errorPanel = requiredElement<HTMLElement>("#error-panel");
-const timeSummary = requiredElement<HTMLElement>("#time-summary");
-const zoomIn = requiredElement<HTMLButtonElement>("#zoom-in");
-const zoomOut = requiredElement<HTMLButtonElement>("#zoom-out");
-const centerSun = requiredElement<HTMLButtonElement>("#center-sun");
-const centerShip = requiredElement<HTMLButtonElement>("#center-ship");
-const centerSelected = requiredElement<HTMLButtonElement>("#center-selected");
-const zoomSelected = requiredElement<HTMLButtonElement>("#zoom-selected");
-const targetSelected = requiredElement<HTMLButtonElement>("#target-selected");
-const timeInput = requiredElement<HTMLInputElement>("#time-input");
-const applyTime = requiredElement<HTMLButtonElement>("#apply-time");
-const timeNow = requiredElement<HTMLButtonElement>("#time-now");
-const resetShipButton = requiredElement<HTMLButtonElement>("#reset-ship");
-const restartJourneyButton = requiredElement<HTMLButtonElement>("#restart-journey");
-const modeButtons = requiredElement<HTMLElement>("#mode-buttons");
-const sizeModeButtons = requiredElement<HTMLElement>("#size-mode-buttons");
-const displayToggles = requiredElement<HTMLElement>("#display-toggles");
-const zoomPresets = requiredElement<HTMLElement>("#zoom-presets");
-const bodyPopover = requiredElement<HTMLElement>("#body-popover");
-const measurePanel = requiredElement<HTMLElement>("#measure-panel");
-const onboardingPanel = requiredElement<HTMLElement>("#onboarding-panel");
-const scaleLadder = requiredElement<HTMLElement>("#scale-ladder");
-const scaleNote = requiredElement<HTMLElement>("#scale-note");
+const mapContext = canvas.getContext("2d");
+if (!mapContext) throw new Error("Canvas 2D context is not available");
+const ctx: CanvasRenderingContext2D = mapContext;
+
 const loadingScreen = requiredElement<HTMLElement>("#loading-screen");
-const loadingProgressFill = requiredElement<HTMLElement>("#loading-progress-fill");
+const loadingDetail = requiredElement<HTMLElement>("#loading-detail");
+const loadingFill = requiredElement<HTMLElement>("#loading-progress-fill");
 const loadingProgressLabel = requiredElement<HTMLElement>("#loading-progress-label");
 const loadingStepLabel = requiredElement<HTMLElement>("#loading-step-label");
-const loadingDetail = requiredElement<HTMLElement>("#loading-detail");
 const loadingElapsed = requiredElement<HTMLElement>("#loading-elapsed");
-const loadingSteps = requiredElement<HTMLElement>("#loading-steps");
-const ctx = requiredCanvasContext(canvas);
-
-const keys = new Set<string>();
-const camera = {
-  xAu: 0,
-  yAu: 0,
-  pxPerAu: 64
-};
+const loadState = requiredElement<HTMLElement>("#load-state");
+const atlasStats = requiredElement<HTMLElement>("#atlas-stats");
+const bodySearch = requiredElement<HTMLInputElement>("#body-search");
+const focusBodyButton = requiredElement<HTMLButtonElement>("#focus-body");
+const quickFocusButtons = requiredElement<HTMLElement>("#quick-focus-buttons");
+const tabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-tab]"));
+const tabPanels = Array.from(document.querySelectorAll<HTMLElement>("[data-tab-panel]"));
+const catalogCount = requiredElement<HTMLElement>("#catalog-count");
+const bodyFilterButtons = requiredElement<HTMLElement>("#body-filter-buttons");
+const bodyPicker = requiredElement<HTMLElement>("#body-picker");
+const guidedTours = requiredElement<HTMLElement>("#guided-tours");
+const selectedHeading = requiredElement<HTMLElement>("#selected-heading");
+const bodyInfo = requiredElement<HTMLElement>("#body-info");
+const centerSelected = requiredElement<HTMLButtonElement>("#center-selected");
+const zoomSelected = requiredElement<HTMLButtonElement>("#zoom-selected");
+const clearMeasure = requiredElement<HTMLButtonElement>("#clear-measure");
+const measureFromSelected = requiredElement<HTMLButtonElement>("#measure-from-selected");
+const measureToSelected = requiredElement<HTMLButtonElement>("#measure-to-selected");
+const measureClickMode = requiredElement<HTMLButtonElement>("#measure-click-mode");
+const measurePanel = requiredElement<HTMLElement>("#measure-panel");
+const timeSummary = requiredElement<HTMLElement>("#time-summary");
+const timeInput = requiredElement<HTMLInputElement>("#time-input");
+const timeNow = requiredElement<HTMLButtonElement>("#time-now");
+const applyTime = requiredElement<HTMLButtonElement>("#apply-time");
+const zoomPresets = requiredElement<HTMLElement>("#zoom-presets");
+const zoomOut = requiredElement<HTMLButtonElement>("#zoom-out");
+const zoomIn = requiredElement<HTMLButtonElement>("#zoom-in");
+const centerSun = requiredElement<HTMLButtonElement>("#center-sun");
+const sizeModeButtons = requiredElement<HTMLElement>("#size-mode-buttons");
+const displayToggles = requiredElement<HTMLElement>("#display-toggles");
+const scaleLadder = requiredElement<HTMLElement>("#scale-ladder");
+const scaleNote = requiredElement<HTMLElement>("#scale-note");
+const toolbarCenterSelected = requiredElement<HTMLButtonElement>("#toolbar-center-selected");
+const toolbarMeasure = requiredElement<HTMLButtonElement>("#toolbar-measure");
+const toolbarResetView = requiredElement<HTMLButtonElement>("#toolbar-reset-view");
+const bodyPopover = requiredElement<HTMLElement>("#body-popover");
+const errorPanel = requiredElement<HTMLElement>("#error-panel");
 
 let ephemeris: Ephemeris | null = null;
 let bodyByKey = new Map<string, Body>();
-let selectedTarget = "jupiter";
-let selectedBodyKey = "jupiter";
-let ship: Ship | null = null;
-let journeyStats: JourneyStats = createJourneyStats(selectedTarget);
-let activeBodyFilter: BodyFilter = "all";
-let interactionMode: InteractionMode = "pan";
+let selectedKey = "earth";
+let activeTab: AtlasTab = "explore";
+let activeFilter: BodyFilter = "all";
 let sizeMode: SizeMode = "hybrid";
-let recentDestinations = readRecentDestinations();
-let routeWaypoints: RouteWaypoint[] = [];
-let measurePoints: MeasurePoint[] = [];
-let activePopoverBodyKey: string | null = null;
-let cameraAnimation: CameraAnimation | null = null;
-let sizeCompareBodyKey = "earth";
-let bodyTrails: BodyTrail[] = [];
-let trailsLoading = false;
-let trailsError = "";
-let trajectoryPlan: TrajectoryPlan | null = null;
-let trajectoryLoading = false;
-let trajectoryError = "";
-let selectedTrajectoryCandidateId: string | null = null;
-let trajectoryRequestId = 0;
-const displayLayers: Record<DisplayLayer, boolean> = {
+let activeZoomPreset: ZoomPreset = "solar";
+let displayLayers: Record<DisplayLayer, boolean> = {
   labels: true,
   orbits: true,
-  route: true,
-  trails: false
+  grid: true,
+  references: true
 };
-let warpEnabled = false;
-let lastFrame = performance.now();
-let lastHudRender = 0;
-let bodyInfoRenderKey = "";
-let journeyStructuralKey = "";
-let isDragging = false;
-let dragMoved = false;
-let dragStart = { x: 0, y: 0, cameraXAu: 0, cameraYAu: 0 };
-let loadingRunId = 0;
+let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
+let hoverKey: string | null = null;
+let measureMode = false;
+let measurePoints: MeasurePoint[] = [];
+let recentDestinations: RecentDestination[] = readRecentDestinations();
+let mapDragging = false;
+let mapDragMoved = false;
+let dragStart: ScreenPoint | null = null;
+let dragCameraStart: Camera | null = null;
 let loadingStartedAt = performance.now();
-let loadingElapsedTimer: number | null = null;
-let loadingPercent = 0;
-
-for (const target of QUICK_TARGETS) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "target-card";
-  button.dataset.target = target;
-  button.setAttribute("aria-label", `Set target to ${labelForKey(target)}`);
-  button.innerHTML = quickTargetMarkup(target);
-  button.addEventListener("click", () => {
-    setTarget(target, { inspect: true, center: false });
-  });
-  targetButtons.appendChild(button);
-}
-initializeBodyFilterButtons();
-initializeModeButtons();
-initializeSizeModeButtons();
-decorateStaticControls();
-renderOnboarding();
-updateTargetButtons();
-
-window.addEventListener("resize", resizeCanvas);
-window.addEventListener("keydown", (event) => {
-  if (event.code === "Space") {
-    event.preventDefault();
-    if (!event.repeat) {
-      warpEnabled = !warpEnabled;
-      updateHud(true);
-    }
-    return;
-  }
-  keys.add(event.code);
-});
-window.addEventListener("keyup", (event) => keys.delete(event.code));
-
-canvas.addEventListener("wheel", (event) => {
-  event.preventDefault();
-  cancelCameraAnimation();
-  zoomAt(event.clientX, event.clientY, zoomWheelFactor(event.deltaY));
-});
-
-canvas.addEventListener("pointerdown", (event) => {
-  cancelCameraAnimation();
-  isDragging = true;
-  dragMoved = false;
-  canvas.setPointerCapture(event.pointerId);
-  dragStart = {
-    x: event.clientX,
-    y: event.clientY,
-    cameraXAu: camera.xAu,
-    cameraYAu: camera.yAu
-  };
-});
-
-canvas.addEventListener("pointermove", (event) => {
-  if (!isDragging) return;
-  if (Math.hypot(event.clientX - dragStart.x, event.clientY - dragStart.y) > 4) {
-    dragMoved = true;
-  }
-  camera.xAu = dragStart.cameraXAu - (event.clientX - dragStart.x) / camera.pxPerAu;
-  camera.yAu = dragStart.cameraYAu + (event.clientY - dragStart.y) / camera.pxPerAu;
-});
-
-canvas.addEventListener("pointerup", (event) => {
-  isDragging = false;
-  canvas.releasePointerCapture(event.pointerId);
-  if (!dragMoved) {
-    handleMapClick(event.clientX, event.clientY);
-  }
-});
-
-zoomIn.addEventListener("click", () => zoomAtMapFocus(1.25));
-zoomOut.addEventListener("click", () => zoomAtMapFocus(0.8));
-centerSun.addEventListener("click", () => {
-  cancelCameraAnimation();
-  setCameraFocusOnPoint(0, 0);
-});
-centerShip.addEventListener("click", () => {
-  if (!ship) return;
-  cancelCameraAnimation();
-  setCameraFocusOnPoint(ship.xAu, ship.yAu);
-});
-centerSelected.addEventListener("click", () => centerOnBody(selectedBodyKey));
-zoomSelected.addEventListener("click", () => zoomToBody(selectedBodyKey));
-targetSelected.addEventListener("click", () => setTarget(selectedBodyKey, { inspect: true }));
-bodySelect.addEventListener("change", () => {
-  selectedBodyKey = bodySelect.value;
-  renderBodyPicker();
-  updateHud(true);
-});
-destinationSearch.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    setDestination.click();
-  }
-});
-destinationSearch.addEventListener("input", () => renderBodyPicker());
-bodyPicker.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-picker-body]");
-  const key = button?.dataset.pickerBody;
-  if (!key) return;
-  const body = bodyByKey.get(key);
-  setTarget(key, { inspect: true });
-  if (body) {
-    showBodyPopover(body, event.clientX, event.clientY);
-  }
-});
-routeMemory.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-recent-destination]");
-  const key = button?.dataset.recentDestination;
-  if (!key) return;
-  const body = bodyByKey.get(key);
-  setTarget(key, { inspect: true });
-  if (body) {
-    showBodyPopover(body, event.clientX, event.clientY);
-  }
-});
-guidedTours.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-tour-target]");
-  const key = button?.dataset.tourTarget;
-  if (!key) return;
-  setTarget(key, { inspect: true, center: true });
-});
-journey.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-trajectory-candidate]");
-  const candidateId = button?.dataset.trajectoryCandidate;
-  if (!candidateId) return;
-  selectedTrajectoryCandidateId = candidateId;
-  updateHud(true);
-});
-setDestination.addEventListener("click", () => {
-  const body = bodyFromSearchValue(destinationSearch.value);
-  if (!body) {
-    flashSearchError();
-    return;
-  }
-  setTarget(body.key, { inspect: true });
-});
-jumpDestination.addEventListener("click", () => {
-  const body = bodyFromSearchValue(destinationSearch.value) ?? bodyByKey.get(selectedTarget);
-  if (!body) {
-    flashSearchError();
-    return;
-  }
-  centerOnBody(body.key);
-});
-applyTime.addEventListener("click", () => {
-  const timestamp = datetimeLocalToIso(timeInput.value);
-  if (timestamp) {
-    loadEphemeris(timestamp, { preserveCamera: true });
-  }
-});
-timeInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    applyTime.click();
-  }
-});
-timeNow.addEventListener("click", () => loadEphemeris(new Date().toISOString(), { preserveCamera: true }));
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-step-days]")) {
-  button.addEventListener("click", () => {
-    if (!ephemeris) return;
-    const days = Number(button.dataset.stepDays ?? "0");
-    const next = new Date(ephemeris.timestamp_utc);
-    next.setUTCDate(next.getUTCDate() + days);
-    loadEphemeris(next.toISOString(), { preserveCamera: true });
-  });
-}
-resetShipButton.addEventListener("click", () => {
-  resetShipNearEarth(false);
-  updateHud();
-});
-restartJourneyButton.addEventListener("click", () => {
-  resetShipNearEarth(true);
-  updateHud();
-});
-modeButtons.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-mode]");
-  const mode = button?.dataset.mode as InteractionMode | undefined;
-  if (!mode || !modeCopy[mode]) return;
-  interactionMode = mode;
-  updateModeButtons();
-  updateMeasurePanel();
-});
-sizeModeButtons.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-size-mode]");
-  const mode = button?.dataset.sizeMode as SizeMode | undefined;
-  if (!mode || !(mode in SIZE_MODE_COPY)) return;
-  sizeMode = mode;
-  updateSizeModeButtons();
-  updateHud(true);
-});
-displayToggles.addEventListener("change", (event) => {
-  const input = (event.target as HTMLElement).closest<HTMLInputElement>("[data-layer]");
-  const layer = input?.dataset.layer as DisplayLayer | undefined;
-  if (!input || !layer) return;
-  displayLayers[layer] = input.checked;
-  if (layer === "trails" && input.checked) {
-    loadTrails();
-  }
-  updateHud();
-});
-for (const button of zoomPresets.querySelectorAll<HTMLButtonElement>("[data-zoom-preset]")) {
-  button.addEventListener("click", () => {
-    const preset = button.dataset.zoomPreset as ZoomPreset | undefined;
-    if (!preset) return;
-    applyZoomPreset(preset);
-  });
-}
-bodyPopover.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-popover-action]");
-  if (!button || !activePopoverBodyKey) return;
-  handlePopoverAction(button.dataset.popoverAction ?? "", activePopoverBodyKey);
-});
-bodyInfo.addEventListener("change", (event) => {
-  const select = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-size-compare-select]");
-  if (!select) return;
-  const key = select.value;
-  if (!bodyByKey.has(key)) return;
-  sizeCompareBodyKey = key;
-  updateBodyInfo();
-});
-measurePanel.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-measure-action]");
-  if (button?.dataset.measureAction !== "clear") return;
-  measurePoints = [];
-  updateMeasurePanel();
-});
-onboardingPanel.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-dismiss-onboarding]");
-  if (!button) return;
-  localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
-  onboardingPanel.hidden = true;
-});
+let renderRequested = false;
 
 resizeCanvas();
-loadEphemeris();
-requestAnimationFrame(loop);
+bindEvents();
+initializeUi();
+loadAtlas();
+requestAnimationFrame(render);
 
-async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: boolean } = {}) {
-  const loadingRun = beginLoading(timestampUtc ? "Recomputing atlas for selected UTC timestamp." : "Loading current UTC atlas.");
-  try {
-    updateLoadingProgress(loadingRun, "api", 12, "Connecting to local ephemeris API", "Opening the Python/Skyfield data service on this machine.");
-    scheduleLoadingProgress(
-      loadingRun,
-      450,
-      "download",
-      28,
-      "Waiting for ephemeris payload",
-      "Skyfield, JPL kernels, Horizons vectors, and catalog rows can take a moment on first load."
-    );
-    const query = timestampUtc ? `?timestamp=${encodeURIComponent(timestampUtc)}` : "";
-    const response = await fetch(`/api/ephemeris${query}`);
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Ephemeris API returned ${response.status}.\n${text}`);
-    }
-
-    updateLoadingProgress(loadingRun, "download", 48, "Ephemeris payload received", "Reading real heliocentric positions and catalog metadata.");
-    scheduleLoadingProgress(loadingRun, 180, "parse", 64, "Parsing catalog objects", "Building the local body index, aliases, and search filters.");
-    ephemeris = (await response.json()) as Ephemeris;
-    updateLoadingProgress(loadingRun, "parse", 72, "Catalog parsed", `Loaded ${ephemeris.bodies.length} bodies into the atlas.`);
-    bodyByKey = new Map(ephemeris.bodies.map((body) => [body.key, body]));
-    ensureSelectedKeysExist();
-    populateCatalogControls();
-    setTimeInputFromTimestamp(ephemeris.timestamp_utc);
-    updateTimeSummary();
-    initializeShip();
-    resetJourneyStats();
-    updateLoadingProgress(loadingRun, "render", 88, "Preparing map view", "Positioning the ship, journey panel, labels, and scale ladder.");
-    if (!options.preserveCamera) {
-      fitInitialView();
-    }
-    if (displayLayers.trails) {
-      loadTrails();
-    }
-    void loadTrajectoryPlan();
-    loadState.textContent = "live";
-    errorPanel.hidden = true;
-    updateHud();
-    finishLoading(loadingRun);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    loadState.textContent = "error";
-    failLoading(loadingRun, message);
-    errorPanel.hidden = false;
-    errorPanel.textContent = [
-      "Could not load live ephemeris data.",
-      "",
-      "Start the Python API first, then reload the page.",
-      "",
-      message
-    ].join("\n");
-  }
-}
-
-function beginLoading(detail: string) {
-  loadingRunId += 1;
-  const runId = loadingRunId;
-  loadingPercent = 0;
+async function loadAtlas(timestampIso?: string) {
   loadingStartedAt = performance.now();
+  setLoading("api", 8, "Connecting to local API");
+  setError("");
   loadState.textContent = "loading";
-  loadingScreen.hidden = false;
-  loadingScreen.classList.remove("error");
-  loadingDetail.textContent = detail;
-  updateLoadingElapsed(runId);
-  if (loadingElapsedTimer !== null) {
-    window.clearInterval(loadingElapsedTimer);
-  }
-  loadingElapsedTimer = window.setInterval(() => updateLoadingElapsed(runId), 100);
-  updateLoadingProgress(runId, "api", 4, "Starting atlas boot", detail);
-  return runId;
-}
 
-function scheduleLoadingProgress(
-  runId: number,
-  delayMs: number,
-  step: LoadingStepKey,
-  percent: number,
-  label: string,
-  detail: string
-) {
-  window.setTimeout(() => updateLoadingProgress(runId, step, percent, label, detail), delayMs);
-}
+  try {
+    const query = new URLSearchParams();
+    if (timestampIso) query.set("timestamp", timestampIso);
+    const url = `/api/ephemeris${query.toString() ? `?${query.toString()}` : ""}`;
+    setLoading("download", 28, "Loading ephemeris and catalog payload");
+    const response = await fetch(url);
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `API request failed with ${response.status}`);
+    }
 
-function updateLoadingProgress(runId: number, step: LoadingStepKey, percent: number, label: string, detail: string) {
-  if (runId !== loadingRunId || percent < loadingPercent) return;
-  loadingPercent = clamp(percent, 0, 100);
-  loadingProgressFill.style.width = `${loadingPercent}%`;
-  loadingProgressLabel.textContent = `${Math.round(loadingPercent)}%`;
-  loadingStepLabel.textContent = label;
-  loadingDetail.textContent = detail;
+    setLoading("parse", 64, "Indexing celestial objects");
+    const payload = (await response.json()) as Ephemeris;
+    ephemeris = payload;
+    bodyByKey = new Map(payload.bodies.map((body) => [body.key, body]));
+    if (!bodyByKey.has(selectedKey)) selectedKey = bodyByKey.get("earth")?.key ?? payload.bodies[0]?.key ?? "";
+    timeInput.value = toDatetimeLocalValue(new Date(payload.timestamp_utc));
+    recentDestinations = readRecentDestinations();
 
-  const activeIndex = LOADING_STEPS.indexOf(step);
-  for (const item of loadingSteps.querySelectorAll<HTMLElement>("[data-loading-step]")) {
-    const itemStep = item.dataset.loadingStep as LoadingStepKey | undefined;
-    const itemIndex = itemStep ? LOADING_STEPS.indexOf(itemStep) : -1;
-    item.classList.toggle("done", itemIndex >= 0 && itemIndex < activeIndex);
-    item.classList.toggle("active", itemStep === step);
-  }
-}
-
-function finishLoading(runId: number) {
-  updateLoadingProgress(runId, "render", 100, "Atlas ready", "Live coordinates are rendered. The route planner can continue updating in the journey panel.");
-  window.setTimeout(() => {
-    if (runId !== loadingRunId) return;
+    setLoading("render", 88, "Preparing scientific controls");
+    updateAllUi();
+    if (payload.bodies.length > 0) {
+      applyZoomPreset(activeZoomPreset, false);
+    }
     loadingScreen.hidden = true;
-    stopLoadingElapsedTimer();
-  }, 260);
-}
-
-function failLoading(runId: number, message: string) {
-  if (runId !== loadingRunId) return;
-  loadingScreen.classList.add("error");
-  updateLoadingProgress(runId, "api", Math.max(loadingPercent, 100), "Load failed", "The local ephemeris API did not return usable data.");
-  loadingDetail.textContent = message.split("\n")[0] || "Could not load live ephemeris data.";
-  stopLoadingElapsedTimer();
-}
-
-function updateLoadingElapsed(runId: number) {
-  if (runId !== loadingRunId) return;
-  loadingElapsed.textContent = `${((performance.now() - loadingStartedAt) / 1000).toFixed(1)}s`;
-}
-
-function stopLoadingElapsedTimer() {
-  if (loadingElapsedTimer === null) return;
-  window.clearInterval(loadingElapsedTimer);
-  loadingElapsedTimer = null;
-}
-
-async function loadTrajectoryPlan() {
-  const targetBody = bodyByKey.get(selectedTarget);
-  if (
-    !ephemeris ||
-    !targetBody ||
-    !selectedTarget ||
-    selectedTarget === "earth" ||
-    selectedTarget === "sun" ||
-    isStaticStellarCatalogBody(targetBody)
-  ) {
-    trajectoryPlan = null;
-    selectedTrajectoryCandidateId = null;
-    trajectoryLoading = false;
-    trajectoryError = "";
-    return;
-  }
-
-  const requestId = ++trajectoryRequestId;
-  trajectoryLoading = true;
-  trajectoryError = "";
-  updateHud(true);
-
-  try {
-    const assist = routeWaypoints[0]?.key ?? "auto";
-    const query = new URLSearchParams({
-      timestamp: ephemeris.timestamp_utc,
-      destination: selectedTarget,
-      assist,
-      scan_days: "900",
-      step_days: "60"
-    });
-    const response = await fetch(`/api/trajectory?${query.toString()}`);
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-    const payload = (await response.json()) as TrajectoryPlan;
-    if (requestId !== trajectoryRequestId) return;
-    trajectoryPlan = payload;
-    selectedTrajectoryCandidateId = payload.selected_candidate_id;
+    loadState.textContent = "ready";
+    requestRender();
   } catch (error) {
-    if (requestId !== trajectoryRequestId) return;
-    trajectoryPlan = null;
-    selectedTrajectoryCandidateId = null;
-    trajectoryError = error instanceof Error ? error.message : String(error);
-  } finally {
-    if (requestId === trajectoryRequestId) {
-      trajectoryLoading = false;
-      updateHud(true);
-    }
+    loadState.textContent = "error";
+    setError(error instanceof Error ? error.message : String(error));
+    loadingDetail.textContent = "Unable to load the atlas data.";
+    loadingProgressLabel.textContent = "error";
   }
 }
 
-async function loadTrails() {
-  if (!ephemeris || trailsLoading) return;
-  trailsLoading = true;
-  trailsError = "";
-  try {
-    const bodyKeys = ephemeris.bodies
-      .filter((body) => body.key !== "sun" && body.catalog?.position_model !== "horizons_vectors" && !isStaticStellarCatalogBody(body))
-      .map((body) => body.key)
-      .join(",");
-    const query = new URLSearchParams({
-      timestamp: ephemeris.timestamp_utc,
-      bodies: bodyKeys,
-      days: "3650",
-      step_days: "45"
+function bindEvents() {
+  window.addEventListener("resize", () => {
+    resizeCanvas();
+    requestRender();
+  });
+
+  bodySearch.addEventListener("input", () => {
+    updateBodyPicker();
+  });
+
+  bodySearch.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      focusSearchResult();
+    }
+  });
+
+  focusBodyButton.addEventListener("click", focusSearchResult);
+
+  quickFocusButtons.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-focus-key]");
+    if (!button) return;
+    selectBody(button.dataset.focusKey ?? "", { center: true, zoom: "local" });
+  });
+
+  tabButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      setActiveTab((button.dataset.tab as AtlasTab) ?? "explore");
     });
-    const response = await fetch(`/api/trails?${query.toString()}`);
-    if (!response.ok) {
-      throw new Error(await response.text());
+  });
+
+  bodyFilterButtons.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
+    if (!button) return;
+    activeFilter = (button.dataset.bodyFilter as BodyFilter) ?? "all";
+    updateBodyFilters();
+    updateBodyPicker();
+  });
+
+  bodyPicker.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-key]");
+    if (!button) return;
+    selectBody(button.dataset.bodyKey ?? "", { center: true });
+  });
+
+  guidedTours.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-tour-id]");
+    if (!button) return;
+    const tour = GUIDED_SETS.find((item) => item.id === button.dataset.tourId);
+    if (!tour) return;
+    const bodies = tour.keys.map((key) => bodyByKey.get(key)).filter(isPresent);
+    if (bodies.length === 0) return;
+    selectedKey = bodies[0].key;
+    fitBodies(bodies, 0.2);
+    setActiveTab("inspect");
+    updateAllUi();
+  });
+
+  centerSelected.addEventListener("click", () => centerOnSelected(false));
+  zoomSelected.addEventListener("click", () => centerOnSelected(true));
+  toolbarCenterSelected.addEventListener("click", () => centerOnSelected(false));
+  toolbarResetView.addEventListener("click", () => applyZoomPreset("solar"));
+
+  clearMeasure.addEventListener("click", () => {
+    measurePoints = [];
+    updateMeasurePanel();
+    requestRender();
+  });
+
+  measureFromSelected.addEventListener("click", () => setMeasurePointFromSelected(0));
+  measureToSelected.addEventListener("click", () => setMeasurePointFromSelected(1));
+  measureClickMode.addEventListener("click", () => {
+    measureMode = !measureMode;
+    setActiveTab("measure");
+    updateMeasurePanel();
+    requestRender();
+  });
+  toolbarMeasure.addEventListener("click", () => {
+    measureMode = !measureMode;
+    setActiveTab("measure");
+    updateMeasurePanel();
+    requestRender();
+  });
+
+  timeNow.addEventListener("click", () => {
+    timeInput.value = toDatetimeLocalValue(new Date());
+    void loadAtlas(new Date().toISOString());
+  });
+
+  applyTime.addEventListener("click", () => {
+    const date = dateFromInput();
+    if (date) void loadAtlas(date.toISOString());
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-step-days]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const current = dateFromInput() ?? new Date(ephemeris?.timestamp_utc ?? Date.now());
+      const days = Number(button.dataset.stepDays ?? "0");
+      const next = new Date(current.getTime() + days * 86_400_000);
+      timeInput.value = toDatetimeLocalValue(next);
+      void loadAtlas(next.toISOString());
+    });
+  });
+
+  zoomPresets.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-zoom-preset]");
+    if (!button) return;
+    applyZoomPreset((button.dataset.zoomPreset as ZoomPreset) ?? "solar");
+  });
+
+  zoomOut.addEventListener("click", () => zoomAt(canvas.width / 2, canvas.height / 2, 0.72));
+  zoomIn.addEventListener("click", () => zoomAt(canvas.width / 2, canvas.height / 2, 1.32));
+  centerSun.addEventListener("click", () => {
+    const sun = bodyByKey.get("sun");
+    if (sun) {
+      selectedKey = sun.key;
+      centerOnBody(sun, false);
+      updateAllUi();
     }
-    const payload = (await response.json()) as { bodies: BodyTrail[] };
-    bodyTrails = payload.bodies.map((trail) => ({
-      key: trail.key,
-      name: trail.name,
-      points: trail.points.map((point) => ({ x_au: point.x_au, y_au: point.y_au, z_au: point.z_au }))
-    }));
-  } catch (error) {
-    trailsError = error instanceof Error ? error.message : String(error);
-    displayLayers.trails = false;
-    const input = displayToggles.querySelector<HTMLInputElement>('[data-layer="trails"]');
-    if (input) input.checked = false;
-  } finally {
-    trailsLoading = false;
-    updateHud();
-  }
-}
+  });
 
-function initializeShip(force = false) {
-  const earth = bodyByKey.get("earth");
-  if (!earth || (ship && !force)) return;
+  sizeModeButtons.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-size-mode]");
+    if (!button) return;
+    sizeMode = (button.dataset.sizeMode as SizeMode) ?? "hybrid";
+    updateSizeModes();
+    requestRender();
+  });
 
-  const earthAngle = Math.atan2(earth.position.y_au, earth.position.x_au);
-  const tangent = earthAngle + Math.PI / 2;
-  ship = {
-    xAu: earth.position.x_au + Math.cos(tangent) * 0.002,
-    yAu: earth.position.y_au + Math.sin(tangent) * 0.002,
-    zAu: earth.position.z_au,
-    vxAuPerSec: 0,
-    vyAuPerSec: 0,
-    vzAuPerSec: 0,
-    angleRad: tangent
-  };
-}
+  displayToggles.addEventListener("change", (event) => {
+    const input = (event.target as HTMLElement).closest<HTMLInputElement>("input[data-layer]");
+    if (!input) return;
+    const layer = input.dataset.layer as DisplayLayer;
+    displayLayers = { ...displayLayers, [layer]: input.checked };
+    updateDisplayToggles();
+    requestRender();
+  });
 
-function resetShipNearEarth(resetStats: boolean) {
-  initializeShip(true);
-  if (resetStats) {
-    resetJourneyStats();
-  }
-}
+  canvas.addEventListener("pointerdown", (event) => {
+    canvas.setPointerCapture(event.pointerId);
+    mapDragging = true;
+    mapDragMoved = false;
+    dragStart = { x: event.clientX, y: event.clientY };
+    dragCameraStart = { ...camera };
+  });
 
-function fitInitialView() {
-  const width = canvas.clientWidth || window.innerWidth;
-  const height = canvas.clientHeight || window.innerHeight;
-  const outerBody = bodyByKey.get("saturn");
-  const radiusAu = outerBody ? Math.hypot(outerBody.position.x_au, outerBody.position.y_au) : 10;
-  camera.pxPerAu = clamp(Math.min(width, height) / (radiusAu * 2.35), 18, 82);
-  setCameraFocusOnPoint(0, 0, camera.pxPerAu);
-}
-
-function loop(now: number) {
-  const dt = Math.min(0.05, (now - lastFrame) / 1000);
-  lastFrame = now;
-  updateCameraAnimation(now);
-  updateShip(dt);
-  draw();
-  requestAnimationFrame(loop);
-}
-
-function updateShip(dt: number) {
-  if (!ship) return;
-  const previousX = ship.xAu;
-  const previousY = ship.yAu;
-  const previousZ = ship.zAu;
-  const target = bodyByKey.get(selectedTarget);
-
-  const rotationSpeed = warpEnabled ? 1.45 : 1.9;
-  if (keys.has("KeyA")) ship.angleRad += rotationSpeed * dt;
-  if (keys.has("KeyD")) ship.angleRad -= rotationSpeed * dt;
-
-  const warpMultiplier = warpEnabled ? 250 : 1;
-  const accelerationAu = 0.00000018 * warpMultiplier;
-  const maxSpeedAu = 0.000026 * warpMultiplier;
-  let thrust = 0;
-  if (keys.has("KeyW")) thrust += 1;
-  if (keys.has("KeyS")) thrust -= 0.75;
-
-  if (thrust !== 0) {
-    ship.vxAuPerSec += Math.cos(ship.angleRad) * accelerationAu * thrust * dt;
-    ship.vyAuPerSec += Math.sin(ship.angleRad) * accelerationAu * thrust * dt;
-    const depth = target ? targetDepthVector(target) : null;
-    if (depth && depth.direction !== 0) {
-      ship.vzAuPerSec += depth.direction * accelerationAu * thrust * depth.blend * dt;
+  canvas.addEventListener("pointermove", (event) => {
+    const point = eventToCanvasPoint(event);
+    hoverKey = nearestBodyAt(point.x, point.y)?.body.key ?? null;
+    if (mapDragging && dragStart && dragCameraStart) {
+      const dx = event.clientX - dragStart.x;
+      const dy = event.clientY - dragStart.y;
+      if (Math.hypot(dx, dy) > 3) mapDragMoved = true;
+      camera = {
+        ...camera,
+        xAu: dragCameraStart.xAu - dx / camera.pxPerAu,
+        yAu: dragCameraStart.yAu + dy / camera.pxPerAu
+      };
     }
-  }
+    requestRender();
+  });
 
-  if (!warpEnabled) {
-    ship.vxAuPerSec *= 0.9995;
-    ship.vyAuPerSec *= 0.9995;
-    ship.vzAuPerSec *= 0.9995;
-  }
+  canvas.addEventListener("pointerup", (event) => {
+    canvas.releasePointerCapture(event.pointerId);
+    mapDragging = false;
+    const point = eventToCanvasPoint(event);
+    if (!mapDragMoved) handleMapClick(point);
+    dragStart = null;
+    dragCameraStart = null;
+  });
 
-  const speed = Math.hypot(ship.vxAuPerSec, ship.vyAuPerSec, ship.vzAuPerSec);
-  if (speed > maxSpeedAu) {
-    const ratio = maxSpeedAu / speed;
-    ship.vxAuPerSec *= ratio;
-    ship.vyAuPerSec *= ratio;
-    ship.vzAuPerSec *= ratio;
-  }
-
-  ship.xAu += ship.vxAuPerSec * dt;
-  ship.yAu += ship.vyAuPerSec * dt;
-  ship.zAu += ship.vzAuPerSec * dt;
-
-  if (target) {
-    updateJourneyStats(shipTargetDistanceKm(target), target, dt, previousX, previousY, previousZ);
-  }
-  updateHud();
+  canvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const point = eventToCanvasPoint(event);
+      zoomAt(point.x, point.y, event.deltaY > 0 ? 0.84 : 1.18);
+    },
+    { passive: false }
+  );
 }
 
-function targetDepthVector(target: Body) {
-  if (!ship) return null;
-  const dx = target.position.x_au - ship.xAu;
-  const dy = target.position.y_au - ship.yAu;
-  const dz = target.position.z_au - ship.zAu;
-  const distanceAu = Math.hypot(dx, dy, dz);
-  if (distanceAu <= 0) return null;
-  return {
-    direction: Math.abs(dz) < 1e-12 ? 0 : Math.sign(dz),
-    blend: clamp(Math.abs(dz) / distanceAu, 0, 0.92)
-  };
+function initializeUi() {
+  updateTabs();
+  updateBodyFilters();
+  updateSizeModes();
+  updateDisplayToggles();
+  updateMeasurePanel();
 }
 
-function draw() {
-  const width = canvas.width / devicePixelRatio;
-  const height = canvas.height / devicePixelRatio;
+function updateAllUi() {
+  updateStats();
+  updateQuickFocus();
+  updateTabs();
+  updateBodyFilters();
+  updateBodyPicker();
+  updateGuidedSets();
+  updateBodyInfo();
+  updateMeasurePanel();
+  updateTimeSummary();
+  updateSizeModes();
+  updateDisplayToggles();
+  updateScaleUi();
+}
 
-  ctx.save();
-  ctx.scale(devicePixelRatio, devicePixelRatio);
-  ctx.clearRect(0, 0, width, height);
-  drawStarfield(width, height);
-
+function render() {
+  renderRequested = false;
+  resizeCanvas();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawBackground();
   if (ephemeris) {
-    if (displayLayers.orbits) {
-      drawOrbitPaths();
-    }
-    if (displayLayers.trails) {
-      drawBodyTrails();
-    }
-    if (displayLayers.route) {
-      drawRouteGuide();
-    }
-    drawTargetHeadingIndicator();
-    for (const body of ephemeris.bodies) {
-      drawBody(body);
-    }
-    drawBodyLabels();
-    drawSizeComparisonOverlay(width, height);
+    if (displayLayers.grid) drawGrid();
+    if (displayLayers.orbits) drawOrbitGuides();
+    drawMeasurements();
+    drawBodies();
+    if (displayLayers.labels) drawLabels();
+    if (displayLayers.references) drawEdgeReferences();
   }
-
-  drawMeasurement();
-  drawShip();
-  if (ephemeris) {
-    drawViewportReferences(width, height);
-  }
-  drawMiniMap(width, height);
-  ctx.restore();
+  drawCrosshair();
+  if (!renderRequested) requestAnimationFrame(render);
 }
 
-function drawStarfield(width: number, height: number) {
-  ctx.fillStyle = "#060607";
-  ctx.fillRect(0, 0, width, height);
-
-  const gridAu = pickGridAu();
-  const left = camera.xAu - width / 2 / camera.pxPerAu;
-  const right = camera.xAu + width / 2 / camera.pxPerAu;
-  const bottom = camera.yAu - height / 2 / camera.pxPerAu;
-  const top = camera.yAu + height / 2 / camera.pxPerAu;
-  const startX = Math.floor(left / gridAu) * gridAu;
-  const startY = Math.floor(bottom / gridAu) * gridAu;
-
-  ctx.strokeStyle = "rgba(243, 240, 232, 0.055)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let x = startX; x <= right; x += gridAu) {
-    const p = worldToScreen(x, 0);
-    ctx.moveTo(p.x, 0);
-    ctx.lineTo(p.x, height);
-  }
-  for (let y = startY; y <= top; y += gridAu) {
-    const p = worldToScreen(0, y);
-    ctx.moveTo(0, p.y);
-    ctx.lineTo(width, p.y);
-  }
-  ctx.stroke();
+function requestRender() {
+  renderRequested = true;
 }
 
-function drawOrbitPaths() {
-  if (!ephemeris) return;
-  const drawableBodies = ephemeris.bodies
-    .filter((body) => body.orbit && body.orbit.semi_major_axis_km && body.orbit.eccentricity < 1)
-    .sort((a, b) => orbitDrawPriority(a) - orbitDrawPriority(b));
+function drawBackground() {
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, "#080a09");
+  gradient.addColorStop(0.48, "#10110e");
+  gradient.addColorStop(1, "#090908");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  const seed = 44;
   ctx.save();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  for (const body of drawableBodies) {
-    drawOrbitPath(body);
-  }
-  ctx.restore();
-}
-
-function orbitDrawPriority(body: Body) {
-  if (body.key === selectedTarget) return 1000;
-  if (body.key === selectedBodyKey) return 900;
-  if (body.object_type === "moon") return 300 + body.radius_km / 1000;
-  return 100 + body.radius_km / 1000;
-}
-
-function drawOrbitPath(body: Body) {
-  if (!ephemeris || !body.orbit || body.orbit.semi_major_axis_km === null) return;
-  if (body.orbit.eccentricity >= 1) return;
-
-  const parent = bodyByKey.get(body.orbit.central_body_key);
-  if (!parent) return;
-
-  const points = orbitPathPoints(body, parent);
-  if (points.length < 3) return;
-
-  const screens = points.map((point) => worldToScreen(point.xAu, point.yAu));
-  if (!orbitPathShouldDraw(screens, body)) return;
-
-  const emphasized = body.key === selectedTarget || body.key === selectedBodyKey;
-  const isMoon = body.object_type === "moon";
-  const color = safeCssColor(body.color);
-
-  if (emphasized) {
-    ctx.setLineDash([]);
-    ctx.strokeStyle = hexToRgba(color, 0.18);
-    ctx.lineWidth = isMoon ? 6 : 5;
-    drawScreenPath(screens);
-  }
-
-  ctx.setLineDash(isMoon ? [3, 6] : []);
-  ctx.strokeStyle = hexToRgba(color, emphasized ? 0.86 : isMoon ? 0.38 : 0.46);
-  ctx.lineWidth = emphasized ? 2.2 : isMoon ? 1.1 : 1.35;
-  drawScreenPath(screens);
-
-  if (emphasized) {
-    const periapsis = orbitPointAtTrueAnomaly(body, parent, 0);
-    if (periapsis) {
-      const marker = worldToScreen(periapsis.xAu, periapsis.yAu);
-      if (isScreenPointVisible(marker, 16)) {
-        ctx.setLineDash([]);
-        ctx.fillStyle = hexToRgba(color, 0.78);
-        ctx.beginPath();
-        ctx.arc(marker.x, marker.y, 2.6, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-}
-
-function orbitPathPoints(body: Body, parent: Body) {
-  const points: RoutePoint[] = [];
-  for (let index = 0; index <= ORBIT_PATH_SAMPLES; index += 1) {
-    const trueAnomalyRad = (index / ORBIT_PATH_SAMPLES) * Math.PI * 2;
-    const point = orbitPointAtTrueAnomaly(body, parent, trueAnomalyRad);
-    if (point) points.push(point);
-  }
-  return points;
-}
-
-function orbitPointAtTrueAnomaly(body: Body, parent: Body, trueAnomalyRad: number): RoutePoint | null {
-  if (!ephemeris || !body.orbit || body.orbit.semi_major_axis_km === null) return null;
-  const eccentricity = body.orbit.eccentricity;
-  if (eccentricity >= 1) return null;
-
-  const semiMajorAxisAu = body.orbit.semi_major_axis_km / ephemeris.au_km;
-  const semiLatusRectumAu = semiMajorAxisAu * (1 - eccentricity * eccentricity);
-  const radiusAu = semiLatusRectumAu / (1 + eccentricity * Math.cos(trueAnomalyRad));
-  if (!Number.isFinite(radiusAu) || radiusAu <= 0) return null;
-
-  const inclinationRad = degToRad(body.orbit.inclination_deg ?? 0);
-  const longitudeNodeRad = degToRad(body.orbit.longitude_of_ascending_node_deg ?? 0);
-  const argumentPeriapsisRad = degToRad(body.orbit.argument_of_periapsis_deg ?? 0);
-  const argumentRad = argumentPeriapsisRad + trueAnomalyRad;
-
-  const cosNode = Math.cos(longitudeNodeRad);
-  const sinNode = Math.sin(longitudeNodeRad);
-  const cosInclination = Math.cos(inclinationRad);
-  const sinInclination = Math.sin(inclinationRad);
-  const cosArgument = Math.cos(argumentRad);
-  const sinArgument = Math.sin(argumentRad);
-
-  const xAu = radiusAu * (cosNode * cosArgument - sinNode * sinArgument * cosInclination);
-  const yAu = radiusAu * (sinNode * cosArgument + cosNode * sinArgument * cosInclination);
-  const zAu = radiusAu * (sinArgument * sinInclination);
-
-  return {
-    xAu: parent.position.x_au + xAu,
-    yAu: parent.position.y_au + yAu,
-    zAu: parent.position.z_au + zAu
-  };
-}
-
-function orbitPathShouldDraw(screens: ScreenPoint[], body: Body) {
-  const emphasized = body.key === selectedTarget || body.key === selectedBodyKey;
-  const xs = screens.map((point) => point.x);
-  const ys = screens.map((point) => point.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const width = canvas.width / devicePixelRatio;
-  const height = canvas.height / devicePixelRatio;
-  const spanPx = Math.max(maxX - minX, maxY - minY);
-  if (spanPx < (emphasized ? 4 : 7)) return false;
-  if (maxX < -80 || minX > width + 80 || maxY < -80 || minY > height + 80) return false;
-  return true;
-}
-
-function drawScreenPath(screens: ScreenPoint[]) {
-  ctx.beginPath();
-  screens.forEach((screen, index) => {
-    if (index === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  });
-  ctx.stroke();
-}
-
-function drawRouteGuide() {
-  const earth = bodyByKey.get("earth");
-  const target = bodyByKey.get(selectedTarget);
-  if (!earth || !target) return;
-
-  const activePlan = activeTrajectoryCandidate();
-  const routeBodies = routeBodySequence(earth, target);
-  const routePoints = activeRoutePoints(earth, target);
-  if (routePoints.length < 2) return;
-  const routeScreens = routePoints.map((point) => worldToScreen(point.xAu, point.yAu));
-
-  ctx.save();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.setLineDash([]);
-
-  ctx.strokeStyle = "rgba(116, 196, 255, 0.12)";
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  routeScreens.forEach((screen, index) => {
-    if (index === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  });
-  ctx.stroke();
-
-  ctx.strokeStyle = activePlan?.kind === "gravity_assist" ? "rgba(217, 184, 111, 0.78)" : "rgba(116, 196, 255, 0.68)";
-  ctx.lineWidth = 2.4;
-  ctx.setLineDash(activePlan?.kind === "gravity_assist" ? [9, 7] : []);
-  ctx.beginPath();
-  routeScreens.forEach((screen, index) => {
-    if (index === 0) ctx.moveTo(screen.x, screen.y);
-    else ctx.lineTo(screen.x, screen.y);
-  });
-  ctx.stroke();
-
-  ctx.setLineDash([]);
-  const occupiedLabels = displayLayers.labels ? bodyLabelRects() : [];
-  if (activePlan) {
-    drawFutureBodyMotion(activePlan.events);
-    for (const event of activePlan.events) {
-      const screen = worldToScreen(event.x_au, event.y_au);
-      ctx.fillStyle = event.kind === "flyby" ? "rgba(217, 184, 111, 0.96)" : "rgba(116, 196, 255, 0.92)";
-      ctx.strokeStyle = "rgba(6, 6, 7, 0.86)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(screen.x, screen.y, event.kind === "flyby" ? 6 : 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      drawMapCallout(trajectoryEventLabel(event), screen, eventLabelPlacements(event.kind), occupiedLabels, {
-        color: event.kind === "flyby" ? "rgba(255, 230, 169, 0.94)" : "rgba(201, 234, 255, 0.94)"
-      });
-    }
-  } else {
-    for (const body of routeBodies) {
-      const screen = worldToScreen(body.position.x_au, body.position.y_au);
-      ctx.strokeStyle = body.key === selectedTarget ? "rgba(217, 184, 111, 0.88)" : "rgba(116, 196, 255, 0.58)";
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.arc(screen.x, screen.y, Math.max(7, labelAnchorRadius(body) + 4), 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  }
-
-  const labelPoint = routeLabelAnchor(routeScreens, activePlan?.events ?? []);
-  if (labelPoint) {
-    drawMapCallout(
-      activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : "transfer plan",
-      labelPoint,
-      routeLabelPlacements(),
-      occupiedLabels,
-      {
-        color: activePlan?.kind === "gravity_assist" ? "rgba(255, 225, 153, 0.94)" : "rgba(187, 226, 255, 0.94)",
-        background: "rgba(10, 14, 15, 0.88)",
-        border: activePlan?.kind === "gravity_assist" ? "rgba(217, 184, 111, 0.5)" : "rgba(116, 196, 255, 0.44)"
-      }
-    );
-  }
-  ctx.restore();
-}
-
-function drawFutureBodyMotion(events: TrajectoryEvent[]) {
-  ctx.save();
-  for (const event of events) {
-    if (Math.abs(event.offset_days) < 0.5) continue;
-    const currentBody = bodyByKey.get(event.body_key);
-    if (!currentBody) continue;
-
-    const currentScreen = worldToScreen(currentBody.position.x_au, currentBody.position.y_au);
-    const eventScreen = worldToScreen(event.x_au, event.y_au);
-    if (!isScreenPointVisible(currentScreen, 140) && !isScreenPointVisible(eventScreen, 140)) continue;
-
-    ctx.setLineDash([2, 8]);
-    ctx.strokeStyle = event.kind === "flyby" ? "rgba(217, 184, 111, 0.24)" : "rgba(116, 196, 255, 0.18)";
-    ctx.lineWidth = 1.2;
+  for (let index = 0; index < 180; index += 1) {
+    const x = pseudoRandom(seed + index * 11) * canvas.width;
+    const y = pseudoRandom(seed + index * 17) * canvas.height;
+    const alpha = 0.12 + pseudoRandom(seed + index * 23) * 0.44;
+    const size = 0.5 + pseudoRandom(seed + index * 29) * 1.2;
+    ctx.fillStyle = `rgba(238, 233, 211, ${alpha})`;
     ctx.beginPath();
-    ctx.moveTo(currentScreen.x, currentScreen.y);
-    ctx.lineTo(eventScreen.x, eventScreen.y);
-    ctx.stroke();
-
-    ctx.setLineDash([]);
-    ctx.strokeStyle = event.kind === "flyby" ? "rgba(217, 184, 111, 0.46)" : "rgba(116, 196, 255, 0.34)";
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(eventScreen.x, eventScreen.y, event.kind === "flyby" ? 13 : 10, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function trajectoryEventLabel(event: TrajectoryEvent) {
-  if (event.kind === "departure") return `${event.body_name} departure ${offsetLabel(event.offset_days)}`;
-  if (event.kind === "flyby") return `${event.body_name} at flyby ${offsetLabel(event.offset_days)}`;
-  return `${event.body_name} at arrival ${offsetLabel(event.offset_days)}`;
-}
-
-function eventLabelPlacements(kind: TrajectoryEvent["kind"]): LabelPlacement[] {
-  if (kind === "flyby") {
-    return [
-      { dx: 16, dy: -42 },
-      { dx: 16, dy: 20 },
-      { dx: -18, dy: -42, align: "right" },
-      { dx: -18, dy: 20, align: "right" },
-      { dx: 0, dy: -58, align: "center" }
-    ];
-  }
-  return [
-    { dx: 14, dy: -34 },
-    { dx: 14, dy: 18 },
-    { dx: -16, dy: -34, align: "right" },
-    { dx: -16, dy: 18, align: "right" },
-    { dx: 0, dy: -52, align: "center" }
-  ];
-}
-
-function routeLabelPlacements(): LabelPlacement[] {
-  return [
-    { dx: 18, dy: -34 },
-    { dx: 18, dy: 18 },
-    { dx: -18, dy: -34, align: "right" },
-    { dx: -18, dy: 18, align: "right" },
-    { dx: 0, dy: -52, align: "center" }
-  ];
-}
-
-function routeLabelAnchor(routeScreens: ScreenPoint[], events: TrajectoryEvent[]) {
-  const eventScreens = events.map((event) => worldToScreen(event.x_au, event.y_au));
-  const candidates = [0.5, 0.62, 0.38, 0.74, 0.26, 0.86, 0.14]
-    .map((fraction) => routeScreens[Math.max(0, Math.min(routeScreens.length - 1, Math.floor(routeScreens.length * fraction)))])
-    .filter((point): point is ScreenPoint => Boolean(point));
-  return (
-    candidates.find((point) => {
-      if (!isScreenPointVisible(point, 80)) return false;
-      return eventScreens.every((eventPoint) => Math.hypot(point.x - eventPoint.x, point.y - eventPoint.y) > 96);
-    }) ??
-    candidates.find((point) => isScreenPointVisible(point, 80)) ??
-    candidates[0] ??
-    null
-  );
-}
-
-function drawMapCallout(
-  text: string,
-  anchor: ScreenPoint,
-  placements: LabelPlacement[],
-  occupied: LabelRect[],
-  options: { color?: string; background?: string; border?: string } = {}
-) {
-  ctx.save();
-  ctx.font = "700 11px ui-sans-serif, system-ui";
-  ctx.textBaseline = "middle";
-
-  const paddingX = 7;
-  const paddingY = 4;
-  const width = Math.ceil(ctx.measureText(text).width + paddingX * 2);
-  const height = 20 + paddingY;
-  const viewportWidth = canvas.width / devicePixelRatio;
-  const viewportHeight = canvas.height / devicePixelRatio;
-  const placement = placements
-    .map((candidate) => labelRectForPlacement(anchor, candidate, width, height, viewportWidth, viewportHeight))
-    .find((rect) => occupied.every((existing) => !rectsOverlap(rect, existing, 12))) ??
-    labelRectForPlacement(anchor, placements[0] ?? { dx: 12, dy: -28 }, width, height, viewportWidth, viewportHeight);
-
-  if (Math.hypot(anchor.x - (placement.x + placement.width / 2), anchor.y - (placement.y + placement.height / 2)) > 24) {
-    ctx.strokeStyle = options.border ?? "rgba(244, 241, 232, 0.2)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(anchor.x, anchor.y);
-    ctx.lineTo(placement.x + placement.width / 2, placement.y + placement.height / 2);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = options.background ?? "rgba(6, 8, 9, 0.88)";
-  ctx.strokeStyle = options.border ?? "rgba(244, 241, 232, 0.22)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(placement.x, placement.y, placement.width, placement.height, 5);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = options.color ?? "rgba(244, 241, 232, 0.9)";
-  ctx.fillText(text, placement.x + paddingX, placement.y + placement.height / 2);
-  ctx.restore();
-
-  occupied.push(placement);
-}
-
-function labelRectForPlacement(
-  anchor: ScreenPoint,
-  placement: LabelPlacement,
-  width: number,
-  height: number,
-  viewportWidth: number,
-  viewportHeight: number
-): LabelRect {
-  let x = anchor.x + placement.dx;
-  if (placement.align === "center") x -= width / 2;
-  if (placement.align === "right") x -= width;
-  return {
-    x: clamp(x, 8, Math.max(8, viewportWidth - width - 8)),
-    y: clamp(anchor.y + placement.dy, 8, Math.max(8, viewportHeight - height - 8)),
-    width,
-    height
-  };
-}
-
-function bodyLabelRects() {
-  return bodyLabelLayouts().map((layout) => layout.rect);
-}
-
-function bodyLabelLayouts(): BodyLabelLayout[] {
-  if (!ephemeris) return [];
-  const bodies = ephemeris.bodies;
-  const occupied: LabelRect[] = [];
-  const layouts: BodyLabelLayout[] = [];
-  ctx.save();
-  for (const body of [...bodies].sort((a, b) => bodyLabelPriority(b) - bodyLabelPriority(a))) {
-    const screen = worldToScreen(body.position.x_au, body.position.y_au);
-    if (!isScreenPointVisible(screen, 80)) continue;
-    if (!shouldDrawBodyLabel(body, screen)) continue;
-
-    const radius = labelAnchorRadius(body);
-    const label = bodyDisplayLabel(body);
-    const isEmphasized = body.key === selectedTarget || body.key === selectedBodyKey;
-    const font = isEmphasized ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
-    ctx.font = font;
-    const width = Math.ceil(ctx.measureText(label).width + 10);
-    const height = isEmphasized ? 19 : 18;
-    const rect = bodyLabelPlacements(radius, body)
-      .map((placement) => labelRectForPlacement(screen, placement, width, height, canvas.width / devicePixelRatio, canvas.height / devicePixelRatio))
-      .find((candidate) => occupied.every((existing) => !rectsOverlap(candidate, existing, 14)));
-    if (!rect) continue;
-
-    occupied.push(rect);
-    layouts.push({
-      body,
-      text: label,
-      rect,
-      font,
-      color: body.key === "sun" ? "#ffe8a3" : "#f3f0e8"
-    });
-  }
-  ctx.restore();
-  return layouts.sort((a, b) => bodies.indexOf(a.body) - bodies.indexOf(b.body));
-}
-
-function bodyLabelPriority(body: Body) {
-  if (body.key === selectedTarget) return 1000;
-  if (body.key === selectedBodyKey) return 900;
-  if (body.key === "sun") return 800;
-  if (body.radius_km > 1000) return 600 + Math.min(body.radius_km, 100_000) / 1000;
-  return 100 + body.radius_km;
-}
-
-function shouldDrawBodyLabel(body: Body, screen: ScreenPoint) {
-  if (body.key === selectedTarget || body.key === selectedBodyKey) return true;
-  if (bodyHasFutureEvent(body) && hasNearbyLargerBody(body, screen, 96)) return false;
-
-  const parentKey = body.parent_key ?? COMPACT_SATELLITE_PARENT_KEYS[body.key];
-  if (!parentKey) return true;
-
-  const parent = bodyByKey.get(parentKey);
-  if (!parent) return true;
-
-  const parentScreen = worldToScreen(parent.position.x_au, parent.position.y_au);
-  if (Math.hypot(screen.x - parentScreen.x, screen.y - parentScreen.y) <= 34) return false;
-
-  return true;
-}
-
-function hasNearbyLargerBody(body: Body, screen: ScreenPoint, minDistancePx: number) {
-  for (const other of bodyByKey.values()) {
-    if (other.key === body.key || other.radius_km < body.radius_km) continue;
-    const otherScreen = worldToScreen(other.position.x_au, other.position.y_au);
-    if (Math.hypot(screen.x - otherScreen.x, screen.y - otherScreen.y) < minDistancePx) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function bodyLabelPlacements(radius: number, body?: Body): LabelPlacement[] {
-  const placements: LabelPlacement[] = [
-    { dx: radius + 12, dy: -10 },
-    { dx: radius + 12, dy: 14 },
-    { dx: -radius - 12, dy: -10, align: "right" },
-    { dx: -radius - 12, dy: 14, align: "right" },
-    { dx: 0, dy: -radius - 31, align: "center" },
-    { dx: 0, dy: radius + 14, align: "center" }
-  ];
-  if (body && bodyHasFutureEvent(body)) {
-    return [placements[4], placements[5], placements[2], placements[3], placements[0], placements[1]];
-  }
-  return placements;
-}
-
-function drawBodyLabels() {
-  if (!displayLayers.labels) return;
-  const layouts = bodyLabelLayouts();
-  ctx.save();
-  ctx.textBaseline = "middle";
-  for (const layout of layouts) {
-    ctx.font = layout.font;
-    ctx.fillStyle = layout.color;
-    ctx.fillText(layout.text, layout.rect.x + 5, layout.rect.y + layout.rect.height / 2);
-  }
-  ctx.restore();
-}
-
-function drawSizeComparisonOverlay(width: number, height: number) {
-  const body = bodyByKey.get(selectedBodyKey);
-  if (!body || body.radius_km <= 0) return;
-
-  const compareBody = sizePairComparisonBody(body);
-  if (!compareBody || compareBody.radius_km <= 0) return;
-
-  const selectedScreen = worldToScreen(body.position.x_au, body.position.y_au);
-  const viewport = mapViewportRect();
-  if (
-    selectedScreen.x < viewport.left - 100 ||
-    selectedScreen.x > viewport.right + 100 ||
-    selectedScreen.y < viewport.top - 100 ||
-    selectedScreen.y > viewport.bottom + 100
-  ) {
-    return;
-  }
-
-  const maxDiameterKm = Math.max(body.radius_km * 2, compareBody.radius_km * 2, 1);
-  const maxDiameterPx = clamp(Math.min(viewport.right - viewport.left, viewport.bottom - viewport.top, width, height) * 0.2, 72, 132);
-  const kmPerPx = maxDiameterKm / maxDiameterPx;
-  const selectedMajorRadius = body.radius_km / kmPerPx;
-  const compareMajorRadius = compareBody.radius_km / kmPerPx;
-  const selectedLayoutRadius = Math.max(8, selectedMajorRadius);
-  const compareLayoutRadius = Math.max(8, compareMajorRadius);
-  const gap = 42;
-  const spaceRight = viewport.right - selectedScreen.x - selectedLayoutRadius;
-  const spaceLeft = selectedScreen.x - viewport.left - selectedLayoutRadius;
-  const placeRight = spaceRight >= spaceLeft;
-  const compareX = clamp(
-    selectedScreen.x + (placeRight ? 1 : -1) * (selectedLayoutRadius + gap + compareLayoutRadius),
-    viewport.left + compareLayoutRadius + 16,
-    viewport.right - compareLayoutRadius - 16
-  );
-  const compareY = clamp(selectedScreen.y, viewport.top + compareLayoutRadius + 46, viewport.bottom - compareLayoutRadius - 46);
-
-  ctx.save();
-  ctx.lineCap = "round";
-  ctx.setLineDash([4, 6]);
-  ctx.strokeStyle = "rgba(217, 184, 111, 0.54)";
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(selectedScreen.x, selectedScreen.y);
-  ctx.lineTo(compareX, compareY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  drawSizeComparisonDisk(body, selectedScreen, selectedMajorRadius, "selected", viewport);
-  drawSizeComparisonDisk(compareBody, { x: compareX, y: compareY }, compareMajorRadius, "compare", viewport);
-  ctx.restore();
-}
-
-function drawSizeComparisonDisk(body: Body, center: ScreenPoint, majorRadius: number, role: string, viewport: MapViewportRect) {
-  const color = safeCssColor(body.color);
-  const minorRadius = majorRadius * objectMinorMajorRatio(body);
-  const locatorOnly = majorRadius < 3 || minorRadius < 3;
-  const drawMajorRadius = locatorOnly ? 8 : majorRadius;
-  const drawMinorRadius = locatorOnly ? 8 : minorRadius;
-
-  ctx.save();
-  if (body.deep_sky) {
-    drawDeepSkyComparisonShape(body, center, drawMajorRadius, drawMinorRadius, color, locatorOnly);
-  } else {
-    drawSolarSystemComparisonShape(body, center, drawMajorRadius, color, locatorOnly);
-  }
-
-  if (locatorOnly) {
-    ctx.setLineDash([2, 4]);
-    ctx.strokeStyle = hexToRgba(color, 0.72);
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(center.x, center.y, 8, 8, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  drawSizeComparisonCaption(body, center, Math.max(drawMajorRadius, drawMinorRadius), role, viewport);
-  ctx.restore();
-}
-
-function drawDeepSkyComparisonShape(body: Body, center: ScreenPoint, majorRadius: number, minorRadius: number, color: string, locatorOnly: boolean) {
-  const rotation = body.deep_sky?.deep_sky_type === "galaxy" ? -0.34 : 0;
-  ctx.fillStyle = locatorOnly ? hexToRgba(color, 0.72) : hexToRgba(color, 0.24);
-  ctx.strokeStyle = hexToRgba(color, locatorOnly ? 0.9 : 0.72);
-  ctx.lineWidth = locatorOnly ? 1.2 : 1.6;
-  ctx.beginPath();
-  ctx.ellipse(center.x, center.y, majorRadius, Math.max(minorRadius, 0.8), rotation, 0, Math.PI * 2);
-  if (!locatorOnly) ctx.fill();
-  ctx.stroke();
-
-  if (!locatorOnly && body.deep_sky?.deep_sky_type === "galaxy") {
-    ctx.strokeStyle = "rgba(255, 240, 199, 0.36)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.ellipse(center.x, center.y, majorRadius * 0.62, Math.max(minorRadius * 0.24, 0.5), rotation, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-}
-
-function drawSolarSystemComparisonShape(body: Body, center: ScreenPoint, radius: number, color: string, locatorOnly: boolean) {
-  if (body.key === "saturn" && !locatorOnly) {
-    ctx.strokeStyle = "rgba(216, 194, 138, 0.74)";
-    ctx.lineWidth = Math.max(0.75, Math.min(1.8, radius * 0.08));
-    ctx.beginPath();
-    ctx.ellipse(center.x, center.y, radius * 1.65, radius * 0.55, -0.35, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = locatorOnly ? hexToRgba(color, 0.82) : hexToRgba(color, 0.58);
-  ctx.strokeStyle = "rgba(244, 241, 232, 0.72)";
-  ctx.lineWidth = locatorOnly ? 1 : Math.max(0.75, Math.min(1.4, radius * 0.08));
-  ctx.beginPath();
-  ctx.arc(center.x, center.y, locatorOnly ? 1.8 : radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-}
-
-function drawSizeComparisonCaption(body: Body, center: ScreenPoint, radius: number, role: string, viewport: MapViewportRect) {
-  const title = body.name;
-  const detail = `${role} · ${formatDistance(body.radius_km * 2)} wide`;
-  ctx.save();
-  ctx.font = "720 11px ui-sans-serif, system-ui";
-  const titleWidth = ctx.measureText(title).width;
-  ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
-  const detailWidth = ctx.measureText(detail).width;
-  const width = Math.ceil(Math.max(titleWidth, detailWidth) + 14);
-  const height = 34;
-  const x = clamp(center.x - width / 2, viewport.left + 8, viewport.right - width - 8);
-  const y = clamp(center.y + radius + 9, viewport.top + 8, viewport.bottom - height - 8);
-
-  ctx.fillStyle = "rgba(7, 10, 11, 0.9)";
-  ctx.strokeStyle = "rgba(244, 241, 232, 0.18)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(x, y, width, height, 6);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.textBaseline = "top";
-  ctx.font = "720 11px ui-sans-serif, system-ui";
-  ctx.fillStyle = "#f3f0e8";
-  ctx.fillText(title, x + 7, y + 5);
-  ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
-  ctx.fillStyle = "rgba(217, 184, 111, 0.88)";
-  ctx.fillText(detail, x + 7, y + 19);
-  ctx.restore();
-}
-
-function bodyDisplayLabel(body: Body) {
-  return bodyHasFutureEvent(body) ? `${body.name} now` : body.name;
-}
-
-function bodyHasFutureEvent(body: Body) {
-  const candidate = activeTrajectoryCandidate();
-  return Boolean(candidate?.events.some((event) => event.body_key === body.key && Math.abs(event.offset_days) >= 0.5));
-}
-
-function rectsOverlap(a: LabelRect, b: LabelRect, padding = 0) {
-  return !(
-    a.x + a.width + padding < b.x ||
-    b.x + b.width + padding < a.x ||
-    a.y + a.height + padding < b.y ||
-    b.y + b.height + padding < a.y
-  );
-}
-
-function isScreenPointVisible(point: ScreenPoint, margin = 0) {
-  const width = canvas.width / devicePixelRatio;
-  const height = canvas.height / devicePixelRatio;
-  return point.x >= -margin && point.x <= width + margin && point.y >= -margin && point.y <= height + margin;
-}
-
-function drawBodyTrails() {
-  if (!bodyTrails.length) return;
-  ctx.save();
-  for (const trail of bodyTrails) {
-    if (trail.points.length < 2) continue;
-    const isTarget = trail.key === selectedTarget;
-    ctx.strokeStyle = isTarget ? "rgba(217, 184, 111, 0.42)" : "rgba(244, 241, 232, 0.13)";
-    ctx.lineWidth = isTarget ? 1.8 : 1;
-    ctx.setLineDash(isTarget ? [6, 5] : [2, 7]);
-    ctx.beginPath();
-    trail.points.forEach((point, index) => {
-      const screen = worldToScreen(point.x_au, point.y_au);
-      if (index === 0) ctx.moveTo(screen.x, screen.y);
-      else ctx.lineTo(screen.x, screen.y);
-    });
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawViewportReferences(width: number, height: number) {
-  const references = viewportReferences(width, height);
-  if (!references.length) return;
-
-  const obstructions = canvasOverlayRects(width, height);
-  ctx.save();
-  for (const reference of references) {
-    const rect = viewportReferenceRect(reference, width, height, obstructions);
-    drawViewportReferenceLead(reference, rect);
-    drawViewportReferenceCard(reference, rect);
-  }
-  ctx.restore();
-}
-
-function viewportReferences(width: number, height: number) {
-  if (!ephemeris) return [];
-
-  const closestBySide = new Map<ViewportReferenceSide, ViewportReference>();
-  const center = { x: width / 2, y: height / 2 };
-
-  for (const body of ephemeris.bodies) {
-    if (!Number.isFinite(body.position.x_au) || !Number.isFinite(body.position.y_au)) continue;
-    const screen = worldToScreen(body.position.x_au, body.position.y_au);
-    if (isPointInViewport(screen, width, height, 40)) continue;
-
-    const dx = screen.x - center.x;
-    const dy = screen.y - center.y;
-    if (Math.hypot(dx, dy) < 1) continue;
-
-    const side = viewportReferenceSide(dx, dy, width, height);
-    const distanceKm = bodyDistanceFromCameraCenterKm(body);
-    const existing = closestBySide.get(side);
-    if (existing && existing.distanceKm <= distanceKm) continue;
-
-    closestBySide.set(side, {
-      side,
-      body,
-      distanceKm,
-      screen,
-      anchor: viewportEdgeIntersection(side, dx, dy, width, height)
-    });
-  }
-
-  return VIEWPORT_REFERENCE_SIDES.map((side) => closestBySide.get(side)).filter((reference): reference is ViewportReference =>
-    Boolean(reference)
-  );
-}
-
-function viewportReferenceSide(dx: number, dy: number, width: number, height: number): ViewportReferenceSide {
-  const tx = dx === 0 ? Number.POSITIVE_INFINITY : Math.abs((width / 2) / dx);
-  const ty = dy === 0 ? Number.POSITIVE_INFINITY : Math.abs((height / 2) / dy);
-  if (tx < ty) return dx < 0 ? "left" : "right";
-  return dy < 0 ? "top" : "bottom";
-}
-
-function viewportEdgeIntersection(side: ViewportReferenceSide, dx: number, dy: number, width: number, height: number): ScreenPoint {
-  const center = { x: width / 2, y: height / 2 };
-  if (side === "left" || side === "right") {
-    const x = side === "left" ? 0 : width;
-    const t = dx === 0 ? 0 : (x - center.x) / dx;
-    return { x, y: clamp(center.y + dy * t, 0, height) };
-  }
-
-  const y = side === "top" ? 0 : height;
-  const t = dy === 0 ? 0 : (y - center.y) / dy;
-  return { x: clamp(center.x + dx * t, 0, width), y };
-}
-
-function isPointInViewport(point: ScreenPoint, width: number, height: number, margin = 0) {
-  return point.x >= -margin && point.x <= width + margin && point.y >= -margin && point.y <= height + margin;
-}
-
-function bodyDistanceFromCameraCenterKm(body: Body) {
-  const auKm = ephemeris?.au_km ?? AU_KM_FALLBACK;
-  return Math.hypot(body.position.x_au - camera.xAu, body.position.y_au - camera.yAu, body.position.z_au) * auKm;
-}
-
-function viewportReferenceRect(reference: ViewportReference, width: number, height: number, obstructions: LabelRect[]): LabelRect {
-  const cardWidth = Math.min(VIEWPORT_REFERENCE_CARD_WIDTH, Math.max(144, width - VIEWPORT_REFERENCE_MARGIN * 2));
-  const cardHeight = VIEWPORT_REFERENCE_CARD_HEIGHT;
-  let rect: LabelRect;
-
-  if (reference.side === "left") {
-    rect = {
-      x: VIEWPORT_REFERENCE_MARGIN,
-      y: reference.anchor.y - cardHeight / 2,
-      width: cardWidth,
-      height: cardHeight
-    };
-  } else if (reference.side === "right") {
-    rect = {
-      x: width - cardWidth - VIEWPORT_REFERENCE_MARGIN,
-      y: reference.anchor.y - cardHeight / 2,
-      width: cardWidth,
-      height: cardHeight
-    };
-  } else if (reference.side === "top") {
-    rect = {
-      x: reference.anchor.x - cardWidth / 2,
-      y: VIEWPORT_REFERENCE_MARGIN,
-      width: cardWidth,
-      height: cardHeight
-    };
-  } else {
-    rect = {
-      x: reference.anchor.x - cardWidth / 2,
-      y: height - cardHeight - VIEWPORT_REFERENCE_MARGIN,
-      width: cardWidth,
-      height: cardHeight
-    };
-  }
-
-  return avoidReferenceObstructions(clampReferenceRect(rect, width, height), reference.side, obstructions, width, height);
-}
-
-function avoidReferenceObstructions(
-  rect: LabelRect,
-  side: ViewportReferenceSide,
-  obstructions: LabelRect[],
-  width: number,
-  height: number
-) {
-  let next = rect;
-  for (let index = 0; index < obstructions.length * 2; index += 1) {
-    const obstruction = obstructions.find((candidate) => rectsOverlap(next, candidate, 8));
-    if (!obstruction) break;
-
-    if (side === "left") {
-      const belowY = obstruction.y + obstruction.height + 10;
-      const aboveY = obstruction.y - next.height - 10;
-      next =
-        obstruction.x <= next.x
-          ? { ...next, x: obstruction.x + obstruction.width + 10 }
-          : belowY <= height - next.height - VIEWPORT_REFERENCE_MARGIN
-            ? { ...next, y: belowY }
-            : { ...next, y: aboveY };
-    } else if (side === "right") {
-      const belowY = obstruction.y + obstruction.height + 10;
-      const aboveY = obstruction.y - next.height - 10;
-      next =
-        obstruction.x + obstruction.width >= next.x + next.width
-          ? { ...next, x: obstruction.x - next.width - 10 }
-          : belowY <= height - next.height - VIEWPORT_REFERENCE_MARGIN
-            ? { ...next, y: belowY }
-            : { ...next, y: aboveY };
-    } else if (side === "top") {
-      const leftX = obstruction.x - next.width - 10;
-      const rightX = obstruction.x + obstruction.width + 10;
-      next =
-        obstruction.x + obstruction.width / 2 > width / 2 && leftX >= VIEWPORT_REFERENCE_MARGIN
-          ? { ...next, x: leftX }
-          : rightX <= width - next.width - VIEWPORT_REFERENCE_MARGIN
-            ? { ...next, x: rightX }
-            : { ...next, y: obstruction.y + obstruction.height + 10 };
-    } else {
-      const leftX = obstruction.x - next.width - 10;
-      const rightX = obstruction.x + obstruction.width + 10;
-      const aboveY = obstruction.y - next.height - 10;
-      next =
-        aboveY >= VIEWPORT_REFERENCE_MARGIN
-          ? { ...next, y: aboveY }
-          : obstruction.x + obstruction.width / 2 > width / 2 && leftX >= VIEWPORT_REFERENCE_MARGIN
-          ? { ...next, x: leftX }
-          : rightX <= width - next.width - VIEWPORT_REFERENCE_MARGIN
-            ? { ...next, x: rightX }
-            : { ...next, y: aboveY };
-    }
-    next = clampReferenceRect(next, width, height);
-  }
-  return next;
-}
-
-function clampReferenceRect(rect: LabelRect, width: number, height: number): LabelRect {
-  return {
-    ...rect,
-    x: clamp(rect.x, VIEWPORT_REFERENCE_MARGIN, Math.max(VIEWPORT_REFERENCE_MARGIN, width - rect.width - VIEWPORT_REFERENCE_MARGIN)),
-    y: clamp(rect.y, VIEWPORT_REFERENCE_MARGIN, Math.max(VIEWPORT_REFERENCE_MARGIN, height - rect.height - VIEWPORT_REFERENCE_MARGIN))
-  };
-}
-
-function canvasOverlayRects(width: number, height: number): LabelRect[] {
-  const canvasRect = canvas.getBoundingClientRect();
-  const selectors = [".hud", ".map-tools", ".onboarding-panel", ".mission-panel", ".journey-panel", ".flight-deck", ".measure-panel", ".body-popover"];
-  return selectors
-    .flatMap((selector) => Array.from(document.querySelectorAll<HTMLElement>(selector)))
-    .filter((element) => {
-      const style = window.getComputedStyle(element);
-      return !element.hidden && style.display !== "none" && style.visibility !== "hidden";
-    })
-    .map((element) => element.getBoundingClientRect())
-    .map((rect) => ({
-      x: rect.left - canvasRect.left,
-      y: rect.top - canvasRect.top,
-      width: rect.width,
-      height: rect.height
-    }))
-    .filter((rect) => rect.x < width && rect.y < height && rect.x + rect.width > 0 && rect.y + rect.height > 0);
-}
-
-function drawViewportReferenceLead(reference: ViewportReference, rect: LabelRect) {
-  const attach = viewportReferenceAttachPoint(reference.side, rect);
-  ctx.save();
-  ctx.strokeStyle = "rgba(217, 184, 111, 0.34)";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([3, 5]);
-  ctx.beginPath();
-  ctx.moveTo(attach.x, attach.y);
-  ctx.lineTo(reference.anchor.x, reference.anchor.y);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function viewportReferenceAttachPoint(side: ViewportReferenceSide, rect: LabelRect): ScreenPoint {
-  if (side === "left") return { x: rect.x, y: rect.y + rect.height / 2 };
-  if (side === "right") return { x: rect.x + rect.width, y: rect.y + rect.height / 2 };
-  if (side === "top") return { x: rect.x + rect.width / 2, y: rect.y };
-  return { x: rect.x + rect.width / 2, y: rect.y + rect.height };
-}
-
-function drawViewportReferenceCard(reference: ViewportReference, rect: LabelRect) {
-  const iconSize = 34;
-  const iconX = rect.x + 13 + iconSize / 2;
-  const iconY = rect.y + rect.height / 2;
-  const textX = rect.x + 58;
-  const textWidth = rect.width - 70;
-
-  ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.32)";
-  ctx.shadowBlur = 18;
-  ctx.shadowOffsetY = 8;
-  ctx.fillStyle = "rgba(11, 15, 16, 0.88)";
-  ctx.strokeStyle = "rgba(217, 184, 111, 0.34)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(rect.x, rect.y, rect.width, rect.height, 8);
-  ctx.fill();
-  ctx.shadowColor = "transparent";
-  ctx.stroke();
-
-  drawReferenceBodyImage(reference.body, iconX, iconY, iconSize);
-
-  ctx.textBaseline = "middle";
-  ctx.font = "700 12px Inter, system-ui, sans-serif";
-  ctx.fillStyle = "#f5efe3";
-  ctx.fillText(truncateCanvasText(reference.body.name, textWidth), textX, rect.y + 20);
-  ctx.font = "600 10px Inter, system-ui, sans-serif";
-  ctx.fillStyle = "rgba(217, 184, 111, 0.94)";
-  ctx.fillText(truncateCanvasText(compactDistance(reference.distanceKm), textWidth), textX, rect.y + 38);
-  ctx.restore();
-}
-
-function drawReferenceBodyImage(body: Body, x: number, y: number, size: number) {
-  const radius = size / 2;
-  ctx.save();
-  if (body.object_type === "galaxy") {
-    const glow = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius * 1.1);
-    glow.addColorStop(0, "rgba(255, 244, 212, 0.95)");
-    glow.addColorStop(0.42, hexToRgba(body.color, 0.72));
-    glow.addColorStop(1, "rgba(217, 184, 111, 0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.ellipse(x, y, radius * 1.24, radius * 0.48, -0.42, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = hexToRgba(body.color, 0.8);
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.ellipse(x, y, radius * 0.94, radius * 0.34, -0.42, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = "#fff0bc";
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 0.18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    return;
-  }
-
-  if (body.object_type === "nebula") {
-    const glow = ctx.createRadialGradient(x, y, radius * 0.1, x, y, radius * 1.15);
-    glow.addColorStop(0, "rgba(255, 255, 255, 0.82)");
-    glow.addColorStop(0.42, hexToRgba(body.color, 0.68));
-    glow.addColorStop(1, "rgba(215, 155, 220, 0)");
-    ctx.fillStyle = glow;
-    for (const blob of [
-      { dx: -0.18, dy: 0.02, rx: 0.82, ry: 0.52, rot: -0.4 },
-      { dx: 0.26, dy: -0.1, rx: 0.54, ry: 0.36, rot: 0.45 }
-    ]) {
-      ctx.beginPath();
-      ctx.ellipse(x + radius * blob.dx, y + radius * blob.dy, radius * blob.rx, radius * blob.ry, blob.rot, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.fillStyle = "#fff4c7";
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 0.1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    return;
-  }
-
-  if (body.object_type === "star_cluster" || body.object_type === "asterism" || body.object_type === "milky_way_patch") {
-    ctx.strokeStyle = hexToRgba(body.color, 0.5);
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 0.82, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = "#fff3cf";
-    const points = [
-      [0, 0, 0.12],
-      [-0.34, -0.2, 0.09],
-      [0.32, -0.25, 0.08],
-      [-0.12, 0.35, 0.07],
-      [0.4, 0.24, 0.06],
-      [-0.42, 0.26, 0.06]
-    ];
-    for (const [dx, dy, r] of points) {
-      ctx.beginPath();
-      ctx.arc(x + radius * dx, y + radius * dy, radius * r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-    return;
-  }
-
-  if (body.object_type === "star") {
-    const glow = ctx.createRadialGradient(x, y, radius * 0.15, x, y, radius * 1.35);
-    glow.addColorStop(0, body.color);
-    glow.addColorStop(0.54, `${body.color}88`);
-    glow.addColorStop(1, "rgba(255, 209, 102, 0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 1.35, 0, Math.PI * 2);
+    ctx.arc(x, y, size, 0, Math.PI * 2);
     ctx.fill();
   }
-
-  if (body.key === "saturn") {
-    ctx.strokeStyle = "rgba(234, 214, 154, 0.72)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(x, y, radius * 1.25, radius * 0.42, -0.25, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = body.color;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.42)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(x, y, radius * 0.72, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  if (body.key === "earth") {
-    ctx.fillStyle = "rgba(91, 181, 121, 0.82)";
-    ctx.beginPath();
-    ctx.ellipse(x - radius * 0.18, y - radius * 0.14, radius * 0.22, radius * 0.34, -0.8, 0, Math.PI * 2);
-    ctx.ellipse(x + radius * 0.2, y + radius * 0.18, radius * 0.26, radius * 0.18, 0.4, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (body.key === "jupiter" || body.key === "saturn") {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 0.7, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.strokeStyle = "rgba(255, 246, 214, 0.35)";
-    ctx.lineWidth = 2;
-    for (let offset = -radius * 0.32; offset <= radius * 0.36; offset += radius * 0.24) {
-      ctx.beginPath();
-      ctx.moveTo(x - radius, y + offset);
-      ctx.lineTo(x + radius, y + offset + radius * 0.06);
-      ctx.stroke();
-    }
-    ctx.restore();
-  } else if (body.object_type === "moon") {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
-    for (const crater of [
-      { dx: -0.22, dy: -0.12, r: 0.08 },
-      { dx: 0.2, dy: 0.1, r: 0.11 },
-      { dx: -0.02, dy: 0.28, r: 0.06 }
-    ]) {
-      ctx.beginPath();
-      ctx.arc(x + radius * crater.dx, y + radius * crater.dy, radius * crater.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
   ctx.restore();
 }
 
-function truncateCanvasText(text: string, maxWidth: number) {
-  if (ctx.measureText(text).width <= maxWidth) return text;
-  let low = 0;
-  let high = text.length;
-  while (low < high) {
-    const mid = Math.ceil((low + high) / 2);
-    if (ctx.measureText(`${text.slice(0, mid)}...`).width <= maxWidth) low = mid;
-    else high = mid - 1;
+function drawGrid() {
+  const rect = usableViewportRect();
+  const worldLeft = screenToWorld(rect.left, rect.top).xAu;
+  const worldRight = screenToWorld(rect.right, rect.top).xAu;
+  const worldTop = screenToWorld(rect.left, rect.top).yAu;
+  const worldBottom = screenToWorld(rect.left, rect.bottom).yAu;
+  const step = niceStep(Math.abs(worldRight - worldLeft) / 8);
+  const startX = Math.floor(worldLeft / step) * step;
+  const endX = Math.ceil(worldRight / step) * step;
+  const startY = Math.floor(worldBottom / step) * step;
+  const endY = Math.ceil(worldTop / step) * step;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(235, 228, 206, 0.09)";
+  ctx.lineWidth = 1;
+  for (let x = startX; x <= endX; x += step) {
+    const screen = worldToScreen(x, 0);
+    ctx.beginPath();
+    ctx.moveTo(screen.x, rect.top);
+    ctx.lineTo(screen.x, rect.bottom);
+    ctx.stroke();
   }
-  return `${text.slice(0, Math.max(1, low))}...`;
+  for (let y = startY; y <= endY; y += step) {
+    const screen = worldToScreen(0, y);
+    ctx.beginPath();
+    ctx.moveTo(rect.left, screen.y);
+    ctx.lineTo(rect.right, screen.y);
+    ctx.stroke();
+  }
+  drawScaleBar(rect, step);
+  ctx.restore();
 }
 
-function drawMeasurement() {
+function drawScaleBar(rect: Rect, stepAu: number) {
+  const lengthPx = Math.min(180, Math.max(64, stepAu * camera.pxPerAu));
+  const lengthAu = lengthPx / camera.pxPerAu;
+  const x = rect.left + 24;
+  const y = rect.bottom - 34;
+  ctx.strokeStyle = "rgba(239, 233, 213, 0.72)";
+  ctx.fillStyle = "rgba(239, 233, 213, 0.82)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x + lengthPx, y);
+  ctx.moveTo(x, y - 5);
+  ctx.lineTo(x, y + 5);
+  ctx.moveTo(x + lengthPx, y - 5);
+  ctx.lineTo(x + lengthPx, y + 5);
+  ctx.stroke();
+  ctx.font = "12px Inter, system-ui, sans-serif";
+  ctx.fillText(formatDistance(lengthAu * auKm()), x, y - 10);
+}
+
+function drawOrbitGuides() {
+  const bodies = visibleBodies().filter((body) => body.orbit && body.parent_key);
+  ctx.save();
+  ctx.strokeStyle = "rgba(136, 189, 166, 0.22)";
+  ctx.lineWidth = 1;
+  for (const body of bodies) {
+    const parent = bodyByKey.get(body.parent_key ?? "");
+    const semiMajorKm = body.orbit?.semi_major_axis_km;
+    if (!parent || !semiMajorKm || semiMajorKm <= 0) continue;
+    const parentScreen = worldToScreen(parent.position.x_au, parent.position.y_au);
+    const radiusPx = (semiMajorKm / auKm()) * camera.pxPerAu;
+    if (radiusPx < 4 || radiusPx > Math.max(canvas.width, canvas.height) * 3) continue;
+    ctx.beginPath();
+    ctx.arc(parentScreen.x, parentScreen.y, radiusPx, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawMeasurements() {
   if (measurePoints.length === 0) return;
   ctx.save();
-  ctx.strokeStyle = "rgba(217, 184, 111, 0.76)";
-  ctx.fillStyle = "rgba(217, 184, 111, 0.96)";
+  const points = measurePoints.map((point) => worldToScreen(point.xAu, point.yAu));
+  ctx.strokeStyle = "rgba(236, 183, 89, 0.82)";
+  ctx.fillStyle = "rgba(236, 183, 89, 0.95)";
   ctx.lineWidth = 2;
-  ctx.setLineDash([4, 5]);
-  const screens = measurePoints.map((point) => worldToScreen(point.xAu, point.yAu));
-  if (screens.length === 2) {
+  ctx.setLineDash([8, 7]);
+  if (points.length === 2) {
     ctx.beginPath();
-    ctx.moveTo(screens[0].x, screens[0].y);
-    ctx.lineTo(screens[1].x, screens[1].y);
+    ctx.moveTo(points[0].x, points[0].y);
+    ctx.lineTo(points[1].x, points[1].y);
     ctx.stroke();
   }
   ctx.setLineDash([]);
-  for (const screen of screens) {
+  points.forEach((point, index) => {
     ctx.beginPath();
-    ctx.arc(screen.x, screen.y, 5, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
     ctx.fill();
+    drawMapLabel(index === 0 ? "A" : "B", point.x + 10, point.y - 10, "rgba(236, 183, 89, 0.9)");
+  });
+  ctx.restore();
+}
+
+function drawBodies() {
+  const selected = selectedBody();
+  ctx.save();
+  for (const body of visibleBodies()) {
+    const screen = worldToScreen(body.position.x_au, body.position.y_au);
+    const radius = markerRadius(body);
+    const selectedOrHover = body.key === selected?.key || body.key === hoverKey;
+    ctx.globalAlpha = selectedOrHover ? 1 : bodyAlpha(body);
+    ctx.fillStyle = body.color || "#d9b86f";
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    if (selectedOrHover) {
+      ctx.strokeStyle = body.key === selected?.key ? "rgba(248, 218, 136, 0.95)" : "rgba(177, 218, 205, 0.82)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(screen.x, screen.y, radius + 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
 
-function drawMiniMap(width: number, height: number) {
-  if (!ephemeris || window.innerWidth < 760) return;
-  const size = 118;
-  const x = width - size - 504;
-  const y = height - size - 16;
-  if (x < 380) return;
-  const miniMapBodies = ephemeris.bodies.filter((body) => !isStaticStellarCatalogBody(body));
-  const bodies = miniMapBodies.length ? miniMapBodies : ephemeris.bodies;
-  const maxAu = Math.max(1, ...bodies.map((body) => Math.hypot(body.position.x_au, body.position.y_au)));
-  const scale = (size - 22) / (maxAu * 2);
+function drawLabels() {
+  const labels = prioritizedLabelBodies();
+  const occupied: Rect[] = [];
+  ctx.save();
+  ctx.font = "12px Inter, system-ui, sans-serif";
+  for (const body of labels) {
+    const screen = worldToScreen(body.position.x_au, body.position.y_au);
+    const label = body.name;
+    const width = ctx.measureText(label).width + 18;
+    const height = 22;
+    const rect = {
+      left: screen.x + 10,
+      top: screen.y - height - 8,
+      right: screen.x + 10 + width,
+      bottom: screen.y - 8,
+      width,
+      height
+    };
+    if (!rectInCanvas(rect) || occupied.some((item) => rectsOverlap(item, rect))) continue;
+    occupied.push(rect);
+    drawMapLabel(label, rect.left, rect.top + 15, body.key === selectedKey ? "rgba(248, 218, 136, 0.95)" : "rgba(239, 233, 213, 0.76)");
+  }
+  ctx.restore();
+}
+
+function drawEdgeReferences() {
+  const rect = usableViewportRect();
+  const references = bodiesOutsideViewport()
+    .sort((a, b) => a.screenDistance - b.screenDistance)
+    .slice(0, 8);
 
   ctx.save();
-  ctx.fillStyle = "rgba(10, 14, 15, 0.7)";
-  ctx.strokeStyle = "rgba(244, 241, 232, 0.16)";
+  ctx.font = "11px Inter, system-ui, sans-serif";
+  for (const reference of references) {
+    const clamped = {
+      x: clamp(reference.screen.x, rect.left + 16, rect.right - 16),
+      y: clamp(reference.screen.y, rect.top + 16, rect.bottom - 16)
+    };
+    const color = reference.body.color || "#d9b86f";
+    ctx.strokeStyle = `${color}aa`;
+    ctx.fillStyle = `${color}ee`;
+    ctx.beginPath();
+    ctx.arc(clamped.x, clamped.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    drawMapLabel(reference.body.name, clamped.x + 8, clamped.y + 4, "rgba(239, 233, 213, 0.6)");
+  }
+  ctx.restore();
+}
+
+function drawCrosshair() {
+  if (!measureMode) return;
+  const selected = selectedBody();
+  if (!selected) return;
+  const screen = worldToScreen(selected.position.x_au, selected.position.y_au);
+  ctx.save();
+  ctx.strokeStyle = "rgba(236, 183, 89, 0.5)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.roundRect(x, y, size, size, 8);
-  ctx.fill();
-  ctx.stroke();
-
-  const centerX = x + size / 2;
-  const centerY = y + size / 2;
-  for (const body of bodies) {
-    const px = centerX + body.position.x_au * scale;
-    const py = centerY - body.position.y_au * scale;
-    ctx.fillStyle = body.key === selectedTarget ? "#d9b86f" : body.color;
-    ctx.beginPath();
-    ctx.arc(px, py, body.key === selectedTarget ? 3.5 : 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const viewHalfWidthAu = width / 2 / camera.pxPerAu;
-  const viewHalfHeightAu = height / 2 / camera.pxPerAu;
-  ctx.strokeStyle = "rgba(116, 196, 255, 0.58)";
-  ctx.strokeRect(
-    centerX + (camera.xAu - viewHalfWidthAu) * scale,
-    centerY - (camera.yAu + viewHalfHeightAu) * scale,
-    viewHalfWidthAu * 2 * scale,
-    viewHalfHeightAu * 2 * scale
-  );
-  ctx.restore();
-}
-
-function drawTrueDeepSkyBody(body: Body, screen: ScreenPoint, radius: number) {
-  if (radius < 0.35) return;
-
-  const ratio = deepSkyMinorMajorRatio(body);
-  const rotation = body.object_type === "galaxy" ? -0.42 : body.object_type === "nebula" ? 0.32 : 0;
-  const isElliptical = body.object_type === "galaxy" || body.object_type === "nebula";
-  const lineWidth = Math.max(0.7, Math.min(2.2, radius * 0.01));
-
-  ctx.save();
-  ctx.fillStyle = hexToRgba(body.color, body.object_type === "galaxy" ? 0.12 : 0.1);
-  ctx.strokeStyle = hexToRgba(body.color, 0.72);
-  ctx.lineWidth = lineWidth;
-
-  ctx.beginPath();
-  if (isElliptical) {
-    ctx.ellipse(screen.x, screen.y, radius, Math.max(radius * ratio, 0.35), rotation, 0, Math.PI * 2);
-  } else {
-    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
-  }
-  ctx.fill();
-  ctx.stroke();
-
-  if (body.object_type === "galaxy" && radius >= 4) {
-    ctx.strokeStyle = hexToRgba("#fff0bc", 0.45);
-    ctx.lineWidth = Math.max(0.5, lineWidth * 0.7);
-    ctx.beginPath();
-    ctx.ellipse(screen.x, screen.y, radius * 0.38, Math.max(radius * ratio * 0.15, 0.25), rotation, 0, Math.PI * 2);
-    ctx.stroke();
-  } else if ((body.object_type === "star_cluster" || body.object_type === "asterism" || body.object_type === "milky_way_patch") && radius >= 3) {
-    ctx.fillStyle = "rgba(255, 243, 207, 0.82)";
-    const points = [
-      [0, 0],
-      [-0.34, -0.2],
-      [0.32, -0.25],
-      [-0.12, 0.35],
-      [0.4, 0.24],
-      [-0.42, 0.26]
-    ];
-    for (const [dx, dy] of points) {
-      ctx.beginPath();
-      ctx.arc(screen.x + radius * dx, screen.y + radius * dy, Math.max(0.45, Math.min(2.8, radius * 0.045)), 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  ctx.restore();
-}
-
-function deepSkyMinorMajorRatio(body: Body) {
-  const major = body.deep_sky?.physical_diameter_ly;
-  const minor = body.deep_sky?.physical_minor_diameter_ly;
-  if (!major || !minor || major <= 0 || minor <= 0) return 1;
-  return clamp(Math.min(major, minor) / Math.max(major, minor), 0.08, 1);
-}
-
-function isScreenDiskVisible(screen: ScreenPoint, radius: number) {
-  if (!Number.isFinite(radius)) return false;
-  const margin = Math.max(80, Math.min(radius, 8000));
-  return screen.x >= -margin && screen.x <= window.innerWidth + margin && screen.y >= -margin && screen.y <= window.innerHeight + margin;
-}
-
-function drawTargetHeadingIndicator() {
-  if (!ship) return;
-  const target = bodyByKey.get(selectedTarget);
-  if (!target) return;
-
-  const shipScreen = worldToScreen(ship.xAu, ship.yAu);
-  const direction = Math.atan2(target.position.y_au - ship.yAu, target.position.x_au - ship.xAu);
-  const forward = { x: Math.cos(direction), y: -Math.sin(direction) };
-  const side = { x: -forward.y, y: forward.x };
-  const start = 28;
-  const end = 74;
-
-  ctx.save();
-  ctx.strokeStyle = "rgba(255, 209, 102, 0.78)";
-  ctx.fillStyle = "rgba(255, 209, 102, 0.92)";
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.moveTo(shipScreen.x + forward.x * start, shipScreen.y + forward.y * start);
-  ctx.lineTo(shipScreen.x + forward.x * end, shipScreen.y + forward.y * end);
-  ctx.stroke();
-
-  const tipX = shipScreen.x + forward.x * end;
-  const tipY = shipScreen.y + forward.y * end;
-  ctx.beginPath();
-  ctx.moveTo(tipX, tipY);
-  ctx.lineTo(tipX - forward.x * 11 + side.x * 6, tipY - forward.y * 11 + side.y * 6);
-  ctx.lineTo(tipX - forward.x * 11 - side.x * 6, tipY - forward.y * 11 - side.y * 6);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawBody(body: Body) {
-  const screen = worldToScreen(body.position.x_au, body.position.y_au);
-  const radius = renderedBodyRadius(body);
-  const markerRadius = readableDisplayRadius(body);
-  const isTarget = body.key === selectedTarget;
-  const isSelectedBody = body.key === selectedBodyKey;
-  const emphasized = isTarget || isSelectedBody;
-
-  ctx.save();
-  if (isDeepSkyBody(body)) {
-    if (sizeMode === "true" && radius < 0.35 && !emphasized) {
-      ctx.restore();
-      return;
-    }
-
-    const markerOnly = sizeMode === "hybrid" && radius < 1.2;
-    const shouldDrawSymbolicMarker = sizeMode === "readable" || markerOnly || radius <= 0;
-    const visibleRadius = shouldDrawSymbolicMarker ? markerRadius : radius;
-    if (!isScreenDiskVisible(screen, visibleRadius + 24)) {
-      ctx.restore();
-      return;
-    }
-
-    if (shouldDrawSymbolicMarker) {
-      drawReferenceBodyImage(body, screen.x, screen.y, Math.max(22, markerRadius * 3.6));
-      if (sizeMode === "hybrid" && markerOnly) {
-        ctx.strokeStyle = hexToRgba(body.color, 0.62);
-        ctx.lineWidth = 1;
-        ctx.setLineDash([2, 4]);
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y, markerRadius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-    } else {
-      drawTrueDeepSkyBody(body, screen, visibleRadius);
-      if (sizeMode === "hybrid" && visibleRadius < markerRadius) {
-        ctx.strokeStyle = hexToRgba(body.color, 0.34);
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(screen.x, screen.y, markerRadius, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    }
-
-    ctx.strokeStyle = isTarget ? "#f3f0e8" : isSelectedBody ? "#74c4ff" : hexToRgba(body.color, 0.38);
-    ctx.lineWidth = isTarget || isSelectedBody ? 2 : 1;
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, Math.max(labelAnchorRadius(body) + (isTarget || isSelectedBody ? 6 : 3), 7), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-    return;
-  }
-
-  if (sizeMode === "true" && radius < 0.35 && !emphasized) {
-    ctx.restore();
-    return;
-  }
-
-  const markerOnly = sizeMode === "hybrid" && radius < 1.2;
-  const shouldDrawSymbolicMarker = sizeMode === "readable" || markerOnly;
-  const visibleRadius = shouldDrawSymbolicMarker ? markerRadius : radius;
-
-  if (body.key === "saturn" && (shouldDrawSymbolicMarker || visibleRadius >= 1.8)) {
-    ctx.strokeStyle = "rgba(216, 194, 138, 0.74)";
-    ctx.lineWidth = shouldDrawSymbolicMarker ? 2 : Math.max(0.6, Math.min(1.5, visibleRadius * 0.08));
-    ctx.beginPath();
-    ctx.ellipse(screen.x, screen.y, visibleRadius * 1.65, visibleRadius * 0.55, -0.35, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  if (sizeMode === "hybrid" && markerOnly) {
-    ctx.strokeStyle = hexToRgba(body.color, 0.62);
-    ctx.lineWidth = 1;
-    ctx.setLineDash([2, 4]);
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, markerRadius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  if (visibleRadius >= 0.35) {
-    ctx.fillStyle = body.color;
-    ctx.strokeStyle = isTarget ? "#f3f0e8" : isSelectedBody ? "#74c4ff" : "rgba(0, 0, 0, 0.38)";
-    ctx.lineWidth = isTarget || isSelectedBody ? 2 : Math.max(0.75, Math.min(1, visibleRadius * 0.16));
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, visibleRadius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  if (sizeMode === "hybrid" && !markerOnly && radius >= 1.2 && radius < markerRadius) {
-    ctx.strokeStyle = hexToRgba(body.color, 0.34);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, markerRadius, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  if (isSelectedBody && !isTarget) {
-    ctx.strokeStyle = "rgba(116, 196, 255, 0.72)";
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, Math.max(labelAnchorRadius(body) + 5, 7), 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  if (isTarget) {
-    ctx.strokeStyle = "rgba(244, 241, 232, 0.72)";
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, Math.max(labelAnchorRadius(body) + 5, 7), 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-function drawShip() {
-  if (!ship) return;
-  const screen = worldToScreen(ship.xAu, ship.yAu);
-  const forward = { x: Math.cos(ship.angleRad), y: -Math.sin(ship.angleRad) };
-  const side = { x: -forward.y, y: forward.x };
-  const size = warpEnabled ? 14 : 11;
-
-  ctx.save();
-  if (warpEnabled) {
-    ctx.strokeStyle = "rgba(116, 196, 255, 0.56)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(screen.x, screen.y, size + 8, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  ctx.fillStyle = "#f3f0e8";
-  ctx.strokeStyle = "#060607";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(screen.x + forward.x * size, screen.y + forward.y * size);
-  ctx.lineTo(screen.x - forward.x * size * 0.75 + side.x * size * 0.62, screen.y - forward.y * size * 0.75 + side.y * size * 0.62);
-  ctx.lineTo(screen.x - forward.x * size * 0.35, screen.y - forward.y * size * 0.35);
-  ctx.lineTo(screen.x - forward.x * size * 0.75 - side.x * size * 0.62, screen.y - forward.y * size * 0.75 - side.y * size * 0.62);
-  ctx.closePath();
-  ctx.fill();
+  ctx.moveTo(screen.x - 15, screen.y);
+  ctx.lineTo(screen.x + 15, screen.y);
+  ctx.moveTo(screen.x, screen.y - 15);
+  ctx.lineTo(screen.x, screen.y + 15);
   ctx.stroke();
   ctx.restore();
 }
 
-function updateHud(force = false) {
-  if (!ephemeris || !ship) return;
-  const now = performance.now();
-  if (!force && now - lastHudRender < 160) return;
-  lastHudRender = now;
-
-  const target = bodyByKey.get(selectedTarget);
-  if (!target) return;
-
-  const shipTargetKm = shipTargetDistanceKm(target);
-  const shipSpeedKmS = shipSpeedKmPerSecond();
-  const scaleKm = ephemeris.au_km / camera.pxPerAu;
-  const navigation = navigationMetrics(target, shipTargetKm);
-  const inspectedBody = bodyByKey.get(selectedBodyKey);
-
-  hudValues.innerHTML = "";
-  appendDefinition("UTC", formatTimestamp(ephemeris.timestamp_utc));
-  appendDefinition("Target", target.name);
-  appendDefinition("Inspecting", inspectedBody?.name ?? "none");
-  appendDefinition("Catalog", `${ephemeris.catalog?.object_count ?? ephemeris.bodies.length} loaded objects`);
-  appendDefinition("Data", ephemeris.data_source.replace("NASA/JPL ", "JPL "));
-  appendDefinition("Frame", "heliocentric ecliptic x/y");
-
-  updateFlightValues(shipSpeedKmS, scaleKm, navigation);
-  updateScaleLadder(scaleKm);
-  updateBodyInfo();
-  updateJourney(target, shipTargetKm);
+function drawMapLabel(text: string, x: number, y: number, color: string) {
+  ctx.save();
+  ctx.fillStyle = "rgba(8, 10, 9, 0.72)";
+  ctx.strokeStyle = "rgba(239, 233, 213, 0.13)";
+  const width = ctx.measureText(text).width + 12;
+  roundedRect(x - 6, y - 15, width, 22, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+  ctx.restore();
 }
 
-function appendDefinition(term: string, value: string) {
-  const dt = document.createElement("dt");
-  dt.textContent = term;
-  const dd = document.createElement("dd");
-  dd.textContent = value;
-  hudValues.append(dt, dd);
-}
-
-function updateJourney(target: Body, shipTargetKm: number) {
-  if (!ephemeris || !ship) return;
-  const earth = bodyByKey.get("earth");
-  if (!earth) return;
-
-  const progress = journeyRouteProgress(earth, target, ship);
-  const progressPercent = progress * 100;
-  const remainingLightSeconds = shipTargetKm / LIGHT_SPEED_KM_S;
-  const navigation = navigationMetrics(target, shipTargetKm);
-  const thresholdKm = arrivalThresholdKm(target);
-  const targetLightSeconds = target.distance_from_earth_km / LIGHT_SPEED_KM_S;
-  const activePlan = activeTrajectoryCandidate();
-  const routeDistanceKm = routeTotalDistanceKm(earth, target);
-  const isStaticCatalogTarget = isStaticStellarCatalogBody(target);
-  const directRouteLabel = activePlan
-    ? `${activePlan.label} path distance`
-    : isStaticCatalogTarget
-      ? "Straight-line catalog distance"
-    : routeWaypoints.length
-      ? `Transfer preview via ${routeWaypoints.length} waypoint${routeWaypoints.length === 1 ? "" : "s"}`
-      : "Approx transfer preview distance";
-  const nextAction = nextGuidanceText(navigation, shipTargetKm, thresholdKm);
-  const comparisonText = distanceComparisonText(target.distance_from_earth_km);
-  const status = journeyStats.arrived
-    ? "arrived"
-    : shipTargetKm <= thresholdKm
-      ? "inside arrival zone"
-      : navigation.closingSpeedKmS > 0
-        ? "closing"
-        : "not closing";
-  const statusLabel = journeyStats.arrived ? "Arrival confirmed" : status;
-  const routeProgress = clamp(progressPercent, 0, 100);
-  const progressLabel = activePlan?.kind === "gravity_assist" ? "gravity-assist plan" : isStaticCatalogTarget ? "straight-line reference" : "transfer preview";
-  const structuralKey = [
-    ephemeris.timestamp_utc,
-    target.key,
-    selectedBodyKey,
-    trajectoryLoading ? "loading" : "ready",
-    trajectoryError,
-    trajectoryPlan?.generated_at_utc ?? "no-plan",
-    activePlan?.id ?? "no-active-plan",
-    routeWaypoints.map((waypoint) => waypoint.key).join(",")
-  ].join("|");
-
-  if (journeyStructuralKey !== structuralKey) {
-    journeyStructuralKey = structuralKey;
-    journey.innerHTML = `
-      <div class="journey-hero">
-        <div>
-          <span class="eyebrow">Journey</span>
-          <h2>Earth to ${escapeHtml(target.name)}</h2>
-        </div>
-        <span class="status-token" data-journey-field="status"></span>
-      </div>
-      <div class="route-card">
-        <div class="route-body origin">
-          ${bodyOrbHtml(earth, "large")}
-          <span>Origin</span>
-          <strong>${escapeHtml(earth.name)}</strong>
-        </div>
-        <div class="route-vector" aria-label="Route progress from Earth to ${escapeHtml(target.name)}">
-          <div class="route-track">
-            <span class="route-progress-dot" data-journey-field="route-dot"></span>
-          </div>
-          <span data-journey-field="route-summary"></span>
-        </div>
-        <div class="route-body destination">
-          ${bodyOrbHtml(target, "large")}
-          <span>Destination</span>
-          <strong>${escapeHtml(target.name)}</strong>
-        </div>
-      </div>
-      <p class="route-note">${escapeHtml(routeNoteText(activePlan))}</p>
-      ${renderTrajectoryPlanner(activePlan)}
-      <div class="distance-focus">
-        <span data-journey-field="next-action"></span>
-        <strong data-journey-field="ship-target-distance"></strong>
-      </div>
-      <div class="progress-track" aria-label="Journey progress">
-        <div class="progress-fill" data-journey-field="progress-fill"></div>
-      </div>
-      <div class="progress-caption">
-        <span data-journey-field="progress-label"></span>
-        <span data-journey-field="light-time-remaining"></span>
-      </div>
-      <div class="metric-tiles">
-        <article>
-          <span>ETA now</span>
-          <strong data-journey-field="eta"></strong>
-        </article>
-        <article>
-          <span>Heading error</span>
-          <strong data-journey-field="heading-error"></strong>
-        </article>
-        <article>
-          <span>Closest approach</span>
-          <strong data-journey-field="closest-approach"></strong>
-        </article>
-        <article>
-          <span>Arrival zone</span>
-          <strong data-journey-field="arrival-zone"></strong>
-        </article>
-      </div>
-      <div class="journey-grid detail-grid">
-        <span>${escapeHtml(directRouteLabel)}</span><strong data-journey-field="route-distance"></strong>
-        <span>Earth-target light time</span><strong data-journey-field="earth-target-light-time"></strong>
-        <span>Light story</span><strong data-journey-field="light-story"></strong>
-        <span>Comparison</span><strong data-journey-field="comparison"></strong>
-        <span>Distance flown</span><strong data-journey-field="distance-flown"></strong>
-        <span>Max speed</span><strong data-journey-field="max-speed"></strong>
-        <span>Elapsed flight time</span><strong data-journey-field="elapsed-flight-time"></strong>
-      </div>
-    `;
-  }
-
-  updateJourneyField("status", statusLabel);
-  updateJourneyField(
-    "route-summary",
-    `${activePlan?.kind === "gravity_assist" ? "gravity assist" : isStaticCatalogTarget ? "reference" : "transfer"} · ${formatDistance(routeDistanceKm)}`
-  );
-  updateJourneyField("next-action", nextAction);
-  updateJourneyField("ship-target-distance", formatDistance(shipTargetKm));
-  updateJourneyField("progress-label", `${progressPercent.toFixed(2)}% along ${progressLabel}`);
-  updateJourneyField("light-time-remaining", `${formatDuration(remainingLightSeconds)} light time remaining`);
-  updateJourneyField("eta", navigation.etaText);
-  updateJourneyField("heading-error", formatDegrees(navigation.headingErrorDeg));
-  updateJourneyField("closest-approach", Number.isFinite(journeyStats.closestKm) ? formatDistance(journeyStats.closestKm) : "not recorded");
-  updateJourneyField("arrival-zone", formatDistance(thresholdKm));
-  updateJourneyField("route-distance", formatDistance(routeDistanceKm));
-  updateJourneyField("earth-target-light-time", formatDuration(targetLightSeconds));
-  updateJourneyField("light-story", lightStoryText(target, shipTargetKm));
-  updateJourneyField("comparison", comparisonText);
-  updateJourneyField("distance-flown", formatDistance(journeyStats.distanceTraveledKm));
-  updateJourneyField("max-speed", `${formatNumber(journeyStats.maxSpeedKmS)} km/s`);
-  updateJourneyField("elapsed-flight-time", formatDuration(journeyStats.elapsedSeconds));
-  const progressFill = journey.querySelector<HTMLElement>('[data-journey-field="progress-fill"]');
-  if (progressFill) progressFill.style.width = `${progressPercent.toFixed(2)}%`;
-  const progressDot = journey.querySelector<HTMLElement>('[data-journey-field="route-dot"]');
-  if (progressDot) progressDot.style.left = `${routeProgress.toFixed(2)}%`;
-}
-
-function updateJourneyField(field: string, value: string) {
-  const element = journey.querySelector<HTMLElement>(`[data-journey-field="${field}"]`);
-  if (element && element.textContent !== value) {
-    element.textContent = value;
-  }
-}
-
-function routeNoteText(candidate: TrajectoryCandidate | null) {
-  if (!candidate) {
-    const target = bodyByKey.get(selectedTarget);
-    if (target && isStaticStellarCatalogBody(target)) {
-      return `${target.deep_sky ? "Deep-sky" : "Interstellar"} catalog target: straight-line reference distance only. No mission trajectory model is active yet.`;
-    }
-    return "Approximate Sun-centered trajectory preview. It uses real current positions, but it is not a full mission-grade gravity solve yet.";
-  }
-  if (candidate.kind === "gravity_assist") {
-    const flyby = candidate.flyby;
-    const status = flyby?.feasible ? "unpowered turn feasible" : "correction burn likely";
-    return `${candidate.label}: event markers show future body positions; patched-conic single-flyby estimate; ${status}.`;
-  }
-  return "Direct patched-conic transfer estimate; arrival marker shows the target's future position.";
-}
-
-function renderTrajectoryPlanner(activePlan: TrajectoryCandidate | null) {
-  if (trajectoryLoading) {
-    return `
-      <section class="trajectory-panel">
-        <div class="trajectory-head">
-          <span>Gravity-assist planner</span>
-          <strong>searching launch windows</strong>
-        </div>
-      </section>
-    `;
-  }
-
-  if (trajectoryError) {
-    return `
-      <section class="trajectory-panel warning">
-        <div class="trajectory-head">
-          <span>Gravity-assist planner</span>
-          <strong>unavailable</strong>
-        </div>
-        <p>${escapeHtml(trajectoryError)}</p>
-      </section>
-    `;
-  }
-
-  if (!trajectoryPlan || !activePlan) {
-    return "";
-  }
-
-  const cards = trajectoryPlan.candidates.slice(0, 5).map((candidate) => renderTrajectoryCandidateCard(candidate, candidate.id === activePlan.id)).join("");
-  const eventText = activePlan.events.map((event) => `${event.kind} ${event.body_name} ${offsetLabel(event.offset_days)}`).join(" · ");
-  const flyby = activePlan.flyby;
-  const flybyMetrics = flyby
-    ? `
-      <span>Flyby turn</span><strong>${formatDegrees(flyby.turn_angle_deg)} / ${formatDegrees(flyby.max_turn_angle_deg)}</strong>
-      <span>Assist gain</span><strong>${formatSignedSpeed(flyby.speed_change_km_s)}</strong>
-      <span>Flyby altitude</span><strong>${formatDistance(flyby.periapsis_altitude_km)}</strong>
-    `
-    : "";
-
-  return `
-    <section class="trajectory-panel">
-      <div class="trajectory-head">
-        <span>Gravity-assist planner</span>
-        <strong>${activePlan.kind === "gravity_assist" ? "single-flyby patched conic" : "direct transfer"}</strong>
-      </div>
-      <div class="trajectory-cards">${cards}</div>
-      <div class="trajectory-detail">
-        <span>Selected plan</span><strong>${escapeHtml(activePlan.label)}</strong>
-        <span>Events</span><strong>${escapeHtml(eventText)}</strong>
-        <span>Total Δv estimate</span><strong>${formatDeltaV(activePlan.metrics.total_delta_v_km_s)}</strong>
-        <span>Flight time</span><strong>${formatDuration(activePlan.metrics.total_time_days * 86_400)}</strong>
-        ${flybyMetrics}
-      </div>
-      <p>${escapeHtml(activePlan.warnings[0] ?? trajectoryPlan.limitations[0] ?? "Patched-conic planning estimate.")}</p>
-    </section>
-  `;
-}
-
-function renderTrajectoryCandidateCard(candidate: TrajectoryCandidate, active: boolean) {
-  const feasible = candidate.metrics.feasible;
-  const flybyLabel = candidate.kind === "gravity_assist" ? "flyby" : "direct";
-  const departure = offsetLabel(candidate.metrics.departure_offset_days);
-  const arrival = offsetLabel(candidate.metrics.arrival_offset_days);
-  return `
-    <button type="button" class="trajectory-card${active ? " active" : ""}" data-trajectory-candidate="${escapeHtml(candidate.id)}">
-      <span>${escapeHtml(flybyLabel)}</span>
-      <strong>${escapeHtml(candidate.label)}</strong>
-      <small>depart ${departure} · arrive ${arrival}</small>
-      <small>${formatDeltaV(candidate.metrics.total_delta_v_km_s)} · ${formatDuration(candidate.metrics.total_time_days * 86_400)}</small>
-      <em>${feasible ? "feasible" : "needs burn"}</em>
-    </button>
-  `;
-}
-
-function updateFlightValues(shipSpeedKmS: number, scaleKm: number, navigation: ReturnType<typeof navigationMetrics>) {
-  flightValues.innerHTML = `
-    <div class="flight-help">
-      ${keyboardControls
-        .map((control) => {
-          const pressed = control.keys.some((key) => keys.has(key.code)) || (control.id === "warp" && warpEnabled);
-          return `
-            <article class="${pressed ? "active" : ""}" title="${escapeHtml(control.tooltip)}">
-              <div class="key-group">${control.keys.map((key) => `<kbd>${escapeHtml(key.label)}</kbd>`).join("")}</div>
-              <span>${escapeHtml(control.label)}</span>
-            </article>
-          `;
-        })
-        .join("")}
-    </div>
-    <div class="flight-metric">
-      <span>Speed</span>
-      <strong>${formatNumber(shipSpeedKmS)} km/s</strong>
-    </div>
-    <div class="flight-metric">
-      <span>Warp</span>
-      <strong>${warpEnabled ? "on · 250x" : "off"}</strong>
-    </div>
-    <div class="flight-metric">
-      <span>Closing</span>
-      <strong>${navigation.closingSpeedKmS > 0 ? `${formatNumber(navigation.closingSpeedKmS)} km/s` : "not closing"}</strong>
-    </div>
-    <div class="flight-metric">
-      <span>Depth</span>
-      <strong>${depthMetricText(navigation)}</strong>
-    </div>
-    <div class="flight-metric">
-      <span>Scale</span>
-      <strong>${shortScaleText(scaleKm, ephemeris?.au_km ?? AU_KM_FALLBACK)}</strong>
-    </div>
-  `;
-}
-
-function updateScaleLadder(kmPerPx: number) {
-  const viewportKm = kmPerPx * Math.max(window.innerWidth, window.innerHeight);
-  const activeBand = scaleBandForViewport(viewportKm);
-  const markerPercent = scaleLadderMarkerPercent(viewportKm);
-  scaleLadder.innerHTML = `
-    <div class="scale-ladder-head">
-      <span>Scale ladder</span>
-      <strong>${escapeHtml(scaleBandTitle(activeBand))}</strong>
-    </div>
-    <div class="scale-ladder-track" style="--scale-marker: ${markerPercent.toFixed(2)}%" aria-hidden="true">
-      <span class="scale-ladder-line"></span>
-      <span class="scale-ladder-marker"></span>
-      ${SCALE_LADDER_STOPS.map((band) => `<span class="scale-ladder-tick ${band.key === activeBand ? "active" : ""}"></span>`).join("")}
-    </div>
-    <div class="scale-ladder-labels">
-      ${SCALE_LADDER_STOPS.map((band) => `<span class="${band.key === activeBand ? "active" : ""}">${escapeHtml(band.label)}</span>`).join("")}
-    </div>
-    <p>${escapeHtml(scaleBandDescription(activeBand, viewportKm))}</p>
-  `;
-}
-
-function scaleBandForViewport(viewportKm: number): ScaleBandKey {
-  for (const stop of SCALE_LADDER_STOPS) {
-    if (viewportKm < stop.maxViewportKm) return stop.key;
-  }
-  return "deep_sky";
-}
-
-function scaleLadderMarkerPercent(viewportKm: number) {
-  const minKm = SCALE_LADDER_STOPS[0].maxViewportKm / 10;
-  const maxKm = SCALE_LADDER_STOPS[SCALE_LADDER_STOPS.length - 1].maxViewportKm;
-  const value = clamp(viewportKm, minKm, maxKm);
-  const minLog = Math.log10(minKm);
-  const maxLog = Math.log10(maxKm);
-  return ((Math.log10(value) - minLog) / (maxLog - minLog)) * 100;
-}
-
-function scaleBandTitle(band: ScaleBandKey) {
-  const labels: Record<ScaleBandKey, string> = {
-    planetary: "planetary close-up",
-    solar: "Solar System scale",
-    nearby_stars: "nearby-star scale",
-    milky_way: "Milky Way scale",
-    local_group: "Local Group scale",
-    deep_sky: "deep-sky scale"
-  };
-  return labels[band];
-}
-
-function scaleBandDescription(band: ScaleBandKey, viewportKm: number) {
-  const span = compactDistance(viewportKm);
-  const descriptions: Record<ScaleBandKey, string> = {
-    planetary: `${span} across this viewport: moon systems and planet close approaches are readable here.`,
-    solar: `${span} across this viewport: planets, moons, and transfer paths fit in the same coordinate space.`,
-    nearby_stars: `${span} across this viewport: the hidden depth axis matters as much as the top-down position.`,
-    milky_way: `${span} across this viewport: catalog objects are static sky positions with distance estimates.`,
-    local_group: `${span} across this viewport: light-time becomes historical lookback time.`,
-    deep_sky: `${span} across this viewport: this is an atlas scale, not a mission-planning scale.`
-  };
-  return descriptions[band];
-}
-
-function depthMetricText(navigation: ReturnType<typeof navigationMetrics>) {
-  if (navigation.depthOffsetKm < 1) return "on plane";
-  const closing = navigation.depthClosingSpeedKmS > 0.001;
-  return `${compactDistance(navigation.depthOffsetKm)}${closing ? " closing" : ""}`;
-}
-
-function updateBodyInfo() {
+function updateStats() {
   if (!ephemeris) return;
-  const body = bodyByKey.get(selectedBodyKey) ?? bodyByKey.get(selectedTarget);
-  if (!body) {
-    if (bodyInfoRenderKey !== "empty") {
-      bodyInfo.textContent = "";
-      bodyInfoRenderKey = "empty";
-    }
-    return;
-  }
-
-  const compareBody = sizePairComparisonBody(body);
-  const renderKey = [
-    ephemeris.timestamp_utc,
-    body.key,
-    selectedTarget,
-    sizeCompareBodyKey,
-    compareBody?.key ?? "none",
-    ephemeris.catalog?.object_count ?? ephemeris.bodies.length
-  ].join("|");
-  if (bodyInfoRenderKey === renderKey) return;
-  bodyInfoRenderKey = renderKey;
-
-  const classification = classifyBody(body);
-  const parent = body.parent_key ? bodyByKey.get(body.parent_key) : null;
-  const source = body.catalog?.ephemeris_kernel ?? body.catalog_group ?? "loaded catalog";
-  const stellarRows = stellarInfoRows(body);
-  const deepSkyRows = deepSkyInfoRows(body);
-  const orbitRows = orbitInfoRows(body);
-  const pairComparison = sizePairComparisonMarkup(body, compareBody);
-  const sizeComparison = sizeComparisonMarkup(body);
-
-  bodyInfo.innerHTML = `
-    <div class="body-info-title">
-      <div class="body-title-main">
-        ${bodyOrbHtml(body)}
-        <div>
-          <span class="eyebrow">Inspected body</span>
-          <strong>${escapeHtml(body.name)}</strong>
-        </div>
-      </div>
-    </div>
-    ${pairComparison}
-    ${sizeComparison}
-    <div class="body-grid">
-      <span>Type</span><strong>${escapeHtml(classification.label)}</strong>
-      <span>Parent</span><strong>${escapeHtml(parent?.name ?? (body.parent_key ? labelForKey(body.parent_key) : "none"))}</strong>
-      <span>From Sun</span><strong>${formatDistance(body.position.heliocentric_distance_km)}</strong>
-      <span>From Earth</span><strong>${formatDistance(body.distance_from_earth_km)}</strong>
-      <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
-      <span>${body.deep_sky ? "Estimated radius" : "Mean radius"}</span><strong>${body.radius_km > 0 ? formatDistance(body.radius_km) : "not represented"}</strong>
-      <span>Source</span><strong>${escapeHtml(source)}</strong>
-      ${stellarRows}
-      ${deepSkyRows}
-      ${orbitRows}
-    </div>
+  const counts = countBodies(ephemeris.bodies);
+  atlasStats.innerHTML = `
+    <div><dt>Objects</dt><dd>${ephemeris.bodies.length}</dd></div>
+    <div><dt>Planets</dt><dd>${counts.planet}</dd></div>
+    <div><dt>Moons</dt><dd>${counts.moon}</dd></div>
+    <div><dt>Deep sky</dt><dd>${counts.deepSky}</dd></div>
+    <div><dt>Epoch</dt><dd>${formatShortDate(ephemeris.timestamp_utc)}</dd></div>
   `;
+  catalogCount.textContent = `${ephemeris.bodies.length} objects`;
 }
 
-function stellarInfoRows(body: Body) {
-  const stellar = body.stellar;
-  if (!stellar) return "";
-  const exoplanetText = stellar.exoplanet_count === null ? "confirmed host" : `${stellar.exoplanet_count} confirmed`;
-  const coordinates =
-    stellar.ra_deg === null || stellar.dec_deg === null
-      ? "not listed"
-      : `${stellar.ra_deg.toFixed(2)}° RA / ${stellar.dec_deg.toFixed(2)}° Dec`;
-  return `
-    <span>Catalog distance</span><strong>${formatLightYears(stellar.distance_ly)}</strong>
-    <span>Exoplanets</span><strong>${escapeHtml(exoplanetText)}</strong>
-    <span>Sky position</span><strong>${escapeHtml(coordinates)}</strong>
-    <span>Stellar temp</span><strong>${stellar.stellar_teff_k ? `${formatNumber(stellar.stellar_teff_k)} K` : "not listed"}</strong>
-  `;
-}
-
-function deepSkyInfoRows(body: Body) {
-  const deepSky = body.deep_sky;
-  if (!deepSky) return "";
-  const aliases = [deepSky.ngc ? `NGC ${deepSky.ngc}` : "", deepSky.ic ? deepSky.ic.replace(/^IC/, "IC ") : "", deepSky.common_name ?? ""]
-    .filter(Boolean)
-    .join(" · ");
-  const coordinates =
-    deepSky.ra_deg === null || deepSky.dec_deg === null
-      ? "not listed"
-      : `${deepSky.ra_deg.toFixed(2)}° RA / ${deepSky.dec_deg.toFixed(2)}° Dec`;
-  return `
-    <span>Catalog ID</span><strong>${escapeHtml([deepSky.messier ? `M${deepSky.messier}` : "", aliases].filter(Boolean).join(" · "))}</strong>
-    <span>Deep-sky type</span><strong>${escapeHtml(deepSky.deep_sky_type_label ?? "Deep-sky object")}</strong>
-    <span>Catalog distance</span><strong>${formatLightYears(deepSky.distance_ly)}</strong>
-    <span>Lookback time</span><strong>${formatLookbackTime(deepSky.distance_ly)}</strong>
-    <span>Apparent mag</span><strong>${deepSky.apparent_magnitude === null ? "not listed" : formatMagnitude(deepSky.apparent_magnitude)}</strong>
-    <span>Angular size</span><strong>${escapeHtml(deepSky.angular_size_arcmin ? `${deepSky.angular_size_arcmin} arcmin` : "not listed")}</strong>
-    <span>Estimated diameter</span><strong>${escapeHtml(formatDeepSkyPhysicalSize(deepSky))}</strong>
-    <span>Size basis</span><strong>${escapeHtml(deepSky.physical_size_note ?? "not listed")}</strong>
-    <span>Constellation</span><strong>${escapeHtml(deepSky.constellation || "not listed")}</strong>
-    <span>Best season</span><strong>${escapeHtml(deepSky.viewing_season || "not listed")}</strong>
-    <span>Observe with</span><strong>${escapeHtml(deepSky.observing_equipment || "not listed")}</strong>
-    <span>Sky position</span><strong>${escapeHtml(coordinates)}</strong>
-    <span>Why it matters</span><strong>${escapeHtml(deepSky.why_interesting || "catalog highlight")}</strong>
-  `;
-}
-
-function sizePairComparisonMarkup(body: Body, compareBody: Body | null) {
-  if (!compareBody) return "";
-
-  return `
-    <section class="size-pair-comparison">
-      <div class="size-pair-head">
-        <div>
-          <span>Map compare</span>
-          <strong>${escapeHtml(compareBody.name)} beside ${escapeHtml(body.name)}</strong>
-        </div>
-        <label>
-          <span>Place object</span>
-          <select data-size-compare-select aria-label="Object to place next to ${escapeHtml(body.name)}">
-            ${sizePairOptionsHtml(body.key, compareBody.key)}
-          </select>
-        </label>
-      </div>
-    </section>
-  `;
-}
-
-function sizePairComparisonBody(body: Body) {
-  const current = bodyByKey.get(sizeCompareBodyKey);
-  if (current && current.key !== body.key && current.radius_km > 0) return current;
-
-  const preferredKeys =
-    body.deep_sky
-      ? ["m31", "m33", "m42", "m45", "m13", "sun", "earth"]
-      : body.catalog?.position_model === "stellar_catalog_coordinates"
-        ? ["sun", "proxima-cen", "earth", "jupiter", "m31"]
-        : ["earth", "moon", "jupiter", "sun", "m31"];
-  const fallback = preferredKeys
-    .map((key) => bodyByKey.get(key))
-    .find((candidate): candidate is Body => Boolean(candidate && candidate.key !== body.key && candidate.radius_km > 0));
-  if (fallback) {
-    sizeCompareBodyKey = fallback.key;
-    return fallback;
-  }
-
-  const firstOther = Array.from(bodyByKey.values()).find((candidate) => candidate.key !== body.key && candidate.radius_km > 0);
-  if (firstOther) {
-    sizeCompareBodyKey = firstOther.key;
-    return firstOther;
-  }
-  return null;
-}
-
-function sizePairOptionsHtml(selectedKey: string, compareKey: string) {
-  if (!ephemeris) return "";
-  return ephemeris.bodies
-    .filter((body) => body.key !== selectedKey && body.radius_km > 0)
-    .sort((a, b) => a.name.localeCompare(b.name))
+function updateQuickFocus() {
+  quickFocusButtons.innerHTML = FEATURED_KEYS.map((key) => bodyByKey.get(key))
+    .filter(isPresent)
     .map(
       (body) => `
-        <option value="${escapeHtml(body.key)}" ${body.key === compareKey ? "selected" : ""}>
-          ${escapeHtml(body.name)} - ${escapeHtml(classifyBody(body).label)}
-        </option>
+        <button type="button" data-focus-key="${escapeHtml(body.key)}" style="--body-color: ${escapeHtml(body.color)}">
+          <span class="body-orb"></span>${escapeHtml(shortBodyName(body.name))}
+        </button>
       `
     )
     .join("");
 }
 
-function objectMinorMajorRatio(body: Body) {
-  if (body.deep_sky) return deepSkyMinorMajorRatio(body);
-  return 1;
-}
-
-function sizeComparisonMarkup(body: Body) {
-  const comparisonBodies = sizeComparisonBodies(body);
-  if (!comparisonBodies.length) {
-    return `
-      <section class="size-comparison">
-        <div class="size-comparison-head">
-          <span>Size reference</span>
-          <strong>No physical size</strong>
-        </div>
-        <p>This catalog entry has position and distance data, but no physical radius or angular size that can be converted into diameter.</p>
-      </section>
-    `;
+function updateTabs() {
+  for (const button of tabButtons) {
+    button.classList.toggle("active", button.dataset.tab === activeTab);
+    button.setAttribute("aria-selected", String(button.dataset.tab === activeTab));
   }
-
-  const maxDiameterKm = Math.max(...comparisonBodies.map((item) => item.radius_km * 2), 1);
-
-  return `
-    <section class="size-comparison">
-      <div class="size-comparison-head">
-        <span>True relative diameter</span>
-        <strong>${escapeHtml(body.name)}</strong>
-      </div>
-      <div class="size-comparison-bars">
-        ${comparisonBodies
-          .map((item) => {
-            const diameterKm = item.radius_km * 2;
-            const ratio = clamp(diameterKm / maxDiameterKm, 0, 1);
-            return `
-              <div class="size-comparison-row">
-                <span>${bodyOrbHtml(item)}</span>
-                <strong>${escapeHtml(item.name)}</strong>
-                <i style="--diameter-ratio: ${ratio.toFixed(6)}"></i>
-                <em>${formatDistance(diameterKm)}</em>
-              </div>
-            `;
-          })
-          .join("")}
-      </div>
-      <p>Bars use real diameter ratios. Tiny bodies may become hairlines at this scale.</p>
-    </section>
-  `;
-}
-
-function sizeComparisonBodies(body: Body) {
-  const anchorKeys = [
-    body.key,
-    body.parent_key ?? "",
-    selectedTarget,
-    ...(body.deep_sky ? ["m31", "m33", "m42", "m45", "m13"] : ["sun", "jupiter", "saturn", "earth", "moon"])
-  ];
-  const sameTypeBodies = Array.from(bodyByKey.values())
-    .filter((item) => item.object_type === body.object_type && item.radius_km > 0)
-    .sort((a, b) => b.radius_km - a.radius_km);
-  const bodyIndex = sameTypeBodies.findIndex((item) => item.key === body.key);
-  const neighborBodies =
-    bodyIndex === -1
-      ? sameTypeBodies.slice(0, 3)
-      : sameTypeBodies.slice(Math.max(0, bodyIndex - 2), Math.min(sameTypeBodies.length, bodyIndex + 3));
-  const seen = new Set<string>();
-  return [
-    ...anchorKeys.map((key) => bodyByKey.get(key)),
-    ...neighborBodies
-  ]
-    .filter((item): item is Body => Boolean(item && item.radius_km > 0))
-    .filter((item) => {
-      if (seen.has(item.key)) return false;
-      seen.add(item.key);
-      return true;
-    })
-    .sort((a, b) => b.radius_km - a.radius_km)
-    .slice(0, 6);
-}
-
-function orbitInfoRows(body: Body) {
-  const orbit = body.orbit;
-  const state = body.state_vector;
-  if (!orbit || !state) {
-    if (!state) return "";
-    return `
-      <span>State frame</span><strong>${escapeHtml(state.frame)}</strong>
-      <span>Speed</span><strong>${formatSpeed(state.heliocentric_speed_km_s)}</strong>
-    `;
+  for (const panel of tabPanels) {
+    panel.hidden = panel.dataset.tabPanel !== activeTab;
   }
-
-  return `
-    <span>Orbit around</span><strong>${escapeHtml(orbit.central_body_name)}</strong>
-    <span>Orbit class</span><strong>${escapeHtml(labelForOrbitClass(orbit.orbit_class))}</strong>
-    <span>Parent distance</span><strong>${formatDistance(state.distance_km)}</strong>
-    <span>Orbital speed</span><strong>${formatSpeed(state.speed_km_s)}</strong>
-    <span>Semi-major axis</span><strong>${formatNullableDistance(orbit.semi_major_axis_km)}</strong>
-    <span>Period</span><strong>${formatOrbitPeriod(orbit.orbital_period_days)}</strong>
-    <span>Eccentricity</span><strong>${formatRatio(orbit.eccentricity)}</strong>
-    <span>Inclination</span><strong>${formatNullableDegrees(orbit.inclination_deg)}</strong>
-  `;
+  toolbarMeasure.classList.toggle("active", measureMode);
 }
 
-function shipTargetDistanceKm(target: Body) {
-  if (!ephemeris || !ship) return 0;
-  const dx = ship.xAu - target.position.x_au;
-  const dy = ship.yAu - target.position.y_au;
-  const dz = ship.zAu - target.position.z_au;
-  return Math.hypot(dx, dy, dz) * ephemeris.au_km;
+function setActiveTab(tab: AtlasTab) {
+  activeTab = tab;
+  updateTabs();
 }
 
-function shipSpeedKmPerSecond() {
-  if (!ephemeris || !ship) return 0;
-  return Math.hypot(ship.vxAuPerSec, ship.vyAuPerSec, ship.vzAuPerSec) * ephemeris.au_km;
+function updateBodyFilters() {
+  bodyFilterButtons.innerHTML = BODY_FILTERS.map(
+    (filter) => `
+      <button type="button" data-body-filter="${filter.key}" class="${filter.key === activeFilter ? "active" : ""}">
+        ${escapeHtml(filter.label)}
+      </button>
+    `
+  ).join("");
 }
 
-function navigationMetrics(target: Body, shipTargetKm: number) {
-  if (!ephemeris || !ship) {
-    return { closingSpeedKmS: 0, etaText: "unavailable", headingErrorDeg: 0, depthOffsetKm: 0, depthClosingSpeedKmS: 0 };
-  }
-
-  const dx = target.position.x_au - ship.xAu;
-  const dy = target.position.y_au - ship.yAu;
-  const dz = target.position.z_au - ship.zAu;
-  const distanceAu = Math.hypot(dx, dy, dz);
-  const depthOffsetKm = Math.abs(dz) * ephemeris.au_km;
-  const depthClosingSpeedKmS = Math.abs(dz) < 1e-12 ? 0 : ship.vzAuPerSec * Math.sign(dz) * ephemeris.au_km;
-  if (distanceAu === 0) {
-    return { closingSpeedKmS: 0, etaText: "arrived", headingErrorDeg: 0, depthOffsetKm, depthClosingSpeedKmS };
-  }
-
-  const closingSpeedAuS = (ship.vxAuPerSec * dx + ship.vyAuPerSec * dy + ship.vzAuPerSec * dz) / distanceAu;
-  const closingSpeedKmS = closingSpeedAuS * ephemeris.au_km;
-  const etaText = closingSpeedKmS > 0.001 ? formatDuration(shipTargetKm / closingSpeedKmS) : "not closing";
-  const targetBearing = Math.atan2(dy, dx);
-  const headingErrorDeg = Math.abs(radToDeg(normalizeAngle(targetBearing - ship.angleRad)));
-
-  return { closingSpeedKmS, etaText, headingErrorDeg, depthOffsetKm, depthClosingSpeedKmS };
-}
-
-function updateJourneyStats(shipTargetKm: number, target: Body, dt = 0, previousXAu?: number, previousYAu?: number, previousZAu?: number) {
-  if (journeyStats.targetKey !== selectedTarget) {
-    resetJourneyStats();
-  }
-
-  if (ship && previousXAu !== undefined && previousYAu !== undefined && previousZAu !== undefined && ephemeris) {
-    const segmentKm = Math.hypot(ship.xAu - previousXAu, ship.yAu - previousYAu, ship.zAu - previousZAu) * ephemeris.au_km;
-    journeyStats.distanceTraveledKm += segmentKm;
-    journeyStats.elapsedSeconds += dt;
-    journeyStats.maxSpeedKmS = Math.max(journeyStats.maxSpeedKmS, shipSpeedKmPerSecond());
-    journeyStats.lastShipXAu = ship.xAu;
-    journeyStats.lastShipYAu = ship.yAu;
-    journeyStats.lastShipZAu = ship.zAu;
-  }
-
-  journeyStats.closestKm = Math.min(journeyStats.closestKm, shipTargetKm);
-  if (shipTargetKm <= arrivalThresholdKm(target)) {
-    journeyStats.arrived = true;
-  }
-}
-
-function resetJourneyStats() {
-  journeyStats = createJourneyStats(selectedTarget);
-  const target = bodyByKey.get(selectedTarget);
-  if (target && ship) {
-    journeyStats.closestKm = shipTargetDistanceKm(target);
-    journeyStats.arrived = journeyStats.closestKm <= arrivalThresholdKm(target);
-    journeyStats.lastShipXAu = ship.xAu;
-    journeyStats.lastShipYAu = ship.yAu;
-    journeyStats.lastShipZAu = ship.zAu;
-  }
-}
-
-function createJourneyStats(targetKey: TargetKey): JourneyStats {
-  return {
-    targetKey,
-    closestKm: Number.POSITIVE_INFINITY,
-    arrived: false,
-    elapsedSeconds: 0,
-    distanceTraveledKm: 0,
-    maxSpeedKmS: 0,
-    lastShipXAu: null,
-    lastShipYAu: null,
-    lastShipZAu: null
-  };
-}
-
-function arrivalThresholdKm(target: Body) {
-  return Math.max(25_000, target.radius_km * 8);
-}
-
-function selectBodyAt(clientX: number, clientY: number) {
-  const hit = bodyAtScreenPoint(clientX, clientY);
-  if (!hit) return;
-  selectedBodyKey = hit.key;
-  syncBodySelect();
-  renderBodyPicker();
-  updateHud();
-}
-
-function bodyAtScreenPoint(clientX: number, clientY: number) {
-  if (!ephemeris) return null;
-  const hit = ephemeris.bodies
-    .map((body) => {
-      const screen = worldToScreen(body.position.x_au, body.position.y_au);
-      const distancePx = Math.hypot(screen.x - clientX, screen.y - clientY);
-      return { body, distancePx, hitRadius: Math.max(14, labelAnchorRadius(body) + 8) };
-    })
-    .filter((candidate) => candidate.distancePx <= candidate.hitRadius)
-    .sort((a, b) => a.distancePx - b.distancePx)[0];
-  return hit?.body ?? null;
-}
-
-function handleMapClick(clientX: number, clientY: number) {
-  const body = bodyAtScreenPoint(clientX, clientY);
-  if (interactionMode === "target") {
-    if (body) {
-      setTarget(body.key, { inspect: true });
-      showBodyPopover(body, clientX, clientY);
-    }
-    return;
-  }
-
-  if (interactionMode === "measure") {
-    addMeasurementPoint(body, clientX, clientY);
-    if (body) {
-      selectedBodyKey = body.key;
-      syncBodySelect();
-      showBodyPopover(body, clientX, clientY);
-    } else {
-      hideBodyPopover();
-    }
-    updateHud();
-    return;
-  }
-
-  if (body) {
-    selectedBodyKey = body.key;
-    syncBodySelect();
-    renderBodyPicker();
-    showBodyPopover(body, clientX, clientY);
-    updateHud();
-  } else {
-    hideBodyPopover();
-  }
-}
-
-function showBodyPopover(body: Body, clientX: number, clientY: number) {
-  activePopoverBodyKey = body.key;
-  bodyPopover.hidden = false;
-  bodyPopover.style.left = `${clamp(clientX + 14, 12, window.innerWidth - 260)}px`;
-  bodyPopover.style.top = `${clamp(clientY + 14, 12, window.innerHeight - 210)}px`;
-  bodyPopover.innerHTML = `
-    <div class="popover-title">
-      ${bodyOrbHtml(body)}
-      <div>
-        <strong>${escapeHtml(body.name)}</strong>
-        <span>${escapeHtml(classifyBody(body).label)} · ${formatDistance(body.distance_from_earth_km)} from Earth</span>
-      </div>
-      <button type="button" class="icon-button" data-popover-action="close" aria-label="Close body actions">${icon("close")}</button>
-    </div>
-    <div class="popover-actions">
-      <button type="button" data-popover-action="target">${icon("target")}<span>Target</span></button>
-      <button type="button" data-popover-action="center">${icon("center")}<span>Center</span></button>
-      <button type="button" data-popover-action="zoom">${icon("zoom")}<span>Zoom</span></button>
-      <button type="button" data-popover-action="measure">${icon("ruler")}<span>Measure</span></button>
-      <button type="button" data-popover-action="waypoint">${icon("waypoint")}<span>Waypoint</span></button>
-    </div>
-  `;
-}
-
-function hideBodyPopover() {
-  activePopoverBodyKey = null;
-  bodyPopover.hidden = true;
-}
-
-function handlePopoverAction(action: string, key: string) {
-  const body = bodyByKey.get(key);
-  if (!body) return;
-  if (action === "close") {
-    hideBodyPopover();
-    return;
-  }
-  if (action === "target") {
-    setTarget(key, { inspect: true });
-  } else if (action === "center") {
-    centerOnBody(key);
-  } else if (action === "zoom") {
-    zoomToBody(key);
-  } else if (action === "measure") {
-    interactionMode = "measure";
-    updateModeButtons();
-    addMeasurementPoint(body);
-  } else if (action === "waypoint") {
-    addRouteWaypoint(body);
-  }
-  updateHud();
-}
-
-function addMeasurementPoint(body: Body | null, clientX?: number, clientY?: number) {
-  let point: MeasurePoint;
-  if (body) {
-    point = {
-      label: body.name,
-      xAu: body.position.x_au,
-      yAu: body.position.y_au,
-      zAu: body.position.z_au,
-      bodyKey: body.key
-    };
-  } else if (clientX !== undefined && clientY !== undefined) {
-    const world = screenToWorld(clientX, clientY);
-    point = { label: "Map point", xAu: world.xAu, yAu: world.yAu, zAu: 0 };
-  } else {
-    return;
-  }
-
-  measurePoints = [...measurePoints.filter((candidate) => candidate.bodyKey !== point.bodyKey || !point.bodyKey), point].slice(-2);
-  updateMeasurePanel();
-}
-
-function updateMeasurePanel() {
-  if (interactionMode !== "measure" && measurePoints.length === 0) {
-    measurePanel.hidden = true;
-    return;
-  }
-
-  measurePanel.hidden = false;
-  const distanceKm = measurePoints.length === 2 ? measureDistanceKm() : null;
-  measurePanel.innerHTML = `
-    <div class="measure-title">
-      ${icon("ruler")}
-      <strong>Measure</strong>
-      <button type="button" class="text-action" data-measure-action="clear">Clear</button>
-    </div>
-    <div class="measure-points">
-      <span>${escapeHtml(measurePoints[0]?.label ?? "Choose first point")}</span>
-      <span>${escapeHtml(measurePoints[1]?.label ?? "Choose second point")}</span>
-    </div>
-    <strong>${distanceKm === null ? "Click two bodies or map points" : formatDistance(distanceKm)}</strong>
-    ${distanceKm === null ? "" : `<span>${formatDuration(distanceKm / LIGHT_SPEED_KM_S)} light time</span>`}
-  `;
-}
-
-function measureDistanceKm() {
-  if (!ephemeris || measurePoints.length < 2) return 0;
-  const [a, b] = measurePoints;
-  return Math.hypot(a.xAu - b.xAu, a.yAu - b.yAu, a.zAu - b.zAu) * ephemeris.au_km;
-}
-
-function addRouteWaypoint(body: Body) {
-  if (body.key === "earth" || body.key === selectedTarget) return;
-  routeWaypoints = [...routeWaypoints.filter((waypoint) => waypoint.key !== body.key), { key: body.key, name: body.name }].slice(-4);
-  trajectoryPlan = null;
-  selectedTrajectoryCandidateId = null;
-  trajectoryError = "";
-  void loadTrajectoryPlan();
-}
-
-function routeBodySequence(earth: Body, target: Body) {
-  const sequence = [earth];
-  for (const waypoint of routeWaypoints) {
-    const body = bodyByKey.get(waypoint.key);
-    if (body && body.key !== earth.key && body.key !== target.key) {
-      sequence.push(body);
-    }
-  }
-  sequence.push(target);
-  return sequence;
-}
-
-function routeTrajectoryPoints(earth: Body, target: Body) {
-  const sequence = routeBodySequence(earth, target);
-  const points: RoutePoint[] = [];
-  for (let index = 1; index < sequence.length; index += 1) {
-    const start = sequence[index - 1];
-    const end = sequence[index];
-    const segment =
-      isStaticStellarCatalogBody(start) || isStaticStellarCatalogBody(end)
-        ? linearSegmentPoints(positionToRoutePoint(start.position), positionToRoutePoint(end.position), TRANSFER_PATH_SAMPLES)
-        : transferSegmentPoints(start.position, end.position, TRANSFER_PATH_SAMPLES);
-    if (points.length) {
-      segment.shift();
-    }
-    points.push(...segment);
-  }
-  return points;
-}
-
-function activeTrajectoryCandidate() {
-  if (!trajectoryPlan || trajectoryPlan.parameters.destination !== selectedTarget) return null;
-  const plan = trajectoryPlan;
-  return (
-    plan.candidates.find((candidate) => candidate.id === selectedTrajectoryCandidateId) ??
-    plan.candidates.find((candidate) => candidate.id === plan.selected_candidate_id) ??
-    plan.candidates[0] ??
-    null
-  );
-}
-
-function activeRoutePoints(earth: Body, target: Body) {
-  const candidate = activeTrajectoryCandidate();
-  if (candidate?.samples.length) {
-    return candidate.samples.map((point) => ({ xAu: point.x_au, yAu: point.y_au, zAu: point.z_au }));
-  }
-  return routeTrajectoryPoints(earth, target);
-}
-
-function transferSegmentPoints(start: BodyPosition, end: BodyPosition, sampleCount: number) {
-  const startPoint = positionToRoutePoint(start);
-  const endPoint = positionToRoutePoint(end);
-  const chordAu = routePointDistanceAu(startPoint, endPoint);
-  if (chordAu === 0) return [startPoint, endPoint];
-
-  const startRadiusAu = Math.hypot(startPoint.xAu, startPoint.yAu);
-  const endRadiusAu = Math.hypot(endPoint.xAu, endPoint.yAu);
-  if (startRadiusAu < 0.02 || endRadiusAu < 0.02) {
-    return linearSegmentPoints(startPoint, endPoint, sampleCount);
-  }
-
-  const startTangent = progradeTangent(startPoint);
-  const endTangent = progradeTangent(endPoint);
-  const controlAu = clamp(chordAu * 0.44 + Math.abs(endRadiusAu - startRadiusAu) * 0.08, 0.001, Math.max(chordAu, startRadiusAu, endRadiusAu) * 0.8);
-  const controlA = {
-    xAu: startPoint.xAu + startTangent.x * controlAu,
-    yAu: startPoint.yAu + startTangent.y * controlAu,
-    zAu: startPoint.zAu
-  };
-  const controlB = {
-    xAu: endPoint.xAu - endTangent.x * controlAu,
-    yAu: endPoint.yAu - endTangent.y * controlAu,
-    zAu: endPoint.zAu
-  };
-
-  const points: RoutePoint[] = [];
-  for (let index = 0; index <= sampleCount; index += 1) {
-    const t = index / sampleCount;
-    points.push(cubicRoutePoint(startPoint, controlA, controlB, endPoint, t));
-  }
-  return points;
-}
-
-function linearSegmentPoints(start: RoutePoint, end: RoutePoint, sampleCount: number) {
-  const points: RoutePoint[] = [];
-  for (let index = 0; index <= sampleCount; index += 1) {
-    const t = index / sampleCount;
-    points.push({
-      xAu: start.xAu + (end.xAu - start.xAu) * t,
-      yAu: start.yAu + (end.yAu - start.yAu) * t,
-      zAu: start.zAu + (end.zAu - start.zAu) * t
-    });
-  }
-  return points;
-}
-
-function positionToRoutePoint(position: BodyPosition): RoutePoint {
-  return {
-    xAu: position.x_au,
-    yAu: position.y_au,
-    zAu: position.z_au
-  };
-}
-
-function progradeTangent(point: RoutePoint) {
-  const radiusAu = Math.hypot(point.xAu, point.yAu);
-  if (radiusAu === 0) return { x: 0, y: 1 };
-  return { x: -point.yAu / radiusAu, y: point.xAu / radiusAu };
-}
-
-function cubicRoutePoint(a: RoutePoint, b: RoutePoint, c: RoutePoint, d: RoutePoint, t: number) {
-  const inv = 1 - t;
-  const inv2 = inv * inv;
-  const t2 = t * t;
-  return {
-    xAu: inv2 * inv * a.xAu + 3 * inv2 * t * b.xAu + 3 * inv * t2 * c.xAu + t2 * t * d.xAu,
-    yAu: inv2 * inv * a.yAu + 3 * inv2 * t * b.yAu + 3 * inv * t2 * c.yAu + t2 * t * d.yAu,
-    zAu: a.zAu + (d.zAu - a.zAu) * t
-  };
-}
-
-function routePointDistanceAu(a: RoutePoint, b: RoutePoint) {
-  return Math.hypot(a.xAu - b.xAu, a.yAu - b.yAu, a.zAu - b.zAu);
-}
-
-function routeTotalDistanceKm(earth: Body, target: Body) {
-  if (!ephemeris) return target.distance_from_earth_km;
-  const activePlan = activeTrajectoryCandidate();
-  if (activePlan) {
-    return activePlan.metrics.path_distance_km;
-  }
-  const points = activeRoutePoints(earth, target);
-  let totalKm = 0;
-  for (let index = 1; index < points.length; index += 1) {
-    totalKm += routePointDistanceAu(points[index - 1], points[index]) * ephemeris.au_km;
-  }
-  return totalKm;
-}
-
-function journeyRouteProgress(earth: Body, target: Body, currentShip: Ship) {
-  const points = activeRoutePoints(earth, target);
-  if (points.length < 2) return 0;
-
-  const shipPoint = { xAu: currentShip.xAu, yAu: currentShip.yAu, zAu: currentShip.zAu };
-  let totalAu = 0;
-  let walkedAu = 0;
-  let nearestDistanceAu = Number.POSITIVE_INFINITY;
-  let nearestAlongAu = 0;
-
-  for (let index = 1; index < points.length; index += 1) {
-    const start = points[index - 1];
-    const end = points[index];
-    const segmentAu = routePointDistanceAu(start, end);
-    if (segmentAu === 0) continue;
-
-    const projection = closestProgressOnSegment(start, end, shipPoint);
-    if (projection.distanceAu < nearestDistanceAu) {
-      nearestDistanceAu = projection.distanceAu;
-      nearestAlongAu = walkedAu + segmentAu * projection.t;
-    }
-    walkedAu += segmentAu;
-    totalAu += segmentAu;
-  }
-
-  if (totalAu === 0) return 0;
-  return clamp(nearestAlongAu / totalAu, 0, 1);
-}
-
-function closestProgressOnSegment(start: RoutePoint, end: RoutePoint, point: RoutePoint) {
-  const vx = end.xAu - start.xAu;
-  const vy = end.yAu - start.yAu;
-  const vz = end.zAu - start.zAu;
-  const wx = point.xAu - start.xAu;
-  const wy = point.yAu - start.yAu;
-  const wz = point.zAu - start.zAu;
-  const mag2 = vx * vx + vy * vy + vz * vz;
-  const t = mag2 === 0 ? 0 : clamp((wx * vx + wy * vy + wz * vz) / mag2, 0, 1);
-  return {
-    t,
-    distanceAu: Math.hypot(start.xAu + vx * t - point.xAu, start.yAu + vy * t - point.yAu, start.zAu + vz * t - point.zAu)
-  };
-}
-
-function nextGuidanceText(navigation: ReturnType<typeof navigationMetrics>, distanceKm: number, thresholdKm: number) {
-  if (distanceKm <= thresholdKm) return "Inside arrival zone";
-  if (navigation.closingSpeedKmS <= 0) return "Point toward target, then thrust";
-  if (navigation.headingErrorDeg > 25) return "Course correcting";
-  if (warpEnabled) return "Warp flight";
-  return "Distance remaining";
-}
-
-function distanceComparisonText(distanceKm: number) {
-  const comparisons = educationalComparisons(distanceKm, { auKm: ephemeris?.au_km ?? AU_KM_FALLBACK });
-  const light = comparisons.find((comparison) => comparison.key === "light_time");
-  const moon = comparisons.find((comparison) => comparison.key === "earth_moon_distances");
-  if (light && moon) {
-    return `${moon.displayValue} Earth-Moon distances · ${light.displayValue} light time`;
-  }
-  return `${formatNumber(distanceKm / EARTH_MOON_AVG_KM)} Earth-Moon distances`;
-}
-
-function lightStoryText(target: Body, shipTargetKm: number) {
-  if (target.deep_sky?.distance_ly) {
-    return `You see it as it was ${formatLookbackTime(target.deep_sky.distance_ly)} ago.`;
-  }
-  if (isStaticStellarCatalogBody(target)) {
-    return `Target light takes ${formatLightYears(shipTargetKm / LIGHT_YEAR_KM)} to reach the ship.`;
-  }
-  return `Current ship-target light time is ${formatDuration(shipTargetKm / LIGHT_SPEED_KM_S)}.`;
-}
-
-function centerOnBody(key: string) {
-  const body = bodyByKey.get(key);
-  if (!body) return;
-  cancelCameraAnimation();
-  setCameraFocusOnPoint(body.position.x_au, body.position.y_au);
-}
-
-function zoomToBody(key: string) {
-  const body = bodyByKey.get(key);
-  if (!body) return;
-  const viewRadiusAu = zoomViewRadiusAu(body);
-  const viewport = mapViewportRect();
-  const focusSize = Math.max(260, Math.min(viewport.right - viewport.left, viewport.bottom - viewport.top));
-  const targetPxPerAu = clamp(
-    focusSize / (viewRadiusAu * 2.15),
-    MIN_PX_PER_AU,
-    MAX_PX_PER_AU
-  );
-  const targetCamera = cameraForFocusedPoint(body.position.x_au, body.position.y_au, targetPxPerAu);
-  animateCameraTo(targetCamera.xAu, targetCamera.yAu, targetPxPerAu);
-}
-
-function animateCameraTo(xAu: number, yAu: number, pxPerAu: number, durationMs = 850) {
-  cameraAnimation = {
-    startedAt: performance.now(),
-    durationMs,
-    fromXAu: camera.xAu,
-    fromYAu: camera.yAu,
-    fromPxPerAu: camera.pxPerAu,
-    toXAu: xAu,
-    toYAu: yAu,
-    toPxPerAu: clamp(pxPerAu, MIN_PX_PER_AU, MAX_PX_PER_AU)
-  };
-}
-
-function updateCameraAnimation(now: number) {
-  if (!cameraAnimation) return;
-  const progress = clamp((now - cameraAnimation.startedAt) / cameraAnimation.durationMs, 0, 1);
-  const eased = easeInOutCubic(progress);
-  camera.xAu = lerp(cameraAnimation.fromXAu, cameraAnimation.toXAu, eased);
-  camera.yAu = lerp(cameraAnimation.fromYAu, cameraAnimation.toYAu, eased);
-  camera.pxPerAu = Math.exp(lerp(Math.log(cameraAnimation.fromPxPerAu), Math.log(cameraAnimation.toPxPerAu), eased));
-  if (progress >= 1) {
-    camera.xAu = cameraAnimation.toXAu;
-    camera.yAu = cameraAnimation.toYAu;
-    camera.pxPerAu = cameraAnimation.toPxPerAu;
-    cameraAnimation = null;
-    updateHud(true);
-  }
-}
-
-function cancelCameraAnimation() {
-  cameraAnimation = null;
-}
-
-function easeInOutCubic(value: number) {
-  return value < 0.5 ? 4 * value * value * value : 1 - ((-2 * value + 2) ** 3) / 2;
-}
-
-function lerp(from: number, to: number, value: number) {
-  return from + (to - from) * value;
-}
-
-function ensureSelectedKeysExist() {
-  const loadedKeys = Array.from(bodyByKey.keys());
-  if (!bodyByKey.has(selectedTarget)) {
-    selectedTarget = bodyByKey.has(selectedBodyKey) ? selectedBodyKey : bodyByKey.has("jupiter") ? "jupiter" : (loadedKeys[0] ?? "");
-  }
-  if (!bodyByKey.has(selectedBodyKey)) {
-    selectedBodyKey = selectedTarget;
-  }
-}
-
-function populateCatalogControls() {
+function updateBodyPicker() {
   if (!ephemeris) return;
-  const previous = bodySelect.value || selectedBodyKey;
-  bodySelect.innerHTML = "";
-
-  for (const body of ephemeris.bodies) {
-    const option = document.createElement("option");
-    option.value = body.key;
-    option.textContent = body.name;
-    bodySelect.appendChild(option);
-  }
-
-  selectedBodyKey = bodyByKey.has(previous) ? previous : selectedBodyKey;
-  syncBodySelect();
-  syncDestinationSearch();
-  renderBodyPicker();
-  renderRouteMemory();
-  renderGuidedTours();
-  updateTargetButtons();
-}
-
-function syncBodySelect() {
-  if (bodySelect.value !== selectedBodyKey) {
-    bodySelect.value = selectedBodyKey;
-  }
-}
-
-function initializeBodyFilterButtons() {
-  bodyFilterButtons.innerHTML = BODY_FILTERS.map((filter) => {
-    const label = BODY_FILTER_LABELS[filter];
-    return `<button type="button" data-body-filter="${filter}">${escapeHtml(label)}</button>`;
-  }).join("");
-  bodyFilterButtons.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
-    const filter = button?.dataset.bodyFilter as BodyFilter | undefined;
-    if (!filter || !BODY_FILTERS.includes(filter)) return;
-    activeBodyFilter = filter;
-    if (isSelectedDestinationSearchValue()) {
-      destinationSearch.value = "";
-    }
-    renderBodyPicker();
-  });
-}
-
-function initializeModeButtons() {
-  for (const button of modeButtons.querySelectorAll<HTMLButtonElement>("[data-mode]")) {
-    const mode = button.dataset.mode as InteractionMode | undefined;
-    if (!mode || !modeCopy[mode]) continue;
-    button.textContent = modeCopy[mode].label;
-    button.title = modeCopy[mode].tooltip;
-    button.setAttribute("aria-label", modeCopy[mode].tooltip);
-  }
-  updateModeButtons();
-}
-
-function initializeSizeModeButtons() {
-  updateSizeModeButtons();
-}
-
-function renderBodyPicker() {
-  if (!ephemeris) return;
-  const includeTypes = activeBodyFilter === "all" ? undefined : [activeBodyFilter as DestinationBodyType];
-  const query = destinationPickerQuery();
+  const includeTypes = BODY_FILTERS.find((filter) => filter.key === activeFilter)?.types;
   const sections = buildDestinationPickerSections(ephemeris.bodies, {
-    query,
-    selectedKey: selectedBodyKey,
-    currentTargetKey: selectedTarget,
+    query: bodySearch.value,
+    selectedKey,
+    currentTargetKey: selectedKey,
     recentDestinations,
     includeTypes,
-    maxResults: query ? 12 : undefined,
-    maxFavorites: activeBodyFilter === "all" ? 4 : 0,
-    maxFrequent: activeBodyFilter === "all" ? 4 : 0,
-    maxRecent: activeBodyFilter === "all" ? 4 : 0,
-    includeAllSection: true,
-    auKm: ephemeris.au_km
-  }).filter((section) => section.items.length > 0);
+    auKm: auKm(),
+    maxResults: bodySearch.value ? 80 : 240,
+    maxFavorites: 8,
+    maxFrequent: 8,
+    maxRecent: 8,
+    includeAllSection: true
+  });
 
-  for (const button of bodyFilterButtons.querySelectorAll<HTMLButtonElement>("[data-body-filter]")) {
-    button.classList.toggle("active", button.dataset.bodyFilter === activeBodyFilter);
-  }
+  const visibleSections = bodySearch.value.trim() ? sections : sections.filter((section) => section.kind === "all");
 
-  bodyPicker.innerHTML = sections
-    .map((section) => {
-      const allSectionLimit = activeBodyFilter === "all" ? 10 : 16;
-      const items = section.items.slice(0, section.kind === "all" ? allSectionLimit : 4);
-      const label = section.kind === "all" && activeBodyFilter !== "all" ? BODY_FILTER_SECTION_LABELS[activeBodyFilter] : section.label;
-      return `
+  bodyPicker.innerHTML = visibleSections
+    .filter((section) => section.items.length > 0)
+    .map(
+      (section) => `
         <section class="destination-picker__section">
-          <span class="destination-picker__section-title">${escapeHtml(label)}</span>
-          <div class="destination-picker__list">
-            ${items.map(renderDestinationPickerItem).join("")}
-          </div>
+          <h3 class="destination-picker__section-title">${escapeHtml(section.label)}</h3>
+          <div class="destination-picker__list">${section.items.map(renderPickerItem).join("")}</div>
         </section>
-      `;
-    })
+      `
+    )
     .join("");
 }
 
-function destinationPickerQuery() {
-  return isSelectedDestinationSearchValue() ? "" : destinationSearch.value;
-}
-
-function isSelectedDestinationSearchValue(value = destinationSearch.value) {
-  const target = bodyByKey.get(selectedTarget);
-  if (!target) return false;
-  return normalizeDestinationQuery(value) === normalizeDestinationQuery(bodySearchLabel(target));
-}
-
-function renderDestinationPickerItem(item: DestinationPickerItem) {
-  const badges = item.badges
-    .slice(0, 2)
-    .map((badge) => `<span class="destination-picker__badge">${escapeHtml(badge.label)}</span>`)
-    .join("");
+function renderPickerItem(item: DestinationPickerItem) {
+  const style = destinationPickerColorStyle(item);
   return `
     <button
       type="button"
-      class="destination-picker__item"
-      data-picker-body="${escapeHtml(item.key)}"
-      data-active="${item.isCurrentTarget}"
+      class="destination-picker__item${item.key === selectedKey ? " is-selected" : ""}"
+      data-body-key="${escapeHtml(item.key)}"
       aria-label="${escapeHtml(item.ariaLabel)}"
+      style="--destination-color: ${escapeHtml(style["--destination-color"])}"
     >
-      <span class="destination-picker__orb body-${escapeHtml(item.key)} type-${escapeHtml(item.type)}" style="--destination-color: ${escapeHtml(item.color)}"></span>
+      <span class="destination-picker__orb" aria-hidden="true"></span>
       <span class="destination-picker__copy">
         <strong class="destination-picker__name">${escapeHtml(item.name)}</strong>
         <span class="destination-picker__meta">${escapeHtml(item.metaLabel)}</span>
       </span>
       <span class="destination-picker__distance">${escapeHtml(item.distanceLabel)}</span>
-      ${badges ? `<span class="destination-picker__badges">${badges}</span>` : ""}
     </button>
   `;
 }
 
-function renderRouteMemory() {
-  const recent = recentDestinations
-    .map((entry) => bodyByKey.get(entry.key))
-    .filter((body): body is Body => Boolean(body))
-    .slice(0, 4);
-  if (!recent.length) {
-    routeMemory.innerHTML = "";
+function updateGuidedSets() {
+  guidedTours.innerHTML = GUIDED_SETS.map((tour) => {
+    const available = tour.keys.map((key) => bodyByKey.get(key)).filter(isPresent);
+    if (available.length === 0) return "";
+    return `
+      <button type="button" data-tour-id="${escapeHtml(tour.id)}">
+        <strong>${escapeHtml(tour.label)}</strong>
+        <span>${available.length} objects</span>
+      </button>
+    `;
+  }).join("");
+}
+
+function updateBodyInfo() {
+  const body = selectedBody();
+  if (!body) {
+    selectedHeading.textContent = "No object selected";
+    bodyInfo.innerHTML = `<p class="empty-state">Select an object from the map or catalog.</p>`;
     return;
   }
-  routeMemory.innerHTML = `
-    <span>Recent destinations</span>
-    <div>
-      ${recent
-        .map(
-          (body) => `
-            <button type="button" data-recent-destination="${escapeHtml(body.key)}">
-              ${bodyOrbHtml(body)}
-              <span>${escapeHtml(body.name)}</span>
-            </button>
-          `
-        )
-        .join("")}
-    </div>
+
+  selectedHeading.textContent = body.name;
+  const classification = classifyBody(body);
+  const rows = [
+    ["Type", classification.label],
+    ["Earth distance", formatDistance(body.distance_from_earth_km)],
+    ["Heliocentric distance", formatDistance(body.position.heliocentric_distance_km)],
+    ["Radius", formatDistance(body.radius_km)],
+    ["Position model", readablePositionModel(body.catalog?.position_model ?? body.catalog?.source_type ?? "")],
+    ["Parent", body.parent_key ? bodyByKey.get(body.parent_key)?.name ?? body.parent_key : "None"]
+  ];
+
+  const stateRows = body.state_vector
+    ? [
+        ["Parent-relative speed", `${formatNumber(body.state_vector.speed_km_s)} km/s`],
+        ["Heliocentric speed", `${formatNumber(body.state_vector.heliocentric_speed_km_s)} km/s`]
+      ]
+    : [];
+
+  const orbitRows = body.orbit
+    ? [
+        ["Orbit class", body.orbit.orbit_class],
+        ["Semi-major axis", nullableDistance(body.orbit.semi_major_axis_km)],
+        ["Eccentricity", nullableNumber(body.orbit.eccentricity, 4)],
+        ["Inclination", nullableDegrees(body.orbit.inclination_deg)],
+        ["Period", nullableDays(body.orbit.orbital_period_days)]
+      ]
+    : [];
+
+  const stellarRows = body.stellar
+    ? [
+        ["Catalog distance", nullableLightYears(body.stellar.distance_ly)],
+        ["Known planets", nullableNumber(body.stellar.exoplanet_count, 0)],
+        ["Temperature", body.stellar.stellar_teff_k ? `${formatNumber(body.stellar.stellar_teff_k)} K` : "Unknown"]
+      ]
+    : [];
+
+  const deepSkyRows = body.deep_sky
+    ? [
+        ["Deep-sky type", body.deep_sky.deep_sky_type_label ?? "Unknown"],
+        ["Magnitude", nullableNumber(body.deep_sky.apparent_magnitude, 1)],
+        ["Constellation", body.deep_sky.constellation ?? "Unknown"],
+        ["Viewing season", body.deep_sky.viewing_season ?? "Unknown"],
+        ["Angular size", body.deep_sky.angular_size_arcmin ?? "Unknown"],
+        ["Physical diameter", body.deep_sky.physical_diameter_ly ? `${formatNumber(body.deep_sky.physical_diameter_ly)} ly` : "Unknown"]
+      ]
+    : [];
+
+  bodyInfo.innerHTML = `
+    <article class="selected-object" style="--body-color: ${escapeHtml(body.color)}">
+      <div class="object-hero">
+        <span class="large-orb"></span>
+        <div>
+          <p>${escapeHtml(classification.label)}</p>
+          <h3>${escapeHtml(body.name)}</h3>
+        </div>
+      </div>
+      <dl class="detail-grid">${renderRows(rows)}</dl>
+      ${stateRows.length ? `<h4>State vector</h4><dl class="detail-grid">${renderRows(stateRows)}</dl>` : ""}
+      ${orbitRows.length ? `<h4>Osculating orbit</h4><dl class="detail-grid">${renderRows(orbitRows)}</dl>` : ""}
+      ${stellarRows.length ? `<h4>Stellar catalog</h4><dl class="detail-grid">${renderRows(stellarRows)}</dl>` : ""}
+      ${deepSkyRows.length ? `<h4>Deep-sky catalog</h4><dl class="detail-grid">${renderRows(deepSkyRows)}</dl>` : ""}
+      ${body.deep_sky?.why_interesting ? `<p class="object-note">${escapeHtml(body.deep_sky.why_interesting)}</p>` : ""}
+    </article>
   `;
 }
 
-function renderGuidedTours() {
-  const availableTours = GUIDED_TOURS.map((tour) => ({
-    ...tour,
-    bodies: tour.keys.map((key) => bodyByKey.get(key)).filter((body): body is Body => Boolean(body))
-  })).filter((tour) => tour.bodies.length > 0);
-
-  guidedTours.innerHTML = availableTours
-    .map(
-      (tour) => `
-        <article class="tour-card">
-          <div>
-            <strong>${escapeHtml(tour.label)}</strong>
-            <span>${escapeHtml(tour.description)}</span>
-          </div>
-          <div class="tour-targets">
-            ${tour.bodies
-              .map(
-                (body) => `
-                  <button type="button" data-tour-target="${escapeHtml(body.key)}" title="${escapeHtml(body.name)}">
-                    ${bodyOrbHtml(body)}
-                    <span>${escapeHtml(tourTargetLabel(body))}</span>
-                  </button>
-                `
-              )
-              .join("")}
-          </div>
-        </article>
-      `
-    )
+function renderRows(rows: (string | number | null | undefined)[][]) {
+  return rows
+    .map(([label, value]) => `<dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value ?? "Unknown"))}</dd>`)
     .join("");
 }
 
-function tourTargetLabel(body: Body) {
-  if (body.deep_sky?.common_name) return body.deep_sky.common_name;
-  return body.name;
-}
+function updateMeasurePanel() {
+  measureClickMode.classList.toggle("active", measureMode);
+  toolbarMeasure.classList.toggle("active", measureMode);
 
-function updateModeButtons() {
-  for (const button of modeButtons.querySelectorAll<HTMLButtonElement>("[data-mode]")) {
-    button.classList.toggle("active", button.dataset.mode === interactionMode);
+  const selected = selectedBody();
+  measureFromSelected.disabled = !selected;
+  measureToSelected.disabled = !selected;
+
+  if (measurePoints.length === 0) {
+    measurePanel.innerHTML = `<div class="empty-state">No measurement selected.</div>`;
+    return;
   }
-  canvas.classList.toggle("measure-mode", interactionMode === "measure");
-  canvas.classList.toggle("target-mode", interactionMode === "target");
-}
 
-function updateSizeModeButtons() {
-  for (const button of sizeModeButtons.querySelectorAll<HTMLButtonElement>("[data-size-mode]")) {
-    const mode = button.dataset.sizeMode as SizeMode | undefined;
-    button.classList.toggle("active", mode === sizeMode);
-    if (mode && mode in SIZE_MODE_COPY) {
-      button.title = SIZE_MODE_COPY[mode];
-    }
+  const pointRows = measurePoints
+    .map(
+      (point, index) => `
+        <div class="measure-point">
+          <span>${index === 0 ? "A" : "B"}</span>
+          <strong>${escapeHtml(point.label)}</strong>
+        </div>
+      `
+    )
+    .join("");
+
+  if (measurePoints.length === 1) {
+    measurePanel.innerHTML = `${pointRows}<div class="empty-state">Choose a second point.</div>`;
+    return;
   }
-  scaleNote.textContent = SIZE_MODE_COPY[sizeMode];
-}
 
-function decorateStaticControls() {
-  setButtonContent(setDestination, "target", "Target");
-  setButtonContent(jumpDestination, "locate", "Center", { compact: true });
-  setButtonContent(targetSelected, "target", "Set as target", { compact: true });
-  setButtonContent(centerSelected, "center", "Center map", { compact: true });
-  setButtonContent(zoomSelected, "zoom", "Zoom to body", { compact: true });
-  setButtonContent(applyTime, "check", "Apply timestamp", { compact: true });
-  setButtonContent(zoomOut, "minus", "Zoom out", { compact: true });
-  setButtonContent(zoomIn, "plus", "Zoom in", { compact: true });
-  setButtonContent(centerSun, "sun", "Center on Sun", { compact: true });
-  setButtonContent(centerShip, "ship", "Center on ship", { compact: true });
-  setButtonContent(resetShipButton, "reset", "Reset ship", { compact: true });
-  setButtonContent(restartJourneyButton, "restart", "Restart journey", { compact: true });
-
-  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-step-days]")) {
-    const days = Number(button.dataset.stepDays ?? "0");
-    const label = `${Math.abs(days)}d`;
-    button.classList.add("time-step");
-    button.classList.toggle("past", days < 0);
-    button.classList.toggle("future", days > 0);
-    button.innerHTML = `${icon(days < 0 ? "back" : "forward")}<span>${label}</span>`;
-  }
-}
-
-function setButtonContent(button: HTMLButtonElement, iconName: string, label: string, options: { compact?: boolean } = {}) {
-  const labelClass = options.compact ? "sr-only" : "button-label";
-  button.innerHTML = `${icon(iconName)}<span class="${labelClass}">${escapeHtml(label)}</span>`;
-}
-
-function updateTargetButtons() {
-  for (const button of targetButtons.querySelectorAll<HTMLButtonElement>("button")) {
-    const key = button.dataset.target;
-    if (!key) continue;
-    const body = bodyByKey.get(key);
-    button.classList.toggle("active", key === selectedTarget);
-    button.disabled = !bodyByKey.has(key);
-    button.setAttribute("aria-label", `Set target to ${body?.name ?? labelForKey(key)}`);
-    button.innerHTML = quickTargetMarkup(key, body);
-  }
-}
-
-function quickTargetMarkup(key: string, body?: Body) {
-  const name = body?.name ?? labelForKey(key);
-  const distance = body ? compactDistance(body.distance_from_earth_km) : "loading";
-  return `
-    ${bodyOrbHtml(body ?? key)}
-    <span class="target-copy">
-      <strong>${escapeHtml(name)}</strong>
-      <small>${distance}</small>
-    </span>
+  const distanceKm = measureDistanceKm(measurePoints[0], measurePoints[1]);
+  const comparisons = educationalComparisons(distanceKm, { auKm: auKm(), includeMissionComparisons: false }).slice(0, 4);
+  measurePanel.innerHTML = `
+    ${pointRows}
+    <div class="measure-result">
+      <span>Distance</span>
+      <strong>${formatDistance(distanceKm)}</strong>
+      <small>${formatNumber(distanceKm / auKm())} AU</small>
+    </div>
+    <dl class="comparison-list">
+      ${comparisons.map((comparison) => `<dt>${escapeHtml(comparison.label)}</dt><dd>${escapeHtml(comparison.displayValue)}</dd>`).join("")}
+    </dl>
   `;
 }
 
-function setTarget(key: string, options: { inspect?: boolean; center?: boolean } = {}) {
+function updateTimeSummary() {
+  if (!ephemeris) return;
+  timeSummary.textContent = formatFullDate(ephemeris.timestamp_utc);
+}
+
+function updateSizeModes() {
+  for (const button of sizeModeButtons.querySelectorAll<HTMLButtonElement>("[data-size-mode]")) {
+    button.classList.toggle("active", button.dataset.sizeMode === sizeMode);
+  }
+}
+
+function updateDisplayToggles() {
+  for (const input of displayToggles.querySelectorAll<HTMLInputElement>("input[data-layer]")) {
+    input.checked = displayLayers[input.dataset.layer as DisplayLayer] ?? false;
+  }
+}
+
+function updateScaleUi() {
+  const scaleAu = Math.max(0.000001, usableViewportRect().width / camera.pxPerAu);
+  const active = SCALE_STOPS.find((stop) => scaleAu <= stop.maxAu) ?? SCALE_STOPS[SCALE_STOPS.length - 1];
+  scaleLadder.innerHTML = SCALE_STOPS.map(
+    (stop) => `<span class="${stop.key === active.key ? "active" : ""}">${escapeHtml(stop.label)}</span>`
+  ).join("");
+  scaleNote.textContent = `${active.label} scale. View width: ${formatDistance(scaleAu * auKm())}.`;
+}
+
+function focusSearchResult() {
+  if (!ephemeris) return;
+  const query = bodySearch.value.trim();
+  const body = findDestinationBody(ephemeris.bodies, query) ?? visiblePickerFirstMatch();
+  if (!body) return;
+  selectBody(body.key, { center: true, zoom: "local" });
+}
+
+function visiblePickerFirstMatch() {
+  if (!ephemeris) return null;
+  const includeTypes = BODY_FILTERS.find((filter) => filter.key === activeFilter)?.types;
+  const sections = buildDestinationPickerSections(ephemeris.bodies, {
+    query: bodySearch.value,
+    selectedKey,
+    currentTargetKey: selectedKey,
+    recentDestinations,
+    includeTypes,
+    maxResults: 1,
+    auKm: auKm()
+  });
+  const key = sections[0]?.items[0]?.key;
+  return key ? bodyByKey.get(key) ?? null : null;
+}
+
+function selectBody(key: string, options: { center?: boolean; zoom?: "local" } = {}) {
   const body = bodyByKey.get(key);
   if (!body) return;
-
-  selectedTarget = body.key;
-  trajectoryPlan = null;
-  selectedTrajectoryCandidateId = null;
-  trajectoryError = "";
+  selectedKey = body.key;
   recentDestinations = recordRecentDestination(body.key, { distanceFromEarthKm: body.distance_from_earth_km });
-  if (options.inspect) {
-    selectedBodyKey = body.key;
-    syncBodySelect();
+  if (options.center) centerOnBody(body, options.zoom === "local");
+  bodySearch.value = body.name;
+  setActiveTab("inspect");
+  hidePopover();
+  updateAllUi();
+  requestRender();
+}
+
+function centerOnSelected(zoom: boolean) {
+  const body = selectedBody();
+  if (!body) return;
+  centerOnBody(body, zoom);
+  requestRender();
+}
+
+function centerOnBody(body: Body, zoom: boolean) {
+  camera = { ...camera, xAu: body.position.x_au, yAu: body.position.y_au };
+  if (zoom) {
+    const distanceAu = Math.max(body.position.heliocentric_distance_km / auKm(), 0.02);
+    const targetWidthAu = body.catalog?.source_type === "deep_sky_catalog" ? Math.max(distanceAu * 0.08, 80_000) : Math.max(distanceAu * 0.55, 0.05);
+    camera.pxPerAu = clamp(usableViewportRect().width / targetWidthAu, MIN_ZOOM, MAX_ZOOM);
   }
-  syncDestinationSearch();
-  resetJourneyStats();
-  renderBodyPicker();
-  renderRouteMemory();
-  updateTargetButtons();
-  if (options.center) {
-    centerOnBody(body.key);
+  activeZoomPreset = "solar";
+  updateScaleUi();
+}
+
+function applyZoomPreset(preset: ZoomPreset, update = true) {
+  activeZoomPreset = preset;
+  if (!ephemeris) return;
+  const bodies = presetBodies(preset);
+  if (bodies.length > 0) fitBodies(bodies, 0.16);
+  updateZoomPresetButtons();
+  updateScaleUi();
+  if (update) requestRender();
+}
+
+function presetBodies(preset: ZoomPreset) {
+  if (!ephemeris) return [];
+  if (preset === "inner") {
+    return ["sun", "mercury", "venus", "earth", "moon", "mars"].map((key) => bodyByKey.get(key)).filter(isPresent);
   }
-  updateHud();
-  void loadTrajectoryPlan();
+  if (preset === "solar") {
+    return ephemeris.bodies.filter((body) => isSolarSystemBody(body));
+  }
+  if (preset === "nearby") {
+    return ephemeris.bodies.filter((body) => body.catalog_group === "nearby_exoplanet_systems" || body.key === "sun");
+  }
+  if (preset === "messier") {
+    return ephemeris.bodies.filter((body) => body.catalog_group === "messier_deep_sky");
+  }
+  return ephemeris.bodies;
 }
 
-function bodyFromSearchValue(value: string) {
-  return findDestinationBody(Array.from(bodyByKey.values()), value);
+function updateZoomPresetButtons() {
+  for (const button of zoomPresets.querySelectorAll<HTMLButtonElement>("[data-zoom-preset]")) {
+    button.classList.toggle("active", button.dataset.zoomPreset === activeZoomPreset);
+  }
 }
 
-function flashSearchError() {
-  destinationSearch.setCustomValidity("No loaded body matches this destination.");
-  destinationSearch.reportValidity();
-  window.setTimeout(() => destinationSearch.setCustomValidity(""), 1800);
-}
-
-function bodySearchLabel(body: Body) {
-  return body.name;
-}
-
-function bodyOrbHtml(bodyOrKey: Body | string, size: "large" | "" = "") {
-  const key = typeof bodyOrKey === "string" ? bodyOrKey : bodyOrKey.key;
-  const color = typeof bodyOrKey === "string" ? fallbackBodyColor(key) : safeCssColor(bodyOrKey.color);
-  const typeClass = typeof bodyOrKey === "string" ? "" : `type-${bodyOrKey.object_type ?? "unknown"}`;
-  const classKey = key.replace(/[^a-z0-9_-]/gi, "");
-  const className = ["body-orb", `body-${classKey}`, typeClass, size].filter(Boolean).join(" ");
-  return `<span class="${className}" style="--body-color: ${color};" aria-hidden="true"></span>`;
-}
-
-function fallbackBodyColor(key: string) {
-  const colors: Record<string, string> = {
-    sun: "#ffd166",
-    mercury: "#b8a48a",
-    venus: "#d8b26f",
-    earth: "#62a8ff",
-    moon: "#c8c8c8",
-    mars: "#df6b43",
-    phobos: "#9b8066",
-    deimos: "#b19a82",
-    jupiter: "#d9b382",
-    io: "#e5c45f",
-    europa: "#d8c7a8",
-    ganymede: "#a89980",
-    callisto: "#7b6a58",
-    saturn: "#d8c28a",
-    mimas: "#b9b7ad",
-    enceladus: "#dfe9ef",
-    tethys: "#c9c7bd",
-    dione: "#c6c7c2",
-    rhea: "#b9b5aa",
-    titan: "#d6a657",
-    iapetus: "#8d8070",
-    uranus: "#83d8d8",
-    neptune: "#6f8cff",
-    pluto: "#c9a27c"
+function fitBodies(bodies: Body[], paddingRatio: number) {
+  const rect = usableViewportRect();
+  const xs = bodies.map((body) => body.position.x_au);
+  const ys = bodies.map((body) => body.position.y_au);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const widthAu = Math.max(0.001, maxX - minX);
+  const heightAu = Math.max(0.001, maxY - minY);
+  const paddedWidthAu = widthAu * (1 + paddingRatio * 2);
+  const paddedHeightAu = heightAu * (1 + paddingRatio * 2);
+  camera = {
+    xAu: (minX + maxX) / 2,
+    yAu: (minY + maxY) / 2,
+    pxPerAu: clamp(Math.min(rect.width / paddedWidthAu, rect.height / paddedHeightAu), MIN_ZOOM, MAX_ZOOM)
   };
-  return colors[key] ?? "#d9b86f";
+  updateScaleUi();
 }
 
-function safeCssColor(color: string) {
-  return /^#[0-9a-f]{6}$/i.test(color) ? color : "#d9b86f";
+function zoomAt(x: number, y: number, factor: number) {
+  const before = screenToWorld(x, y);
+  camera.pxPerAu = clamp(camera.pxPerAu * factor, MIN_ZOOM, MAX_ZOOM);
+  const after = screenToWorld(x, y);
+  camera.xAu += before.xAu - after.xAu;
+  camera.yAu += before.yAu - after.yAu;
+  updateScaleUi();
+  requestRender();
 }
 
-function hexToRgba(color: string, alpha: number) {
-  const safe = safeCssColor(color);
-  const value = safe.slice(1);
-  const red = Number.parseInt(value.slice(0, 2), 16);
-  const green = Number.parseInt(value.slice(2, 4), 16);
-  const blue = Number.parseInt(value.slice(4, 6), 16);
-  return `rgba(${red}, ${green}, ${blue}, ${clamp(alpha, 0, 1)})`;
-}
-
-function icon(name: string) {
-  return ICONS[name] ?? "";
-}
-
-function compactDistance(km: number) {
-  if (!Number.isFinite(km)) return "distance pending";
-  const abs = Math.abs(km);
-  if (abs >= LIGHT_YEAR_KM * 0.1) return formatLightYears(km / LIGHT_YEAR_KM);
-  if (abs >= AU_KM_FALLBACK * 0.1) return `${formatAu(km / AU_KM_FALLBACK)} AU`;
-  if (abs >= 1_000_000) {
-    const millions = km / 1_000_000;
-    return `${millions >= 10 ? millions.toFixed(0) : millions.toFixed(1)}M km`;
+function handleMapClick(point: ScreenPoint) {
+  const nearest = nearestBodyAt(point.x, point.y);
+  if (measureMode) {
+    if (nearest) {
+      addMeasurePoint(bodyToMeasurePoint(nearest.body));
+    } else {
+      const world = screenToWorld(point.x, point.y);
+      addMeasurePoint({ label: "Map point", xAu: world.xAu, yAu: world.yAu, zAu: 0 });
+    }
+    return;
   }
-  if (abs >= 100_000) return `${(km / 1_000).toFixed(0)}k km`;
-  return `${formatNumber(km)} km`;
+
+  if (!nearest) {
+    hidePopover();
+    return;
+  }
+  selectedKey = nearest.body.key;
+  recentDestinations = recordRecentDestination(nearest.body.key, { distanceFromEarthKm: nearest.body.distance_from_earth_km });
+  showPopover(nearest.body, point);
+  setActiveTab("inspect");
+  updateAllUi();
+  requestRender();
+}
+
+function nearestBodyAt(x: number, y: number) {
+  let nearest: { body: Body; distancePx: number } | null = null;
+  for (const body of ephemeris?.bodies ?? []) {
+    const screen = worldToScreen(body.position.x_au, body.position.y_au);
+    const threshold = Math.max(14, markerRadius(body) + 8);
+    const distancePx = Math.hypot(screen.x - x, screen.y - y);
+    if (distancePx <= threshold && (!nearest || distancePx < nearest.distancePx)) {
+      nearest = { body, distancePx };
+    }
+  }
+  return nearest;
+}
+
+function showPopover(body: Body, point: ScreenPoint) {
+  const classification = classifyBody(body);
+  bodyPopover.hidden = false;
+  bodyPopover.style.left = `${Math.min(point.x + 16, canvas.width - 260)}px`;
+  bodyPopover.style.top = `${Math.min(point.y + 16, canvas.height - 170)}px`;
+  bodyPopover.innerHTML = `
+    <div class="popover-head" style="--body-color: ${escapeHtml(body.color)}">
+      <span class="body-orb"></span>
+      <div>
+        <strong>${escapeHtml(body.name)}</strong>
+        <span>${escapeHtml(classification.label)}</span>
+      </div>
+    </div>
+    <dl>
+      <dt>Earth distance</dt><dd>${escapeHtml(formatDistance(body.distance_from_earth_km))}</dd>
+      <dt>Radius</dt><dd>${escapeHtml(formatDistance(body.radius_km))}</dd>
+    </dl>
+  `;
+}
+
+function hidePopover() {
+  bodyPopover.hidden = true;
+}
+
+function setMeasurePointFromSelected(index: 0 | 1) {
+  const body = selectedBody();
+  if (!body) return;
+  const point = bodyToMeasurePoint(body);
+  measurePoints[index] = point;
+  measurePoints = measurePoints.slice(0, 2);
+  updateMeasurePanel();
+  requestRender();
+}
+
+function addMeasurePoint(point: MeasurePoint) {
+  if (measurePoints.length >= 2) measurePoints = [];
+  measurePoints = [...measurePoints, point].slice(0, 2);
+  updateMeasurePanel();
+  requestRender();
+}
+
+function bodyToMeasurePoint(body: Body): MeasurePoint {
+  return {
+    label: body.name,
+    xAu: body.position.x_au,
+    yAu: body.position.y_au,
+    zAu: body.position.z_au,
+    bodyKey: body.key
+  };
+}
+
+function measureDistanceKm(a: MeasurePoint, b: MeasurePoint) {
+  return Math.hypot(a.xAu - b.xAu, a.yAu - b.yAu, a.zAu - b.zAu) * auKm();
+}
+
+function visibleBodies() {
+  const rect = expandedRect(usableViewportRect(), 80);
+  return (ephemeris?.bodies ?? []).filter((body) => {
+    const screen = worldToScreen(body.position.x_au, body.position.y_au);
+    return screen.x >= rect.left && screen.x <= rect.right && screen.y >= rect.top && screen.y <= rect.bottom;
+  });
+}
+
+function prioritizedLabelBodies() {
+  const selected = selectedBody();
+  const visible = visibleBodies();
+  return visible
+    .filter((body) => body.key === selected?.key || body.key === hoverKey || isMajorBody(body) || camera.pxPerAu > 12)
+    .sort((a, b) => labelPriority(b) - labelPriority(a))
+    .slice(0, 40);
+}
+
+function bodiesOutsideViewport() {
+  const rect = usableViewportRect();
+  const center = { x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 };
+  return (ephemeris?.bodies ?? [])
+    .filter(isMajorBody)
+    .map((body) => {
+      const screen = worldToScreen(body.position.x_au, body.position.y_au);
+      return { body, screen, screenDistance: Math.hypot(screen.x - center.x, screen.y - center.y) };
+    })
+    .filter(({ screen }) => screen.x < rect.left || screen.x > rect.right || screen.y < rect.top || screen.y > rect.bottom);
+}
+
+function markerRadius(body: Body) {
+  const trueRadiusPx = (body.radius_km / auKm()) * camera.pxPerAu;
+  const classification = classifyBody(body);
+  const base = classification.type === "star" ? 5.4 : classification.type === "planet" ? 4.8 : classification.type === "moon" ? 3.5 : 3.2;
+  if (sizeMode === "true") return clamp(trueRadiusPx, body.key === selectedKey ? 2.2 : 0.7, 36);
+  if (sizeMode === "readable") return body.key === selectedKey ? base + 2.5 : base;
+  return clamp(Math.max(trueRadiusPx, base), body.key === selectedKey ? 4.8 : 2.4, 42);
+}
+
+function bodyAlpha(body: Body) {
+  if (body.catalog_group === "messier_deep_sky" && camera.pxPerAu > 1e-5) return 0.28;
+  if (body.catalog_group === "nearby_exoplanet_systems" && camera.pxPerAu > 0.01) return 0.42;
+  return 0.88;
+}
+
+function labelPriority(body: Body) {
+  if (body.key === selectedKey) return 100;
+  if (body.key === hoverKey) return 90;
+  const classification = classifyBody(body);
+  if (body.key === "sun") return 80;
+  if (classification.type === "planet") return 70;
+  if (classification.type === "moon") return 42;
+  if (classification.type === "star") return 36;
+  return 20;
+}
+
+function isMajorBody(body: Body) {
+  const type = classifyBody(body).type;
+  return type === "planet" || type === "star" || type === "galaxy" || body.key === selectedKey || FEATURED_KEYS.includes(body.key);
+}
+
+function isSolarSystemBody(body: Body) {
+  return body.catalog_group === "core" || body.catalog_group?.endsWith("_moons");
+}
+
+function countBodies(bodies: Body[]) {
+  return bodies.reduce(
+    (counts, body) => {
+      const type = classifyBody(body).type;
+      if (type === "planet") counts.planet += 1;
+      if (type === "moon") counts.moon += 1;
+      if (body.catalog_group === "messier_deep_sky") counts.deepSky += 1;
+      return counts;
+    },
+    { planet: 0, moon: 0, deepSky: 0 }
+  );
+}
+
+function selectedBody() {
+  return bodyByKey.get(selectedKey) ?? null;
+}
+
+function worldToScreen(xAu: number, yAu: number): ScreenPoint {
+  const rect = usableViewportRect();
+  return {
+    x: rect.left + rect.width / 2 + (xAu - camera.xAu) * camera.pxPerAu,
+    y: rect.top + rect.height / 2 - (yAu - camera.yAu) * camera.pxPerAu
+  };
+}
+
+function screenToWorld(x: number, y: number) {
+  const rect = usableViewportRect();
+  return {
+    xAu: camera.xAu + (x - (rect.left + rect.width / 2)) / camera.pxPerAu,
+    yAu: camera.yAu - (y - (rect.top + rect.height / 2)) / camera.pxPerAu
+  };
+}
+
+function usableViewportRect(): Rect {
+  const shell = document.querySelector<HTMLElement>(".atlas-shell");
+  const bar = document.querySelector<HTMLElement>(".atlas-bar");
+  const shellRect = shell?.getBoundingClientRect();
+  const barRect = bar?.getBoundingClientRect();
+  const isWide = window.innerWidth >= 900;
+  const left = 0;
+  const top = isWide ? Math.max(0, (barRect?.bottom ?? 0) + 8) : Math.max(0, (barRect?.bottom ?? 0) + 8);
+  const right = isWide && shellRect ? Math.max(240, shellRect.left - 12) : window.innerWidth;
+  const bottom = !isWide && shellRect ? Math.max(top + 160, shellRect.top - 10) : window.innerHeight;
+  return {
+    left,
+    top,
+    right,
+    bottom,
+    width: Math.max(1, right - left),
+    height: Math.max(1, bottom - top)
+  };
+}
+
+function expandedRect(rect: Rect, amount: number): Rect {
+  return {
+    left: rect.left - amount,
+    top: rect.top - amount,
+    right: rect.right + amount,
+    bottom: rect.bottom + amount,
+    width: rect.width + amount * 2,
+    height: rect.height + amount * 2
+  };
+}
+
+function eventToCanvasPoint(event: PointerEvent | WheelEvent): ScreenPoint {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
+function resizeCanvas() {
+  const width = Math.floor(window.innerWidth);
+  const height = Math.floor(window.innerHeight);
+  if (canvas.width === width && canvas.height === height) return;
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.width = `${window.innerWidth}px`;
+  canvas.style.height = `${window.innerHeight}px`;
+}
+
+function setLoading(step: LoadingStep, progress: number, detail: string) {
+  const elapsed = (performance.now() - loadingStartedAt) / 1000;
+  loadingDetail.textContent = detail;
+  loadingFill.style.width = `${progress}%`;
+  loadingProgressLabel.textContent = `${progress}%`;
+  loadingStepLabel.textContent = step;
+  loadingElapsed.textContent = `${elapsed.toFixed(1)}s`;
+  for (const item of document.querySelectorAll<HTMLElement>("[data-loading-step]")) {
+    item.classList.toggle("active", item.dataset.loadingStep === step);
+  }
+}
+
+function setError(message: string) {
+  errorPanel.hidden = !message;
+  errorPanel.textContent = message;
+}
+
+function dateFromInput() {
+  if (!timeInput.value) return null;
+  const date = new Date(`${timeInput.value}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toDatetimeLocalValue(date: Date) {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}T${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+}
+
+function formatDistance(km: number) {
+  return formatPickerDistance(km, auKm());
+}
+
+function nullableDistance(km: number | null | undefined) {
+  return typeof km === "number" && Number.isFinite(km) ? formatDistance(km) : "Unknown";
+}
+
+function nullableNumber(value: number | null | undefined, digits: number) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "Unknown";
+}
+
+function nullableDegrees(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)} deg` : "Unknown";
+}
+
+function nullableDays(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "Unknown";
+  if (value >= 365) return `${(value / 365.25).toFixed(2)} years`;
+  return `${value.toFixed(2)} days`;
+}
+
+function nullableLightYears(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? `${formatNumber(value)} ly` : "Unknown";
+}
+
+function formatNumber(value: number) {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000_000) return Intl.NumberFormat(undefined, { maximumFractionDigits: 2, notation: "compact" }).format(value);
+  if (abs >= 10_000) return Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
+  if (abs >= 100) return Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
+  if (abs >= 1) return Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+  return Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }).format(value);
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(new Date(value));
+}
+
+function formatFullDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short",
+    timeZone: "UTC"
+  }).format(new Date(value));
+}
+
+function readablePositionModel(value: string) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) || "Unknown";
+}
+
+function shortBodyName(name: string) {
+  return name.replace(/^M(\d+)\s+/, "M$1 ");
+}
+
+function niceStep(rawStep: number) {
+  const exponent = Math.floor(Math.log10(Math.max(rawStep, 1e-12)));
+  const base = 10 ** exponent;
+  const fraction = rawStep / base;
+  if (fraction <= 1) return base;
+  if (fraction <= 2) return 2 * base;
+  if (fraction <= 5) return 5 * base;
+  return 10 * base;
+}
+
+function auKm() {
+  return ephemeris?.au_km ?? AU_KM_FALLBACK;
+}
+
+function pseudoRandom(seed: number) {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function rectInCanvas(rect: Rect) {
+  return rect.right >= 0 && rect.left <= canvas.width && rect.bottom >= 0 && rect.top <= canvas.height;
+}
+
+function rectsOverlap(a: Rect, b: Rect) {
+  return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+}
+
+function roundedRect(x: number, y: number, width: number, height: number, radius: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
 }
 
 function escapeHtml(value: string) {
@@ -4168,475 +1512,4 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-}
-
-function syncDestinationSearch() {
-  const target = bodyByKey.get(selectedTarget);
-  if (target) {
-    destinationSearch.value = bodySearchLabel(target);
-  }
-}
-
-function resizeCanvas() {
-  const ratio = devicePixelRatio || 1;
-  canvas.width = Math.floor(window.innerWidth * ratio);
-  canvas.height = Math.floor(window.innerHeight * ratio);
-  canvas.style.width = `${window.innerWidth}px`;
-  canvas.style.height = `${window.innerHeight}px`;
-}
-
-type MapViewportRect = {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-};
-
-function mapViewportRect(): MapViewportRect {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  const padding = 18;
-  let left = 0;
-  let right = width;
-  let top = 0;
-  let bottom = height;
-
-  for (const selector of [".left-rail", ".right-rail", ".flight-deck"]) {
-    const element = document.querySelector<HTMLElement>(selector);
-    if (!element || getComputedStyle(element).display === "none") continue;
-    const rect = element.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) continue;
-
-    if (element.classList.contains("flight-deck")) {
-      if (rect.top > height * 0.45) bottom = Math.min(bottom, rect.top - padding);
-      continue;
-    }
-
-    const isFullWidthPanel = rect.width > width * 0.72;
-    if (element.classList.contains("left-rail")) {
-      if (isFullWidthPanel) top = Math.max(top, rect.bottom + padding);
-      else left = Math.max(left, rect.right + padding);
-      continue;
-    }
-
-    if (element.classList.contains("right-rail")) {
-      if (isFullWidthPanel) bottom = Math.min(bottom, rect.top - padding);
-      else right = Math.min(right, rect.left - padding);
-    }
-  }
-
-  if (right - left < Math.min(420, width * 0.45)) {
-    left = 0;
-    right = width;
-  }
-  if (bottom - top < Math.min(360, height * 0.42)) {
-    top = 0;
-    bottom = height;
-  }
-
-  return { left, right, top, bottom };
-}
-
-function mapFocusPoint() {
-  const viewport = mapViewportRect();
-  return {
-    x: (viewport.left + viewport.right) / 2,
-    y: (viewport.top + viewport.bottom) / 2
-  };
-}
-
-function cameraForFocusedPoint(xAu: number, yAu: number, pxPerAu: number) {
-  const focus = mapFocusPoint();
-  return {
-    xAu: xAu - (focus.x - window.innerWidth / 2) / pxPerAu,
-    yAu: yAu + (focus.y - window.innerHeight / 2) / pxPerAu
-  };
-}
-
-function setCameraFocusOnPoint(xAu: number, yAu: number, pxPerAu = camera.pxPerAu) {
-  const nextCamera = cameraForFocusedPoint(xAu, yAu, pxPerAu);
-  camera.xAu = nextCamera.xAu;
-  camera.yAu = nextCamera.yAu;
-}
-
-function zoomAtMapFocus(factor: number) {
-  const focus = mapFocusPoint();
-  zoomAt(focus.x, focus.y, factor);
-}
-
-function zoomAt(clientX: number, clientY: number, factor: number) {
-  cancelCameraAnimation();
-  const before = screenToWorld(clientX, clientY);
-  camera.pxPerAu = clamp(camera.pxPerAu * factor, MIN_PX_PER_AU, MAX_PX_PER_AU);
-  const after = screenToWorld(clientX, clientY);
-  camera.xAu += before.xAu - after.xAu;
-  camera.yAu += before.yAu - after.yAu;
-  updateHud(true);
-}
-
-function zoomWheelFactor(deltaY: number) {
-  const zoomingOut = deltaY > 0;
-  const kmPerPx = (ephemeris?.au_km ?? AU_KM_FALLBACK) / camera.pxPerAu;
-  const viewportKm = kmPerPx * Math.max(window.innerWidth, window.innerHeight);
-
-  if (zoomingOut) {
-    if (viewportKm >= LIGHT_YEAR_KM * 100_000) return 0.48;
-    if (viewportKm >= LIGHT_YEAR_KM * 20) return 0.56;
-    if (viewportKm >= AU_KM_FALLBACK * 80) return 0.68;
-    return 0.86;
-  }
-
-  if (viewportKm >= LIGHT_YEAR_KM * 100_000) return 1.9;
-  if (viewportKm >= LIGHT_YEAR_KM * 20) return 1.7;
-  if (viewportKm >= AU_KM_FALLBACK * 80) return 1.45;
-  return 1.16;
-}
-
-function applyZoomPreset(preset: ZoomPreset) {
-  if (!ephemeris) return;
-  if (preset === "local") {
-    const body = bodyByKey.get(selectedBodyKey) ?? bodyByKey.get(selectedTarget);
-    if (!body) return;
-    zoomToBody(body.key);
-    return;
-  }
-
-  const keysByPreset: Record<ZoomPreset, string[]> = {
-    inner: ["mercury", "venus", "earth", "moon", "mars", "phobos", "deimos"],
-    outer: ["jupiter", "saturn", "uranus", "neptune", "pluto"],
-    local: [],
-    group: ["sun", "proxima-cen", "m31", "m32", "m33", "m110"],
-    deep: ephemeris.bodies.filter((body) => isDeepSkyBody(body)).map((body) => body.key),
-    all: ephemeris.bodies.map((body) => body.key)
-  };
-  const bodies = keysByPreset[preset].map((key) => bodyByKey.get(key)).filter((body): body is Body => Boolean(body));
-  if (!bodies.length) return;
-  const maxAu = Math.max(...bodies.map((body) => Math.hypot(body.position.x_au, body.position.y_au)), 0.5);
-  cancelCameraAnimation();
-  camera.pxPerAu = clamp(Math.min(window.innerWidth, window.innerHeight) / (maxAu * 2.4), MIN_PX_PER_AU, MAX_PX_PER_AU);
-  setCameraFocusOnPoint(0, 0, camera.pxPerAu);
-  updateHud(true);
-}
-
-function updateTimeSummary() {
-  if (!ephemeris) return;
-  timeSummary.textContent = formatTimestamp(ephemeris.timestamp_utc).slice(0, 16);
-}
-
-function renderOnboarding() {
-  if (localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1") return;
-  onboardingPanel.hidden = false;
-  onboardingPanel.innerHTML = `
-    <div class="onboarding-head">
-      <span class="eyebrow">First flight</span>
-      <button type="button" class="icon-button" data-dismiss-onboarding aria-label="Dismiss first flight guide">${icon("close")}</button>
-    </div>
-    <div class="onboarding-steps">
-      ${firstRunSteps
-        .map((step, index) => {
-          const hints = "controlHint" in step ? step.controlHint : undefined;
-          return `
-            <article>
-              <span>${index + 1}</span>
-              <div>
-                <strong>${escapeHtml(step.label)}</strong>
-                <p>${escapeHtml(step.body)}</p>
-                ${hints ? `<div class="mini-key-row">${hints.map((key) => `<kbd>${escapeHtml(key.label)}</kbd>`).join("")}</div>` : ""}
-              </div>
-            </article>
-          `;
-        })
-        .join("")}
-    </div>
-  `;
-}
-
-function worldToScreen(xAu: number, yAu: number) {
-  return {
-    x: window.innerWidth / 2 + (xAu - camera.xAu) * camera.pxPerAu,
-    y: window.innerHeight / 2 - (yAu - camera.yAu) * camera.pxPerAu
-  };
-}
-
-function screenToWorld(x: number, y: number) {
-  return {
-    xAu: camera.xAu + (x - window.innerWidth / 2) / camera.pxPerAu,
-    yAu: camera.yAu - (y - window.innerHeight / 2) / camera.pxPerAu
-  };
-}
-
-function readableDisplayRadius(body: Body) {
-  if (body.key === "sun") return 15;
-  if (isStaticStellarCatalogBody(body)) return 5.5;
-  if (body.key === "jupiter") return 10;
-  if (body.key === "saturn") return 9;
-  if (body.key === "uranus" || body.key === "neptune") return 7;
-  if (body.key === "pluto") return 4.5;
-  if (body.key === "moon") return 3.5;
-  if (body.key === "phobos" || body.key === "deimos") return 3;
-  if (body.object_type === "moon") return body.radius_km > 1000 ? 4.5 : 3.2;
-  return 5.5;
-}
-
-function trueBodyRadiusPx(body: Body) {
-  if (body.radius_km <= 0) return 0;
-  return (body.radius_km / (ephemeris?.au_km ?? AU_KM_FALLBACK)) * camera.pxPerAu;
-}
-
-function renderedBodyRadius(body: Body) {
-  if (sizeMode === "readable") return readableDisplayRadius(body);
-  if (sizeMode === "true") return trueBodyRadiusPx(body);
-  return trueBodyRadiusPx(body);
-}
-
-function labelAnchorRadius(body: Body) {
-  if (isDeepSkyBody(body) && sizeMode !== "readable") {
-    return Math.min(Math.max(readableDisplayRadius(body), trueBodyRadiusPx(body)), 60);
-  }
-  if (sizeMode === "true") return Math.max(readableDisplayRadius(body), trueBodyRadiusPx(body));
-  return readableDisplayRadius(body);
-}
-
-function zoomViewRadiusAu(body: Body) {
-  const auKm = ephemeris?.au_km ?? AU_KM_FALLBACK;
-  const radiusAu = body.radius_km > 0 ? body.radius_km / auKm : 0;
-  if (isDeepSkyBody(body) && radiusAu > 0) {
-    return radiusAu * 2.4;
-  }
-  if (body.catalog?.position_model === "stellar_catalog_coordinates" && radiusAu > 0) {
-    return clamp(radiusAu * 42, 0.015, 0.22);
-  }
-  return localViewRadiusAu(body);
-}
-
-function localViewRadiusAu(body: Body) {
-  if (isStaticStellarCatalogBody(body)) return 25;
-
-  const systemRadiusAu: Record<string, number> = {
-    sun: 0.04,
-    mercury: 0.00035,
-    venus: 0.00035,
-    earth: 0.0032,
-    moon: 0.00035,
-    mars: 0.00024,
-    phobos: 0.00008,
-    deimos: 0.00008,
-    jupiter: 0.017,
-    saturn: 0.035,
-    uranus: 0.008,
-    neptune: 0.006,
-    pluto: 0.0012
-  };
-  const configuredRadius = systemRadiusAu[body.key];
-  if (configuredRadius) return configuredRadius;
-
-  const auKm = ephemeris?.au_km ?? AU_KM_FALLBACK;
-  const bodyRadiusAu = body.radius_km / auKm;
-  return clamp(bodyRadiusAu * 180, 0.00008, 0.04);
-}
-
-function isStaticStellarCatalogBody(body: Body) {
-  return body.catalog?.position_model === "stellar_catalog_coordinates" || body.catalog?.position_model === "deep_sky_catalog_coordinates";
-}
-
-function isDeepSkyBody(body: Body) {
-  return Boolean(body.deep_sky);
-}
-
-function pickGridAu() {
-  const targetPx = 88;
-  const rawAu = targetPx / camera.pxPerAu;
-  if (!Number.isFinite(rawAu) || rawAu <= 0) return 1;
-
-  const magnitude = 10 ** Math.floor(Math.log10(rawAu));
-  const multiplier = [1, 2, 5, 10].find((value) => value * magnitude >= rawAu) ?? 10;
-  return multiplier * magnitude;
-}
-
-function scaleText(kmPerPx: number, auKm: number) {
-  if (kmPerPx >= LIGHT_YEAR_KM * 0.001) return `1 px = ${formatLightYears(kmPerPx / LIGHT_YEAR_KM)}`;
-  const auPerPx = kmPerPx / auKm;
-  if (auPerPx >= 0.001) return `1 px = ${formatNumber(kmPerPx)} km / ${formatAu(auPerPx)} AU`;
-  if (kmPerPx < 1) return `1 px = ${formatNumber(kmPerPx * 1000)} m`;
-  return `1 px = ${formatNumber(kmPerPx)} km`;
-}
-
-function shortScaleText(kmPerPx: number, auKm: number) {
-  if (kmPerPx >= LIGHT_YEAR_KM * 0.001) return `${formatLightYears(kmPerPx / LIGHT_YEAR_KM)}/px`;
-  const auPerPx = kmPerPx / auKm;
-  if (auPerPx >= 0.001) return `${formatAu(auPerPx)} AU/px`;
-  if (kmPerPx < 1) return `${formatNumber(kmPerPx * 1000)} m/px`;
-  return `${formatNumber(kmPerPx)} km/px`;
-}
-
-function formatTimestamp(timestampUtc: string) {
-  return timestampUtc.replace("T", " ").replace(/\.\d+Z$/, " UTC").replace("Z", " UTC");
-}
-
-function degToRad(degrees: number) {
-  return (degrees * Math.PI) / 180;
-}
-
-function formatDistance(km: number) {
-  const abs = Math.abs(km);
-  if (abs >= LIGHT_YEAR_KM * 0.1) {
-    return formatLightYears(km / LIGHT_YEAR_KM);
-  }
-  if (abs >= AU_KM_FALLBACK * 0.1) {
-    return `${formatNumber(km)} km (${formatAu(km / AU_KM_FALLBACK)} AU)`;
-  }
-  return `${formatNumber(km)} km`;
-}
-
-function formatLightYears(lightYears: number | null) {
-  if (lightYears === null || !Number.isFinite(lightYears)) return "not listed";
-  const abs = Math.abs(lightYears);
-  if (abs >= 100) return `${formatNumber(lightYears)} ly`;
-  if (abs >= 10) return `${lightYears.toFixed(1)} ly`;
-  return `${lightYears.toFixed(2)} ly`;
-}
-
-function formatLookbackTime(lightYears: number | null) {
-  if (lightYears === null || !Number.isFinite(lightYears)) return "not listed";
-  if (lightYears >= 1_000_000) return `${formatNumber(lightYears / 1_000_000)} million years`;
-  if (lightYears >= 1_000) return `${formatNumber(lightYears / 1_000)} thousand years`;
-  return `${formatNumber(lightYears)} years`;
-}
-
-function formatDeepSkyPhysicalSize(deepSky: DeepSkyInfo) {
-  const major = deepSky.physical_diameter_ly;
-  const minor = deepSky.physical_minor_diameter_ly;
-  if (major === null || !Number.isFinite(major)) return "not listed";
-  if (minor === null || !Number.isFinite(minor) || Math.abs(major - minor) / Math.max(major, 1) < 0.02) {
-    return formatLightYears(major);
-  }
-  return `${formatLightYears(major)} x ${formatLightYears(minor)}`;
-}
-
-function formatMagnitude(value: number) {
-  return value.toFixed(1).replace(/\.0$/, "");
-}
-
-function formatNullableDistance(km: number | null) {
-  return km === null || !Number.isFinite(km) ? "not defined" : formatDistance(km);
-}
-
-function formatSpeed(kmPerSecond: number) {
-  return `${formatNumber(kmPerSecond)} km/s`;
-}
-
-function formatDuration(seconds: number) {
-  if (!Number.isFinite(seconds)) return "unavailable";
-  if (seconds < 90) return `${seconds.toFixed(1)} s`;
-  const minutes = seconds / 60;
-  if (minutes < 90) return `${minutes.toFixed(1)} min`;
-  const hours = minutes / 60;
-  if (hours < 48) return `${hours.toFixed(2)} h`;
-  const days = hours / 24;
-  if (days >= 365.25 * 2) return `${formatNumber(days / 365.25)} yr`;
-  return `${days.toFixed(2)} d`;
-}
-
-function formatOrbitPeriod(days: number | null) {
-  if (days === null || !Number.isFinite(days)) return "not closed";
-  if (days >= 365.25 * 2) return `${formatNumber(days / 365.25)} yr`;
-  if (days >= 2) return `${formatNumber(days)} d`;
-  return formatDuration(days * 86_400);
-}
-
-function formatDegrees(degrees: number) {
-  return `${degrees.toFixed(1)}°`;
-}
-
-function formatNullableDegrees(degrees: number | null) {
-  return degrees === null || !Number.isFinite(degrees) ? "not defined" : formatDegrees(degrees);
-}
-
-function formatRatio(value: number) {
-  if (!Number.isFinite(value)) return "not defined";
-  if (Math.abs(value) < 0.01) return value.toExponential(2);
-  return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
-}
-
-function formatDeltaV(value: number) {
-  return `${formatNumber(value)} km/s Δv`;
-}
-
-function formatSignedSpeed(value: number) {
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatNumber(value)} km/s`;
-}
-
-function offsetLabel(days: number) {
-  if (Math.abs(days) < 0.05) return "now";
-  return days > 0 ? `+${formatNumber(days)} d` : `${formatNumber(days)} d`;
-}
-
-function formatAu(au: number) {
-  const abs = Math.abs(au);
-  if (abs >= 10) return au.toFixed(1);
-  if (abs >= 1) return au.toFixed(2);
-  if (abs >= 0.01) return au.toFixed(3);
-  return au.toExponential(2);
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: value >= 100 ? 0 : 2
-  }).format(value);
-}
-
-function labelForKey(key: string) {
-  return key.charAt(0).toUpperCase() + key.slice(1);
-}
-
-function labelForOrbitClass(value: string) {
-  return value
-    .split("-")
-    .map((part) => labelForKey(part))
-    .join(" ");
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function normalizeAngle(radians: number) {
-  let angle = radians;
-  while (angle <= -Math.PI) angle += Math.PI * 2;
-  while (angle > Math.PI) angle -= Math.PI * 2;
-  return angle;
-}
-
-function radToDeg(radians: number) {
-  return (radians * 180) / Math.PI;
-}
-
-function datetimeLocalToIso(value: string) {
-  if (!value) return null;
-  const parsed = new Date(`${value.endsWith("Z") ? value.slice(0, -1) : value}Z`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString();
-}
-
-function setTimeInputFromTimestamp(timestampUtc: string) {
-  const parsed = new Date(timestampUtc);
-  if (Number.isNaN(parsed.getTime())) return;
-  timeInput.value = parsed.toISOString().slice(0, 19);
-}
-
-function requiredElement<T extends Element>(selector: string) {
-  const element = document.querySelector<T>(selector);
-  if (!element) {
-    throw new Error(`Missing required element: ${selector}`);
-  }
-  return element;
-}
-
-function requiredCanvasContext(targetCanvas: HTMLCanvasElement) {
-  const context = targetCanvas.getContext("2d");
-  if (!context) {
-    throw new Error("Canvas 2D context is unavailable.");
-  }
-  return context;
 }
