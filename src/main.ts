@@ -1205,6 +1205,7 @@ function draw() {
       drawBody(body);
     }
     drawBodyLabels();
+    drawSizeComparisonOverlay(width, height);
   }
 
   drawMeasurement();
@@ -1703,6 +1704,176 @@ function drawBodyLabels() {
     ctx.fillStyle = layout.color;
     ctx.fillText(layout.text, layout.rect.x + 5, layout.rect.y + layout.rect.height / 2);
   }
+  ctx.restore();
+}
+
+function drawSizeComparisonOverlay(width: number, height: number) {
+  const body = bodyByKey.get(selectedBodyKey);
+  if (!body || body.radius_km <= 0) return;
+
+  const compareBody = sizePairComparisonBody(body);
+  if (!compareBody || compareBody.radius_km <= 0) return;
+
+  const selectedScreen = worldToScreen(body.position.x_au, body.position.y_au);
+  const viewport = mapViewportRect();
+  if (
+    selectedScreen.x < viewport.left - 100 ||
+    selectedScreen.x > viewport.right + 100 ||
+    selectedScreen.y < viewport.top - 100 ||
+    selectedScreen.y > viewport.bottom + 100
+  ) {
+    return;
+  }
+
+  const maxDiameterKm = Math.max(body.radius_km * 2, compareBody.radius_km * 2, 1);
+  const maxDiameterPx = clamp(Math.min(viewport.right - viewport.left, viewport.bottom - viewport.top, width, height) * 0.2, 72, 132);
+  const kmPerPx = maxDiameterKm / maxDiameterPx;
+  const selectedMajorRadius = body.radius_km / kmPerPx;
+  const compareMajorRadius = compareBody.radius_km / kmPerPx;
+  const selectedLayoutRadius = Math.max(8, selectedMajorRadius);
+  const compareLayoutRadius = Math.max(8, compareMajorRadius);
+  const gap = 42;
+  const spaceRight = viewport.right - selectedScreen.x - selectedLayoutRadius;
+  const spaceLeft = selectedScreen.x - viewport.left - selectedLayoutRadius;
+  const placeRight = spaceRight >= spaceLeft;
+  const compareX = clamp(
+    selectedScreen.x + (placeRight ? 1 : -1) * (selectedLayoutRadius + gap + compareLayoutRadius),
+    viewport.left + compareLayoutRadius + 16,
+    viewport.right - compareLayoutRadius - 16
+  );
+  const compareY = clamp(selectedScreen.y, viewport.top + compareLayoutRadius + 46, viewport.bottom - compareLayoutRadius - 46);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.setLineDash([4, 6]);
+  ctx.strokeStyle = "rgba(217, 184, 111, 0.54)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(selectedScreen.x, selectedScreen.y);
+  ctx.lineTo(compareX, compareY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  const midpoint = { x: (selectedScreen.x + compareX) / 2, y: (selectedScreen.y + compareY) / 2 };
+  drawSizeComparisonPill("same size scale", midpoint, viewport);
+  drawSizeComparisonDisk(body, selectedScreen, selectedMajorRadius, "selected", viewport);
+  drawSizeComparisonDisk(compareBody, { x: compareX, y: compareY }, compareMajorRadius, "compare", viewport);
+  ctx.restore();
+}
+
+function drawSizeComparisonPill(text: string, point: ScreenPoint, viewport: MapViewportRect) {
+  ctx.save();
+  ctx.font = "720 10px ui-sans-serif, system-ui";
+  ctx.textBaseline = "middle";
+  const width = Math.ceil(ctx.measureText(text).width + 14);
+  const height = 20;
+  const x = clamp(point.x - width / 2, viewport.left + 8, viewport.right - width - 8);
+  const y = clamp(point.y - height / 2, viewport.top + 8, viewport.bottom - height - 8);
+  ctx.fillStyle = "rgba(8, 11, 12, 0.9)";
+  ctx.strokeStyle = "rgba(217, 184, 111, 0.48)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 5);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255, 229, 164, 0.9)";
+  ctx.fillText(text, x + 7, y + height / 2);
+  ctx.restore();
+}
+
+function drawSizeComparisonDisk(body: Body, center: ScreenPoint, majorRadius: number, role: string, viewport: MapViewportRect) {
+  const color = safeCssColor(body.color);
+  const minorRadius = majorRadius * objectMinorMajorRatio(body);
+  const locatorOnly = majorRadius < 3 || minorRadius < 3;
+  const drawMajorRadius = locatorOnly ? 8 : majorRadius;
+  const drawMinorRadius = locatorOnly ? 8 : minorRadius;
+
+  ctx.save();
+  if (body.deep_sky) {
+    drawDeepSkyComparisonShape(body, center, drawMajorRadius, drawMinorRadius, color, locatorOnly);
+  } else {
+    drawSolarSystemComparisonShape(body, center, drawMajorRadius, color, locatorOnly);
+  }
+
+  if (locatorOnly) {
+    ctx.setLineDash([2, 4]);
+    ctx.strokeStyle = hexToRgba(color, 0.72);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(center.x, center.y, 8, 8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  drawSizeComparisonCaption(body, center, Math.max(drawMajorRadius, drawMinorRadius), role, viewport);
+  ctx.restore();
+}
+
+function drawDeepSkyComparisonShape(body: Body, center: ScreenPoint, majorRadius: number, minorRadius: number, color: string, locatorOnly: boolean) {
+  const rotation = body.deep_sky?.deep_sky_type === "galaxy" ? -0.34 : 0;
+  ctx.fillStyle = locatorOnly ? hexToRgba(color, 0.72) : hexToRgba(color, 0.24);
+  ctx.strokeStyle = hexToRgba(color, locatorOnly ? 0.9 : 0.72);
+  ctx.lineWidth = locatorOnly ? 1.2 : 1.6;
+  ctx.beginPath();
+  ctx.ellipse(center.x, center.y, majorRadius, Math.max(minorRadius, 0.8), rotation, 0, Math.PI * 2);
+  if (!locatorOnly) ctx.fill();
+  ctx.stroke();
+
+  if (!locatorOnly && body.deep_sky?.deep_sky_type === "galaxy") {
+    ctx.strokeStyle = "rgba(255, 240, 199, 0.36)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(center.x, center.y, majorRadius * 0.62, Math.max(minorRadius * 0.24, 0.5), rotation, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawSolarSystemComparisonShape(body: Body, center: ScreenPoint, radius: number, color: string, locatorOnly: boolean) {
+  if (body.key === "saturn" && !locatorOnly) {
+    ctx.strokeStyle = "rgba(216, 194, 138, 0.74)";
+    ctx.lineWidth = Math.max(0.75, Math.min(1.8, radius * 0.08));
+    ctx.beginPath();
+    ctx.ellipse(center.x, center.y, radius * 1.65, radius * 0.55, -0.35, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = locatorOnly ? hexToRgba(color, 0.82) : color;
+  ctx.strokeStyle = "rgba(244, 241, 232, 0.72)";
+  ctx.lineWidth = locatorOnly ? 1 : Math.max(0.75, Math.min(1.4, radius * 0.08));
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, locatorOnly ? 1.8 : radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawSizeComparisonCaption(body: Body, center: ScreenPoint, radius: number, role: string, viewport: MapViewportRect) {
+  const title = body.name;
+  const detail = `${role} · ${formatDistance(body.radius_km * 2)} wide`;
+  ctx.save();
+  ctx.font = "720 11px ui-sans-serif, system-ui";
+  const titleWidth = ctx.measureText(title).width;
+  ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
+  const detailWidth = ctx.measureText(detail).width;
+  const width = Math.ceil(Math.max(titleWidth, detailWidth) + 14);
+  const height = 34;
+  const x = clamp(center.x - width / 2, viewport.left + 8, viewport.right - width - 8);
+  const y = clamp(center.y + radius + 9, viewport.top + 8, viewport.bottom - height - 8);
+
+  ctx.fillStyle = "rgba(7, 10, 11, 0.9)";
+  ctx.strokeStyle = "rgba(244, 241, 232, 0.18)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.textBaseline = "top";
+  ctx.font = "720 11px ui-sans-serif, system-ui";
+  ctx.fillStyle = "#f3f0e8";
+  ctx.fillText(title, x + 7, y + 5);
+  ctx.font = "10px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.fillStyle = "rgba(217, 184, 111, 0.88)";
+  ctx.fillText(detail, x + 7, y + 19);
   ctx.restore();
 }
 
@@ -2938,17 +3109,12 @@ function deepSkyInfoRows(body: Body) {
 function sizePairComparisonMarkup(body: Body, compareBody: Body | null) {
   if (!compareBody) return "";
 
-  const leftDiameterKm = body.radius_km * 2;
-  const rightDiameterKm = compareBody.radius_km * 2;
-  const maxDiameterKm = Math.max(leftDiameterKm, rightDiameterKm, 1);
-  const scaleKmPerPx = maxDiameterKm / 112;
-
   return `
     <section class="size-pair-comparison">
       <div class="size-pair-head">
         <div>
-          <span>Real-size compare</span>
-          <strong>${escapeHtml(body.name)} next to</strong>
+          <span>Map compare</span>
+          <strong>${escapeHtml(compareBody.name)} beside ${escapeHtml(body.name)}</strong>
         </div>
         <label>
           <span>Place object</span>
@@ -2957,11 +3123,6 @@ function sizePairComparisonMarkup(body: Body, compareBody: Body | null) {
           </select>
         </label>
       </div>
-      <div class="size-pair-stage">
-        ${sizePairObjectHtml(body, maxDiameterKm, "Selected")}
-        ${sizePairObjectHtml(compareBody, maxDiameterKm, "Comparison")}
-      </div>
-      <p>Filled disks share one real scale: ${escapeHtml(formatDistance(scaleKmPerPx))} per pixel. Locator rings only mark sub-pixel disks.</p>
     </section>
   `;
 }
@@ -3005,30 +3166,6 @@ function sizePairOptionsHtml(selectedKey: string, compareKey: string) {
       `
     )
     .join("");
-}
-
-function sizePairObjectHtml(body: Body, maxDiameterKm: number, role: string) {
-  const diameterKm = body.radius_km * 2;
-  const majorPx = maxDiameterKm > 0 ? (diameterKm / maxDiameterKm) * 112 : 0;
-  const minorPx = majorPx * objectMinorMajorRatio(body);
-  const isTiny = majorPx < 7 || minorPx < 7;
-  return `
-    <article class="size-pair-object ${isTiny ? "is-tiny" : ""}">
-      <div class="size-pair-viewport">
-        <span
-          class="size-pair-disk type-${escapeHtml(body.object_type ?? "unknown")}"
-          style="--body-color: ${safeCssColor(body.color)}; width: ${Math.max(majorPx, 0).toFixed(4)}px; height: ${Math.max(minorPx, 0).toFixed(4)}px;"
-          aria-hidden="true"
-        ></span>
-        ${isTiny ? `<span class="size-pair-locator" aria-hidden="true"></span>` : ""}
-      </div>
-      <div class="size-pair-label">
-        <span>${escapeHtml(role)}</span>
-        <strong>${escapeHtml(body.name)}</strong>
-        <em>${escapeHtml(formatDistance(diameterKm))}</em>
-      </div>
-    </article>
-  `;
 }
 
 function objectMinorMajorRatio(body: Body) {

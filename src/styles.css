@@ -996,22 +996,22 @@ dd {
 
 .size-pair-comparison {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid rgba(217, 184, 111, 0.22);
   border-radius: 7px;
   margin-bottom: 12px;
-  padding: 10px;
+  padding: 9px;
   background: linear-gradient(135deg, rgba(217, 184, 111, 0.08), rgba(116, 196, 255, 0.035));
 }
 
 .size-pair-head {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: end;
+  gap: 10px;
 }
 
-.size-pair-head span,
-.size-pair-label span {
+.size-pair-head span {
   color: var(--accent);
   font-size: 10px;
   font-weight: 720;
@@ -1022,7 +1022,7 @@ dd {
 .size-pair-head strong {
   display: block;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1041,91 +1041,6 @@ dd {
   background: rgba(6, 9, 9, 0.92);
   color: var(--text);
   font: inherit;
-}
-
-.size-pair-stage {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  align-items: stretch;
-}
-
-.size-pair-object {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.size-pair-viewport {
-  position: relative;
-  display: grid;
-  place-items: center;
-  height: 128px;
-  overflow: hidden;
-  border: 1px solid rgba(244, 241, 232, 0.09);
-  border-radius: 7px;
-  background:
-    linear-gradient(90deg, rgba(244, 241, 232, 0.045) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(244, 241, 232, 0.045) 1px, transparent 1px),
-    rgba(3, 5, 6, 0.44);
-  background-size: 22px 22px;
-}
-
-.size-pair-disk {
-  display: block;
-  border: 1px solid rgba(255, 255, 255, 0.38);
-  border-radius: 999px;
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.82), transparent 22%),
-    var(--body-color);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--body-color), transparent 58%);
-}
-
-.size-pair-disk.type-galaxy,
-.size-pair-disk.type-nebula {
-  background:
-    radial-gradient(ellipse at center, rgba(255, 244, 212, 0.62), transparent 20%),
-    color-mix(in srgb, var(--body-color), transparent 42%);
-}
-
-.size-pair-locator {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border: 1px dashed rgba(244, 241, 232, 0.74);
-  border-radius: 999px;
-  box-shadow: 0 0 0 1px rgba(6, 9, 9, 0.7);
-}
-
-.size-pair-label {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.size-pair-label strong,
-.size-pair-label em {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.size-pair-label strong {
-  font-size: 12px;
-}
-
-.size-pair-label em {
-  color: var(--muted);
-  font-family: var(--font-data);
-  font-size: 11px;
-  font-style: normal;
-}
-
-.size-pair-comparison p {
-  margin: 0;
-  color: var(--quiet);
-  font-size: 11px;
-  line-height: 1.35;
 }
 
 .size-comparison {
