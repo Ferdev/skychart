@@ -1215,21 +1215,53 @@ dd {
 }
 
 .scale-ladder-track {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 4px;
-  margin: 8px 0 5px;
+  align-items: center;
+  height: 24px;
+  margin: 8px 0 4px;
 }
 
-.scale-ladder-track span {
-  height: 5px;
+.scale-ladder-line {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 2px;
+  transform: translateY(-50%);
   border-radius: 999px;
-  background: rgba(244, 241, 232, 0.14);
+  background: linear-gradient(90deg, rgba(116, 196, 255, 0.28), rgba(217, 184, 111, 0.72), rgba(243, 111, 179, 0.38));
 }
 
-.scale-ladder-track span.active {
+.scale-ladder-tick {
+  position: relative;
+  z-index: 1;
+  justify-self: center;
+  width: 2px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(244, 241, 232, 0.32);
+}
+
+.scale-ladder-tick.active {
+  height: 15px;
   background: var(--accent);
-  box-shadow: 0 0 14px rgba(217, 184, 111, 0.34);
+  box-shadow: 0 0 14px rgba(217, 184, 111, 0.36);
+}
+
+.scale-ladder-marker {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: var(--scale-marker);
+  width: 13px;
+  height: 13px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(6, 8, 9, 0.9);
+  border-radius: 999px;
+  background: #ffe3a0;
+  box-shadow: 0 0 0 1px rgba(217, 184, 111, 0.72), 0 0 18px rgba(217, 184, 111, 0.45);
 }
 
 .scale-ladder-labels span {
@@ -1238,6 +1270,10 @@ dd {
   font-size: 9.5px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.scale-ladder-labels span.active {
+  color: #fff1c9;
 }
 
 .scale-ladder p {

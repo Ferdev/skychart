@@ -23,7 +23,7 @@ const BODY_FILTERS = ["all", "planet", "moon", "dwarf_planet", "star", "galaxy",
 const ONBOARDING_DISMISSED_KEY = "cosmic-atlas.onboarding-dismissed";
 const TRANSFER_PATH_SAMPLES = 96;
 const ORBIT_PATH_SAMPLES = 192;
-const MIN_PX_PER_AU = 0.00005;
+const MIN_PX_PER_AU = 0.0000000001;
 const MAX_PX_PER_AU = 24_000_000;
 const VIEWPORT_REFERENCE_SIDES: ViewportReferenceSide[] = ["top", "right", "bottom", "left"];
 const VIEWPORT_REFERENCE_CARD_WIDTH = 190;
@@ -65,7 +65,7 @@ const ICONS: Record<string, string> = {
 type BodyFilter = (typeof BODY_FILTERS)[number];
 type InteractionMode = "pan" | "target" | "measure";
 type DisplayLayer = "labels" | "orbits" | "route" | "trails";
-type ZoomPreset = "inner" | "outer" | "local" | "all";
+type ZoomPreset = "inner" | "outer" | "local" | "group" | "deep" | "all";
 type ScaleBandKey = "planetary" | "solar" | "nearby_stars" | "milky_way" | "local_group" | "deep_sky";
 
 type GuidedTour = {
@@ -96,6 +96,15 @@ const BODY_FILTER_SECTION_LABELS: Record<BodyFilter, string> = {
   nebula: "Nebulae",
   star_cluster: "Star clusters"
 };
+
+const SCALE_LADDER_STOPS: { key: ScaleBandKey; label: string; maxViewportKm: number }[] = [
+  { key: "planetary", label: "Planet", maxViewportKm: 1_000_000 },
+  { key: "solar", label: "Solar System", maxViewportKm: AU_KM_FALLBACK * 80 },
+  { key: "nearby_stars", label: "Nearby stars", maxViewportKm: LIGHT_YEAR_KM * 80 },
+  { key: "milky_way", label: "Milky Way", maxViewportKm: LIGHT_YEAR_KM * 120_000 },
+  { key: "local_group", label: "Local Group", maxViewportKm: LIGHT_YEAR_KM * 15_000_000 },
+  { key: "deep_sky", label: "Deep sky", maxViewportKm: LIGHT_YEAR_KM * 120_000_000 }
+];
 
 const COMPACT_SATELLITE_PARENT_KEYS: Record<string, string> = {
   phobos: "mars",
@@ -595,7 +604,7 @@ window.addEventListener("keyup", (event) => keys.delete(event.code));
 
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
-  zoomAt(event.clientX, event.clientY, event.deltaY > 0 ? 0.86 : 1.16);
+  zoomAt(event.clientX, event.clientY, zoomWheelFactor(event.deltaY));
 });
 
 canvas.addEventListener("pointerdown", (event) => {
@@ -2456,36 +2465,38 @@ function updateFlightValues(shipSpeedKmS: number, scaleKm: number, navigation: R
 function updateScaleLadder(kmPerPx: number) {
   const viewportKm = kmPerPx * Math.max(window.innerWidth, window.innerHeight);
   const activeBand = scaleBandForViewport(viewportKm);
-  const bands: { key: ScaleBandKey; label: string }[] = [
-    { key: "planetary", label: "Planet" },
-    { key: "solar", label: "Solar System" },
-    { key: "nearby_stars", label: "Nearby stars" },
-    { key: "milky_way", label: "Milky Way" },
-    { key: "local_group", label: "Local Group" },
-    { key: "deep_sky", label: "Deep sky" }
-  ];
+  const markerPercent = scaleLadderMarkerPercent(viewportKm);
   scaleLadder.innerHTML = `
     <div class="scale-ladder-head">
       <span>Scale ladder</span>
       <strong>${escapeHtml(scaleBandTitle(activeBand))}</strong>
     </div>
-    <div class="scale-ladder-track" aria-hidden="true">
-      ${bands.map((band) => `<span class="${band.key === activeBand ? "active" : ""}"></span>`).join("")}
+    <div class="scale-ladder-track" style="--scale-marker: ${markerPercent.toFixed(2)}%" aria-hidden="true">
+      <span class="scale-ladder-line"></span>
+      <span class="scale-ladder-marker"></span>
+      ${SCALE_LADDER_STOPS.map((band) => `<span class="scale-ladder-tick ${band.key === activeBand ? "active" : ""}"></span>`).join("")}
     </div>
     <div class="scale-ladder-labels">
-      ${bands.map((band) => `<span>${escapeHtml(band.label)}</span>`).join("")}
+      ${SCALE_LADDER_STOPS.map((band) => `<span class="${band.key === activeBand ? "active" : ""}">${escapeHtml(band.label)}</span>`).join("")}
     </div>
     <p>${escapeHtml(scaleBandDescription(activeBand, viewportKm))}</p>
   `;
 }
 
 function scaleBandForViewport(viewportKm: number): ScaleBandKey {
-  if (viewportKm < 1_000_000) return "planetary";
-  if (viewportKm < AU_KM_FALLBACK * 80) return "solar";
-  if (viewportKm < LIGHT_YEAR_KM * 80) return "nearby_stars";
-  if (viewportKm < LIGHT_YEAR_KM * 120_000) return "milky_way";
-  if (viewportKm < LIGHT_YEAR_KM * 8_000_000) return "local_group";
+  for (const stop of SCALE_LADDER_STOPS) {
+    if (viewportKm < stop.maxViewportKm) return stop.key;
+  }
   return "deep_sky";
+}
+
+function scaleLadderMarkerPercent(viewportKm: number) {
+  const minKm = SCALE_LADDER_STOPS[0].maxViewportKm / 10;
+  const maxKm = SCALE_LADDER_STOPS[SCALE_LADDER_STOPS.length - 1].maxViewportKm;
+  const value = clamp(viewportKm, minKm, maxKm);
+  const minLog = Math.log10(minKm);
+  const maxLog = Math.log10(maxKm);
+  return ((Math.log10(value) - minLog) / (maxLog - minLog)) * 100;
 }
 
 function scaleBandTitle(band: ScaleBandKey) {
@@ -3495,6 +3506,24 @@ function zoomAt(clientX: number, clientY: number, factor: number) {
   updateHud(true);
 }
 
+function zoomWheelFactor(deltaY: number) {
+  const zoomingOut = deltaY > 0;
+  const kmPerPx = (ephemeris?.au_km ?? AU_KM_FALLBACK) / camera.pxPerAu;
+  const viewportKm = kmPerPx * Math.max(window.innerWidth, window.innerHeight);
+
+  if (zoomingOut) {
+    if (viewportKm >= LIGHT_YEAR_KM * 100_000) return 0.48;
+    if (viewportKm >= LIGHT_YEAR_KM * 20) return 0.56;
+    if (viewportKm >= AU_KM_FALLBACK * 80) return 0.68;
+    return 0.86;
+  }
+
+  if (viewportKm >= LIGHT_YEAR_KM * 100_000) return 1.9;
+  if (viewportKm >= LIGHT_YEAR_KM * 20) return 1.7;
+  if (viewportKm >= AU_KM_FALLBACK * 80) return 1.45;
+  return 1.16;
+}
+
 function applyZoomPreset(preset: ZoomPreset) {
   if (!ephemeris) return;
   if (preset === "local") {
@@ -3516,6 +3545,8 @@ function applyZoomPreset(preset: ZoomPreset) {
     inner: ["mercury", "venus", "earth", "moon", "mars", "phobos", "deimos"],
     outer: ["jupiter", "saturn", "uranus", "neptune", "pluto"],
     local: [],
+    group: ["sun", "proxima-cen", "m31", "m32", "m33", "m110"],
+    deep: ephemeris.bodies.filter((body) => isDeepSkyBody(body)).map((body) => body.key),
     all: ephemeris.bodies.map((body) => body.key)
   };
   const bodies = keysByPreset[preset].map((key) => bodyByKey.get(key)).filter((body): body is Body => Boolean(body));
@@ -3624,46 +3655,11 @@ function isDeepSkyBody(body: Body) {
 function pickGridAu() {
   const targetPx = 88;
   const rawAu = targetPx / camera.pxPerAu;
-  const powers = [
-    0.000001,
-    0.000002,
-    0.000005,
-    0.00001,
-    0.00002,
-    0.00005,
-    0.0001,
-    0.0002,
-    0.0005,
-    0.001,
-    0.002,
-    0.005,
-    0.01,
-    0.02,
-    0.05,
-    0.1,
-    0.25,
-    0.5,
-    1,
-    2,
-    5,
-    10,
-    20,
-    50,
-    100,
-    250,
-    500,
-    1_000,
-    2_500,
-    5_000,
-    10_000,
-    25_000,
-    50_000,
-    100_000,
-    250_000,
-    500_000,
-    1_000_000
-  ];
-  return powers.find((value) => value >= rawAu) ?? 2_000_000;
+  if (!Number.isFinite(rawAu) || rawAu <= 0) return 1;
+
+  const magnitude = 10 ** Math.floor(Math.log10(rawAu));
+  const multiplier = [1, 2, 5, 10].find((value) => value * magnitude >= rawAu) ?? 10;
+  return multiplier * magnitude;
 }
 
 function scaleText(kmPerPx: number, auKm: number) {
