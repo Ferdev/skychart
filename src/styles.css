@@ -1298,10 +1298,15 @@ dd {
 .route-vector {
   display: grid;
   gap: 6px;
+  min-width: 0;
   color: var(--muted);
   font-family: var(--font-data);
   font-size: 11px;
   text-align: center;
+}
+
+.route-vector > span {
+  overflow-wrap: anywhere;
 }
 
 .route-track {
@@ -1950,7 +1955,15 @@ kbd:has(+ kbd) {
   }
 
   .search-control {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) minmax(76px, auto);
+  }
+
+  #jump-destination {
+    display: none;
+  }
+
+  .primary-action {
+    padding: 0 10px;
   }
 
   .target-row,
@@ -1963,9 +1976,10 @@ kbd:has(+ kbd) {
   }
 
   .route-card {
-    grid-template-columns: auto minmax(70px, 1fr) auto;
+    grid-template-columns: 52px minmax(0, 1fr) 52px;
     gap: 8px;
     padding: 10px;
+    overflow: hidden;
   }
 
   .body-orb.large {
@@ -1974,7 +1988,7 @@ kbd:has(+ kbd) {
   }
 
   .route-body {
-    min-width: 54px;
+    min-width: 0;
   }
 
   .route-body strong {
