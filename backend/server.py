@@ -103,6 +103,11 @@ def catalog_object(
     common_name: str | None = None,
     observing_equipment: str | None = None,
     why_interesting: str | None = None,
+    angular_major_arcmin: float | None = None,
+    angular_minor_arcmin: float | None = None,
+    physical_diameter_ly: float | None = None,
+    physical_minor_diameter_ly: float | None = None,
+    physical_size_note: str | None = None,
 ) -> dict[str, Any]:
     return {
         "key": key,
@@ -138,6 +143,11 @@ def catalog_object(
         "common_name": common_name,
         "observing_equipment": observing_equipment,
         "why_interesting": why_interesting,
+        "angular_major_arcmin": angular_major_arcmin,
+        "angular_minor_arcmin": angular_minor_arcmin,
+        "physical_diameter_ly": physical_diameter_ly,
+        "physical_minor_diameter_ly": physical_minor_diameter_ly,
+        "physical_size_note": physical_size_note,
     }
 
 
@@ -185,6 +195,51 @@ CATALOG_OBJECTS = [
 ]
 
 
+def parse_angular_size_arcmin(value: str | None) -> tuple[float, float | None] | None:
+    if not value:
+        return None
+
+    cleaned = value.strip().lower().replace("×", "x")
+    parts = [part for part in re.split(r"\s*x\s*", cleaned) if part]
+    values: list[float] = []
+    for part in parts[:2]:
+        match = re.search(r"\d+(?:\.\d+)?", part)
+        if not match:
+            continue
+        values.append(float(match.group(0)))
+
+    if not values:
+        return None
+
+    major = max(values)
+    minor = min(values) if len(values) > 1 else None
+    return major, minor
+
+
+def physical_diameter_ly(distance_ly: float, angular_arcmin: float) -> float:
+    angular_rad = math.radians(angular_arcmin / 60.0)
+    return 2.0 * distance_ly * math.tan(angular_rad / 2.0)
+
+
+def deep_sky_physical_size_payload(entry: dict[str, Any]) -> dict[str, float | str] | None:
+    distance_ly = entry.get("distance_ly")
+    angular_size = parse_angular_size_arcmin(str(entry.get("angular_size_arcmin") or ""))
+    if distance_ly is None or angular_size is None:
+        return None
+
+    major_arcmin, minor_arcmin = angular_size
+    major_diameter_ly = physical_diameter_ly(float(distance_ly), major_arcmin)
+    minor_diameter_ly = physical_diameter_ly(float(distance_ly), minor_arcmin) if minor_arcmin is not None else major_diameter_ly
+
+    return {
+        "angular_major_arcmin": major_arcmin,
+        "angular_minor_arcmin": minor_arcmin if minor_arcmin is not None else major_arcmin,
+        "physical_diameter_ly": major_diameter_ly,
+        "physical_minor_diameter_ly": minor_diameter_ly,
+        "physical_size_note": "estimated from catalog angular size and distance",
+    }
+
+
 def load_deep_sky_catalog_objects() -> list[dict[str, Any]]:
     if not DEEP_SKY_CATALOG_PATH.exists():
         return []
@@ -192,12 +247,15 @@ def load_deep_sky_catalog_objects() -> list[dict[str, Any]]:
     payload = json.loads(DEEP_SKY_CATALOG_PATH.read_text(encoding="utf-8"))
     objects: list[dict[str, Any]] = []
     for entry in payload.get("objects", []):
+        physical_size = deep_sky_physical_size_payload(entry) or {}
+        physical_diameter = physical_size.get("physical_diameter_ly")
+        radius_km = float(physical_diameter) * LIGHT_YEAR_KM / 2.0 if physical_diameter is not None else 0.0
         objects.append(
             catalog_object(
                 key=str(entry["key"]),
                 name=str(entry["name"]),
                 ephemeris=f"Messier {entry['messier']}",
-                radius_km=0.0,
+                radius_km=radius_km,
                 mu_km3_s2=0.0,
                 color=str(entry.get("color") or "#d9b86f"),
                 object_type=str(entry["object_type"]),
@@ -220,6 +278,11 @@ def load_deep_sky_catalog_objects() -> list[dict[str, Any]]:
                 common_name=str(entry["common_name"]) if entry.get("common_name") else None,
                 observing_equipment=str(entry.get("observing_equipment") or ""),
                 why_interesting=str(entry.get("why_interesting") or ""),
+                angular_major_arcmin=physical_size.get("angular_major_arcmin"),
+                angular_minor_arcmin=physical_size.get("angular_minor_arcmin"),
+                physical_diameter_ly=physical_size.get("physical_diameter_ly"),
+                physical_minor_diameter_ly=physical_size.get("physical_minor_diameter_ly"),
+                physical_size_note=str(physical_size.get("physical_size_note")) if physical_size.get("physical_size_note") else None,
             )
         )
     return objects
@@ -397,6 +460,11 @@ def deep_sky_catalog_payload(item: dict[str, Any]) -> dict[str, Any]:
         "deep_sky_type_label": item.get("deep_sky_type_label"),
         "apparent_magnitude": item.get("apparent_magnitude"),
         "angular_size_arcmin": item.get("angular_size_arcmin"),
+        "angular_major_arcmin": item.get("angular_major_arcmin"),
+        "angular_minor_arcmin": item.get("angular_minor_arcmin"),
+        "physical_diameter_ly": item.get("physical_diameter_ly"),
+        "physical_minor_diameter_ly": item.get("physical_minor_diameter_ly"),
+        "physical_size_note": item.get("physical_size_note"),
         "constellation": item.get("constellation"),
         "viewing_season": item.get("viewing_season"),
         "common_name": item.get("common_name"),
@@ -589,6 +657,11 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
         "deep_sky_type_label": item.get("deep_sky_type_label"),
         "apparent_magnitude": item.get("apparent_magnitude"),
         "angular_size_arcmin": item.get("angular_size_arcmin"),
+        "angular_major_arcmin": item.get("angular_major_arcmin"),
+        "angular_minor_arcmin": item.get("angular_minor_arcmin"),
+        "physical_diameter_ly": item.get("physical_diameter_ly"),
+        "physical_minor_diameter_ly": item.get("physical_minor_diameter_ly"),
+        "physical_size_note": item.get("physical_size_note"),
         "constellation": item.get("constellation"),
         "viewing_season": item.get("viewing_season"),
         "common_name": item.get("common_name"),

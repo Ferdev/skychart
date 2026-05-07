@@ -246,6 +246,11 @@ type DeepSkyInfo = {
   deep_sky_type_label: string | null;
   apparent_magnitude: number | null;
   angular_size_arcmin: string | null;
+  angular_major_arcmin: number | null;
+  angular_minor_arcmin: number | null;
+  physical_diameter_ly: number | null;
+  physical_minor_diameter_ly: number | null;
+  physical_size_note: string | null;
   constellation: string | null;
   viewing_season: string | null;
   common_name: string | null;
@@ -297,6 +302,11 @@ type CatalogObject = {
   deep_sky_type_label?: string | null;
   apparent_magnitude?: number | null;
   angular_size_arcmin?: string | null;
+  angular_major_arcmin?: number | null;
+  angular_minor_arcmin?: number | null;
+  physical_diameter_ly?: number | null;
+  physical_minor_diameter_ly?: number | null;
+  physical_size_note?: string | null;
   constellation?: string | null;
   viewing_season?: string | null;
   common_name?: string | null;
@@ -2165,6 +2175,67 @@ function drawMiniMap(width: number, height: number) {
   ctx.restore();
 }
 
+function drawTrueDeepSkyBody(body: Body, screen: ScreenPoint, radius: number) {
+  if (radius < 0.35) return;
+
+  const ratio = deepSkyMinorMajorRatio(body);
+  const rotation = body.object_type === "galaxy" ? -0.42 : body.object_type === "nebula" ? 0.32 : 0;
+  const isElliptical = body.object_type === "galaxy" || body.object_type === "nebula";
+  const lineWidth = Math.max(0.7, Math.min(2.2, radius * 0.01));
+
+  ctx.save();
+  ctx.fillStyle = hexToRgba(body.color, body.object_type === "galaxy" ? 0.12 : 0.1);
+  ctx.strokeStyle = hexToRgba(body.color, 0.72);
+  ctx.lineWidth = lineWidth;
+
+  ctx.beginPath();
+  if (isElliptical) {
+    ctx.ellipse(screen.x, screen.y, radius, Math.max(radius * ratio, 0.35), rotation, 0, Math.PI * 2);
+  } else {
+    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  if (body.object_type === "galaxy" && radius >= 4) {
+    ctx.strokeStyle = hexToRgba("#fff0bc", 0.45);
+    ctx.lineWidth = Math.max(0.5, lineWidth * 0.7);
+    ctx.beginPath();
+    ctx.ellipse(screen.x, screen.y, radius * 0.38, Math.max(radius * ratio * 0.15, 0.25), rotation, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if ((body.object_type === "star_cluster" || body.object_type === "asterism" || body.object_type === "milky_way_patch") && radius >= 3) {
+    ctx.fillStyle = "rgba(255, 243, 207, 0.82)";
+    const points = [
+      [0, 0],
+      [-0.34, -0.2],
+      [0.32, -0.25],
+      [-0.12, 0.35],
+      [0.4, 0.24],
+      [-0.42, 0.26]
+    ];
+    for (const [dx, dy] of points) {
+      ctx.beginPath();
+      ctx.arc(screen.x + radius * dx, screen.y + radius * dy, Math.max(0.45, Math.min(2.8, radius * 0.045)), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+
+function deepSkyMinorMajorRatio(body: Body) {
+  const major = body.deep_sky?.physical_diameter_ly;
+  const minor = body.deep_sky?.physical_minor_diameter_ly;
+  if (!major || !minor || major <= 0 || minor <= 0) return 1;
+  return clamp(Math.min(major, minor) / Math.max(major, minor), 0.08, 1);
+}
+
+function isScreenDiskVisible(screen: ScreenPoint, radius: number) {
+  if (!Number.isFinite(radius)) return false;
+  const margin = Math.max(80, Math.min(radius, 8000));
+  return screen.x >= -margin && screen.x <= window.innerWidth + margin && screen.y >= -margin && screen.y <= window.innerHeight + margin;
+}
+
 function drawTargetHeadingIndicator() {
   if (!ship) return;
   const target = bodyByKey.get(selectedTarget);
@@ -2207,11 +2278,45 @@ function drawBody(body: Body) {
 
   ctx.save();
   if (isDeepSkyBody(body)) {
-    drawReferenceBodyImage(body, screen.x, screen.y, Math.max(22, markerRadius * 3.6));
+    if (sizeMode === "true" && radius < 0.35 && !emphasized) {
+      ctx.restore();
+      return;
+    }
+
+    const markerOnly = sizeMode === "hybrid" && radius < 1.2;
+    const shouldDrawSymbolicMarker = sizeMode === "readable" || markerOnly || radius <= 0;
+    const visibleRadius = shouldDrawSymbolicMarker ? markerRadius : radius;
+    if (!isScreenDiskVisible(screen, visibleRadius + 24)) {
+      ctx.restore();
+      return;
+    }
+
+    if (shouldDrawSymbolicMarker) {
+      drawReferenceBodyImage(body, screen.x, screen.y, Math.max(22, markerRadius * 3.6));
+      if (sizeMode === "hybrid" && markerOnly) {
+        ctx.strokeStyle = hexToRgba(body.color, 0.62);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, markerRadius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    } else {
+      drawTrueDeepSkyBody(body, screen, visibleRadius);
+      if (sizeMode === "hybrid" && visibleRadius < markerRadius) {
+        ctx.strokeStyle = hexToRgba(body.color, 0.34);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(screen.x, screen.y, markerRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
     ctx.strokeStyle = isTarget ? "#f3f0e8" : isSelectedBody ? "#74c4ff" : hexToRgba(body.color, 0.38);
     ctx.lineWidth = isTarget || isSelectedBody ? 2 : 1;
     ctx.beginPath();
-    ctx.arc(screen.x, screen.y, markerRadius + (isTarget || isSelectedBody ? 6 : 3), 0, Math.PI * 2);
+    ctx.arc(screen.x, screen.y, Math.max(labelAnchorRadius(body) + (isTarget || isSelectedBody ? 6 : 3), 7), 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
     return;
@@ -2725,7 +2830,7 @@ function updateBodyInfo() {
       <span>From Sun</span><strong>${formatDistance(body.position.heliocentric_distance_km)}</strong>
       <span>From Earth</span><strong>${formatDistance(body.distance_from_earth_km)}</strong>
       <span>Ecliptic z</span><strong>${formatDistance(body.position.z_km)}</strong>
-      <span>${body.deep_sky ? "Physical radius" : "Mean radius"}</span><strong>${body.deep_sky ? "not represented" : formatDistance(body.radius_km)}</strong>
+      <span>${body.deep_sky ? "Estimated radius" : "Mean radius"}</span><strong>${body.radius_km > 0 ? formatDistance(body.radius_km) : "not represented"}</strong>
       <span>Source</span><strong>${escapeHtml(source)}</strong>
       ${stellarRows}
       ${deepSkyRows}
@@ -2767,6 +2872,8 @@ function deepSkyInfoRows(body: Body) {
     <span>Lookback time</span><strong>${formatLookbackTime(deepSky.distance_ly)}</strong>
     <span>Apparent mag</span><strong>${deepSky.apparent_magnitude === null ? "not listed" : formatMagnitude(deepSky.apparent_magnitude)}</strong>
     <span>Angular size</span><strong>${escapeHtml(deepSky.angular_size_arcmin ? `${deepSky.angular_size_arcmin} arcmin` : "not listed")}</strong>
+    <span>Estimated diameter</span><strong>${escapeHtml(formatDeepSkyPhysicalSize(deepSky))}</strong>
+    <span>Size basis</span><strong>${escapeHtml(deepSky.physical_size_note ?? "not listed")}</strong>
     <span>Constellation</span><strong>${escapeHtml(deepSky.constellation || "not listed")}</strong>
     <span>Best season</span><strong>${escapeHtml(deepSky.viewing_season || "not listed")}</strong>
     <span>Observe with</span><strong>${escapeHtml(deepSky.observing_equipment || "not listed")}</strong>
@@ -2776,20 +2883,19 @@ function deepSkyInfoRows(body: Body) {
 }
 
 function sizeComparisonMarkup(body: Body) {
-  if (body.deep_sky) {
+  const comparisonBodies = sizeComparisonBodies(body);
+  if (!comparisonBodies.length) {
     return `
       <section class="size-comparison">
         <div class="size-comparison-head">
           <span>Size reference</span>
-          <strong>Angular, not physical</strong>
+          <strong>No physical size</strong>
         </div>
-        <p>Physical radius is not represented for this catalog object. Use angular size, distance, and lookback time instead.</p>
+        <p>This catalog entry has position and distance data, but no physical radius or angular size that can be converted into diameter.</p>
       </section>
     `;
   }
 
-  const comparisonBodies = sizeComparisonBodies(body);
-  if (!comparisonBodies.length) return "";
   const maxDiameterKm = Math.max(...comparisonBodies.map((item) => item.radius_km * 2), 1);
 
   return `
@@ -2820,20 +2926,26 @@ function sizeComparisonMarkup(body: Body) {
 }
 
 function sizeComparisonBodies(body: Body) {
-  const keys = [
+  const anchorKeys = [
     body.key,
     body.parent_key ?? "",
     selectedTarget,
-    "sun",
-    "jupiter",
-    "saturn",
-    "earth",
-    "moon"
+    ...(body.deep_sky ? ["m31", "m33", "m42", "m45", "m13"] : ["sun", "jupiter", "saturn", "earth", "moon"])
   ];
+  const sameTypeBodies = Array.from(bodyByKey.values())
+    .filter((item) => item.object_type === body.object_type && item.radius_km > 0)
+    .sort((a, b) => b.radius_km - a.radius_km);
+  const bodyIndex = sameTypeBodies.findIndex((item) => item.key === body.key);
+  const neighborBodies =
+    bodyIndex === -1
+      ? sameTypeBodies.slice(0, 3)
+      : sameTypeBodies.slice(Math.max(0, bodyIndex - 2), Math.min(sameTypeBodies.length, bodyIndex + 3));
   const seen = new Set<string>();
-  return keys
-    .map((key) => bodyByKey.get(key))
-    .filter((item): item is Body => Boolean(item && item.radius_km > 0 && !isStaticStellarCatalogBody(item)))
+  return [
+    ...anchorKeys.map((key) => bodyByKey.get(key)),
+    ...neighborBodies
+  ]
+    .filter((item): item is Body => Boolean(item && item.radius_km > 0))
     .filter((item) => {
       if (seen.has(item.key)) return false;
       seen.add(item.key);
@@ -3866,17 +3978,20 @@ function readableDisplayRadius(body: Body) {
 }
 
 function trueBodyRadiusPx(body: Body) {
-  if (isStaticStellarCatalogBody(body) || body.radius_km <= 0) return 0;
+  if (body.radius_km <= 0) return 0;
   return (body.radius_km / (ephemeris?.au_km ?? AU_KM_FALLBACK)) * camera.pxPerAu;
 }
 
 function renderedBodyRadius(body: Body) {
-  if (sizeMode === "readable" || isStaticStellarCatalogBody(body)) return readableDisplayRadius(body);
+  if (sizeMode === "readable") return readableDisplayRadius(body);
   if (sizeMode === "true") return trueBodyRadiusPx(body);
   return trueBodyRadiusPx(body);
 }
 
 function labelAnchorRadius(body: Body) {
+  if (isDeepSkyBody(body) && sizeMode !== "readable") {
+    return Math.min(Math.max(readableDisplayRadius(body), trueBodyRadiusPx(body)), 60);
+  }
   if (sizeMode === "true") return Math.max(readableDisplayRadius(body), trueBodyRadiusPx(body));
   return readableDisplayRadius(body);
 }
@@ -3973,6 +4088,16 @@ function formatLookbackTime(lightYears: number | null) {
   if (lightYears >= 1_000_000) return `${formatNumber(lightYears / 1_000_000)} million years`;
   if (lightYears >= 1_000) return `${formatNumber(lightYears / 1_000)} thousand years`;
   return `${formatNumber(lightYears)} years`;
+}
+
+function formatDeepSkyPhysicalSize(deepSky: DeepSkyInfo) {
+  const major = deepSky.physical_diameter_ly;
+  const minor = deepSky.physical_minor_diameter_ly;
+  if (major === null || !Number.isFinite(major)) return "not listed";
+  if (minor === null || !Number.isFinite(minor) || Math.abs(major - minor) / Math.max(major, 1) < 0.02) {
+    return formatLightYears(major);
+  }
+  return `${formatLightYears(major)} x ${formatLightYears(minor)}`;
 }
 
 function formatMagnitude(value: number) {

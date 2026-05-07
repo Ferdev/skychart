@@ -80,7 +80,7 @@ The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL 
 
 Nearby exoplanet-host stars are a curated static slice from the NASA Exoplanet Archive. Their catalog right ascension, declination, and distance are converted into heliocentric ecliptic Cartesian coordinates so they can be searched, targeted, centered, measured, and rendered in the same map coordinate space. These stars are not JPL-propagated dynamic ephemeris bodies.
 
-Messier objects are loaded from a generated snapshot in `data/catalogs/deep_sky_catalog.json`. The generator script `scripts/build_deep_sky_catalog.py` pulls the AstroPixels Messier table for RA/Dec, distance estimates, apparent magnitude, angular size, constellation, season, and common names, and records NASA HEASARC Messier table notes as catalog context. Distance-known Messier entries are targetable and measured with the same x/y/z distance math, but they remain static catalog positions rather than propagated ephemerides.
+Messier objects are loaded from a generated snapshot in `data/catalogs/deep_sky_catalog.json`. The generator script `scripts/build_deep_sky_catalog.py` pulls the AstroPixels Messier table for RA/Dec, distance estimates, apparent magnitude, angular size, constellation, season, and common names, and records NASA HEASARC Messier table notes as catalog context. Distance-known Messier entries are targetable and measured with the same x/y/z distance math, but they remain static catalog positions rather than propagated ephemerides. When angular size and distance are available, the backend derives an estimated physical diameter for true-size rendering.
 
 The API now exposes a catalog layer:
 
@@ -104,7 +104,7 @@ Positions are computed as heliocentric ecliptic Cartesian coordinates:
 
 Distances are never numerically compressed or altered. Zoom only changes the map transform from AU to pixels.
 
-Planet, Moon, and star display radii are deliberately exaggerated so bodies remain visible. The Orbits layer draws current osculating orbit references from the epoch state vectors; these are visual guides, not n-body propagated paths. At interstellar scale the grid and HUD switch to light-year-friendly labels, but the underlying coordinates remain AU/km.
+The map has three object-size modes. `Readable` deliberately exaggerates object markers so bodies remain visible. `Hybrid` renders true radii when they are large enough at the current zoom and falls back to navigation markers for sub-pixel objects. `True` uses the loaded physical radius directly, including catalog stars and Messier objects with size estimates; selected or targeted sub-pixel objects still get rings so they can be found. Messier physical sizes are estimates derived from catalog angular size and distance, not resolved shape models. The Orbits layer draws current osculating orbit references from the epoch state vectors; these are visual guides, not n-body propagated paths. At interstellar scale the grid and HUD switch to light-year-friendly labels, but the underlying coordinates remain AU/km.
 
 ## Time Controls
 
@@ -116,7 +116,7 @@ The timestamp input is treated as UTC. Changing time recomputes every celestial 
 - Mars, Jupiter, Saturn, Uranus, Neptune, and Pluto use barycenter targets from the planetary ephemeris.
 - Phobos and Deimos use the official NAIF MAR099s satellite SPK. The Galilean moons and included Saturn moons use NASA/JPL Horizons parent-relative vectors. Many smaller or newly cataloged satellites are still missing.
 - Nearby exoplanet-host stars use static NASA Exoplanet Archive catalog positions. Proper motion, radial velocity, binary motion, and future/past epoch propagation are not implemented yet.
-- Messier deep-sky objects use static catalog RA/Dec and distance estimates. Their distances are educational catalog values, not mission-grade astrometric solutions. Proper motion, expansion, radial velocity, and catalog uncertainty propagation are not implemented.
+- Messier deep-sky objects use static catalog RA/Dec and distance estimates. Their distances and physical sizes are educational catalog values, not mission-grade astrometric solutions. Physical diameter is derived from angular size and distance where available. Proper motion, expansion, radial velocity, orientation, and catalog uncertainty propagation are not implemented.
 - NGC/IC support currently comes through aliases attached to Messier objects, not the full NGC/IC catalog. Objects without reliable distances are intentionally not placed at fake depths.
 - The app now has catalog group metadata, but the frontend still loads all default Solar System groups at startup. True viewport/lazy catalog streaming is a future scaling step.
 - Interstellar and deep-sky targets can be selected and measured, but the route planner is intentionally disabled for static catalog targets until there is a credible non-Solar-System navigation model.
