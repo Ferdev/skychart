@@ -1719,11 +1719,14 @@ kbd:has(+ kbd) {
   white-space: normal;
 }
 
+.body-popover {
+  position: absolute;
+  z-index: 4;
+}
+
 .body-popover,
 .measure-panel,
 .onboarding-panel {
-  position: absolute;
-  z-index: 4;
   border: 1px solid var(--panel-edge);
   border-radius: 8px;
   background:
@@ -1772,11 +1775,9 @@ kbd:has(+ kbd) {
 }
 
 .measure-panel {
-  left: 16px;
-  top: 330px;
   display: grid;
   gap: 8px;
-  width: min(348px, calc(100vw - 32px));
+  width: auto;
   padding: 12px;
   font-size: 12px;
 }
@@ -1802,9 +1803,7 @@ kbd:has(+ kbd) {
 }
 
 .onboarding-panel {
-  left: 16px;
-  top: 330px;
-  width: min(348px, calc(100vw - 32px));
+  width: auto;
   padding: 12px;
 }
 
@@ -1927,9 +1926,6 @@ kbd:has(+ kbd) {
   }
 
   .measure-panel {
-    top: calc(22vh + 86px);
-    right: 12px;
-    left: 12px;
     width: auto;
   }
 
