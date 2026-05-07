@@ -58,6 +58,8 @@ const ICONS: Record<string, string> = {
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z"></path><circle cx="12" cy="10" r="2"></circle></svg>',
   ruler:
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17 17 4l3 3L7 20l-3-3Z"></path><path d="m13 8 3 3M10 11l2 2M7 14l3 3"></path></svg>',
+  zoom:
+    '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"></circle><path d="m15 15 5 5M10.5 8v5M8 10.5h5"></path></svg>',
   close:
     '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>'
 };
@@ -69,6 +71,17 @@ type ZoomPreset = "inner" | "outer" | "local" | "group" | "deep" | "all";
 type SizeMode = "readable" | "hybrid" | "true";
 type ScaleBandKey = "planetary" | "solar" | "nearby_stars" | "milky_way" | "local_group" | "deep_sky";
 type LoadingStepKey = "api" | "download" | "parse" | "render";
+
+type CameraAnimation = {
+  startedAt: number;
+  durationMs: number;
+  fromXAu: number;
+  fromYAu: number;
+  fromPxPerAu: number;
+  toXAu: number;
+  toYAu: number;
+  toPxPerAu: number;
+};
 
 type GuidedTour = {
   id: string;
@@ -534,6 +547,7 @@ const zoomOut = requiredElement<HTMLButtonElement>("#zoom-out");
 const centerSun = requiredElement<HTMLButtonElement>("#center-sun");
 const centerShip = requiredElement<HTMLButtonElement>("#center-ship");
 const centerSelected = requiredElement<HTMLButtonElement>("#center-selected");
+const zoomSelected = requiredElement<HTMLButtonElement>("#zoom-selected");
 const targetSelected = requiredElement<HTMLButtonElement>("#target-selected");
 const timeInput = requiredElement<HTMLInputElement>("#time-input");
 const applyTime = requiredElement<HTMLButtonElement>("#apply-time");
@@ -578,6 +592,7 @@ let recentDestinations = readRecentDestinations();
 let routeWaypoints: RouteWaypoint[] = [];
 let measurePoints: MeasurePoint[] = [];
 let activePopoverBodyKey: string | null = null;
+let cameraAnimation: CameraAnimation | null = null;
 let bodyTrails: BodyTrail[] = [];
 let trailsLoading = false;
 let trailsError = "";
@@ -639,10 +654,12 @@ window.addEventListener("keyup", (event) => keys.delete(event.code));
 
 canvas.addEventListener("wheel", (event) => {
   event.preventDefault();
+  cancelCameraAnimation();
   zoomAt(event.clientX, event.clientY, zoomWheelFactor(event.deltaY));
 });
 
 canvas.addEventListener("pointerdown", (event) => {
+  cancelCameraAnimation();
   isDragging = true;
   dragMoved = false;
   canvas.setPointerCapture(event.pointerId);
@@ -674,15 +691,18 @@ canvas.addEventListener("pointerup", (event) => {
 zoomIn.addEventListener("click", () => zoomAt(window.innerWidth / 2, window.innerHeight / 2, 1.25));
 zoomOut.addEventListener("click", () => zoomAt(window.innerWidth / 2, window.innerHeight / 2, 0.8));
 centerSun.addEventListener("click", () => {
+  cancelCameraAnimation();
   camera.xAu = 0;
   camera.yAu = 0;
 });
 centerShip.addEventListener("click", () => {
   if (!ship) return;
+  cancelCameraAnimation();
   camera.xAu = ship.xAu;
   camera.yAu = ship.yAu;
 });
 centerSelected.addEventListener("click", () => centerOnBody(selectedBodyKey));
+zoomSelected.addEventListener("click", () => zoomToBody(selectedBodyKey));
 targetSelected.addEventListener("click", () => setTarget(selectedBodyKey, { inspect: true }));
 bodySelect.addEventListener("change", () => {
   selectedBodyKey = bodySelect.value;
@@ -1084,6 +1104,7 @@ function fitInitialView() {
 function loop(now: number) {
   const dt = Math.min(0.05, (now - lastFrame) / 1000);
   lastFrame = now;
+  updateCameraAnimation(now);
   updateShip(dt);
   draw();
   requestAnimationFrame(loop);
@@ -3147,6 +3168,7 @@ function showBodyPopover(body: Body, clientX: number, clientY: number) {
     <div class="popover-actions">
       <button type="button" data-popover-action="target">${icon("target")}<span>Target</span></button>
       <button type="button" data-popover-action="center">${icon("center")}<span>Center</span></button>
+      <button type="button" data-popover-action="zoom">${icon("zoom")}<span>Zoom</span></button>
       <button type="button" data-popover-action="measure">${icon("ruler")}<span>Measure</span></button>
       <button type="button" data-popover-action="waypoint">${icon("waypoint")}<span>Waypoint</span></button>
     </div>
@@ -3169,6 +3191,8 @@ function handlePopoverAction(action: string, key: string) {
     setTarget(key, { inspect: true });
   } else if (action === "center") {
     centerOnBody(key);
+  } else if (action === "zoom") {
+    zoomToBody(key);
   } else if (action === "measure") {
     interactionMode = "measure";
     updateModeButtons();
@@ -3452,8 +3476,62 @@ function lightStoryText(target: Body, shipTargetKm: number) {
 function centerOnBody(key: string) {
   const body = bodyByKey.get(key);
   if (!body) return;
+  cancelCameraAnimation();
   camera.xAu = body.position.x_au;
   camera.yAu = body.position.y_au;
+}
+
+function zoomToBody(key: string) {
+  const body = bodyByKey.get(key);
+  if (!body) return;
+  const viewRadiusAu = zoomViewRadiusAu(body);
+  const targetPxPerAu = clamp(
+    Math.min(window.innerWidth, window.innerHeight) / (viewRadiusAu * 2.15),
+    MIN_PX_PER_AU,
+    MAX_PX_PER_AU
+  );
+  animateCameraTo(body.position.x_au, body.position.y_au, targetPxPerAu);
+}
+
+function animateCameraTo(xAu: number, yAu: number, pxPerAu: number, durationMs = 850) {
+  cameraAnimation = {
+    startedAt: performance.now(),
+    durationMs,
+    fromXAu: camera.xAu,
+    fromYAu: camera.yAu,
+    fromPxPerAu: camera.pxPerAu,
+    toXAu: xAu,
+    toYAu: yAu,
+    toPxPerAu: clamp(pxPerAu, MIN_PX_PER_AU, MAX_PX_PER_AU)
+  };
+}
+
+function updateCameraAnimation(now: number) {
+  if (!cameraAnimation) return;
+  const progress = clamp((now - cameraAnimation.startedAt) / cameraAnimation.durationMs, 0, 1);
+  const eased = easeInOutCubic(progress);
+  camera.xAu = lerp(cameraAnimation.fromXAu, cameraAnimation.toXAu, eased);
+  camera.yAu = lerp(cameraAnimation.fromYAu, cameraAnimation.toYAu, eased);
+  camera.pxPerAu = Math.exp(lerp(Math.log(cameraAnimation.fromPxPerAu), Math.log(cameraAnimation.toPxPerAu), eased));
+  if (progress >= 1) {
+    camera.xAu = cameraAnimation.toXAu;
+    camera.yAu = cameraAnimation.toYAu;
+    camera.pxPerAu = cameraAnimation.toPxPerAu;
+    cameraAnimation = null;
+    updateHud(true);
+  }
+}
+
+function cancelCameraAnimation() {
+  cameraAnimation = null;
+}
+
+function easeInOutCubic(value: number) {
+  return value < 0.5 ? 4 * value * value * value : 1 - ((-2 * value + 2) ** 3) / 2;
+}
+
+function lerp(from: number, to: number, value: number) {
+  return from + (to - from) * value;
 }
 
 function ensureSelectedKeysExist() {
@@ -3685,6 +3763,7 @@ function decorateStaticControls() {
   setButtonContent(jumpDestination, "locate", "Center", { compact: true });
   setButtonContent(targetSelected, "target", "Set as target", { compact: true });
   setButtonContent(centerSelected, "center", "Center map", { compact: true });
+  setButtonContent(zoomSelected, "zoom", "Zoom to body", { compact: true });
   setButtonContent(applyTime, "check", "Apply timestamp", { compact: true });
   setButtonContent(zoomOut, "minus", "Zoom out", { compact: true });
   setButtonContent(zoomIn, "plus", "Zoom in", { compact: true });
@@ -3865,6 +3944,7 @@ function resizeCanvas() {
 }
 
 function zoomAt(clientX: number, clientY: number, factor: number) {
+  cancelCameraAnimation();
   const before = screenToWorld(clientX, clientY);
   camera.pxPerAu = clamp(camera.pxPerAu * factor, MIN_PX_PER_AU, MAX_PX_PER_AU);
   const after = screenToWorld(clientX, clientY);
@@ -3896,15 +3976,7 @@ function applyZoomPreset(preset: ZoomPreset) {
   if (preset === "local") {
     const body = bodyByKey.get(selectedBodyKey) ?? bodyByKey.get(selectedTarget);
     if (!body) return;
-    const viewRadiusAu = localViewRadiusAu(body);
-    camera.xAu = body.position.x_au;
-    camera.yAu = body.position.y_au;
-    camera.pxPerAu = clamp(
-      Math.min(window.innerWidth, window.innerHeight) / (viewRadiusAu * 2.15),
-      MIN_PX_PER_AU,
-      MAX_PX_PER_AU
-    );
-    updateHud(true);
+    zoomToBody(body.key);
     return;
   }
 
@@ -3919,6 +3991,7 @@ function applyZoomPreset(preset: ZoomPreset) {
   const bodies = keysByPreset[preset].map((key) => bodyByKey.get(key)).filter((body): body is Body => Boolean(body));
   if (!bodies.length) return;
   const maxAu = Math.max(...bodies.map((body) => Math.hypot(body.position.x_au, body.position.y_au)), 0.5);
+  cancelCameraAnimation();
   camera.xAu = 0;
   camera.yAu = 0;
   camera.pxPerAu = clamp(Math.min(window.innerWidth, window.innerHeight) / (maxAu * 2.4), MIN_PX_PER_AU, MAX_PX_PER_AU);
@@ -4002,6 +4075,18 @@ function labelAnchorRadius(body: Body) {
   }
   if (sizeMode === "true") return Math.max(readableDisplayRadius(body), trueBodyRadiusPx(body));
   return readableDisplayRadius(body);
+}
+
+function zoomViewRadiusAu(body: Body) {
+  const auKm = ephemeris?.au_km ?? AU_KM_FALLBACK;
+  const radiusAu = body.radius_km > 0 ? body.radius_km / auKm : 0;
+  if (isDeepSkyBody(body) && radiusAu > 0) {
+    return radiusAu * 2.4;
+  }
+  if (body.catalog?.position_model === "stellar_catalog_coordinates" && radiusAu > 0) {
+    return clamp(radiusAu * 42, 0.015, 0.22);
+  }
+  return localViewRadiusAu(body);
 }
 
 function localViewRadiusAu(body: Body) {
