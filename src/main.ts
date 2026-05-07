@@ -1754,30 +1754,8 @@ function drawSizeComparisonOverlay(width: number, height: number) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  const midpoint = { x: (selectedScreen.x + compareX) / 2, y: (selectedScreen.y + compareY) / 2 };
-  drawSizeComparisonPill("same size scale", midpoint, viewport);
   drawSizeComparisonDisk(body, selectedScreen, selectedMajorRadius, "selected", viewport);
   drawSizeComparisonDisk(compareBody, { x: compareX, y: compareY }, compareMajorRadius, "compare", viewport);
-  ctx.restore();
-}
-
-function drawSizeComparisonPill(text: string, point: ScreenPoint, viewport: MapViewportRect) {
-  ctx.save();
-  ctx.font = "720 10px ui-sans-serif, system-ui";
-  ctx.textBaseline = "middle";
-  const width = Math.ceil(ctx.measureText(text).width + 14);
-  const height = 20;
-  const x = clamp(point.x - width / 2, viewport.left + 8, viewport.right - width - 8);
-  const y = clamp(point.y - height / 2, viewport.top + 8, viewport.bottom - height - 8);
-  ctx.fillStyle = "rgba(8, 11, 12, 0.9)";
-  ctx.strokeStyle = "rgba(217, 184, 111, 0.48)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(x, y, width, height, 5);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "rgba(255, 229, 164, 0.9)";
-  ctx.fillText(text, x + 7, y + height / 2);
   ctx.restore();
 }
 
@@ -1837,7 +1815,7 @@ function drawSolarSystemComparisonShape(body: Body, center: ScreenPoint, radius:
     ctx.stroke();
   }
 
-  ctx.fillStyle = locatorOnly ? hexToRgba(color, 0.82) : color;
+  ctx.fillStyle = locatorOnly ? hexToRgba(color, 0.82) : hexToRgba(color, 0.58);
   ctx.strokeStyle = "rgba(244, 241, 232, 0.72)";
   ctx.lineWidth = locatorOnly ? 1 : Math.max(0.75, Math.min(1.4, radius * 0.08));
   ctx.beginPath();
