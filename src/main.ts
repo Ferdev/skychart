@@ -690,18 +690,16 @@ canvas.addEventListener("pointerup", (event) => {
   }
 });
 
-zoomIn.addEventListener("click", () => zoomAt(window.innerWidth / 2, window.innerHeight / 2, 1.25));
-zoomOut.addEventListener("click", () => zoomAt(window.innerWidth / 2, window.innerHeight / 2, 0.8));
+zoomIn.addEventListener("click", () => zoomAtMapFocus(1.25));
+zoomOut.addEventListener("click", () => zoomAtMapFocus(0.8));
 centerSun.addEventListener("click", () => {
   cancelCameraAnimation();
-  camera.xAu = 0;
-  camera.yAu = 0;
+  setCameraFocusOnPoint(0, 0);
 });
 centerShip.addEventListener("click", () => {
   if (!ship) return;
   cancelCameraAnimation();
-  camera.xAu = ship.xAu;
-  camera.yAu = ship.yAu;
+  setCameraFocusOnPoint(ship.xAu, ship.yAu);
 });
 centerSelected.addEventListener("click", () => centerOnBody(selectedBodyKey));
 zoomSelected.addEventListener("click", () => zoomToBody(selectedBodyKey));
@@ -1107,8 +1105,7 @@ function fitInitialView() {
   const outerBody = bodyByKey.get("saturn");
   const radiusAu = outerBody ? Math.hypot(outerBody.position.x_au, outerBody.position.y_au) : 10;
   camera.pxPerAu = clamp(Math.min(width, height) / (radiusAu * 2.35), 18, 82);
-  camera.xAu = 0;
-  camera.yAu = 0;
+  setCameraFocusOnPoint(0, 0, camera.pxPerAu);
 }
 
 function loop(now: number) {
@@ -3605,20 +3602,22 @@ function centerOnBody(key: string) {
   const body = bodyByKey.get(key);
   if (!body) return;
   cancelCameraAnimation();
-  camera.xAu = body.position.x_au;
-  camera.yAu = body.position.y_au;
+  setCameraFocusOnPoint(body.position.x_au, body.position.y_au);
 }
 
 function zoomToBody(key: string) {
   const body = bodyByKey.get(key);
   if (!body) return;
   const viewRadiusAu = zoomViewRadiusAu(body);
+  const viewport = mapViewportRect();
+  const focusSize = Math.max(260, Math.min(viewport.right - viewport.left, viewport.bottom - viewport.top));
   const targetPxPerAu = clamp(
-    Math.min(window.innerWidth, window.innerHeight) / (viewRadiusAu * 2.15),
+    focusSize / (viewRadiusAu * 2.15),
     MIN_PX_PER_AU,
     MAX_PX_PER_AU
   );
-  animateCameraTo(body.position.x_au, body.position.y_au, targetPxPerAu);
+  const targetCamera = cameraForFocusedPoint(body.position.x_au, body.position.y_au, targetPxPerAu);
+  animateCameraTo(targetCamera.xAu, targetCamera.yAu, targetPxPerAu);
 }
 
 function animateCameraTo(xAu: number, yAu: number, pxPerAu: number, durationMs = 850) {
@@ -4071,6 +4070,85 @@ function resizeCanvas() {
   canvas.style.height = `${window.innerHeight}px`;
 }
 
+type MapViewportRect = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+function mapViewportRect(): MapViewportRect {
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const padding = 18;
+  let left = 0;
+  let right = width;
+  let top = 0;
+  let bottom = height;
+
+  for (const selector of [".left-rail", ".right-rail", ".flight-deck"]) {
+    const element = document.querySelector<HTMLElement>(selector);
+    if (!element || getComputedStyle(element).display === "none") continue;
+    const rect = element.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue;
+
+    if (element.classList.contains("flight-deck")) {
+      if (rect.top > height * 0.45) bottom = Math.min(bottom, rect.top - padding);
+      continue;
+    }
+
+    const isFullWidthPanel = rect.width > width * 0.72;
+    if (element.classList.contains("left-rail")) {
+      if (isFullWidthPanel) top = Math.max(top, rect.bottom + padding);
+      else left = Math.max(left, rect.right + padding);
+      continue;
+    }
+
+    if (element.classList.contains("right-rail")) {
+      if (isFullWidthPanel) bottom = Math.min(bottom, rect.top - padding);
+      else right = Math.min(right, rect.left - padding);
+    }
+  }
+
+  if (right - left < Math.min(420, width * 0.45)) {
+    left = 0;
+    right = width;
+  }
+  if (bottom - top < Math.min(360, height * 0.42)) {
+    top = 0;
+    bottom = height;
+  }
+
+  return { left, right, top, bottom };
+}
+
+function mapFocusPoint() {
+  const viewport = mapViewportRect();
+  return {
+    x: (viewport.left + viewport.right) / 2,
+    y: (viewport.top + viewport.bottom) / 2
+  };
+}
+
+function cameraForFocusedPoint(xAu: number, yAu: number, pxPerAu: number) {
+  const focus = mapFocusPoint();
+  return {
+    xAu: xAu - (focus.x - window.innerWidth / 2) / pxPerAu,
+    yAu: yAu + (focus.y - window.innerHeight / 2) / pxPerAu
+  };
+}
+
+function setCameraFocusOnPoint(xAu: number, yAu: number, pxPerAu = camera.pxPerAu) {
+  const nextCamera = cameraForFocusedPoint(xAu, yAu, pxPerAu);
+  camera.xAu = nextCamera.xAu;
+  camera.yAu = nextCamera.yAu;
+}
+
+function zoomAtMapFocus(factor: number) {
+  const focus = mapFocusPoint();
+  zoomAt(focus.x, focus.y, factor);
+}
+
 function zoomAt(clientX: number, clientY: number, factor: number) {
   cancelCameraAnimation();
   const before = screenToWorld(clientX, clientY);
@@ -4120,9 +4198,8 @@ function applyZoomPreset(preset: ZoomPreset) {
   if (!bodies.length) return;
   const maxAu = Math.max(...bodies.map((body) => Math.hypot(body.position.x_au, body.position.y_au)), 0.5);
   cancelCameraAnimation();
-  camera.xAu = 0;
-  camera.yAu = 0;
   camera.pxPerAu = clamp(Math.min(window.innerWidth, window.innerHeight) / (maxAu * 2.4), MIN_PX_PER_AU, MAX_PX_PER_AU);
+  setCameraFocusOnPoint(0, 0, camera.pxPerAu);
   updateHud(true);
 }
 

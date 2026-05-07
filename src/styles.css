@@ -419,7 +419,6 @@ button:disabled {
 }
 
 .panel {
-  position: absolute;
   z-index: 3;
   border: 1px solid var(--panel-edge);
   border-radius: 8px;
@@ -430,10 +429,40 @@ button:disabled {
     inset 0 0 0 1px rgba(255, 255, 255, 0.018);
 }
 
-.hud {
+.left-rail,
+.right-rail {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.left-rail > *,
+.right-rail > * {
+  pointer-events: auto;
+}
+
+.left-rail {
   top: 16px;
+  bottom: 160px;
   left: 16px;
+  align-content: start;
   width: min(348px, calc(100vw - 32px));
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.right-rail {
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  grid-template-rows: auto minmax(230px, 1fr);
+  width: min(468px, calc(100vw - 32px));
+  min-height: 0;
+}
+
+.hud {
   padding: 16px;
 }
 
@@ -442,17 +471,13 @@ button:disabled {
 }
 
 .mission-panel {
-  top: 16px;
-  right: 16px;
-  width: min(468px, calc(100vw - 32px));
+  overflow: auto;
+  max-height: min(58vh, 640px);
 }
 
 .map-tools {
-  top: 224px;
-  left: 16px;
   display: grid;
   gap: 10px;
-  width: min(348px, calc(100vw - 32px));
   padding: 10px;
 }
 
@@ -471,15 +496,13 @@ button:disabled {
 }
 
 .journey-panel {
-  right: 16px;
-  bottom: 16px;
-  width: min(468px, calc(100vw - 32px));
-  max-height: 45vh;
+  min-height: 0;
   overflow: auto;
   padding: 16px;
 }
 
 .flight-deck {
+  position: absolute;
   bottom: 16px;
   left: 16px;
   display: grid;
@@ -1580,12 +1603,8 @@ dd {
 }
 
 .scale-ladder {
-  position: absolute;
-  z-index: 3;
-  left: 16px;
-  bottom: 188px;
-  width: min(430px, calc(100vw - 556px));
-  min-width: 360px;
+  width: auto;
+  min-width: 0;
   border: 1px solid rgba(244, 241, 232, 0.14);
   border-radius: 8px;
   padding: 10px 12px;
@@ -1685,13 +1704,9 @@ dd {
 }
 
 .scale-note {
-  position: absolute;
-  z-index: 3;
-  left: 16px;
-  bottom: 150px;
-  max-width: min(420px, calc(100vw - 32px));
+  max-width: none;
   border: 1px solid rgba(244, 241, 232, 0.14);
-  border-radius: 999px;
+  border-radius: 8px;
   padding: 7px 11px;
   background: rgba(10, 14, 15, 0.78);
   color: rgba(244, 241, 232, 0.72);
@@ -1939,42 +1954,39 @@ kbd:has(+ kbd) {
 }
 
 @media (max-width: 760px) {
-  .hud {
-    right: 12px;
+  .left-rail {
     top: 12px;
-    left: 12px;
-    width: auto;
-    max-height: 22vh;
-    overflow: auto;
-  }
-
-  .mission-panel {
-    top: auto;
-    right: 12px;
-    bottom: 46px;
-    left: 12px;
-    width: auto;
-    max-height: 40vh;
-    overflow: auto;
-  }
-
-  .journey-panel {
-    top: calc(22vh + 86px);
     right: 12px;
     bottom: auto;
     left: 12px;
     width: auto;
-    max-height: 22vh;
-    overflow: auto;
+    max-height: 34vh;
+  }
+
+  .right-rail {
+    top: calc(34vh + 24px);
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .hud {
+    max-height: none;
+  }
+
+  .mission-panel {
+    max-height: 24vh;
+  }
+
+  .journey-panel {
+    max-height: none;
   }
 
   .map-tools {
-    top: calc(22vh + 24px);
-    right: 12px;
-    left: 12px;
     display: flex;
     align-items: center;
-    width: auto;
     min-height: 50px;
     overflow-x: auto;
     padding: 8px;
@@ -2023,10 +2035,7 @@ kbd:has(+ kbd) {
   }
 
   .scale-note {
-    right: 12px;
-    bottom: 10px;
-    left: 12px;
-    text-align: center;
+    display: none;
   }
 
   .search-control {
