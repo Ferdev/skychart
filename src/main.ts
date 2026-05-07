@@ -66,6 +66,7 @@ type BodyFilter = (typeof BODY_FILTERS)[number];
 type InteractionMode = "pan" | "target" | "measure";
 type DisplayLayer = "labels" | "orbits" | "route" | "trails";
 type ZoomPreset = "inner" | "outer" | "local" | "group" | "deep" | "all";
+type SizeMode = "readable" | "hybrid" | "true";
 type ScaleBandKey = "planetary" | "solar" | "nearby_stars" | "milky_way" | "local_group" | "deep_sky";
 type LoadingStepKey = "api" | "download" | "parse" | "render";
 
@@ -108,6 +109,12 @@ const SCALE_LADDER_STOPS: { key: ScaleBandKey; label: string; maxViewportKm: num
 ];
 
 const LOADING_STEPS: LoadingStepKey[] = ["api", "download", "parse", "render"];
+
+const SIZE_MODE_COPY: Record<SizeMode, string> = {
+  readable: "Size mode: readable. Body markers are deliberately exaggerated; numerical distances and radii remain real.",
+  hybrid: "Size mode: hybrid. True radii render when they are large enough; markers remain for navigation.",
+  true: "Size mode: true. Body disks use real radius-to-pixel scale; selection rings mark sub-pixel objects."
+};
 
 const COMPACT_SATELLITE_PARENT_KEYS: Record<string, string> = {
   phobos: "mars",
@@ -524,12 +531,14 @@ const timeNow = requiredElement<HTMLButtonElement>("#time-now");
 const resetShipButton = requiredElement<HTMLButtonElement>("#reset-ship");
 const restartJourneyButton = requiredElement<HTMLButtonElement>("#restart-journey");
 const modeButtons = requiredElement<HTMLElement>("#mode-buttons");
+const sizeModeButtons = requiredElement<HTMLElement>("#size-mode-buttons");
 const displayToggles = requiredElement<HTMLElement>("#display-toggles");
 const zoomPresets = requiredElement<HTMLElement>("#zoom-presets");
 const bodyPopover = requiredElement<HTMLElement>("#body-popover");
 const measurePanel = requiredElement<HTMLElement>("#measure-panel");
 const onboardingPanel = requiredElement<HTMLElement>("#onboarding-panel");
 const scaleLadder = requiredElement<HTMLElement>("#scale-ladder");
+const scaleNote = requiredElement<HTMLElement>("#scale-note");
 const loadingScreen = requiredElement<HTMLElement>("#loading-screen");
 const loadingProgressFill = requiredElement<HTMLElement>("#loading-progress-fill");
 const loadingProgressLabel = requiredElement<HTMLElement>("#loading-progress-label");
@@ -554,6 +563,7 @@ let ship: Ship | null = null;
 let journeyStats: JourneyStats = createJourneyStats(selectedTarget);
 let activeBodyFilter: BodyFilter = "all";
 let interactionMode: InteractionMode = "pan";
+let sizeMode: SizeMode = "hybrid";
 let recentDestinations = readRecentDestinations();
 let routeWaypoints: RouteWaypoint[] = [];
 let measurePoints: MeasurePoint[] = [];
@@ -598,6 +608,7 @@ for (const target of QUICK_TARGETS) {
 }
 initializeBodyFilterButtons();
 initializeModeButtons();
+initializeSizeModeButtons();
 decorateStaticControls();
 renderOnboarding();
 updateTargetButtons();
@@ -751,6 +762,14 @@ modeButtons.addEventListener("click", (event) => {
   interactionMode = mode;
   updateModeButtons();
   updateMeasurePanel();
+});
+sizeModeButtons.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-size-mode]");
+  const mode = button?.dataset.sizeMode as SizeMode | undefined;
+  if (!mode || !(mode in SIZE_MODE_COPY)) return;
+  sizeMode = mode;
+  updateSizeModeButtons();
+  updateHud(true);
 });
 displayToggles.addEventListener("change", (event) => {
   const input = (event.target as HTMLElement).closest<HTMLInputElement>("[data-layer]");
@@ -1371,7 +1390,7 @@ function drawRouteGuide() {
       ctx.strokeStyle = body.key === selectedTarget ? "rgba(217, 184, 111, 0.88)" : "rgba(116, 196, 255, 0.58)";
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.arc(screen.x, screen.y, Math.max(7, displayRadius(body) + 4), 0, Math.PI * 2);
+      ctx.arc(screen.x, screen.y, Math.max(7, labelAnchorRadius(body) + 4), 0, Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -1553,7 +1572,7 @@ function bodyLabelLayouts(): BodyLabelLayout[] {
     if (!isScreenPointVisible(screen, 80)) continue;
     if (!shouldDrawBodyLabel(body, screen)) continue;
 
-    const radius = displayRadius(body);
+    const radius = labelAnchorRadius(body);
     const label = bodyDisplayLabel(body);
     const isEmphasized = body.key === selectedTarget || body.key === selectedBodyKey;
     const font = isEmphasized ? "700 13px ui-sans-serif, system-ui" : "12px ui-sans-serif, system-ui";
@@ -2180,42 +2199,82 @@ function drawTargetHeadingIndicator() {
 
 function drawBody(body: Body) {
   const screen = worldToScreen(body.position.x_au, body.position.y_au);
-  const radius = displayRadius(body);
+  const radius = renderedBodyRadius(body);
+  const markerRadius = readableDisplayRadius(body);
   const isTarget = body.key === selectedTarget;
   const isSelectedBody = body.key === selectedBodyKey;
+  const emphasized = isTarget || isSelectedBody;
 
   ctx.save();
   if (isDeepSkyBody(body)) {
-    drawReferenceBodyImage(body, screen.x, screen.y, Math.max(22, radius * 3.6));
+    drawReferenceBodyImage(body, screen.x, screen.y, Math.max(22, markerRadius * 3.6));
     ctx.strokeStyle = isTarget ? "#f3f0e8" : isSelectedBody ? "#74c4ff" : hexToRgba(body.color, 0.38);
     ctx.lineWidth = isTarget || isSelectedBody ? 2 : 1;
     ctx.beginPath();
-    ctx.arc(screen.x, screen.y, radius + (isTarget || isSelectedBody ? 6 : 3), 0, Math.PI * 2);
+    ctx.arc(screen.x, screen.y, markerRadius + (isTarget || isSelectedBody ? 6 : 3), 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
     return;
   }
 
-  if (body.key === "saturn") {
+  if (sizeMode === "true" && radius < 0.35 && !emphasized) {
+    ctx.restore();
+    return;
+  }
+
+  const markerOnly = sizeMode === "hybrid" && radius < 1.2;
+  const shouldDrawSymbolicMarker = sizeMode === "readable" || markerOnly;
+  const visibleRadius = shouldDrawSymbolicMarker ? markerRadius : radius;
+
+  if (body.key === "saturn" && (shouldDrawSymbolicMarker || visibleRadius >= 1.8)) {
     ctx.strokeStyle = "rgba(216, 194, 138, 0.74)";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = shouldDrawSymbolicMarker ? 2 : Math.max(0.6, Math.min(1.5, visibleRadius * 0.08));
     ctx.beginPath();
-    ctx.ellipse(screen.x, screen.y, radius * 1.65, radius * 0.55, -0.35, 0, Math.PI * 2);
+    ctx.ellipse(screen.x, screen.y, visibleRadius * 1.65, visibleRadius * 0.55, -0.35, 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  ctx.fillStyle = body.color;
-  ctx.strokeStyle = isTarget ? "#f3f0e8" : isSelectedBody ? "#74c4ff" : "rgba(0, 0, 0, 0.38)";
-  ctx.lineWidth = isTarget || isSelectedBody ? 2 : 1;
-  ctx.beginPath();
-  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  if (sizeMode === "hybrid" && markerOnly) {
+    ctx.strokeStyle = hexToRgba(body.color, 0.62);
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 4]);
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, markerRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (visibleRadius >= 0.35) {
+    ctx.fillStyle = body.color;
+    ctx.strokeStyle = isTarget ? "#f3f0e8" : isSelectedBody ? "#74c4ff" : "rgba(0, 0, 0, 0.38)";
+    ctx.lineWidth = isTarget || isSelectedBody ? 2 : Math.max(0.75, Math.min(1, visibleRadius * 0.16));
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, visibleRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  if (sizeMode === "hybrid" && !markerOnly && radius >= 1.2 && radius < markerRadius) {
+    ctx.strokeStyle = hexToRgba(body.color, 0.34);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, markerRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   if (isSelectedBody && !isTarget) {
     ctx.strokeStyle = "rgba(116, 196, 255, 0.72)";
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(screen.x, screen.y, radius + 5, 0, Math.PI * 2);
+    ctx.arc(screen.x, screen.y, Math.max(labelAnchorRadius(body) + 5, 7), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  if (isTarget) {
+    ctx.strokeStyle = "rgba(244, 241, 232, 0.72)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y, Math.max(labelAnchorRadius(body) + 5, 7), 0, Math.PI * 2);
     ctx.stroke();
   }
 
@@ -2647,6 +2706,7 @@ function updateBodyInfo() {
   const stellarRows = stellarInfoRows(body);
   const deepSkyRows = deepSkyInfoRows(body);
   const orbitRows = orbitInfoRows(body);
+  const sizeComparison = sizeComparisonMarkup(body);
 
   bodyInfo.innerHTML = `
     <div class="body-info-title">
@@ -2658,6 +2718,7 @@ function updateBodyInfo() {
         </div>
       </div>
     </div>
+    ${sizeComparison}
     <div class="body-grid">
       <span>Type</span><strong>${escapeHtml(classification.label)}</strong>
       <span>Parent</span><strong>${escapeHtml(parent?.name ?? (body.parent_key ? labelForKey(body.parent_key) : "none"))}</strong>
@@ -2712,6 +2773,74 @@ function deepSkyInfoRows(body: Body) {
     <span>Sky position</span><strong>${escapeHtml(coordinates)}</strong>
     <span>Why it matters</span><strong>${escapeHtml(deepSky.why_interesting || "catalog highlight")}</strong>
   `;
+}
+
+function sizeComparisonMarkup(body: Body) {
+  if (body.deep_sky) {
+    return `
+      <section class="size-comparison">
+        <div class="size-comparison-head">
+          <span>Size reference</span>
+          <strong>Angular, not physical</strong>
+        </div>
+        <p>Physical radius is not represented for this catalog object. Use angular size, distance, and lookback time instead.</p>
+      </section>
+    `;
+  }
+
+  const comparisonBodies = sizeComparisonBodies(body);
+  if (!comparisonBodies.length) return "";
+  const maxDiameterKm = Math.max(...comparisonBodies.map((item) => item.radius_km * 2), 1);
+
+  return `
+    <section class="size-comparison">
+      <div class="size-comparison-head">
+        <span>True relative diameter</span>
+        <strong>${escapeHtml(body.name)}</strong>
+      </div>
+      <div class="size-comparison-bars">
+        ${comparisonBodies
+          .map((item) => {
+            const diameterKm = item.radius_km * 2;
+            const ratio = clamp(diameterKm / maxDiameterKm, 0, 1);
+            return `
+              <div class="size-comparison-row">
+                <span>${bodyOrbHtml(item)}</span>
+                <strong>${escapeHtml(item.name)}</strong>
+                <i style="--diameter-ratio: ${ratio.toFixed(6)}"></i>
+                <em>${formatDistance(diameterKm)}</em>
+              </div>
+            `;
+          })
+          .join("")}
+      </div>
+      <p>Bars use real diameter ratios. Tiny bodies may become hairlines at this scale.</p>
+    </section>
+  `;
+}
+
+function sizeComparisonBodies(body: Body) {
+  const keys = [
+    body.key,
+    body.parent_key ?? "",
+    selectedTarget,
+    "sun",
+    "jupiter",
+    "saturn",
+    "earth",
+    "moon"
+  ];
+  const seen = new Set<string>();
+  return keys
+    .map((key) => bodyByKey.get(key))
+    .filter((item): item is Body => Boolean(item && item.radius_km > 0 && !isStaticStellarCatalogBody(item)))
+    .filter((item) => {
+      if (seen.has(item.key)) return false;
+      seen.add(item.key);
+      return true;
+    })
+    .sort((a, b) => b.radius_km - a.radius_km)
+    .slice(0, 6);
 }
 
 function orbitInfoRows(body: Body) {
@@ -2840,7 +2969,7 @@ function bodyAtScreenPoint(clientX: number, clientY: number) {
     .map((body) => {
       const screen = worldToScreen(body.position.x_au, body.position.y_au);
       const distancePx = Math.hypot(screen.x - clientX, screen.y - clientY);
-      return { body, distancePx, hitRadius: Math.max(14, displayRadius(body) + 8) };
+      return { body, distancePx, hitRadius: Math.max(14, labelAnchorRadius(body) + 8) };
     })
     .filter((candidate) => candidate.distancePx <= candidate.hitRadius)
     .sort((a, b) => a.distancePx - b.distancePx)[0];
@@ -3272,6 +3401,10 @@ function initializeModeButtons() {
   updateModeButtons();
 }
 
+function initializeSizeModeButtons() {
+  updateSizeModeButtons();
+}
+
 function renderBodyPicker() {
   if (!ephemeris) return;
   const includeTypes = activeBodyFilter === "all" ? undefined : [activeBodyFilter as DestinationBodyType];
@@ -3414,6 +3547,17 @@ function updateModeButtons() {
   }
   canvas.classList.toggle("measure-mode", interactionMode === "measure");
   canvas.classList.toggle("target-mode", interactionMode === "target");
+}
+
+function updateSizeModeButtons() {
+  for (const button of sizeModeButtons.querySelectorAll<HTMLButtonElement>("[data-size-mode]")) {
+    const mode = button.dataset.sizeMode as SizeMode | undefined;
+    button.classList.toggle("active", mode === sizeMode);
+    if (mode && mode in SIZE_MODE_COPY) {
+      button.title = SIZE_MODE_COPY[mode];
+    }
+  }
+  scaleNote.textContent = SIZE_MODE_COPY[sizeMode];
 }
 
 function decorateStaticControls() {
@@ -3708,7 +3852,7 @@ function screenToWorld(x: number, y: number) {
   };
 }
 
-function displayRadius(body: Body) {
+function readableDisplayRadius(body: Body) {
   if (body.key === "sun") return 15;
   if (isStaticStellarCatalogBody(body)) return 5.5;
   if (body.key === "jupiter") return 10;
@@ -3719,6 +3863,22 @@ function displayRadius(body: Body) {
   if (body.key === "phobos" || body.key === "deimos") return 3;
   if (body.object_type === "moon") return body.radius_km > 1000 ? 4.5 : 3.2;
   return 5.5;
+}
+
+function trueBodyRadiusPx(body: Body) {
+  if (isStaticStellarCatalogBody(body) || body.radius_km <= 0) return 0;
+  return (body.radius_km / (ephemeris?.au_km ?? AU_KM_FALLBACK)) * camera.pxPerAu;
+}
+
+function renderedBodyRadius(body: Body) {
+  if (sizeMode === "readable" || isStaticStellarCatalogBody(body)) return readableDisplayRadius(body);
+  if (sizeMode === "true") return trueBodyRadiusPx(body);
+  return trueBodyRadiusPx(body);
+}
+
+function labelAnchorRadius(body: Body) {
+  if (sizeMode === "true") return Math.max(readableDisplayRadius(body), trueBodyRadiusPx(body));
+  return readableDisplayRadius(body);
 }
 
 function localViewRadiusAu(body: Body) {
