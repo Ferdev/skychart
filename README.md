@@ -65,7 +65,7 @@ The first backend request downloads the required kernels into `data/skyfield/`, 
 - `de440s.bsp` for the Sun, planets, Earth's Moon, and Pluto barycenter.
 - `mar099s.bsp` for Phobos and Deimos.
 
-The first Jupiter/Saturn moon positions are fetched from the NASA/JPL Horizons API rather than downloaded as very large local kernels.
+The first Jupiter/Saturn moon positions are fetched from the NASA/JPL Horizons API rather than downloaded as very large local kernels. Expensive Horizons vectors and backend API payloads are cached under `data/cache/`. Default "current time" requests are bucketed to five-minute UTC intervals so local reloads do not repeatedly hit Horizons for effectively identical startup data. Explicit timestamps from the time controls are still computed at the requested UTC second.
 
 You can also run the two processes separately:
 
@@ -108,7 +108,7 @@ The map has three object-size modes. `Readable` deliberately exaggerates object 
 
 ## Time Controls
 
-The timestamp input is treated as UTC. Changing time recomputes every celestial body from the ephemeris source. The spacecraft remains in the same heliocentric coordinate space until you reset or restart the journey.
+The timestamp input is treated as UTC. Changing time recomputes every celestial body from the ephemeris source, reusing deterministic local cache entries when present. The spacecraft remains in the same heliocentric coordinate space until you reset or restart the journey.
 
 ## Accuracy Limitations
 

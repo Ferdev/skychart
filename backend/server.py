@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import re
 from datetime import datetime, timedelta, timezone
@@ -17,6 +18,7 @@ from skyfield.framelib import ecliptic_frame
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data" / "skyfield"
+CACHE_DIR = ROOT / "data" / "cache"
 DEEP_SKY_CATALOG_PATH = ROOT / "data" / "catalogs" / "deep_sky_catalog.json"
 HOST = "127.0.0.1"
 PORT = 8765
@@ -25,6 +27,8 @@ PARSEC_AU = 206_264.80624709636
 LIGHT_YEAR_KM = 9_460_730_472_580.8
 SUN_MU_KM3_S2 = 132_712_440_018.0
 SECONDS_PER_DAY = 86_400.0
+CACHE_SCHEMA_VERSION = 2
+LIVE_TIMESTAMP_BUCKET_SECONDS = 300
 EPHEMERIS_SOURCE = (
     "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK; NASA/JPL Horizons vectors; "
     "NASA Exoplanet Archive host-star catalog; generated Messier deep-sky catalog snapshot"
@@ -356,14 +360,76 @@ def target_for_body(item: dict[str, Any], ephemeris: Any) -> Any:
     return kernel[item["ephemeris"]]
 
 
+def bucket_datetime(value: datetime, bucket_seconds: int) -> datetime:
+    value = value.astimezone(timezone.utc).replace(microsecond=0)
+    epoch_seconds = int(value.timestamp())
+    bucketed_seconds = epoch_seconds - (epoch_seconds % bucket_seconds)
+    return datetime.fromtimestamp(bucketed_seconds, timezone.utc)
+
+
 def parse_timestamp(value: str | None) -> datetime:
     if not value:
-        return datetime.now(timezone.utc)
+        return bucket_datetime(datetime.now(timezone.utc), LIVE_TIMESTAMP_BUCKET_SECONDS)
     cleaned = value.strip().replace("Z", "+00:00")
     parsed = datetime.fromisoformat(cleaned)
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(timezone.utc).replace(microsecond=0)
+
+
+def cache_key_payload(kind: str, **parts: Any) -> dict[str, Any]:
+    return {
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "kind": kind,
+        **parts,
+    }
+
+
+def cache_path(namespace: str, key: dict[str, Any]) -> Path:
+    serialized = json.dumps(key, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    return CACHE_DIR / namespace / f"{digest}.json"
+
+
+def read_cache(namespace: str, key: dict[str, Any]) -> dict[str, Any] | None:
+    path = cache_path(namespace, key)
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def write_cache(namespace: str, key: dict[str, Any], payload: dict[str, Any]) -> None:
+    path = cache_path(namespace, key)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_suffix(".json.tmp")
+    temporary_path.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    temporary_path.replace(path)
+
+
+def cached_payload(namespace: str, key: dict[str, Any], builder: Any) -> dict[str, Any]:
+    cached = read_cache(namespace, key)
+    if cached is not None:
+        return payload_with_cache_metadata(cached, True, namespace)
+
+    payload = builder()
+    write_cache(namespace, key, payload)
+    return payload_with_cache_metadata(payload, False, namespace)
+
+
+def payload_with_cache_metadata(payload: dict[str, Any], hit: bool, namespace: str) -> dict[str, Any]:
+    return {
+        **payload,
+        "cache": {
+            "hit": hit,
+            "namespace": namespace,
+            "schema_version": CACHE_SCHEMA_VERSION,
+            "live_timestamp_bucket_seconds": LIVE_TIMESTAMP_BUCKET_SECONDS,
+        },
+    }
 
 
 def vector_payload(vector: Any) -> dict[str, float]:
@@ -485,6 +551,17 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
     if cached is not None:
         return cached
 
+    disk_cache_key = cache_key_payload(
+        "horizons_vector",
+        horizons_id=str(horizons_id),
+        center=center,
+        timestamp_utc=timestamp_key,
+    )
+    disk_cached = read_cache("horizons", disk_cache_key)
+    if disk_cached is not None:
+        _horizons_vectors[cache_key] = disk_cached
+        return disk_cached
+
     stop_timestamp = timestamp + timedelta(minutes=1)
     query = urlencode(
         {
@@ -534,6 +611,7 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
         "heliocentric_distance_km": math.sqrt(x_km * x_km + y_km * y_km + z_km * z_km),
     }
     _horizons_vectors[cache_key] = position
+    write_cache("horizons", disk_cache_key, position)
     return position
 
 
@@ -1835,7 +1913,8 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 timestamp = parse_timestamp(query.get("timestamp", [None])[0])
                 groups = parse_catalog_groups(query)
-                self.respond(ephemeris_payload(timestamp, groups))
+                key = cache_key_payload("ephemeris", timestamp_utc=isoformat_utc(timestamp), groups=groups)
+                self.respond(cached_payload("api", key, lambda: ephemeris_payload(timestamp, groups)))
             except QueryInputError as exc:
                 payload: dict[str, Any] = {"error": str(exc)}
                 if exc.details is not None:
@@ -1850,7 +1929,8 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 groups = parse_catalog_groups(query)
                 objects = catalog_objects_for_groups(groups)
-                self.respond(catalog_summary_payload(groups, objects))
+                key = cache_key_payload("catalog", groups=groups)
+                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, objects)))
             except QueryInputError as exc:
                 payload = {"error": str(exc)}
                 if exc.details is not None:
@@ -1865,7 +1945,8 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 timestamp = parse_timestamp(query.get("timestamp", [None])[0])
                 groups = parse_catalog_groups(query)
-                self.respond(orbits_payload(timestamp, groups))
+                key = cache_key_payload("orbits", timestamp_utc=isoformat_utc(timestamp), groups=groups)
+                self.respond(cached_payload("api", key, lambda: orbits_payload(timestamp, groups)))
             except QueryInputError as exc:
                 payload: dict[str, Any] = {"error": str(exc)}
                 if exc.details is not None:
@@ -1878,7 +1959,17 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/trails":
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
-                self.respond(trails_payload(*parse_trails_query(query)))
+                timestamp, body_keys, days, step_days, request_meta = parse_trails_query(query)
+                key = cache_key_payload(
+                    "trails",
+                    timestamp_utc=isoformat_utc(timestamp),
+                    bodies=body_keys,
+                    days=days,
+                    step_days=step_days,
+                    requested_days=request_meta["requested_days"],
+                    requested_step_days=request_meta["requested_step_days"],
+                )
+                self.respond(cached_payload("api", key, lambda: trails_payload(timestamp, body_keys, days, step_days, request_meta)))
             except QueryInputError as exc:
                 payload: dict[str, Any] = {"error": str(exc)}
                 if exc.details is not None:
@@ -1891,7 +1982,18 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/trajectory":
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
-                self.respond(trajectory_payload(*parse_trajectory_query(query)))
+                timestamp, destination_key, assist, scan_days, step_days, request_meta = parse_trajectory_query(query)
+                key = cache_key_payload(
+                    "trajectory",
+                    timestamp_utc=isoformat_utc(timestamp),
+                    destination=destination_key,
+                    assist=assist,
+                    scan_days=scan_days,
+                    step_days=step_days,
+                    requested_scan_days=request_meta["requested_scan_days"],
+                    requested_step_days=request_meta["requested_step_days"],
+                )
+                self.respond(cached_payload("api", key, lambda: trajectory_payload(timestamp, destination_key, assist, scan_days, step_days, request_meta)))
             except QueryInputError as exc:
                 payload: dict[str, Any] = {"error": str(exc)}
                 if exc.details is not None:
