@@ -67,6 +67,7 @@ type InteractionMode = "pan" | "target" | "measure";
 type DisplayLayer = "labels" | "orbits" | "route" | "trails";
 type ZoomPreset = "inner" | "outer" | "local" | "group" | "deep" | "all";
 type ScaleBandKey = "planetary" | "solar" | "nearby_stars" | "milky_way" | "local_group" | "deep_sky";
+type LoadingStepKey = "api" | "download" | "parse" | "render";
 
 type GuidedTour = {
   id: string;
@@ -105,6 +106,8 @@ const SCALE_LADDER_STOPS: { key: ScaleBandKey; label: string; maxViewportKm: num
   { key: "local_group", label: "Local Group", maxViewportKm: LIGHT_YEAR_KM * 15_000_000 },
   { key: "deep_sky", label: "Deep sky", maxViewportKm: LIGHT_YEAR_KM * 120_000_000 }
 ];
+
+const LOADING_STEPS: LoadingStepKey[] = ["api", "download", "parse", "render"];
 
 const COMPACT_SATELLITE_PARENT_KEYS: Record<string, string> = {
   phobos: "mars",
@@ -527,6 +530,13 @@ const bodyPopover = requiredElement<HTMLElement>("#body-popover");
 const measurePanel = requiredElement<HTMLElement>("#measure-panel");
 const onboardingPanel = requiredElement<HTMLElement>("#onboarding-panel");
 const scaleLadder = requiredElement<HTMLElement>("#scale-ladder");
+const loadingScreen = requiredElement<HTMLElement>("#loading-screen");
+const loadingProgressFill = requiredElement<HTMLElement>("#loading-progress-fill");
+const loadingProgressLabel = requiredElement<HTMLElement>("#loading-progress-label");
+const loadingStepLabel = requiredElement<HTMLElement>("#loading-step-label");
+const loadingDetail = requiredElement<HTMLElement>("#loading-detail");
+const loadingElapsed = requiredElement<HTMLElement>("#loading-elapsed");
+const loadingSteps = requiredElement<HTMLElement>("#loading-steps");
 const ctx = requiredCanvasContext(canvas);
 
 const keys = new Set<string>();
@@ -569,6 +579,10 @@ let journeyStructuralKey = "";
 let isDragging = false;
 let dragMoved = false;
 let dragStart = { x: 0, y: 0, cameraXAu: 0, cameraYAu: 0 };
+let loadingRunId = 0;
+let loadingStartedAt = performance.now();
+let loadingElapsedTimer: number | null = null;
+let loadingPercent = 0;
 
 for (const target of QUICK_TARGETS) {
   const button = document.createElement("button");
@@ -778,8 +792,17 @@ loadEphemeris();
 requestAnimationFrame(loop);
 
 async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: boolean } = {}) {
+  const loadingRun = beginLoading(timestampUtc ? "Recomputing atlas for selected UTC timestamp." : "Loading current UTC atlas.");
   try {
-    loadState.textContent = "loading";
+    updateLoadingProgress(loadingRun, "api", 12, "Connecting to local ephemeris API", "Opening the Python/Skyfield data service on this machine.");
+    scheduleLoadingProgress(
+      loadingRun,
+      450,
+      "download",
+      28,
+      "Waiting for ephemeris payload",
+      "Skyfield, JPL kernels, Horizons vectors, and catalog rows can take a moment on first load."
+    );
     const query = timestampUtc ? `?timestamp=${encodeURIComponent(timestampUtc)}` : "";
     const response = await fetch(`/api/ephemeris${query}`);
     if (!response.ok) {
@@ -787,7 +810,10 @@ async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: 
       throw new Error(`Ephemeris API returned ${response.status}.\n${text}`);
     }
 
+    updateLoadingProgress(loadingRun, "download", 48, "Ephemeris payload received", "Reading real heliocentric positions and catalog metadata.");
+    scheduleLoadingProgress(loadingRun, 180, "parse", 64, "Parsing catalog objects", "Building the local body index, aliases, and search filters.");
     ephemeris = (await response.json()) as Ephemeris;
+    updateLoadingProgress(loadingRun, "parse", 72, "Catalog parsed", `Loaded ${ephemeris.bodies.length} bodies into the atlas.`);
     bodyByKey = new Map(ephemeris.bodies.map((body) => [body.key, body]));
     ensureSelectedKeysExist();
     populateCatalogControls();
@@ -795,6 +821,7 @@ async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: 
     updateTimeSummary();
     initializeShip();
     resetJourneyStats();
+    updateLoadingProgress(loadingRun, "render", 88, "Preparing map view", "Positioning the ship, journey panel, labels, and scale ladder.");
     if (!options.preserveCamera) {
       fitInitialView();
     }
@@ -805,9 +832,11 @@ async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: 
     loadState.textContent = "live";
     errorPanel.hidden = true;
     updateHud();
+    finishLoading(loadingRun);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     loadState.textContent = "error";
+    failLoading(loadingRun, message);
     errorPanel.hidden = false;
     errorPanel.textContent = [
       "Could not load live ephemeris data.",
@@ -817,6 +846,80 @@ async function loadEphemeris(timestampUtc?: string, options: { preserveCamera?: 
       message
     ].join("\n");
   }
+}
+
+function beginLoading(detail: string) {
+  loadingRunId += 1;
+  const runId = loadingRunId;
+  loadingPercent = 0;
+  loadingStartedAt = performance.now();
+  loadState.textContent = "loading";
+  loadingScreen.hidden = false;
+  loadingScreen.classList.remove("error");
+  loadingDetail.textContent = detail;
+  updateLoadingElapsed(runId);
+  if (loadingElapsedTimer !== null) {
+    window.clearInterval(loadingElapsedTimer);
+  }
+  loadingElapsedTimer = window.setInterval(() => updateLoadingElapsed(runId), 100);
+  updateLoadingProgress(runId, "api", 4, "Starting atlas boot", detail);
+  return runId;
+}
+
+function scheduleLoadingProgress(
+  runId: number,
+  delayMs: number,
+  step: LoadingStepKey,
+  percent: number,
+  label: string,
+  detail: string
+) {
+  window.setTimeout(() => updateLoadingProgress(runId, step, percent, label, detail), delayMs);
+}
+
+function updateLoadingProgress(runId: number, step: LoadingStepKey, percent: number, label: string, detail: string) {
+  if (runId !== loadingRunId || percent < loadingPercent) return;
+  loadingPercent = clamp(percent, 0, 100);
+  loadingProgressFill.style.width = `${loadingPercent}%`;
+  loadingProgressLabel.textContent = `${Math.round(loadingPercent)}%`;
+  loadingStepLabel.textContent = label;
+  loadingDetail.textContent = detail;
+
+  const activeIndex = LOADING_STEPS.indexOf(step);
+  for (const item of loadingSteps.querySelectorAll<HTMLElement>("[data-loading-step]")) {
+    const itemStep = item.dataset.loadingStep as LoadingStepKey | undefined;
+    const itemIndex = itemStep ? LOADING_STEPS.indexOf(itemStep) : -1;
+    item.classList.toggle("done", itemIndex >= 0 && itemIndex < activeIndex);
+    item.classList.toggle("active", itemStep === step);
+  }
+}
+
+function finishLoading(runId: number) {
+  updateLoadingProgress(runId, "render", 100, "Atlas ready", "Live coordinates are rendered. The route planner can continue updating in the journey panel.");
+  window.setTimeout(() => {
+    if (runId !== loadingRunId) return;
+    loadingScreen.hidden = true;
+    stopLoadingElapsedTimer();
+  }, 260);
+}
+
+function failLoading(runId: number, message: string) {
+  if (runId !== loadingRunId) return;
+  loadingScreen.classList.add("error");
+  updateLoadingProgress(runId, "api", Math.max(loadingPercent, 100), "Load failed", "The local ephemeris API did not return usable data.");
+  loadingDetail.textContent = message.split("\n")[0] || "Could not load live ephemeris data.";
+  stopLoadingElapsedTimer();
+}
+
+function updateLoadingElapsed(runId: number) {
+  if (runId !== loadingRunId) return;
+  loadingElapsed.textContent = `${((performance.now() - loadingStartedAt) / 1000).toFixed(1)}s`;
+}
+
+function stopLoadingElapsedTimer() {
+  if (loadingElapsedTimer === null) return;
+  window.clearInterval(loadingElapsedTimer);
+  loadingElapsedTimer = null;
 }
 
 async function loadTrajectoryPlan() {

@@ -228,6 +228,196 @@ button:disabled {
     var(--bg-deep);
 }
 
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(5, 7, 8, 0.82), rgba(5, 7, 8, 0.94)),
+    repeating-linear-gradient(90deg, rgba(244, 241, 232, 0.035) 0 1px, transparent 1px 80px),
+    repeating-linear-gradient(0deg, rgba(244, 241, 232, 0.03) 0 1px, transparent 1px 80px);
+  backdrop-filter: blur(4px);
+}
+
+.loading-screen[hidden] {
+  display: none;
+}
+
+.loading-panel {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 18px;
+  width: min(520px, calc(100vw - 48px));
+  border: 1px solid rgba(217, 184, 111, 0.28);
+  border-radius: 8px;
+  padding: 20px;
+  background:
+    linear-gradient(180deg, rgba(19, 24, 25, 0.94), rgba(9, 13, 14, 0.96)),
+    var(--panel);
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.54),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.loading-orbit {
+  position: relative;
+  grid-row: span 5;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(217, 184, 111, 0.42);
+  border-radius: 999px;
+}
+
+.loading-orbit::before,
+.loading-orbit::after {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(116, 196, 255, 0.24);
+  border-radius: 999px;
+  content: "";
+}
+
+.loading-orbit::after {
+  inset: 26px;
+  border-color: rgba(244, 241, 232, 0.5);
+  background: rgba(217, 184, 111, 0.96);
+  box-shadow: 0 0 18px rgba(217, 184, 111, 0.38);
+}
+
+.loading-orbit span {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #74c4ff;
+  box-shadow: 0 0 14px rgba(116, 196, 255, 0.65);
+  transform-origin: 4px 4px;
+  animation: loading-orbit 1.4s linear infinite;
+}
+
+.loading-copy h2 {
+  margin: 0;
+  font-size: 29px;
+}
+
+.loading-copy p:last-child,
+.loading-source {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.42;
+}
+
+.loading-progress {
+  grid-column: 2;
+  overflow: hidden;
+  height: 9px;
+  border: 1px solid rgba(244, 241, 232, 0.16);
+  border-radius: 999px;
+  background: rgba(244, 241, 232, 0.07);
+}
+
+.loading-progress span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(116, 196, 255, 0.86), rgba(217, 184, 111, 0.96));
+  box-shadow: 0 0 18px rgba(217, 184, 111, 0.34);
+  transition: width 220ms ease;
+}
+
+.loading-meta {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  color: var(--muted);
+  font-family: var(--font-data);
+  font-size: 11px;
+}
+
+.loading-meta strong {
+  color: #fff1c9;
+}
+
+.loading-steps {
+  grid-column: 2;
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.loading-steps li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--quiet);
+  font-size: 12px;
+}
+
+.loading-steps li::before {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border: 1px solid rgba(244, 241, 232, 0.24);
+  border-radius: 999px;
+  content: "";
+}
+
+.loading-steps li.active {
+  color: var(--text);
+}
+
+.loading-steps li.active::before {
+  border-color: rgba(217, 184, 111, 0.78);
+  background: rgba(217, 184, 111, 0.28);
+  box-shadow: 0 0 12px rgba(217, 184, 111, 0.34);
+}
+
+.loading-steps li.done {
+  color: rgba(244, 241, 232, 0.72);
+}
+
+.loading-steps li.done::before {
+  border-color: rgba(116, 196, 255, 0.7);
+  background: rgba(116, 196, 255, 0.62);
+}
+
+.loading-source {
+  grid-column: 2;
+  margin-top: 0;
+  color: var(--quiet);
+  font-size: 11px;
+}
+
+.loading-screen.error .loading-panel {
+  border-color: rgba(215, 128, 115, 0.58);
+}
+
+.loading-screen.error .loading-progress span {
+  background: var(--danger);
+}
+
+@keyframes loading-orbit {
+  from {
+    transform: rotate(0deg) translateX(30px) rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg) translateX(30px) rotate(-360deg);
+  }
+}
+
 .panel {
   position: absolute;
   z-index: 3;

@@ -21,6 +21,34 @@
     <main id="app">
       <canvas id="map" aria-label="2D heliocentric ecliptic Solar System map"></canvas>
 
+      <section class="loading-screen" id="loading-screen" role="status" aria-live="polite" aria-label="Loading Cosmic Atlas">
+        <div class="loading-panel">
+          <div class="loading-orbit" aria-hidden="true">
+            <span></span>
+          </div>
+          <div class="loading-copy">
+            <p class="eyebrow">Boot sequence</p>
+            <h2>Loading Cosmic Atlas</h2>
+            <p id="loading-detail">Starting the local ephemeris pipeline.</p>
+          </div>
+          <div class="loading-progress" aria-hidden="true">
+            <span id="loading-progress-fill"></span>
+          </div>
+          <div class="loading-meta">
+            <strong id="loading-progress-label">0%</strong>
+            <span id="loading-step-label">Initializing</span>
+            <span id="loading-elapsed">0.0s</span>
+          </div>
+          <ol class="loading-steps" id="loading-steps">
+            <li data-loading-step="api">Connect to local API</li>
+            <li data-loading-step="download">Download ephemeris payload</li>
+            <li data-loading-step="parse">Parse catalog objects</li>
+            <li data-loading-step="render">Prepare map and controls</li>
+          </ol>
+          <p class="loading-source">JPL DE440s/Skyfield data, Horizons vectors, and generated Messier catalog snapshot.</p>
+        </div>
+      </section>
+
       <aside class="panel hud status-panel" aria-label="Simulation HUD">
         <div class="title-row">
           <div>
