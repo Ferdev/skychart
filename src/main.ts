@@ -699,13 +699,21 @@ bodyPicker.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-picker-body]");
   const key = button?.dataset.pickerBody;
   if (!key) return;
+  const body = bodyByKey.get(key);
   setTarget(key, { inspect: true });
+  if (body) {
+    showBodyPopover(body, event.clientX, event.clientY);
+  }
 });
 routeMemory.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-recent-destination]");
   const key = button?.dataset.recentDestination;
   if (!key) return;
+  const body = bodyByKey.get(key);
   setTarget(key, { inspect: true });
+  if (body) {
+    showBodyPopover(body, event.clientX, event.clientY);
+  }
 });
 guidedTours.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-tour-target]");
