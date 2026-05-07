@@ -593,6 +593,7 @@ let routeWaypoints: RouteWaypoint[] = [];
 let measurePoints: MeasurePoint[] = [];
 let activePopoverBodyKey: string | null = null;
 let cameraAnimation: CameraAnimation | null = null;
+let sizeCompareBodyKey = "earth";
 let bodyTrails: BodyTrail[] = [];
 let trailsLoading = false;
 let trailsError = "";
@@ -610,6 +611,7 @@ const displayLayers: Record<DisplayLayer, boolean> = {
 let warpEnabled = false;
 let lastFrame = performance.now();
 let lastHudRender = 0;
+let bodyInfoRenderKey = "";
 let journeyStructuralKey = "";
 let isDragging = false;
 let dragMoved = false;
@@ -830,6 +832,14 @@ bodyPopover.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-popover-action]");
   if (!button || !activePopoverBodyKey) return;
   handlePopoverAction(button.dataset.popoverAction ?? "", activePopoverBodyKey);
+});
+bodyInfo.addEventListener("change", (event) => {
+  const select = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-size-compare-select]");
+  if (!select) return;
+  const key = select.value;
+  if (!bodyByKey.has(key)) return;
+  sizeCompareBodyKey = key;
+  updateBodyInfo();
 });
 measurePanel.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-measure-action]");
@@ -2830,9 +2840,24 @@ function updateBodyInfo() {
   if (!ephemeris) return;
   const body = bodyByKey.get(selectedBodyKey) ?? bodyByKey.get(selectedTarget);
   if (!body) {
-    bodyInfo.textContent = "";
+    if (bodyInfoRenderKey !== "empty") {
+      bodyInfo.textContent = "";
+      bodyInfoRenderKey = "empty";
+    }
     return;
   }
+
+  const compareBody = sizePairComparisonBody(body);
+  const renderKey = [
+    ephemeris.timestamp_utc,
+    body.key,
+    selectedTarget,
+    sizeCompareBodyKey,
+    compareBody?.key ?? "none",
+    ephemeris.catalog?.object_count ?? ephemeris.bodies.length
+  ].join("|");
+  if (bodyInfoRenderKey === renderKey) return;
+  bodyInfoRenderKey = renderKey;
 
   const classification = classifyBody(body);
   const parent = body.parent_key ? bodyByKey.get(body.parent_key) : null;
@@ -2840,6 +2865,7 @@ function updateBodyInfo() {
   const stellarRows = stellarInfoRows(body);
   const deepSkyRows = deepSkyInfoRows(body);
   const orbitRows = orbitInfoRows(body);
+  const pairComparison = sizePairComparisonMarkup(body, compareBody);
   const sizeComparison = sizeComparisonMarkup(body);
 
   bodyInfo.innerHTML = `
@@ -2852,6 +2878,7 @@ function updateBodyInfo() {
         </div>
       </div>
     </div>
+    ${pairComparison}
     ${sizeComparison}
     <div class="body-grid">
       <span>Type</span><strong>${escapeHtml(classification.label)}</strong>
@@ -2909,6 +2936,107 @@ function deepSkyInfoRows(body: Body) {
     <span>Sky position</span><strong>${escapeHtml(coordinates)}</strong>
     <span>Why it matters</span><strong>${escapeHtml(deepSky.why_interesting || "catalog highlight")}</strong>
   `;
+}
+
+function sizePairComparisonMarkup(body: Body, compareBody: Body | null) {
+  if (!compareBody) return "";
+
+  const leftDiameterKm = body.radius_km * 2;
+  const rightDiameterKm = compareBody.radius_km * 2;
+  const maxDiameterKm = Math.max(leftDiameterKm, rightDiameterKm, 1);
+  const scaleKmPerPx = maxDiameterKm / 112;
+
+  return `
+    <section class="size-pair-comparison">
+      <div class="size-pair-head">
+        <div>
+          <span>Real-size compare</span>
+          <strong>${escapeHtml(body.name)} next to</strong>
+        </div>
+        <label>
+          <span>Place object</span>
+          <select data-size-compare-select aria-label="Object to place next to ${escapeHtml(body.name)}">
+            ${sizePairOptionsHtml(body.key, compareBody.key)}
+          </select>
+        </label>
+      </div>
+      <div class="size-pair-stage">
+        ${sizePairObjectHtml(body, maxDiameterKm, "Selected")}
+        ${sizePairObjectHtml(compareBody, maxDiameterKm, "Comparison")}
+      </div>
+      <p>Filled disks share one real scale: ${escapeHtml(formatDistance(scaleKmPerPx))} per pixel. Locator rings only mark sub-pixel disks.</p>
+    </section>
+  `;
+}
+
+function sizePairComparisonBody(body: Body) {
+  const current = bodyByKey.get(sizeCompareBodyKey);
+  if (current && current.key !== body.key && current.radius_km > 0) return current;
+
+  const preferredKeys =
+    body.deep_sky
+      ? ["m31", "m33", "m42", "m45", "m13", "sun", "earth"]
+      : body.catalog?.position_model === "stellar_catalog_coordinates"
+        ? ["sun", "proxima-cen", "earth", "jupiter", "m31"]
+        : ["earth", "moon", "jupiter", "sun", "m31"];
+  const fallback = preferredKeys
+    .map((key) => bodyByKey.get(key))
+    .find((candidate): candidate is Body => Boolean(candidate && candidate.key !== body.key && candidate.radius_km > 0));
+  if (fallback) {
+    sizeCompareBodyKey = fallback.key;
+    return fallback;
+  }
+
+  const firstOther = Array.from(bodyByKey.values()).find((candidate) => candidate.key !== body.key && candidate.radius_km > 0);
+  if (firstOther) {
+    sizeCompareBodyKey = firstOther.key;
+    return firstOther;
+  }
+  return null;
+}
+
+function sizePairOptionsHtml(selectedKey: string, compareKey: string) {
+  if (!ephemeris) return "";
+  return ephemeris.bodies
+    .filter((body) => body.key !== selectedKey && body.radius_km > 0)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(
+      (body) => `
+        <option value="${escapeHtml(body.key)}" ${body.key === compareKey ? "selected" : ""}>
+          ${escapeHtml(body.name)} - ${escapeHtml(classifyBody(body).label)}
+        </option>
+      `
+    )
+    .join("");
+}
+
+function sizePairObjectHtml(body: Body, maxDiameterKm: number, role: string) {
+  const diameterKm = body.radius_km * 2;
+  const majorPx = maxDiameterKm > 0 ? (diameterKm / maxDiameterKm) * 112 : 0;
+  const minorPx = majorPx * objectMinorMajorRatio(body);
+  const isTiny = majorPx < 7 || minorPx < 7;
+  return `
+    <article class="size-pair-object ${isTiny ? "is-tiny" : ""}">
+      <div class="size-pair-viewport">
+        <span
+          class="size-pair-disk type-${escapeHtml(body.object_type ?? "unknown")}"
+          style="--body-color: ${safeCssColor(body.color)}; width: ${Math.max(majorPx, 0).toFixed(4)}px; height: ${Math.max(minorPx, 0).toFixed(4)}px;"
+          aria-hidden="true"
+        ></span>
+        ${isTiny ? `<span class="size-pair-locator" aria-hidden="true"></span>` : ""}
+      </div>
+      <div class="size-pair-label">
+        <span>${escapeHtml(role)}</span>
+        <strong>${escapeHtml(body.name)}</strong>
+        <em>${escapeHtml(formatDistance(diameterKm))}</em>
+      </div>
+    </article>
+  `;
+}
+
+function objectMinorMajorRatio(body: Body) {
+  if (body.deep_sky) return deepSkyMinorMajorRatio(body);
+  return 1;
 }
 
 function sizeComparisonMarkup(body: Body) {
