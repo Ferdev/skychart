@@ -15,15 +15,16 @@ defmodule StarsmapApi.Release do
   def import_catalogs(args \\ []) do
     load_app()
 
-    {:ok, _started} = Application.ensure_all_started(@app)
-
     root_path =
       case args do
         [path | _rest] -> Path.expand(path)
         [] -> Path.expand("..", File.cwd!())
       end
 
-    result = StarsmapApi.Catalog.Importer.import!(root_path)
+    result =
+      with_repo(fn ->
+        StarsmapApi.Catalog.Importer.import!(root_path)
+      end)
 
     IO.puts("Imported #{result.imported_count}/#{result.source_count} catalog objects")
 
@@ -35,10 +36,17 @@ defmodule StarsmapApi.Release do
   def refresh_catalog_summary_counts do
     load_app()
 
-    {:ok, _started} = Application.ensure_all_started(@app)
-    :ok = StarsmapApi.Catalog.refresh_summary_counts!()
+    with_repo(fn ->
+      :ok = StarsmapApi.Catalog.refresh_summary_counts!()
+    end)
 
     IO.puts("Refreshed catalog summary counts")
+  end
+
+  defp with_repo(fun) do
+    [repo | _rest] = repos()
+    {:ok, result, _apps} = Ecto.Migrator.with_repo(repo, fn _repo -> fun.() end)
+    result
   end
 
   defp repos do
