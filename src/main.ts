@@ -376,6 +376,7 @@ type BodyHitEntry = {
 type PickerSearchState = {
   requestId: number;
   latestBodies: Body[];
+  abortController?: AbortController;
 };
 
 type PickerSearchConfig = {
@@ -405,6 +406,7 @@ const STARTUP_CATALOG_GROUPS = ["core", "mars_moons", "jupiter_major_moons", "sa
 const VIEWPORT_CATALOG_MAX_WIDTH_LY = 120_000_000;
 const VIEWPORT_CATALOG_DEBOUNCE_MS = 220;
 const CAMERA_DATA_REFRESH_DEBOUNCE_MS = 180;
+const SEARCH_INPUT_DEBOUNCE_MS = 180;
 const POINT_LAYER_MIN_WIDTH_LY = 12;
 const POINT_LAYER_MAX_WIDTH_LY = 250_000;
 const POINT_LAYER_VIEWPORT_PADDING = 0.35;
@@ -585,6 +587,8 @@ let viewportCatalogTimer: number | null = null;
 let viewportCatalogRequestId = 0;
 let viewportCatalogSignature = "";
 let viewportCatalogInFlightSignature = "";
+let bodyPickerUpdateTimer: number | null = null;
+let comparePickerUpdateTimer: number | null = null;
 let catalogSummary: CatalogSummary | null = null;
 let catalogDensity: CatalogDensityPayload | null = null;
 let catalogDensityTimer: number | null = null;
@@ -693,7 +697,7 @@ function bindEvents() {
     activeGuidedSetId = null;
     catalogSearchState.latestBodies = [];
     updateGuidedSets();
-    void updateBodyPicker();
+    scheduleBodyPickerUpdate();
   });
 
   bodySearch.addEventListener("keydown", (event) => {
@@ -778,7 +782,7 @@ function bindEvents() {
 
   compareSearch.addEventListener("input", () => {
     compareSearchState.latestBodies = [];
-    void updateComparePicker();
+    scheduleComparePickerUpdate();
   });
 
   compareSearch.addEventListener("keydown", (event) => {
@@ -1787,7 +1791,7 @@ function sameStringSet(left: readonly string[], right: readonly string[]) {
   return left.every((item) => rightSet.has(item));
 }
 
-async function searchCatalog(options: { query: string; filter?: BodyFilterDefinition; limit: number }): Promise<CatalogSearchResult> {
+async function searchCatalog(options: { query: string; filter?: BodyFilterDefinition; limit: number; signal?: AbortSignal }): Promise<CatalogSearchResult> {
   const params = new URLSearchParams();
   const query = options.query.trim();
   if (query) params.set("q", query);
@@ -1796,13 +1800,14 @@ async function searchCatalog(options: { query: string; filter?: BodyFilterDefini
   params.set("limit", String(options.limit));
 
   try {
-    const response = await fetch(`/api/catalog/search?${params.toString()}`);
+    const response = await fetch(`/api/catalog/search?${params.toString()}`, { signal: options.signal });
     if (!response.ok) throw new Error(`Catalog search failed with ${response.status}`);
     const payload = (await response.json()) as CatalogSearchPayload;
     const bodies = Array.isArray(payload.bodies) && payload.bodies.length > 0 ? payload.bodies : (payload.objects ?? []).map(catalogObjectToBody);
     const localBodies = localCatalogSearch(options);
     return { bodies: mergeSearchBodies(bodies, localBodies, options.limit), source: "phoenix" };
   } catch (error) {
+    if (options.signal?.aborted) return { bodies: [], source: "local" };
     console.warn("Phoenix catalog search unavailable; using loaded ephemeris catalog.", error);
     return { bodies: localCatalogSearch(options), source: "local" };
   }
@@ -2438,14 +2443,35 @@ async function updateBodyPicker() {
   });
 }
 
+function scheduleBodyPickerUpdate() {
+  if (bodyPickerUpdateTimer !== null) window.clearTimeout(bodyPickerUpdateTimer);
+  bodyPickerUpdateTimer = window.setTimeout(() => {
+    bodyPickerUpdateTimer = null;
+    void updateBodyPicker();
+  }, SEARCH_INPUT_DEBOUNCE_MS);
+}
+
+function scheduleComparePickerUpdate() {
+  if (comparePickerUpdateTimer !== null) window.clearTimeout(comparePickerUpdateTimer);
+  comparePickerUpdateTimer = window.setTimeout(() => {
+    comparePickerUpdateTimer = null;
+    void updateComparePicker();
+  }, SEARCH_INPUT_DEBOUNCE_MS);
+}
+
 async function updateSearchPicker(config: PickerSearchConfig) {
   if (!ephemeris) return;
   const requestId = ++config.state.requestId;
+  config.state.abortController?.abort();
+  config.state.abortController = undefined;
   const rawQuery = config.input.value.trim();
   const query = config.queryForSearch ? config.queryForSearch(rawQuery) : rawQuery;
   const guidedSet = config.guidedSet ?? null;
   const shouldUseCatalogSearch = !guidedSet && (query.length > 0 || config.filter.key !== "all");
-  const catalogResult = shouldUseCatalogSearch ? await searchCatalog({ query, filter: config.filter, limit: query ? 80 : 240 }) : null;
+  const abortController = shouldUseCatalogSearch ? new AbortController() : undefined;
+  config.state.abortController = abortController;
+  const catalogResult = shouldUseCatalogSearch ? await searchCatalog({ query, filter: config.filter, limit: query ? 80 : 240, signal: abortController?.signal }) : null;
+  if (config.state.abortController === abortController) config.state.abortController = undefined;
   if (requestId !== config.state.requestId) return;
 
   const excludeKeys = new Set(config.excludeKeys ?? []);

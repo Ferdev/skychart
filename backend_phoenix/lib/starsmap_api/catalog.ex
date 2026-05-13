@@ -20,6 +20,7 @@ defmodule StarsmapApi.Catalog do
   @max_density_cells 20_000
   @default_point_limit 250_000
   @max_point_limit 1_000_000
+  @search_timeout 5_000
   @summary_timeout 120_000
   @point_query_timeout 10_000
   @point_cache_version 1
@@ -197,14 +198,15 @@ defmodule StarsmapApi.Catalog do
       |> maybe_filter_types(types)
       |> maybe_filter_query(query_text)
 
-    total = Repo.aggregate(base_query, :count, :id)
-
     objects =
       base_query
       |> order_for_search(query_text)
-      |> limit(^limit)
+      |> limit(^(limit + 1))
       |> offset(^offset)
-      |> Repo.all()
+      |> Repo.all(timeout: @search_timeout)
+
+    has_more = length(objects) > limit
+    visible_objects = Enum.take(objects, limit)
 
     %{
       query: query_text,
@@ -212,9 +214,9 @@ defmodule StarsmapApi.Catalog do
       types: types,
       offset: offset,
       limit: limit,
-      total: total,
-      has_more: offset + limit < total,
-      objects: Enum.map(objects, &catalog_object_payload/1)
+      total: offset + length(visible_objects) + if(has_more, do: 1, else: 0),
+      has_more: has_more,
+      objects: Enum.map(visible_objects, &catalog_object_payload/1)
     }
   end
 
@@ -626,11 +628,7 @@ defmodule StarsmapApi.Catalog do
   defp maybe_filter_query(query, query_text) do
     like = "%#{escape_like(query_text)}%"
 
-    where(
-      query,
-      [object],
-      ilike(object.search_text, ^like) or ilike(object.name, ^like) or ilike(object.key, ^like)
-    )
+    where(query, [object], ilike(object.search_text, ^like))
   end
 
   defp optional_array_filter(_column, [], _param_index), do: {"", []}
