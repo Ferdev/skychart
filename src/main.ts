@@ -2467,7 +2467,7 @@ async function updateSearchPicker(config: PickerSearchConfig) {
   const rawQuery = config.input.value.trim();
   const query = config.queryForSearch ? config.queryForSearch(rawQuery) : rawQuery;
   const guidedSet = config.guidedSet ?? null;
-  const shouldUseCatalogSearch = !guidedSet && (query.length > 0 || config.filter.key !== "all");
+  const shouldUseCatalogSearch = !guidedSet && (query.length >= 3 || (query.length === 0 && config.filter.key !== "all"));
   const abortController = shouldUseCatalogSearch ? new AbortController() : undefined;
   config.state.abortController = abortController;
   const catalogResult = shouldUseCatalogSearch ? await searchCatalog({ query, filter: config.filter, limit: query ? 80 : 240, signal: abortController?.signal }) : null;

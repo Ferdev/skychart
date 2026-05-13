@@ -25,6 +25,15 @@ defmodule StarsmapApi.Catalog.SearchTest do
     assert Enum.map(payload.objects, & &1.key) == ["jupiter"]
   end
 
+  test "short interactive queries return immediately without scanning the catalog" do
+    insert_object!("jupiter", "Jupiter")
+
+    payload = Catalog.search(%{"q" => "ju", "limit" => "10"})
+
+    assert payload.objects == []
+    refute payload.has_more
+  end
+
   defp insert_object!(key, name) do
     %CatalogObject{}
     |> CatalogObject.changeset(%{

@@ -192,6 +192,23 @@ defmodule StarsmapApi.Catalog do
     groups = csv_param(params["groups"])
     types = csv_param(params["types"])
 
+    if short_interactive_query?(query_text) do
+      %{
+        query: query_text,
+        groups: groups,
+        types: types,
+        offset: offset,
+        limit: limit,
+        total: 0,
+        has_more: false,
+        objects: []
+      }
+    else
+      search_catalog_objects(query_text, groups, types, offset, limit)
+    end
+  end
+
+  defp search_catalog_objects(query_text, groups, types, offset, limit) do
     base_query =
       CatalogObject
       |> maybe_filter_groups(groups)
@@ -219,6 +236,9 @@ defmodule StarsmapApi.Catalog do
       objects: Enum.map(visible_objects, &catalog_object_payload/1)
     }
   end
+
+  defp short_interactive_query?(""), do: false
+  defp short_interactive_query?(query_text), do: String.length(query_text) < 3
 
   def list_viewport(params) do
     with {:ok, bounds} <- viewport_bounds(params) do
