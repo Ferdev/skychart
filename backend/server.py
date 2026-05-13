@@ -487,6 +487,7 @@ _ephemeris: Any | None = None
 _satellite_kernels: dict[str, Any] = {}
 _horizons_vectors: dict[tuple[str, str], dict[str, float]] = {}
 _kernel_lock = threading.Lock()
+_cache_lock = threading.Lock()
 
 
 class QueryInputError(ValueError):
@@ -584,13 +585,14 @@ def write_cache(namespace: str, key: dict[str, Any], payload: dict[str, Any]) ->
 
 
 def cached_payload(namespace: str, key: dict[str, Any], builder: Any) -> dict[str, Any]:
-    cached = read_cache(namespace, key)
-    if cached is not None:
-        return payload_with_cache_metadata(cached, True, namespace)
+    with _cache_lock:
+        cached = read_cache(namespace, key)
+        if cached is not None:
+            return payload_with_cache_metadata(cached, True, namespace)
 
-    payload = builder()
-    write_cache(namespace, key, payload)
-    return payload_with_cache_metadata(payload, False, namespace)
+        payload = builder()
+        write_cache(namespace, key, payload)
+        return payload_with_cache_metadata(payload, False, namespace)
 
 
 def payload_with_cache_metadata(payload: dict[str, Any], hit: bool, namespace: str) -> dict[str, Any]:
