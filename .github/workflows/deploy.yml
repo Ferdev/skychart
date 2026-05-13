@@ -1,0 +1,113 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - trunk
+      - production
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to deploy
+        type: choice
+        required: true
+        options:
+          - staging
+          - production
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event_name == 'workflow_dispatch' && inputs.target || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'production' && 'production' || 'staging') }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref_name == 'production' && 'production' || 'staging') }}
+      url: ${{ (github.event_name == 'workflow_dispatch' && inputs.target == 'production') || github.ref_name == 'production' && 'https://skychart.org' || 'https://staging.skychart.org' }}
+
+    steps:
+      - name: Resolve deployment target
+        id: target
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            target="${{ inputs.target }}"
+          elif [ "${{ github.ref_name }}" = "production" ]; then
+            target="production"
+          else
+            target="staging"
+          fi
+
+          if [ "$target" = "production" ]; then
+            echo "deploy_env=production" >> "$GITHUB_OUTPUT"
+            echo "deploy_url=https://skychart.org" >> "$GITHUB_OUTPUT"
+            echo "ssh_host=${{ secrets.PRODUCTION_SSH_HOST || secrets.DEPLOY_SSH_HOST }}" >> "$GITHUB_OUTPUT"
+            echo "ssh_user=${{ secrets.PRODUCTION_SSH_USER || secrets.DEPLOY_SSH_USER }}" >> "$GITHUB_OUTPUT"
+            echo "ssh_port=${{ secrets.PRODUCTION_SSH_PORT || secrets.DEPLOY_SSH_PORT || '22' }}" >> "$GITHUB_OUTPUT"
+            echo "deploy_path=${{ secrets.PRODUCTION_DEPLOY_PATH }}" >> "$GITHUB_OUTPUT"
+            echo "phoenix_service=${{ secrets.PRODUCTION_PHOENIX_SERVICE }}" >> "$GITHUB_OUTPUT"
+            echo "python_service=${{ secrets.PRODUCTION_PYTHON_SERVICE }}" >> "$GITHUB_OUTPUT"
+            echo "phx_host=skychart.org" >> "$GITHUB_OUTPUT"
+          else
+            echo "deploy_env=staging" >> "$GITHUB_OUTPUT"
+            echo "deploy_url=https://staging.skychart.org" >> "$GITHUB_OUTPUT"
+            echo "ssh_host=${{ secrets.STAGING_SSH_HOST || secrets.DEPLOY_SSH_HOST }}" >> "$GITHUB_OUTPUT"
+            echo "ssh_user=${{ secrets.STAGING_SSH_USER || secrets.DEPLOY_SSH_USER }}" >> "$GITHUB_OUTPUT"
+            echo "ssh_port=${{ secrets.STAGING_SSH_PORT || secrets.DEPLOY_SSH_PORT || '22' }}" >> "$GITHUB_OUTPUT"
+            echo "deploy_path=${{ secrets.STAGING_DEPLOY_PATH }}" >> "$GITHUB_OUTPUT"
+            echo "phoenix_service=${{ secrets.STAGING_PHOENIX_SERVICE }}" >> "$GITHUB_OUTPUT"
+            echo "python_service=${{ secrets.STAGING_PYTHON_SERVICE }}" >> "$GITHUB_OUTPUT"
+            echo "phx_host=staging.skychart.org" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate deployment secrets
+        shell: bash
+        run: |
+          test -n "${{ steps.target.outputs.ssh_host }}" || (echo "Missing SSH host secret" >&2; exit 1)
+          test -n "${{ steps.target.outputs.ssh_user }}" || (echo "Missing SSH user secret" >&2; exit 1)
+          test -n "${{ secrets.DEPLOY_SSH_KEY }}" || (echo "Missing DEPLOY_SSH_KEY secret" >&2; exit 1)
+          test -n "${{ steps.target.outputs.deploy_path }}" || (echo "Missing deploy path secret" >&2; exit 1)
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          install -m 600 /dev/null ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ steps.target.outputs.ssh_port }}" "${{ steps.target.outputs.ssh_host }}" >> ~/.ssh/known_hosts
+
+      - name: Upload release to server
+        shell: bash
+        run: |
+          release_dir="${{ steps.target.outputs.deploy_path }}/releases/${{ github.sha }}"
+          ssh -i ~/.ssh/deploy_key -p "${{ steps.target.outputs.ssh_port }}" \
+            "${{ steps.target.outputs.ssh_user }}@${{ steps.target.outputs.ssh_host }}" \
+            "mkdir -p '$release_dir'"
+          rsync -az --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ steps.target.outputs.ssh_port }}" \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='dist/' \
+            --exclude='backend_phoenix/deps/' \
+            --exclude='backend_phoenix/_build/' \
+            --exclude='.venv/' \
+            ./ "${{ steps.target.outputs.ssh_user }}@${{ steps.target.outputs.ssh_host }}:$release_dir/"
+
+      - name: Build, migrate, and restart on server
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${{ steps.target.outputs.ssh_port }}" \
+            "${{ steps.target.outputs.ssh_user }}@${{ steps.target.outputs.ssh_host }}" \
+            "DEPLOY_ENV='${{ steps.target.outputs.deploy_env }}' DEPLOY_PATH='${{ steps.target.outputs.deploy_path }}' GITHUB_SHA='${{ github.sha }}' PHX_HOST='${{ steps.target.outputs.phx_host }}' PHOENIX_SERVICE='${{ steps.target.outputs.phoenix_service }}' PYTHON_SERVICE='${{ steps.target.outputs.python_service }}' bash '${{ steps.target.outputs.deploy_path }}/releases/${{ github.sha }}/scripts/deploy-remote.sh'"
