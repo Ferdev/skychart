@@ -107,6 +107,30 @@ cd backend_phoenix && mix test
 
 The Playwright tests expect the Phoenix app to be running, usually at `http://127.0.0.1:4020/`. They skip cleanly when that URL is unavailable.
 
+## Production Catalog Import
+
+The checked-in JSON catalogs and the multi-million-row Gaia slices are imported through different paths. Use the wrapper below after deploys and whenever production looks under-populated:
+
+```bash
+scripts/import_catalogs_if_needed.sh
+```
+
+The wrapper runs migrations, imports the checked-in catalog snapshots, then checks the two large Gaia catalog groups before deciding whether to stream them from Gaia TAP into Postgres:
+
+- `gaia_500pc_stars`, expected minimum `3,016,638` rows.
+- `gaia_10kpc_bright_stars`, expected minimum `1,928,481` rows.
+
+It is safe to run repeatedly. Existing complete Gaia slices are skipped by row-count threshold.
+
+When the app is deployed with Kamal, the same check is wired as a post-deploy hook:
+
+```bash
+kamal app exec -d production --primary --env MIX_ENV:prod -- ./scripts/import_catalogs_if_needed.sh
+```
+
+The Gaia importer accepts either standard `PG*` environment variables or `DATABASE_URL` for its `psql` connection.
+Production uses an `ecto://` `DATABASE_URL`; the importer converts that to a PostgreSQL URL for `psql`.
+
 ## Data Source
 
 The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL `de440s.bsp` planetary ephemeris kernel. It also loads the NAIF `mar099s.bsp` satellite SPK for Mars' moons. Jupiter and Saturn major moons are fetched from the NASA/JPL Horizons API as parent-relative vectors and then placed into the same heliocentric ecliptic coordinate space as the Skyfield bodies.

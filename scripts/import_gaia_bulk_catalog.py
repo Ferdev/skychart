@@ -99,6 +99,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-parallax-over-error", type=float, default=DEFAULT_MIN_PARALLAX_OVER_ERROR)
     parser.add_argument("--skip-count", action="store_true", help="Skip the Gaia COUNT(*) preflight.")
     parser.add_argument("--keep-existing", action="store_true", help="Do not delete the target catalog group before COPY.")
+    parser.add_argument(
+        "--skip-if-existing-at-least",
+        type=int,
+        default=None,
+        help="Skip the import when the target catalog group already has at least this many rows.",
+    )
     return parser.parse_args()
 
 
@@ -244,15 +250,42 @@ def psql_env() -> dict[str, str]:
     return env
 
 
+def psql_base_command() -> list[str]:
+    command = ["psql", "-v", "ON_ERROR_STOP=1"]
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url:
+        if database_url.startswith("ecto://"):
+            database_url = f"postgresql://{database_url.removeprefix('ecto://')}"
+        command.extend(["--dbname", database_url])
+    return command
+
+
 def run_psql(sql: str) -> None:
-    subprocess.run(["psql", "-v", "ON_ERROR_STOP=1", "-c", sql], env=psql_env(), check=True)
+    subprocess.run([*psql_base_command(), "-c", sql], env=psql_env(), check=True)
+
+
+def query_psql_scalar(sql: str) -> str:
+    result = subprocess.run(
+        [*psql_base_command(), "-At", "-c", sql],
+        env=psql_env(),
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+    )
+    return result.stdout.strip()
+
+
+def existing_group_count(group: str) -> int:
+    escaped_group = group.replace("'", "''")
+    raw_count = query_psql_scalar(f"SELECT COUNT(*) FROM catalog_objects WHERE catalog_group = '{escaped_group}'")
+    return int(raw_count or "0")
 
 
 def copy_process() -> subprocess.Popen[str]:
     columns = ", ".join(COPY_COLUMNS)
     command = f"\\copy catalog_objects ({columns}) FROM STDIN WITH (FORMAT csv)"
     return subprocess.Popen(
-        ["psql", "-v", "ON_ERROR_STOP=1", "-c", command],
+        [*psql_base_command(), "-c", command],
         env=psql_env(),
         stdin=subprocess.PIPE,
         text=True,
@@ -401,6 +434,24 @@ def import_range(args: argparse.Namespace, *, delete_existing: bool) -> tuple[in
 
 def main() -> None:
     args = parse_args()
+    if args.preset == "10kpc-g12" and args.group == DEFAULT_GROUP:
+        args.group = TEN_KPC_GROUP
+
+    if args.skip_if_existing_at_least is not None:
+        current_count = existing_group_count(args.group)
+        if current_count >= args.skip_if_existing_at_least:
+            print(
+                f"Skipping {args.group}: existing row count {current_count:,} >= "
+                f"{args.skip_if_existing_at_least:,}.",
+                flush=True,
+            )
+            return
+        print(
+            f"Importing {args.group}: existing row count {current_count:,} < "
+            f"{args.skip_if_existing_at_least:,}.",
+            flush=True,
+        )
+
     if args.preset == "500pc-g14":
         args.min_parallax_mas = 2.0
         args.max_parallax_mas = 20.0
@@ -423,8 +474,6 @@ def main() -> None:
         return
 
     if args.preset == "10kpc-g12":
-        if args.group == DEFAULT_GROUP:
-            args.group = TEN_KPC_GROUP
         args.min_parallax_mas = 0.1
         args.max_parallax_mas = 2.0
         args.min_parallax_over_error = 3.0

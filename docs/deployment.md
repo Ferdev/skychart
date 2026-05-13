@@ -53,6 +53,8 @@ The Docker image contains:
 - built frontend assets served by Phoenix
 - Python ephemeris backend from `backend/server.py`
 - catalog snapshots under `data/`
+- catalog import helpers under `scripts/`
+- `postgresql-client` for streaming large Gaia imports into Postgres
 
 Container startup does:
 
@@ -60,6 +62,13 @@ Container startup does:
 2. run Phoenix migrations
 3. import catalog snapshots into Postgres
 4. start Phoenix on `PORT=4000`
+
+After each Kamal deploy, `.kamal/hooks/post-deploy` runs `scripts/import_catalogs_if_needed.sh` once on the primary app container. That script rechecks migrations and catalog snapshots, then imports the two large Gaia slices only when their catalog groups are below the expected row counts:
+
+- `gaia_500pc_stars`: `3,016,638` rows.
+- `gaia_10kpc_bright_stars`: `1,928,481` rows.
+
+Normal deploys skip the Gaia network import after those slices are already present. First-time environments can take much longer, so deploy workflows allow up to 180 minutes.
 
 Kamal health checks hit `/api/health`.
 

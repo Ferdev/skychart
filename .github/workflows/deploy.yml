@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 180
 
     env:
       DOCKER_BUILDKIT: 1

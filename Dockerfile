@@ -56,7 +56,7 @@ ENV PORT=4000
 ENV PYTHON_BACKEND_URL=http://127.0.0.1:8765
 
 RUN apt-get update -y && \
-  apt-get install -y libstdc++6 openssl libncurses6 locales ca-certificates curl python3 python3-venv \
+  apt-get install -y libstdc++6 openssl libncurses6 locales ca-certificates curl python3 python3-venv postgresql-client \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
@@ -73,12 +73,14 @@ COPY --chown=app:app backend backend
 COPY --chown=app:app data data
 COPY --chown=app:app requirements.txt requirements.txt
 COPY --chown=app:app scripts/docker-entrypoint.sh scripts/docker-entrypoint.sh
+COPY --chown=app:app scripts/import_catalogs_if_needed.sh scripts/import_catalogs_if_needed.sh
+COPY --chown=app:app scripts/import_gaia_bulk_catalog.py scripts/import_gaia_bulk_catalog.py
 
 RUN python3 -m venv /app/.venv && \
   /app/.venv/bin/pip install --no-cache-dir --upgrade pip && \
   /app/.venv/bin/pip install --no-cache-dir -r requirements.txt && \
   chown -R app:app /app && \
-  chmod +x /app/scripts/docker-entrypoint.sh && \
+  chmod +x /app/scripts/docker-entrypoint.sh /app/scripts/import_catalogs_if_needed.sh && \
   ln -s /app/erts-*/bin/epmd /usr/local/bin/epmd
 
 USER app
