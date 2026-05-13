@@ -14,4 +14,4 @@ trap cleanup EXIT INT TERM
 /app/bin/starsmap_api eval "StarsmapApi.Release.migrate()"
 /app/bin/starsmap_api eval "StarsmapApi.Release.import_catalogs([\"/app\"])"
 
-exec /app/bin/server
+exec /app/bin/starsmap_api start
