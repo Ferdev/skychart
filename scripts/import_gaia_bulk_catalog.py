@@ -239,7 +239,10 @@ def selection_distance_label(args: argparse.Namespace) -> str:
 
 
 def pg_array(values: list[str]) -> str:
-    escaped = [f'"{value.replace("\\\\", "\\\\\\\\").replace(chr(34), "\\\\" + chr(34))}"' for value in values]
+    escaped = []
+    for value in values:
+        escaped_value = value.replace("\\", "\\\\").replace('"', '\\"')
+        escaped.append(f'"{escaped_value}"')
     return "{" + ",".join(escaped) + "}"
 
 
