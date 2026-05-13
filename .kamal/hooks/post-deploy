@@ -7,5 +7,5 @@ if [ -n "${KAMAL_DESTINATION:-}" ]; then
 fi
 
 echo "[post-deploy] Ensuring Cosmic Atlas production catalogs are present..."
-kamal app exec "${DEST_FLAG[@]}" --primary --env MIX_ENV:prod -- ./scripts/import_catalogs_if_needed.sh
+kamal app exec "${DEST_FLAG[@]}" --primary --env MIX_ENV:prod --env CATALOG_IMPORT_SUMMARY:0 -- ./scripts/import_catalogs_if_needed.sh
 echo "[post-deploy] Catalog import check completed."

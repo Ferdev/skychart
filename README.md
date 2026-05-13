@@ -117,15 +117,15 @@ scripts/import_catalogs_if_needed.sh
 
 The wrapper runs migrations, imports the checked-in catalog snapshots, then checks the two large Gaia catalog groups before deciding whether to stream them from Gaia TAP into Postgres:
 
-- `gaia_500pc_stars`, expected minimum `3,016,638` rows.
-- `gaia_10kpc_bright_stars`, expected minimum `1,928,481` rows.
+- `gaia_500pc_stars`, expected minimum `1,597,012` rows from the current Gaia TAP sync import.
+- `gaia_10kpc_bright_stars`, expected minimum `1,339,910` rows from the current Gaia TAP sync import.
 
 It is safe to run repeatedly. Existing complete Gaia slices are skipped by row-count threshold.
 
 When the app is deployed with Kamal, the same check is wired as a post-deploy hook:
 
 ```bash
-kamal app exec -d production --primary --env MIX_ENV:prod -- ./scripts/import_catalogs_if_needed.sh
+kamal app exec -d production --primary --env MIX_ENV:prod --env CATALOG_IMPORT_SUMMARY:0 -- ./scripts/import_catalogs_if_needed.sh
 ```
 
 The Gaia importer accepts either standard `PG*` environment variables or `DATABASE_URL` for its `psql` connection.

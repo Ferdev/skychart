@@ -65,8 +65,8 @@ Container startup does:
 
 After each Kamal deploy, `.kamal/hooks/post-deploy` runs `scripts/import_catalogs_if_needed.sh` once on the primary app container. That script rechecks migrations and catalog snapshots, then imports the two large Gaia slices only when their catalog groups are below the expected row counts:
 
-- `gaia_500pc_stars`: `3,016,638` rows.
-- `gaia_10kpc_bright_stars`: `1,928,481` rows.
+- `gaia_500pc_stars`: `1,597,012` rows from the current Gaia TAP sync import.
+- `gaia_10kpc_bright_stars`: `1,339,910` rows from the current Gaia TAP sync import.
 
 Normal deploys skip the Gaia network import after those slices are already present. First-time environments can take much longer, so deploy workflows allow up to 180 minutes.
 
