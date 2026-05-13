@@ -20,7 +20,7 @@ defmodule StarsmapApi.MixProject do
   def application do
     [
       mod: {StarsmapApi.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :sentry]
     ]
   end
 
@@ -47,7 +47,9 @@ defmodule StarsmapApi.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:hackney, "~> 1.20"},
+      {:sentry, "~> 10.0"}
     ]
   end
 

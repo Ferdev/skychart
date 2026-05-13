@@ -7,6 +7,10 @@ defmodule StarsmapApi.Application do
 
   @impl true
   def start(_type, _args) do
+    :logger.add_handler(:sentry_handler, Sentry.LoggerHandler, %{
+      config: %{capture_log_messages: true, level: :error}
+    })
+
     children = [
       StarsmapApiWeb.Telemetry,
       StarsmapApi.Repo,

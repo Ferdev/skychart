@@ -58,6 +58,14 @@ if config_env() == :prod do
 
   config :starsmap_api, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  sentry_dsn = System.get_env("SENTRY_DSN")
+  sentry_dsn = if is_binary(sentry_dsn) and sentry_dsn != "", do: sentry_dsn, else: nil
+
+  config :sentry,
+    dsn: sentry_dsn,
+    enable_source_code_context: true,
+    root_source_code_paths: [File.cwd!()]
+
   config :starsmap_api, StarsmapApiWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [

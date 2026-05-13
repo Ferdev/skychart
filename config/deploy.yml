@@ -34,6 +34,8 @@ env:
   secret:
     - SECRET_KEY_BASE
     - DATABASE_URL
+    - POSTGRES_PASSWORD
+    - SENTRY_DSN
 
 proxy:
   app_port: 4000

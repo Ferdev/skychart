@@ -27,6 +27,7 @@ jobs:
       SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       DATABASE_URL: ecto://skychart:${{ secrets.POSTGRES_PASSWORD }}@skychart-production-postgres/skychart
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
 
     steps:
       - uses: actions/checkout@v5
@@ -74,7 +75,7 @@ jobs:
         shell: bash
         run: |
           missing=()
-          for v in KAMAL_REGISTRY_PASSWORD SECRET_KEY_BASE POSTGRES_PASSWORD DATABASE_URL; do
+          for v in KAMAL_REGISTRY_PASSWORD SECRET_KEY_BASE POSTGRES_PASSWORD DATABASE_URL SENTRY_DSN; do
             if [ -z "${!v}" ]; then missing+=("$v"); fi
           done
           if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then missing+=("SSH_PRIVATE_KEY"); fi
@@ -93,6 +94,7 @@ jobs:
           SECRET_KEY_BASE=$SECRET_KEY_BASE
           POSTGRES_PASSWORD=$POSTGRES_PASSWORD
           DATABASE_URL=$DATABASE_URL
+          SENTRY_DSN=$SENTRY_DSN
           SECRETS_EOF
           sed -i 's/^[[:space:]]*//' .kamal/secrets.production
           cp .kamal/secrets.production .kamal/secrets-common
