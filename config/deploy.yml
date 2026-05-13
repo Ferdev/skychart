@@ -4,7 +4,7 @@ image: ferdev/skychart
 
 minimum_version: 2.4.0
 
-deploy_timeout: 20
+deploy_timeout: 240
 drain_timeout: 20
 readiness_delay: 7
 
