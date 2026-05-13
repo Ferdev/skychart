@@ -366,6 +366,10 @@ type RenderRequestOptions = {
   data?: boolean;
 };
 
+type DataRefreshOptions = {
+  immediate?: boolean;
+};
+
 type BodyHitEntry = {
   body: Body;
   x: number;
@@ -668,9 +672,10 @@ async function loadAtlas(timestampIso?: string) {
     if (payload.bodies.length > 0 && activeZoomPreset) {
       applyZoomPreset(activeZoomPreset, false);
     }
+    requestDataRefresh({ immediate: true });
     loadingScreen.hidden = true;
     loadState.textContent = "ready";
-    requestRender({ data: true });
+    requestRender();
   } catch (error) {
     loadState.textContent = "error";
     setError(error instanceof Error ? error.message : String(error));
@@ -1003,13 +1008,13 @@ function requestRender(options: RenderRequestOptions = {}) {
   renderFrameId = requestAnimationFrame(render);
 }
 
-function requestDataRefresh() {
+function requestDataRefresh(options: DataRefreshOptions = {}) {
   if (cameraDataRefreshTimer !== null) {
     window.clearTimeout(cameraDataRefreshTimer);
     cameraDataRefreshTimer = null;
   }
-  scheduleViewportCatalogLoad();
-  scheduleCatalogPointLoad();
+  scheduleViewportCatalogLoad(options);
+  scheduleCatalogPointLoad(options);
 }
 
 function scheduleCameraDataRefresh() {
@@ -1825,13 +1830,18 @@ function mergeSearchBodies(primary: Body[], fallback: Body[], limit: number) {
   return merged;
 }
 
-function scheduleViewportCatalogLoad() {
+function scheduleViewportCatalogLoad(options: DataRefreshOptions = {}) {
   if (!ephemeris) return;
   const request = viewportCatalogRequest();
   if (!request) return;
   if (request.signature === viewportCatalogSignature || request.signature === viewportCatalogInFlightSignature) return;
 
   if (viewportCatalogTimer !== null) window.clearTimeout(viewportCatalogTimer);
+  if (options.immediate) {
+    viewportCatalogTimer = null;
+    void loadViewportCatalog(request);
+    return;
+  }
   viewportCatalogTimer = window.setTimeout(() => {
     viewportCatalogTimer = null;
     void loadViewportCatalog(request);
@@ -1873,7 +1883,7 @@ async function loadViewportCatalog(request: { signature: string; params: URLSear
   }
 }
 
-function scheduleCatalogPointLoad() {
+function scheduleCatalogPointLoad(options: DataRefreshOptions = {}) {
   if (!ephemeris) return;
   const requests = catalogPointRequests();
   if (requests.length === 0) {
@@ -1912,6 +1922,11 @@ function scheduleCatalogPointLoad() {
   updateStats();
   if (missingRequests.length === 0 || signature === catalogPointInFlightSignature) return;
   if (catalogPointTimer !== null) window.clearTimeout(catalogPointTimer);
+  if (options.immediate) {
+    catalogPointTimer = null;
+    void loadCatalogPointTiles(missingRequests, signature);
+    return;
+  }
   catalogPointTimer = window.setTimeout(() => {
     catalogPointTimer = null;
     void loadCatalogPointTiles(missingRequests, signature);
