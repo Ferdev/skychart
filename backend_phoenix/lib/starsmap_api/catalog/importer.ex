@@ -10,27 +10,32 @@ defmodule StarsmapApi.Catalog.Importer do
   @light_year_km 9_460_730_472_580.8
   @solar_radius_km 695_700.0
   @obliquity_deg 23.4392911
+  @report_sample_limit 20
 
   def import!(root_path \\ repo_root()) do
     rows = rows(root_path)
+    report = import_report(rows)
     {count, _} = Catalog.upsert_objects(rows)
 
     %{
       imported_count: count,
       source_count: length(rows),
-      groups: Enum.frequencies_by(rows, & &1.catalog_group)
+      groups: Enum.frequencies_by(rows, & &1.catalog_group),
+      report: report
     }
   end
 
   def import_all(opts) do
     data_dir = Keyword.fetch!(opts, :data_dir)
     rows = data_dir |> catalog_files() |> Enum.flat_map(&rows_for_file/1)
+    report = import_report(rows)
     {count, _} = Catalog.upsert_objects(rows)
 
     {:ok,
      %{
        total: count,
-       counts: Enum.frequencies_by(rows, & &1.catalog_group)
+       counts: Enum.frequencies_by(rows, & &1.catalog_group),
+       report: report
      }}
   end
 
@@ -42,6 +47,29 @@ defmodule StarsmapApi.Catalog.Importer do
 
   def attrs_for_entry!({type, entry}) do
     row_for_entry(type, entry, entry_source_meta(type, entry))
+  end
+
+  def import_report(rows) when is_list(rows) do
+    global_duplicate_keys = duplicate_keys(rows)
+
+    report = %{
+      total_rows: length(rows),
+      source_type_count: rows |> Enum.map(&source_type/1) |> Enum.uniq() |> length(),
+      catalog_groups: frequencies_by(rows, :catalog_group),
+      object_types: frequencies_by(rows, :object_type),
+      source_types: source_type_reports(rows),
+      duplicate_key_count: map_size(global_duplicate_keys),
+      duplicate_keys: sample_keys(global_duplicate_keys),
+      missing_key_count: Enum.count(rows, &blank?(Map.get(&1, :key))),
+      missing_name_count: Enum.count(rows, &blank?(Map.get(&1, :name))),
+      missing_source_type_count: Enum.count(rows, &blank?(Map.get(&1, :source_type))),
+      missing_map_position_count: Enum.count(rows, &missing_map_position?/1),
+      missing_ra_dec_count: Enum.count(rows, &missing_ra_dec?/1)
+    }
+
+    report
+    |> Map.put(:valid?, valid_report?(report))
+    |> Map.put(:warnings, validation_warnings(report))
   end
 
   def row_for_entry(:exoplanet_system, entry, source_meta) do
@@ -249,6 +277,99 @@ defmodule StarsmapApi.Catalog.Importer do
     |> entries(data)
     |> Enum.map(&row_for_entry(type, &1, source_meta))
   end
+
+  defp source_type_reports(rows) do
+    rows
+    |> Enum.group_by(&source_type/1)
+    |> Enum.map(fn {source_type, source_rows} ->
+      duplicate_keys = duplicate_keys(source_rows)
+
+      {source_type,
+       %{
+         rows: length(source_rows),
+         catalog_groups: frequencies_by(source_rows, :catalog_group),
+         object_types: frequencies_by(source_rows, :object_type),
+         source_catalogs: source_catalog_counts(source_rows),
+         duplicate_key_count: map_size(duplicate_keys),
+         duplicate_keys: sample_keys(duplicate_keys),
+         missing_key_count: Enum.count(source_rows, &blank?(Map.get(&1, :key))),
+         missing_name_count: Enum.count(source_rows, &blank?(Map.get(&1, :name))),
+         missing_map_position_count: Enum.count(source_rows, &missing_map_position?/1),
+         missing_ra_dec_count: Enum.count(source_rows, &missing_ra_dec?/1)
+       }}
+    end)
+    |> Enum.sort_by(fn {source_type, _report} -> source_type end)
+    |> Map.new()
+  end
+
+  defp frequencies_by(rows, field) do
+    rows
+    |> Enum.map(fn row -> Map.get(row, field) end)
+    |> Enum.map(&empty_to_unknown/1)
+    |> Enum.frequencies()
+  end
+
+  defp source_catalog_counts(rows) do
+    rows
+    |> Enum.map(fn row ->
+      case Map.get(row, :source) do
+        %{} = source -> source["catalog"]
+        _ -> nil
+      end
+    end)
+    |> Enum.map(&empty_to_unknown/1)
+    |> Enum.frequencies()
+  end
+
+  defp duplicate_keys(rows) do
+    rows
+    |> Enum.map(&Map.get(&1, :key))
+    |> Enum.reject(&blank?/1)
+    |> Enum.frequencies()
+    |> Enum.filter(fn {_key, count} -> count > 1 end)
+    |> Map.new()
+  end
+
+  defp sample_keys(duplicate_keys) do
+    duplicate_keys
+    |> Map.keys()
+    |> Enum.sort()
+    |> Enum.take(@report_sample_limit)
+  end
+
+  defp source_type(row), do: row |> Map.get(:source_type) |> empty_to_unknown()
+
+  defp missing_map_position?(row), do: is_nil(Map.get(row, :x_au)) or is_nil(Map.get(row, :y_au))
+
+  defp missing_ra_dec?(row), do: is_nil(Map.get(row, :ra_deg)) or is_nil(Map.get(row, :dec_deg))
+
+  defp valid_report?(report) do
+    report.duplicate_key_count == 0 and
+      report.missing_key_count == 0 and
+      report.missing_name_count == 0 and
+      report.missing_source_type_count == 0 and
+      report.missing_map_position_count == 0
+  end
+
+  defp validation_warnings(report) do
+    [
+      warning(report.duplicate_key_count, "duplicate catalog keys"),
+      warning(report.missing_key_count, "rows without stable keys"),
+      warning(report.missing_name_count, "rows without names"),
+      warning(report.missing_source_type_count, "rows without source types"),
+      warning(report.missing_map_position_count, "rows without projected map coordinates"),
+      warning(report.missing_ra_dec_count, "rows without RA/Dec coordinates")
+    ]
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp warning(0, _label), do: nil
+  defp warning(count, label), do: "#{count} #{label}"
+
+  defp blank?(value), do: value in [nil, ""]
+
+  defp empty_to_unknown(value) when value in [nil, ""], do: "unknown"
+  defp empty_to_unknown(value), do: to_string(value)
 
   defp entries(:exoplanet_system, data), do: Map.fetch!(data, "systems")
   defp entries(:bright_star, data), do: Map.fetch!(data, "stars")

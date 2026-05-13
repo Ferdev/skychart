@@ -54,6 +54,17 @@ The first Phoenix migration creates `catalog_objects` as the common searchable p
 
 This table is not the final scientific truth for every object type. It is the fast lookup surface for the UI. Source-specific tables can be added behind it when Gaia, SIMBAD, NED, JPL small bodies, and detailed exoplanet records need richer schemas.
 
+## Import Validation
+
+Phoenix imports still write to the shared `catalog_objects` table, but the importer now emits an import report before upserting rows. The report is a narrow scale-safety primitive for future source-specific table work:
+
+- total rows, object-type counts, catalog-group counts, and source-type counts
+- per-source row counts with the source snapshot catalog names seen in row provenance
+- duplicate stable-key counts and capped duplicate-key samples
+- missing name, source-type, projected map-coordinate, and RA/Dec counts
+
+The report does not change the public object payload. It gives import jobs a cheap way to fail or warn on source quality regressions before larger Gaia, SIMBAD, NED, JPL, or exoplanet snapshots are promoted into the shared searchable projection.
+
 ## API Contract
 
 Initial Phoenix routes:

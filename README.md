@@ -93,6 +93,20 @@ You can also run the legacy Vite development processes separately:
 npm run dev
 ```
 
+## Verify
+
+For Phoenix-served UI changes, use the full browser-facing path rather than only the Vite build:
+
+```bash
+npm run build
+npm run build:phoenix
+ATLAS_BASE_URL=http://127.0.0.1:4020 npm run test:e2e
+ATLAS_BASE_URL=http://127.0.0.1:4020 npm run test:perf
+cd backend_phoenix && mix test
+```
+
+The Playwright tests expect the Phoenix app to be running, usually at `http://127.0.0.1:4020/`. They skip cleanly when that URL is unavailable.
+
 ## Data Source
 
 The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL `de440s.bsp` planetary ephemeris kernel. It also loads the NAIF `mar099s.bsp` satellite SPK for Mars' moons. Jupiter and Saturn major moons are fetched from the NASA/JPL Horizons API as parent-relative vectors and then placed into the same heliocentric ecliptic coordinate space as the Skyfield bodies.

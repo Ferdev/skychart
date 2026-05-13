@@ -40,6 +40,12 @@ type BodyFilter =
   | "star_cluster";
 type DisplayLayer = "labels" | "orbits" | "grid" | "milkyWay" | "references";
 
+type ExternalLink = {
+  provider?: string | null;
+  label?: string | null;
+  url?: string | null;
+};
+
 type VectorComponents = {
   x: number;
   y: number;
@@ -56,6 +62,8 @@ type BodyCatalog = {
   catalog_group?: string;
   ra_deg?: number | null;
   dec_deg?: number | null;
+  external_ids?: Record<string, unknown> | null;
+  external_links?: readonly ExternalLink[];
 };
 
 type BodyStateVector = {
@@ -281,7 +289,9 @@ type CatalogObjectPayload = {
   color?: string | null;
   radius_km?: number | null;
   aliases?: readonly string[] | null;
+  external_ids?: Record<string, unknown> | null;
   external_links?: readonly { provider: string; label: string; url: string }[] | null;
+  source?: Record<string, unknown> | null;
   facts?: Record<string, unknown> | null;
   astrometry?: {
     ra_deg?: number | null;
@@ -696,6 +706,12 @@ function bindEvents() {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-focus-key]");
     if (!button) return;
     selectBody(button.dataset.focusKey ?? "", { center: true, zoom: "local" });
+  });
+
+  bodyInfo.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-related-key]");
+    if (!button) return;
+    void selectBodyByKey(button.dataset.relatedKey ?? "", { center: true, animate: true });
   });
 
   tabButtons.forEach((button) => {
@@ -2258,7 +2274,9 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
       catalog_group: object.catalog_group ?? undefined,
       aliases: object.aliases ?? [],
       ra_deg: finiteOptionalNumber(astrometry.ra_deg),
-      dec_deg: finiteOptionalNumber(astrometry.dec_deg)
+      dec_deg: finiteOptionalNumber(astrometry.dec_deg),
+      external_ids: object.external_ids ?? null,
+      external_links: normalizeExternalLinks(object.external_links ?? [])
     },
     stellar:
       objectType === "star"
@@ -2492,28 +2510,39 @@ function exploreSourceBodies() {
 function updateBodyInfo() {
   const body = selectedBody();
   if (!body) {
-    bodyInfo.innerHTML = "";
+    bodyInfo.innerHTML = renderObjectEmptyState();
     return;
   }
 
   const classification = classifyBody(body);
   const positionModel = readablePositionModel(body.catalog?.position_model ?? body.catalog?.source_type ?? "");
-  const rows = [
+  const parentBody = body.parent_key ? bodyByKey.get(body.parent_key) ?? null : null;
+  const overviewRows = [
     ["Type", classification.label],
-    ["Heliocentric distance", formatDistance(body.position.heliocentric_distance_km)],
     ["Radius", body.radius_km > 0 ? formatDistance(body.radius_km) : "Unknown"],
-    ["Parent", body.parent_key ? bodyByKey.get(body.parent_key)?.name ?? body.parent_key : "None"]
+    ["Parent", parentBody?.name ?? body.parent_key ?? null],
+    ["Catalog group", readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)]
   ];
   const primaryStats = [
     ["Earth distance", formatDistance(body.distance_from_earth_km)],
     ["Diameter", body.radius_km > 0 ? formatDistance(body.radius_km * 2) : "Unknown"],
-    ["Model", positionModel]
+    ["Heliocentric", formatDistance(body.position.heliocentric_distance_km)]
+  ];
+
+  const positionRows = [
+    ["Coordinate frame", ephemeris?.coordinate_frame ?? null],
+    ["Position model", positionModel],
+    ["RA / Dec", formatRaDec(body)],
+    ["X", formatAuCoordinate(body.position.x_au)],
+    ["Y", formatAuCoordinate(body.position.y_au)],
+    ["Z", formatAuCoordinate(body.position.z_au)]
   ];
 
   const stateRows = body.state_vector
     ? [
         ["Parent-relative speed", `${formatNumber(body.state_vector.speed_km_s)} km/s`],
-        ["Heliocentric speed", `${formatNumber(body.state_vector.heliocentric_speed_km_s)} km/s`]
+        ["Heliocentric speed", `${formatNumber(body.state_vector.heliocentric_speed_km_s)} km/s`],
+        ["Parent-relative distance", formatDistance(body.state_vector.distance_km)]
       ]
     : [];
 
@@ -2523,6 +2552,11 @@ function updateBodyInfo() {
         ["Semi-major axis", nullableDistance(body.orbit.semi_major_axis_km)],
         ["Eccentricity", nullableNumber(body.orbit.eccentricity, 4)],
         ["Inclination", nullableDegrees(body.orbit.inclination_deg)],
+        ["Periapsis", nullableDistance(body.orbit.periapsis_km)],
+        ["Apoapsis", nullableDistance(body.orbit.apoapsis_km)],
+        ["Ascending node", nullableDegrees(body.orbit.longitude_of_ascending_node_deg)],
+        ["Argument of periapsis", nullableDegrees(body.orbit.argument_of_periapsis_deg)],
+        ["True anomaly", nullableDegrees(body.orbit.true_anomaly_deg)],
         ["Period", nullableDays(body.orbit.orbital_period_days)]
       ]
     : [];
@@ -2539,6 +2573,7 @@ function updateBodyInfo() {
         ...(body.stellar.exoplanet_count != null ? [["Known planets", nullableNumber(body.stellar.exoplanet_count, 0)]] : []),
         ...(body.stellar.stellar_teff_k ? [["Temperature", `${formatNumber(body.stellar.stellar_teff_k)} K`]] : []),
         ...(body.stellar.stellar_mass_solar ? [["Mass", `${formatNumber(body.stellar.stellar_mass_solar)} Solar masses`]] : []),
+        ...(body.stellar.stellar_radius_solar ? [["Radius", `${formatNumber(body.stellar.stellar_radius_solar)} Solar radii`]] : []),
         ...(body.stellar.spectral_type ? [["Spectral type", body.stellar.spectral_type]] : []),
         ["Radius source", body.stellar.stellar_radius_source ?? null]
       ]
@@ -2554,12 +2589,16 @@ function updateBodyInfo() {
 
   const deepSkyRows = body.deep_sky
     ? [
+        ["Common name", body.deep_sky.common_name ?? null],
         ["Deep-sky type", body.deep_sky.deep_sky_type_label ?? "Unknown"],
         ["Magnitude", nullableNumber(body.deep_sky.apparent_magnitude, 1)],
         ["Constellation", body.deep_sky.constellation ?? "Unknown"],
         ["Viewing season", body.deep_sky.viewing_season ?? "Unknown"],
         ["Angular size", body.deep_sky.angular_size_arcmin ?? "Unknown"],
-        ["Physical diameter", body.deep_sky.physical_diameter_ly ? `${formatNumber(body.deep_sky.physical_diameter_ly)} ly` : "Unknown"]
+        ["Physical diameter", body.deep_sky.physical_diameter_ly ? `${formatNumber(body.deep_sky.physical_diameter_ly)} ly` : "Unknown"],
+        ["Minor diameter", body.deep_sky.physical_minor_diameter_ly ? `${formatNumber(body.deep_sky.physical_minor_diameter_ly)} ly` : null],
+        ["Size note", body.deep_sky.physical_size_note ?? null],
+        ["Equipment", body.deep_sky.observing_equipment ?? null]
       ]
     : [];
 
@@ -2575,26 +2614,146 @@ function updateBodyInfo() {
         ["Aphelion", body.small_body.aphelion_au ? `${formatNumber(body.small_body.aphelion_au)} AU` : null],
         ["Eccentricity", nullableNumber(body.small_body.eccentricity, 4)],
         ["Inclination", nullableDegrees(body.small_body.inclination_deg)],
-        ["Period", nullableDays(body.small_body.orbital_period_days)]
+        ["Period", nullableDays(body.small_body.orbital_period_days)],
+        ["Earth MOID", body.small_body.earth_moid_au ? `${formatNumber(body.small_body.earth_moid_au)} AU` : null]
       ]
     : [];
 
   bodyInfo.innerHTML = `
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
       <section class="object-data-pane">
-        ${renderObjectMedia(body)}
+        ${renderObjectDetailState(body)}
         ${renderFactTiles(primaryStats)}
-        ${renderDataSection("Overview", rows)}
+        ${renderIdentifierSection(body)}
+        ${renderMediaSection(body)}
+        ${renderDataSection("Overview", overviewRows)}
+        ${renderDataSection("Position", positionRows)}
         ${renderDataSection("Motion", stateRows)}
-        ${renderDataSection("Osculating orbit", orbitRows)}
-        ${renderDataSection("Stellar catalog", stellarRows)}
+        ${renderDataSection("Orbit", orbitRows)}
+        ${renderDataSection("Stellar facts", stellarRows)}
         ${renderDataSection("Confirmed exoplanets", exoplanetRows, renderExoplanetList(body.exoplanet_system?.planets ?? []))}
-        ${renderDataSection("Deep-sky catalog", deepSkyRows)}
-        ${renderDataSection("Small-body catalog", smallBodyRows)}
-        ${body.exoplanet_system?.why_interesting ? `<p class="object-note">${escapeHtml(body.exoplanet_system.why_interesting)}</p>` : ""}
-        ${body.deep_sky?.why_interesting ? `<p class="object-note">${escapeHtml(body.deep_sky.why_interesting)}</p>` : ""}
+        ${renderDataSection("Deep-sky facts", deepSkyRows)}
+        ${renderDataSection("Small-body facts", smallBodyRows)}
+        ${renderObjectNotes(body)}
+        ${renderSourceSection(body)}
+        ${renderRelatedObjects(body)}
       </section>
     </article>
+  `;
+}
+
+function renderObjectEmptyState() {
+  return `
+    <section class="object-empty-state">
+      <h2>No object selected</h2>
+      <p>Search the catalog or select a point on the atlas to open its scientific object page.</p>
+    </section>
+  `;
+}
+
+function renderObjectDetailState(body: Body) {
+  if (!body.catalog?.preview) return "";
+  return `
+    <section class="object-detail-state" aria-label="Object detail state">
+      <strong>Catalog preview</strong>
+      <span>Showing the indexed catalog record. Full orbital or physical detail appears when that source exposes it.</span>
+    </section>
+  `;
+}
+
+function renderIdentifierSection(body: Body) {
+  const aliases = aliasesForBody(body);
+  const identifiers = externalIdentifierEntries(body);
+  if (aliases.length === 0 && identifiers.length === 0) return "";
+  return `
+    <section class="data-section object-identifiers">
+      <h4>Aliases and IDs</h4>
+      ${aliases.length ? `<div class="identifier-chips">${aliases.map((alias) => `<span>${escapeHtml(alias)}</span>`).join("")}</div>` : ""}
+      ${
+        identifiers.length
+          ? `<dl class="detail-grid">${identifiers
+              .map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`)
+              .join("")}</dl>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderMediaSection(body: Body) {
+  return `
+    <section class="data-section object-media-section">
+      <h4>Media</h4>
+      ${renderObjectMedia(body)}
+    </section>
+  `;
+}
+
+function renderObjectNotes(body: Body) {
+  const notes = [body.exoplanet_system?.why_interesting, body.deep_sky?.why_interesting, ...(body.orbit?.notes ?? [])].filter(isPresent);
+  if (notes.length === 0) return "";
+  return `
+    <section class="data-section object-notes">
+      <h4>Scientific notes</h4>
+      ${notes.map((note) => `<p class="object-note">${escapeHtml(note)}</p>`).join("")}
+    </section>
+  `;
+}
+
+function renderSourceSection(body: Body) {
+  const links = externalLinksForBody(body);
+  const sourceRows = [
+    ["Catalog source", readableOptionalModel(body.catalog?.source_type)],
+    ["Position model", readableOptionalModel(body.catalog?.position_model)],
+    ["Catalog group", readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)],
+    ["Atlas source", ephemeris?.data_source ?? null],
+    ["Epoch", ephemeris?.timestamp_utc ? formatFullDate(ephemeris.timestamp_utc) : null]
+  ];
+  const rows = renderRows(sourceRows);
+  if (!rows && links.length === 0) return "";
+  return `
+    <section class="data-section object-sources">
+      <h4>Source links</h4>
+      ${rows ? `<dl class="detail-grid">${rows}</dl>` : ""}
+      ${
+        links.length
+          ? `<div class="source-link-list">${links
+              .map(
+                (link) => `
+                  <a href="${escapeHtml(link.url ?? "")}" target="_blank" rel="noreferrer">
+                    <span>${escapeHtml(link.provider ?? "Source")}</span>
+                    <strong>${escapeHtml(link.label ?? "Open source record")}</strong>
+                  </a>
+                `
+              )
+              .join("")}</div>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderRelatedObjects(body: Body) {
+  const sections = relatedObjectSections(body);
+  if (sections.length === 0) return "";
+  return `
+    <section class="data-section object-related">
+      <h4>Related objects</h4>
+      <div class="related-section-list">
+        ${sections
+          .map(
+            (section) => `
+              <section class="related-section">
+                <h5>${escapeHtml(section.title)}</h5>
+                <div class="related-object-grid">
+                  ${section.bodies.map((related) => renderRelatedObjectButton(body, related)).join("")}
+                </div>
+              </section>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -2627,6 +2786,116 @@ function renderObjectMedia(body: Body) {
       </div>
     </section>
   `;
+}
+
+function aliasesForBody(body: Body) {
+  return uniqueTextValues([...(body.aliases ?? []), ...(body.catalog?.aliases ?? []), ...(body.deep_sky?.aliases ?? []), body.deep_sky?.common_name ?? null])
+    .filter((alias) => alias.toLowerCase() !== body.name.toLowerCase())
+    .slice(0, 16);
+}
+
+function externalIdentifierEntries(body: Body): [string, string][] {
+  const entries: [string, string][] = [];
+  for (const [key, value] of Object.entries(body.catalog?.external_ids ?? {})) {
+    const formatted = identifierValue(value);
+    if (formatted) entries.push([identifierLabel(key), formatted]);
+  }
+  if (body.stellar?.hip) entries.push(["HIP", `HIP ${body.stellar.hip}`]);
+  if (body.stellar?.hd) entries.push(["HD", `HD ${body.stellar.hd}`]);
+  return uniquePairs(entries).slice(0, 12);
+}
+
+function externalLinksForBody(body: Body) {
+  const classification = classifyBody(body);
+  const lookupName = body.deep_sky?.common_name || body.name;
+  const generatedLinks: ExternalLink[] = [];
+
+  if (["star", "star_cluster", "nebula", "galaxy", "quasar", "active_galaxy", "black_hole"].includes(classification.type)) {
+    generatedLinks.push({
+      provider: "SIMBAD",
+      label: "SIMBAD object lookup",
+      url: `https://simbad.cds.unistra.fr/simbad/sim-id?Ident=${encodeURIComponent(lookupName)}`
+    });
+  }
+
+  if (["galaxy", "quasar", "active_galaxy", "black_hole"].includes(classification.type)) {
+    generatedLinks.push({
+      provider: "NED",
+      label: "NASA/IPAC Extragalactic Database lookup",
+      url: `https://ned.ipac.caltech.edu/byname?objname=${encodeURIComponent(lookupName)}`
+    });
+  }
+
+  if (body.catalog?.source_type === "jpl_sbdb_query" || body.key.startsWith("jpl-sbdb-")) {
+    const spkId = identifierValue(body.catalog?.external_ids?.jpl_spkid) ?? body.name;
+    generatedLinks.push({
+      provider: "NASA/JPL SBDB",
+      label: "Small-Body Database lookup",
+      url: `https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html#/?sstr=${encodeURIComponent(spkId)}`
+    });
+  }
+
+  return normalizeExternalLinks([...(body.catalog?.external_links ?? []), ...generatedLinks]);
+}
+
+function relatedObjectSections(body: Body): { title: string; bodies: Body[] }[] {
+  const sections: { title: string; bodies: Body[] }[] = [];
+  const seen = new Set([body.key]);
+  const append = (title: string, bodies: Body[]) => {
+    const uniqueBodies = bodies.filter((item) => {
+      if (seen.has(item.key)) return false;
+      seen.add(item.key);
+      return true;
+    });
+    if (uniqueBodies.length > 0) sections.push({ title, bodies: uniqueBodies });
+  };
+
+  const parent = body.parent_key ? bodyByKey.get(body.parent_key) ?? null : null;
+  append("Parent body", parent ? [parent] : []);
+  append("Moons and children", childrenForBody(body).slice(0, 8));
+  append("Nearby in view", nearbyVisibleBodies(body).slice(0, 6));
+  append("Same catalog", sameCatalogNeighbors(body).slice(0, 6));
+
+  return sections;
+}
+
+function renderRelatedObjectButton(source: Body, related: Body) {
+  const classification = classifyBody(related);
+  const distanceLabel = formatDistance(bodyDistanceKm(source, related));
+  return `
+    <button type="button" class="related-object" data-related-key="${escapeHtml(related.key)}" style="--body-color: ${escapeHtml(related.color)}">
+      <span class="body-orb"></span>
+      <span>
+        <strong>${escapeHtml(shortBodyName(related.name))}</strong>
+        <small>${escapeHtml(classification.label)} · ${escapeHtml(distanceLabel)} from ${escapeHtml(shortBodyName(source.name))}</small>
+      </span>
+    </button>
+  `;
+}
+
+function childrenForBody(body: Body) {
+  return (ephemeris?.bodies ?? [])
+    .filter((candidate) => candidate.parent_key === body.key)
+    .sort((a, b) => a.distance_from_earth_km - b.distance_from_earth_km);
+}
+
+function nearbyVisibleBodies(body: Body) {
+  const viewport = usableViewportRect();
+  return (ephemeris?.bodies ?? [])
+    .filter((candidate) => {
+      if (candidate.key === body.key) return false;
+      const screen = worldToScreen(candidate.position.x_au, candidate.position.y_au);
+      return pointInRect(screen, viewport);
+    })
+    .sort((a, b) => bodyDistanceKm(body, a) - bodyDistanceKm(body, b));
+}
+
+function sameCatalogNeighbors(body: Body) {
+  const catalogGroup = body.catalog_group ?? body.catalog?.catalog_group;
+  if (!catalogGroup) return [];
+  return (ephemeris?.bodies ?? [])
+    .filter((candidate) => candidate.key !== body.key && (candidate.catalog_group ?? candidate.catalog?.catalog_group) === catalogGroup)
+    .sort((a, b) => bodyDistanceKm(body, a) - bodyDistanceKm(body, b));
 }
 
 function renderExoplanetList(planets: BodyExoplanet[]) {
@@ -2677,6 +2946,30 @@ function renderRows(rows: (string | number | null | undefined)[][]) {
     .filter(([, value]) => value !== null && value !== undefined && value !== "")
     .map(([label, value]) => `<dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value ?? "Unknown"))}</dd>`)
     .join("");
+}
+
+function normalizeExternalLinks(links: readonly ExternalLink[]) {
+  const seen = new Set<string>();
+  return links
+    .map((link) => ({
+      provider: typeof link.provider === "string" && link.provider.trim() ? link.provider.trim() : "Source",
+      label: typeof link.label === "string" && link.label.trim() ? link.label.trim() : "Open source record",
+      url: typeof link.url === "string" ? link.url.trim() : ""
+    }))
+    .filter((link) => {
+      if (!isSafeExternalUrl(link.url) || seen.has(link.url)) return false;
+      seen.add(link.url);
+      return true;
+    });
+}
+
+function isSafeExternalUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function updateCompareUi() {
@@ -3738,6 +4031,65 @@ function nullableDays(value: number | null | undefined) {
 
 function nullableLightYears(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${formatNumber(value)} ly` : "Unknown";
+}
+
+function formatRaDec(body: Body) {
+  const raDeg = finiteOptionalNumber(body.catalog?.ra_deg);
+  const decDeg = finiteOptionalNumber(body.catalog?.dec_deg);
+  if (raDeg == null || decDeg == null) return null;
+  return `${raDeg.toFixed(5)} deg, ${decDeg.toFixed(5)} deg`;
+}
+
+function formatAuCoordinate(value: number) {
+  return `${formatNumber(value)} AU`;
+}
+
+function readableOptionalModel(value: string | null | undefined) {
+  return value ? readablePositionModel(value) : null;
+}
+
+function readableCatalogGroup(value: string | null | undefined) {
+  return value ? readablePositionModel(value) : null;
+}
+
+function uniqueTextValues(values: readonly (string | null | undefined)[]) {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const value of values) {
+    const text = value?.trim();
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(text);
+  }
+  return unique;
+}
+
+function uniquePairs(entries: readonly [string, string][]) {
+  const seen = new Set<string>();
+  return entries.filter(([label, value]) => {
+    const key = `${label.toLowerCase()}:${value.toLowerCase()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function identifierLabel(key: string) {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\bdr3\b/gi, "DR3")
+    .replace(/\bid\b/gi, "ID")
+    .replace(/\boid\b/gi, "OID")
+    .replace(/\bspkid\b/gi, "SPK-ID")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function identifierValue(value: unknown) {
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
 }
 
 function formatNumber(value: number) {

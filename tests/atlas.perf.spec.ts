@@ -1,0 +1,69 @@
+import { expect, test } from "@playwright/test";
+import {
+  catalogEndpointEntries,
+  collectBrowserIssues,
+  installAtlasPerfInstrumentation,
+  openAtlas,
+  readAtlasPerf,
+  resetAtlasPerf,
+  skipIfAtlasUnavailable,
+  waitForCatalogRequestsToSettle
+} from "./atlas-test-utils";
+
+test.describe("Cosmic Atlas performance guardrails", () => {
+  test.beforeEach(async ({ page, request }) => {
+    await skipIfAtlasUnavailable(request);
+    await installAtlasPerfInstrumentation(page);
+    await openAtlas(page);
+    await waitForCatalogRequestsToSettle(page);
+    await resetAtlasPerf(page);
+  });
+
+  test("idle atlas rendering settles instead of continuously scheduling frames", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+
+    await page.waitForTimeout(1_000);
+    const settled = await readAtlasPerf(page);
+    await page.waitForTimeout(1_500);
+    const idle = await readAtlasPerf(page);
+
+    expect(idle.rafCount - settled.rafCount, "requestAnimationFrame calls while idle").toBeLessThanOrEqual(2);
+    expect(catalogEndpointEntries(idle), "catalog endpoint requests while idle").toHaveLength(0);
+    issues.assertClean();
+  });
+
+  test("common zoom controls do not issue runaway catalog loads", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+
+    for (let index = 0; index < 4; index += 1) {
+      await page.locator("#zoom-in").click();
+    }
+    for (let index = 0; index < 3; index += 1) {
+      await page.locator("#zoom-out").click();
+    }
+
+    await waitForCatalogRequestsToSettle(page, 1_000);
+    const afterZoom = await readAtlasPerf(page);
+    const catalogRequests = catalogEndpointEntries(afterZoom);
+    const pointTileRequests = catalogRequests.filter((entry) => entry.url.includes("/api/catalog/points.bin"));
+    const viewportRequests = catalogRequests.filter((entry) => entry.url.includes("/api/catalog/viewport"));
+
+    expect(catalogRequests.length, "total point/viewport catalog requests for seven zoom actions").toBeLessThanOrEqual(12);
+    expect(pointTileRequests.length, "point tile requests for seven zoom actions").toBeLessThanOrEqual(8);
+    expect(viewportRequests.length, "viewport object requests for seven zoom actions").toBeLessThanOrEqual(8);
+    expect(catalogRequests.filter((entry) => entry.failed || (entry.status !== null && entry.status >= 500))).toEqual([]);
+
+    await resetAtlasPerf(page);
+    await page.waitForTimeout(2_000);
+    await waitForCatalogRequestsToSettle(page, 1_000);
+    const finalDeferredRefresh = catalogEndpointEntries(await readAtlasPerf(page));
+    expect(finalDeferredRefresh.length, "final debounced catalog refresh after zoom").toBeLessThanOrEqual(1);
+
+    await resetAtlasPerf(page);
+    await page.waitForTimeout(1_500);
+    const idleAfterZoom = await readAtlasPerf(page);
+    expect(catalogEndpointEntries(idleAfterZoom), "catalog endpoint requests after final refresh settles").toHaveLength(0);
+
+    issues.assertClean();
+  });
+});

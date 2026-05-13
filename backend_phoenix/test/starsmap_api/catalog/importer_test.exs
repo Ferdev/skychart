@@ -1,6 +1,7 @@
 defmodule StarsmapApi.Catalog.ImporterTest do
   use StarsmapApi.DataCase, async: true
 
+  alias StarsmapApi.Catalog
   alias StarsmapApi.Catalog.CatalogObject
   alias StarsmapApi.Catalog.Importer
 
@@ -177,6 +178,66 @@ defmodule StarsmapApi.Catalog.ImporterTest do
     assert attrs.search_text =~ "3c 273"
   end
 
+  test "import_report summarizes validation by source type" do
+    rows = [
+      %{
+        key: "m1",
+        name: "M1",
+        catalog_group: "messier_deep_sky",
+        object_type: "nebula",
+        source_type: "deep_sky_catalog",
+        x_au: 1.0,
+        y_au: 2.0,
+        ra_deg: 83.0,
+        dec_deg: 22.0,
+        source: %{"catalog" => "deep_sky"}
+      },
+      %{
+        key: "m1",
+        name: "M1 duplicate",
+        catalog_group: "messier_deep_sky",
+        object_type: "nebula",
+        source_type: "deep_sky_catalog",
+        x_au: 1.2,
+        y_au: 2.2,
+        ra_deg: 83.1,
+        dec_deg: 22.1,
+        source: %{"catalog" => "deep_sky"}
+      },
+      %{
+        key: "jpl-sbdb-1",
+        name: "Ceres",
+        catalog_group: "jpl_small_bodies",
+        object_type: "asteroid",
+        source_type: "jpl_sbdb_query",
+        x_au: nil,
+        y_au: 2.0,
+        ra_deg: nil,
+        dec_deg: nil,
+        source: %{"catalog" => "small_body"}
+      }
+    ]
+
+    report = Importer.import_report(rows)
+
+    assert report.total_rows == 3
+    assert report[:valid?] == false
+    assert report.duplicate_key_count == 1
+    assert report.duplicate_keys == ["m1"]
+    assert report.missing_map_position_count == 1
+    assert report.missing_ra_dec_count == 1
+    assert "1 duplicate catalog keys" in report.warnings
+    assert "1 rows without projected map coordinates" in report.warnings
+
+    assert report.source_types["deep_sky_catalog"].rows == 2
+    assert report.source_types["deep_sky_catalog"].duplicate_key_count == 1
+    assert report.source_types["deep_sky_catalog"].catalog_groups == %{"messier_deep_sky" => 2}
+    assert report.source_types["deep_sky_catalog"].source_catalogs == %{"deep_sky" => 2}
+
+    assert report.source_types["jpl_sbdb_query"].rows == 1
+    assert report.source_types["jpl_sbdb_query"].missing_map_position_count == 1
+  end
+
   test "import_all upserts rows from a catalog directory" do
     data_dir = tmp_catalog_dir()
 
@@ -229,9 +290,22 @@ defmodule StarsmapApi.Catalog.ImporterTest do
       })
     )
 
-    assert {:ok, %{total: 3, counts: counts}} = Importer.import_all(data_dir: data_dir)
+    assert {:ok, %{total: 3, counts: counts, report: report}} =
+             Importer.import_all(data_dir: data_dir)
+
     assert counts == %{"bright_stars" => 1, "exoplanet_systems" => 1, "messier_deep_sky" => 1}
+    assert report[:valid?] == true
+    assert report.source_types["bright_star_catalog"].rows == 1
+    assert report.source_types["deep_sky_catalog"].rows == 1
+    assert report.source_types["exoplanet_archive_system"].rows == 1
+
     assert Repo.aggregate(CatalogObject, :count) == 3
+
+    assert Catalog.summary().source_counts == %{
+             "bright_star_catalog" => 1,
+             "deep_sky_catalog" => 1,
+             "exoplanet_archive_system" => 1
+           }
 
     assert {:ok, %{total: 3}} = Importer.import_all(data_dir: data_dir)
     assert Repo.aggregate(CatalogObject, :count) == 3

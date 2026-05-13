@@ -87,10 +87,18 @@ defmodule StarsmapApi.Catalog do
       |> Repo.all()
       |> Map.new()
 
+    source_counts =
+      CatalogObject
+      |> group_by([object], object.source_type)
+      |> select([object], {object.source_type, count(object.id)})
+      |> Repo.all()
+      |> Map.new()
+
     %{
       object_count: Enum.sum(Map.values(group_counts)),
       group_counts: group_counts,
-      type_counts: type_counts
+      type_counts: type_counts,
+      source_counts: source_counts
     }
   end
 
