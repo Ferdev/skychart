@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .vite/
+backend_phoenix/priv/static/assets/
+backend_phoenix/priv/static/index.html
 .venv/
 __pycache__/
 *.pyc

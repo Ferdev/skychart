@@ -41,9 +41,18 @@ export type DestinationBody = {
   catalog_group?: string;
   aliases?: readonly string[];
   catalog?: { aliases?: readonly string[] } | null;
+  stellar?: DestinationStellarInfo | null;
   deep_sky?: DestinationDeepSkyInfo | null;
+  exoplanet_system?: DestinationExoplanetSystemInfo | null;
   position: DestinationBodyPosition;
   distance_from_earth_km: number;
+};
+
+export type DestinationStellarInfo = {
+  hip?: number | null;
+  hd?: number | null;
+  apparent_magnitude?: number | null;
+  spectral_type?: string | null;
 };
 
 export type DestinationDeepSkyInfo = {
@@ -57,12 +66,22 @@ export type DestinationDeepSkyInfo = {
   observing_equipment?: string | null;
 };
 
+export type DestinationExoplanetSystemInfo = {
+  confirmed_planet_count?: number | null;
+  system_star_count?: number | null;
+  planets?: readonly { name?: string | null; discovery_method?: string | null; discovery_year?: number | null }[];
+  why_interesting?: string | null;
+};
+
 export type DestinationBodyType =
   | "star"
   | "planet"
   | "moon"
   | "dwarf_planet"
   | "galaxy"
+  | "quasar"
+  | "active_galaxy"
+  | "black_hole"
   | "nebula"
   | "star_cluster"
   | "asterism"
@@ -78,6 +97,8 @@ export type DestinationIconKey =
   | "moon"
   | "dwarf"
   | "galaxy"
+  | "quasar"
+  | "black_hole"
   | "nebula"
   | "cluster"
   | "asteroid"
@@ -243,6 +264,9 @@ const TYPE_LABELS: Record<DestinationBodyType, string> = {
   moon: "Moon",
   dwarf_planet: "Dwarf planet",
   galaxy: "Galaxy",
+  quasar: "Quasar",
+  active_galaxy: "Active galaxy",
+  black_hole: "Black hole",
   nebula: "Nebula",
   star_cluster: "Star cluster",
   asterism: "Asterism",
@@ -259,6 +283,9 @@ const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
   moon: "moon",
   dwarf_planet: "dwarf",
   galaxy: "galaxy",
+  quasar: "quasar",
+  active_galaxy: "galaxy",
+  black_hole: "black_hole",
   nebula: "nebula",
   star_cluster: "cluster",
   asterism: "cluster",
@@ -275,6 +302,9 @@ const TYPE_SORT_GROUPS: Record<DestinationBodyType, number> = {
   moon: 2,
   dwarf_planet: 3,
   galaxy: 4,
+  quasar: 5,
+  active_galaxy: 5,
+  black_hole: 5,
   nebula: 5,
   star_cluster: 6,
   asterism: 7,
@@ -648,6 +678,9 @@ function inferBodyType(key: string, normalizedName: string, radiusKm: number): D
   if (PLANET_KEYS.has(key)) return "planet";
   if (MOON_KEYS.has(key) || normalizedName === "moon") return "moon";
   if (DWARF_PLANET_KEYS.has(key)) return "dwarf_planet";
+  if (normalizedName.includes("quasar")) return "quasar";
+  if (normalizedName.includes("black hole")) return "black_hole";
+  if (normalizedName.includes("agn") || normalizedName.includes("blazar") || normalizedName.includes("seyfert")) return "active_galaxy";
   if (normalizedName.includes("galaxy")) return "galaxy";
   if (normalizedName.includes("nebula")) return "nebula";
   if (normalizedName.includes("cluster")) return "star_cluster";
@@ -660,6 +693,23 @@ function inferBodyType(key: string, normalizedName: string, radiusKm: number): D
 }
 
 function destinationMetaLabel(body: DestinationBody, classification: BodyClassification, radiusLabel: string): string {
+  const exoplanetSystem = body.exoplanet_system;
+  if (exoplanetSystem) {
+    const planetCount = exoplanetSystem.confirmed_planet_count ?? exoplanetSystem.planets?.length ?? 0;
+    const starCount = exoplanetSystem.system_star_count;
+    const parts = ["Exoplanet system", `${planetCount} confirmed ${planetCount === 1 ? "planet" : "planets"}`];
+    if (starCount && starCount > 1) parts.push(`${starCount} stars`);
+    return parts.join(" · ");
+  }
+
+  if (body.catalog_group === "bright_stars" && body.stellar) {
+    const parts = ["Bright star"];
+    if (typeof body.stellar.apparent_magnitude === "number") parts.push(`mag ${formatMagnitude(body.stellar.apparent_magnitude)}`);
+    if (body.stellar.spectral_type) parts.push(body.stellar.spectral_type);
+    if (body.stellar.hip) parts.push(`HIP ${body.stellar.hip}`);
+    return parts.join(" · ");
+  }
+
   const deepSky = body.deep_sky;
   if (!deepSky) return `${classification.label} · ${radiusLabel} radius`;
 
@@ -680,6 +730,9 @@ function destinationSearchTokens(body: DestinationBody, classification: BodyClas
     normalizeText(body.deep_sky?.deep_sky_type_label ?? ""),
     normalizeText(body.deep_sky?.common_name ?? ""),
     normalizeText(body.deep_sky?.constellation ?? ""),
+    normalizeText(body.stellar?.spectral_type ?? ""),
+    normalizeText(body.exoplanet_system?.why_interesting ?? ""),
+    ...(body.exoplanet_system?.planets ?? []).flatMap((planet) => [normalizeText(planet.name ?? ""), normalizeText(planet.discovery_method ?? "")]),
     ...splitWords(body.name),
     ...splitWords(body.key),
     ...bodyAliases(body).flatMap(splitWords)

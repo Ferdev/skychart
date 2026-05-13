@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data" / "skyfield"
 CACHE_DIR = ROOT / "data" / "cache"
 DEEP_SKY_CATALOG_PATH = ROOT / "data" / "catalogs" / "deep_sky_catalog.json"
+EXOPLANET_CATALOG_PATH = ROOT / "data" / "catalogs" / "exoplanet_systems.json"
+BRIGHT_STAR_CATALOG_PATH = ROOT / "data" / "catalogs" / "bright_stars.json"
 HOST = "127.0.0.1"
 PORT = 8765
 AU_KM = 149_597_870.700
@@ -27,11 +29,12 @@ PARSEC_AU = 206_264.80624709636
 LIGHT_YEAR_KM = 9_460_730_472_580.8
 SUN_MU_KM3_S2 = 132_712_440_018.0
 SECONDS_PER_DAY = 86_400.0
-CACHE_SCHEMA_VERSION = 2
+CACHE_SCHEMA_VERSION = 5
 LIVE_TIMESTAMP_BUCKET_SECONDS = 300
 EPHEMERIS_SOURCE = (
     "NASA/JPL DE440s ephemeris via Skyfield; NAIF MAR099s satellite SPK; NASA/JPL Horizons vectors; "
-    "NASA Exoplanet Archive host-star catalog; generated Messier deep-sky catalog snapshot"
+    "NASA Exoplanet Archive host-star and confirmed-planet catalog; Hipparcos bright-star catalog via CDS/VizieR; "
+    "generated Messier deep-sky catalog snapshot; Phoenix catalog index for Gaia DR3 bulk slices, SIMBAD, and JPL SBDB generated slices"
 )
 SATELLITE_KERNEL_URLS = {
     "mar099s.bsp": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/mar099s.bsp",
@@ -58,17 +61,51 @@ CATALOG_GROUPS = {
         "label": "Nearby exoplanet systems",
         "description": "Nearby confirmed exoplanet host stars from NASA Exoplanet Archive coordinates and distances.",
     },
+    "exoplanet_systems": {
+        "label": "Confirmed exoplanet systems",
+        "description": "Generated NASA Exoplanet Archive snapshot of confirmed exoplanet host systems with planet lists.",
+    },
+    "bright_stars": {
+        "label": "Hipparcos bright stars",
+        "description": "Generated Hipparcos Main Catalogue slice from CDS/VizieR with V magnitude < 6.5 and positive parallax.",
+    },
+    "gaia_local_stars": {
+        "label": "Gaia DR3 local stars",
+        "description": "Generated ESA Gaia DR3 local-neighborhood slice loaded through Phoenix viewport/search catalog queries.",
+    },
+    "gaia_500pc_stars": {
+        "label": "Gaia DR3 500 pc stars",
+        "description": "Bulk ESA Gaia DR3 500 pc, G <= 14, quality-filtered star slice streamed directly into Phoenix/Postgres.",
+    },
     "messier_deep_sky": {
         "label": "Messier deep-sky catalog",
         "description": "Distance-known Messier objects with NGC/IC aliases, RA/Dec, magnitudes, angular sizes, and viewing metadata.",
     },
+    "simbad_extragalactic": {
+        "label": "SIMBAD extragalactic catalog",
+        "description": "Generated SIMBAD TAP slice of galaxies, quasars, and active galactic nuclei with redshift-derived distances.",
+    },
+    "jpl_small_bodies": {
+        "label": "JPL small bodies",
+        "description": "Generated NASA/JPL Small-Body Database slice of large asteroids, near-Earth asteroids, and comets.",
+    },
 }
 DEFAULT_CATALOG_GROUPS = tuple(CATALOG_GROUPS.keys())
-STATIC_CATALOG_SOURCE_TYPES = {"stellar_catalog", "deep_sky_catalog"}
+STARTUP_CATALOG_GROUPS = (
+    "core",
+    "mars_moons",
+    "jupiter_major_moons",
+    "saturn_major_moons",
+    "nearby_exoplanet_systems",
+    "messier_deep_sky",
+)
+STATIC_CATALOG_SOURCE_TYPES = {"stellar_catalog", "exoplanet_archive_system", "bright_star_catalog", "deep_sky_catalog"}
 HORIZONS_PARENT_CENTERS = {
     "jupiter": "@5",
     "saturn": "@6",
 }
+CATALOG_SEARCH_DEFAULT_LIMIT = 80
+CATALOG_SEARCH_MAX_LIMIT = 300
 
 
 def catalog_object(
@@ -88,9 +125,21 @@ def catalog_object(
     ra_deg: float | None = None,
     dec_deg: float | None = None,
     distance_pc: float | None = None,
+    parallax_mas: float | None = None,
+    hip: int | None = None,
+    hd: int | None = None,
     exoplanet_count: int | None = None,
     stellar_radius_solar: float | None = None,
     stellar_teff_k: float | None = None,
+    stellar_mass_solar: float | None = None,
+    spectral_type: str | None = None,
+    bv_color_index: float | None = None,
+    absolute_magnitude: float | None = None,
+    stellar_radius_source: str | None = None,
+    system_star_count: int | None = None,
+    system_planet_count: int | None = None,
+    system_moon_count: int | None = None,
+    planets: list[dict[str, Any]] | None = None,
     aliases: list[str] | None = None,
     distance_ly: float | None = None,
     distance_quality: str | None = None,
@@ -128,9 +177,21 @@ def catalog_object(
         "ra_deg": ra_deg,
         "dec_deg": dec_deg,
         "distance_pc": distance_pc,
+        "parallax_mas": parallax_mas,
+        "hip": hip,
+        "hd": hd,
         "exoplanet_count": exoplanet_count,
         "stellar_radius_solar": stellar_radius_solar,
         "stellar_teff_k": stellar_teff_k,
+        "stellar_mass_solar": stellar_mass_solar,
+        "spectral_type": spectral_type,
+        "bv_color_index": bv_color_index,
+        "absolute_magnitude": absolute_magnitude,
+        "stellar_radius_source": stellar_radius_source,
+        "system_star_count": system_star_count,
+        "system_planet_count": system_planet_count,
+        "system_moon_count": system_moon_count,
+        "planets": planets or [],
         "aliases": aliases or [],
         "distance_ly": distance_ly,
         "distance_quality": distance_quality,
@@ -291,8 +352,125 @@ def load_deep_sky_catalog_objects() -> list[dict[str, Any]]:
     return objects
 
 
+def normalized_catalog_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def catalog_identity_tokens(objects: list[dict[str, Any]]) -> set[str]:
+    tokens: set[str] = set()
+    for item in objects:
+        for value in [item.get("name"), *item.get("aliases", [])]:
+            if value:
+                token = normalized_catalog_name(str(value))
+                if token:
+                    tokens.add(token)
+    return tokens
+
+
+def load_exoplanet_system_catalog_objects() -> list[dict[str, Any]]:
+    if not EXOPLANET_CATALOG_PATH.exists():
+        return []
+
+    curated_stellar_names = {
+        normalized_catalog_name(str(item["name"]))
+        for item in CATALOG_OBJECTS
+        if item.get("source_type") == "stellar_catalog"
+    }
+    curated_stellar_keys = {str(item["key"]) for item in CATALOG_OBJECTS if item.get("source_type") == "stellar_catalog"}
+
+    payload = json.loads(EXOPLANET_CATALOG_PATH.read_text(encoding="utf-8"))
+    objects: list[dict[str, Any]] = []
+    for entry in payload.get("systems", []):
+        name = str(entry["name"])
+        key = str(entry["key"])
+        if key in curated_stellar_keys or normalized_catalog_name(name) in curated_stellar_names:
+            continue
+
+        stellar_radius_solar = entry.get("stellar_radius_solar")
+        radius_km = float(stellar_radius_solar) * 695_700.0 if stellar_radius_solar is not None else 0.0
+        objects.append(
+            catalog_object(
+                key=key,
+                name=name,
+                ephemeris=name,
+                radius_km=radius_km,
+                mu_km3_s2=0.0,
+                color=str(entry.get("color") or "#f0c987"),
+                object_type="star",
+                catalog_group="exoplanet_systems",
+                source_type="exoplanet_archive_system",
+                ra_deg=float(entry["ra_deg"]),
+                dec_deg=float(entry["dec_deg"]),
+                distance_pc=float(entry["distance_pc"]),
+                exoplanet_count=int(entry.get("exoplanet_count") or len(entry.get("planets", []))),
+                stellar_radius_solar=stellar_radius_solar,
+                stellar_teff_k=entry.get("stellar_teff_k"),
+                stellar_mass_solar=entry.get("stellar_mass_solar"),
+                spectral_type=entry.get("spectral_type"),
+                system_star_count=entry.get("system_star_count"),
+                system_planet_count=entry.get("system_planet_count"),
+                system_moon_count=entry.get("system_moon_count"),
+                planets=[planet for planet in entry.get("planets", []) if isinstance(planet, dict)],
+                aliases=[str(value) for value in entry.get("aliases", []) if value],
+                why_interesting=str(entry.get("why_interesting") or "A confirmed exoplanet host system from the NASA Exoplanet Archive."),
+            )
+        )
+    return objects
+
+
+def load_bright_star_catalog_objects(existing_objects: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not BRIGHT_STAR_CATALOG_PATH.exists():
+        return []
+
+    existing_tokens = catalog_identity_tokens(existing_objects)
+    payload = json.loads(BRIGHT_STAR_CATALOG_PATH.read_text(encoding="utf-8"))
+    objects: list[dict[str, Any]] = []
+    for entry in payload.get("stars", []):
+        name = str(entry["name"])
+        aliases = [str(value) for value in entry.get("aliases", []) if value]
+        entry_tokens = {
+            token
+            for token in [normalized_catalog_name(name), *(normalized_catalog_name(alias) for alias in aliases)]
+            if token
+        }
+        if existing_tokens.intersection(entry_tokens):
+            continue
+
+        objects.append(
+            catalog_object(
+                key=str(entry["key"]),
+                name=name,
+                ephemeris=name,
+                radius_km=float(entry.get("radius_km") or 0.0),
+                mu_km3_s2=0.0,
+                color=str(entry.get("color") or "#f0c987"),
+                object_type="star",
+                catalog_group="bright_stars",
+                source_type="bright_star_catalog",
+                ra_deg=float(entry["ra_deg"]),
+                dec_deg=float(entry["dec_deg"]),
+                distance_pc=float(entry["distance_pc"]),
+                parallax_mas=float(entry["parallax_mas"]),
+                hip=int(entry["hip"]),
+                hd=int(entry["hd"]) if entry.get("hd") is not None else None,
+                stellar_radius_solar=entry.get("stellar_radius_solar"),
+                stellar_teff_k=entry.get("stellar_teff_k"),
+                spectral_type=entry.get("spectral_type"),
+                bv_color_index=entry.get("bv_color_index"),
+                absolute_magnitude=entry.get("absolute_magnitude"),
+                stellar_radius_source=entry.get("stellar_radius_source"),
+                apparent_magnitude=float(entry["apparent_magnitude"]),
+                aliases=aliases,
+                why_interesting=str(entry.get("why_interesting") or "Bright star from the Hipparcos Main Catalogue."),
+            )
+        )
+    return objects
+
+
 DEEP_SKY_CATALOG_OBJECTS = load_deep_sky_catalog_objects()
-BODIES = [*CATALOG_OBJECTS, *DEEP_SKY_CATALOG_OBJECTS]
+EXOPLANET_SYSTEM_CATALOG_OBJECTS = load_exoplanet_system_catalog_objects()
+BRIGHT_STAR_CATALOG_OBJECTS = load_bright_star_catalog_objects([*CATALOG_OBJECTS, *EXOPLANET_SYSTEM_CATALOG_OBJECTS])
+BODIES = [*CATALOG_OBJECTS, *EXOPLANET_SYSTEM_CATALOG_OBJECTS, *BRIGHT_STAR_CATALOG_OBJECTS, *DEEP_SKY_CATALOG_OBJECTS]
 BODY_BY_KEY = {item["key"]: item for item in BODIES}
 DEFAULT_TRAIL_BODIES = ("earth", "mars", "jupiter")
 DEFAULT_TRAIL_DAYS = 365.0
@@ -486,16 +664,37 @@ def stellar_catalog_position_payload(item: dict[str, Any]) -> dict[str, float]:
     return radec_distance_position_payload(item)
 
 
-def stellar_catalog_payload(item: dict[str, Any]) -> dict[str, float | int | None]:
+def stellar_catalog_payload(item: dict[str, Any]) -> dict[str, Any]:
     distance_pc = item.get("distance_pc")
     return {
         "ra_deg": item.get("ra_deg"),
         "dec_deg": item.get("dec_deg"),
         "distance_pc": distance_pc,
         "distance_ly": float(distance_pc) * PARSEC_AU * AU_KM / LIGHT_YEAR_KM if distance_pc is not None else None,
+        "parallax_mas": item.get("parallax_mas"),
+        "hip": item.get("hip"),
+        "hd": item.get("hd"),
+        "apparent_magnitude": item.get("apparent_magnitude"),
+        "absolute_magnitude": item.get("absolute_magnitude"),
+        "bv_color_index": item.get("bv_color_index"),
         "exoplanet_count": item.get("exoplanet_count"),
         "stellar_radius_solar": item.get("stellar_radius_solar"),
         "stellar_teff_k": item.get("stellar_teff_k"),
+        "stellar_mass_solar": item.get("stellar_mass_solar"),
+        "spectral_type": item.get("spectral_type"),
+        "stellar_radius_source": item.get("stellar_radius_source"),
+    }
+
+
+def exoplanet_system_payload(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "source": "NASA Exoplanet Archive Planetary Systems Composite Parameters",
+        "system_star_count": item.get("system_star_count"),
+        "system_planet_count": item.get("system_planet_count"),
+        "system_moon_count": item.get("system_moon_count"),
+        "confirmed_planet_count": item.get("exoplanet_count"),
+        "planets": item.get("planets", []),
+        "why_interesting": item.get("why_interesting"),
     }
 
 
@@ -641,10 +840,10 @@ def parse_float_param(query: dict[str, list[str]], name: str, default: float) ->
     return value
 
 
-def parse_catalog_groups(query: dict[str, list[str]]) -> list[str]:
+def parse_catalog_groups(query: dict[str, list[str]], default_groups: tuple[str, ...] = DEFAULT_CATALOG_GROUPS) -> list[str]:
     raw_values = query.get("groups")
     if raw_values is None:
-        return list(DEFAULT_CATALOG_GROUPS)
+        return list(default_groups)
 
     groups = [
         part.strip().lower()
@@ -653,7 +852,7 @@ def parse_catalog_groups(query: dict[str, list[str]]) -> list[str]:
         if part.strip()
     ]
     if not groups:
-        return list(DEFAULT_CATALOG_GROUPS)
+        return []
 
     invalid_groups = [group for group in groups if group not in CATALOG_GROUPS]
     if invalid_groups:
@@ -674,9 +873,89 @@ def parse_catalog_groups(query: dict[str, list[str]]) -> list[str]:
     return selected_groups
 
 
+def parse_catalog_keys(query: dict[str, list[str]]) -> list[str]:
+    raw_values = query.get("keys")
+    if raw_values is None:
+        return []
+
+    keys = [
+        part.strip().lower()
+        for value in raw_values
+        for part in value.split(",")
+        if part.strip()
+    ]
+    invalid_keys = [key for key in keys if key not in BODY_BY_KEY]
+    if invalid_keys:
+        raise QueryInputError(
+            "Unknown object key",
+            details={
+                "invalid_keys": invalid_keys,
+            },
+        )
+
+    selected_keys: list[str] = []
+    seen_keys: set[str] = set()
+    for key in keys:
+        if key not in seen_keys:
+            selected_keys.append(key)
+            seen_keys.add(key)
+    return selected_keys
+
+
+def parse_catalog_object_types(query: dict[str, list[str]]) -> list[str]:
+    raw_values = query.get("types")
+    if raw_values is None:
+        return []
+
+    object_types = [
+        part.strip().lower()
+        for value in raw_values
+        for part in value.split(",")
+        if part.strip()
+    ]
+    selected_types: list[str] = []
+    seen_types: set[str] = set()
+    for object_type in object_types:
+        if object_type not in seen_types:
+            selected_types.append(object_type)
+            seen_types.add(object_type)
+    return selected_types
+
+
+def parse_int_param(query: dict[str, list[str]], name: str, default: int, minimum: int, maximum: int) -> int:
+    raw_value = query.get(name, [None])[0]
+    if raw_value is None or raw_value.strip() == "":
+        return default
+
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise QueryInputError(f"{name} must be an integer") from exc
+
+    return min(max(value, minimum), maximum)
+
+
+def parse_bool_param(query: dict[str, list[str]], name: str, default: bool) -> bool:
+    raw_value = query.get(name, [None])[0]
+    if raw_value is None or raw_value.strip() == "":
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def catalog_objects_for_groups(groups: list[str]) -> list[dict[str, Any]]:
     group_set = set(groups)
     return [item for item in BODIES if item["catalog_group"] in group_set]
+
+
+def catalog_objects_for_selection(groups: list[str], keys: list[str] | None = None) -> list[dict[str, Any]]:
+    objects = catalog_objects_for_groups(groups)
+    seen_keys = {str(item["key"]) for item in objects}
+    for key in keys or []:
+        if key in seen_keys:
+            continue
+        objects.append(BODY_BY_KEY[key])
+        seen_keys.add(key)
+    return objects
 
 
 def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
@@ -689,6 +968,14 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
         ephemeris_kernel = "NASA Exoplanet Archive"
         ephemeris_source = "NASA Exoplanet Archive confirmed planet host catalog"
         position_model = "stellar_catalog_coordinates"
+    elif source_type == "exoplanet_archive_system":
+        ephemeris_kernel = "NASA Exoplanet Archive PSCompPars snapshot"
+        ephemeris_source = "NASA Exoplanet Archive Planetary Systems Composite Parameters"
+        position_model = "exoplanet_archive_coordinates"
+    elif source_type == "bright_star_catalog":
+        ephemeris_kernel = "Hipparcos Main Catalogue"
+        ephemeris_source = "CDS/VizieR Hipparcos Main Catalogue"
+        position_model = "hipparcos_catalog_coordinates"
     elif source_type == "deep_sky_catalog":
         ephemeris_kernel = "generated Messier deep-sky snapshot"
         ephemeris_source = "AstroPixels Messier table with NASA HEASARC catalog context"
@@ -716,9 +1003,20 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
         "dec_deg": item.get("dec_deg"),
         "distance_pc": item.get("distance_pc"),
         "distance_ly": item.get("distance_ly"),
+        "parallax_mas": item.get("parallax_mas"),
+        "hip": item.get("hip"),
+        "hd": item.get("hd"),
         "exoplanet_count": item.get("exoplanet_count"),
         "stellar_radius_solar": item.get("stellar_radius_solar"),
         "stellar_teff_k": item.get("stellar_teff_k"),
+        "stellar_mass_solar": item.get("stellar_mass_solar"),
+        "spectral_type": item.get("spectral_type"),
+        "bv_color_index": item.get("bv_color_index"),
+        "absolute_magnitude": item.get("absolute_magnitude"),
+        "stellar_radius_source": item.get("stellar_radius_source"),
+        "system_star_count": item.get("system_star_count"),
+        "system_planet_count": item.get("system_planet_count"),
+        "system_moon_count": item.get("system_moon_count"),
         "messier": item.get("messier"),
         "ngc": item.get("ngc"),
         "ic": item.get("ic"),
@@ -739,7 +1037,7 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def catalog_summary_payload(groups: list[str], objects: list[dict[str, Any]]) -> dict[str, Any]:
+def catalog_summary_payload(groups: list[str], objects: list[dict[str, Any]], include_objects: bool = True) -> dict[str, Any]:
     kernels = sorted({
         item.get("kernel")
         or (
@@ -747,6 +1045,10 @@ def catalog_summary_payload(groups: list[str], objects: list[dict[str, Any]]) ->
             if item.get("source_type") == "horizons"
             else "Messier deep-sky snapshot"
             if item.get("source_type") == "deep_sky_catalog"
+            else "NASA Exoplanet Archive PSCompPars snapshot"
+            if item.get("source_type") == "exoplanet_archive_system"
+            else "Hipparcos Main Catalogue"
+            if item.get("source_type") == "bright_star_catalog"
             else "NASA Exoplanet Archive"
             if item.get("source_type") == "stellar_catalog"
             else "de440s.bsp"
@@ -761,12 +1063,140 @@ def catalog_summary_payload(groups: list[str], objects: list[dict[str, Any]]) ->
             for key, value in CATALOG_GROUPS.items()
         ],
         "object_count": len(objects),
+        "group_counts": {
+            key: sum(1 for item in objects if item["catalog_group"] == key)
+            for key in CATALOG_GROUPS
+        },
         "kernels": kernels,
-        "objects": [catalog_object_payload(item) for item in objects],
+        "objects": [catalog_object_payload(item) for item in objects] if include_objects else [],
         "notes": [
             "Catalog records are separate from rendered ephemeris state so future object classes can be lazy-loaded.",
             "Loaded Solar System records use dynamic SPK or Horizons vector positions.",
         ],
+    }
+
+
+def normalized_search_text(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+
+
+def catalog_search_tokens(item: dict[str, Any]) -> list[str]:
+    values: list[Any] = [
+        item.get("key"),
+        item.get("name"),
+        item.get("object_type"),
+        item.get("catalog_group"),
+        CATALOG_GROUPS[item["catalog_group"]]["label"],
+        item.get("deep_sky_type_label"),
+        item.get("common_name"),
+        item.get("constellation"),
+        item.get("spectral_type"),
+        item.get("why_interesting"),
+        *(item.get("aliases") or []),
+    ]
+    for planet in item.get("planets") or []:
+        if isinstance(planet, dict):
+            values.extend([planet.get("name"), planet.get("discovery_method")])
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = normalized_search_text(value)
+        if text and text not in seen:
+            tokens.append(text)
+            seen.add(text)
+    return tokens
+
+
+def catalog_search_score(item: dict[str, Any], query: str) -> int | None:
+    query_parts = [part for part in normalized_search_text(query).split(" ") if part]
+    if not query_parts:
+        return 0
+
+    tokens = catalog_search_tokens(item)
+    total = 0
+    for part in query_parts:
+        part_score = 0
+        for token in tokens:
+            if token == part:
+                part_score = max(part_score, 120)
+            elif token.startswith(part):
+                part_score = max(part_score, 80)
+            elif part in token:
+                part_score = max(part_score, 35)
+        if part_score == 0:
+            return None
+        total += part_score
+
+    name = normalized_search_text(item.get("name"))
+    key = normalized_search_text(item.get("key"))
+    normalized_query = normalized_search_text(query)
+    if name == normalized_query:
+        total += 320
+    elif name.startswith(normalized_query):
+        total += 140
+    if key == normalized_query:
+        total += 260
+    elif key.startswith(normalized_query):
+        total += 100
+
+    return total
+
+
+def catalog_base_sort_key(item: dict[str, Any]) -> tuple[float, str]:
+    magnitude = item.get("apparent_magnitude")
+    if isinstance(magnitude, (int, float)) and math.isfinite(float(magnitude)):
+        return (float(magnitude), str(item["name"]).lower())
+    return (99.0, str(item["name"]).lower())
+
+
+def filtered_catalog_objects(groups: list[str], object_types: list[str], query_text: str) -> list[dict[str, Any]]:
+    objects = catalog_objects_for_groups(groups)
+    if object_types:
+        type_set = set(object_types)
+        objects = [item for item in objects if str(item.get("object_type") or "").lower() in type_set]
+
+    if query_text.strip():
+        scored: list[tuple[int, dict[str, Any]]] = []
+        for item in objects:
+            score = catalog_search_score(item, query_text)
+            if score is not None:
+                scored.append((score, item))
+        return [
+            item
+            for score, item in sorted(
+                scored,
+                key=lambda pair: (-pair[0], catalog_base_sort_key(pair[1])),
+            )
+        ]
+
+    return sorted(objects, key=catalog_base_sort_key)
+
+
+def catalog_search_payload(
+    timestamp: datetime,
+    groups: list[str],
+    object_types: list[str],
+    query_text: str,
+    offset: int,
+    limit: int,
+) -> dict[str, Any]:
+    matches = filtered_catalog_objects(groups, object_types, query_text)
+    page_objects = matches[offset : offset + limit]
+    bodies, earth_position = body_payloads(timestamp, page_objects)
+    return {
+        "schema_version": 1,
+        "timestamp_utc": isoformat_utc(timestamp),
+        "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
+        "query": query_text,
+        "groups": groups,
+        "types": object_types,
+        "offset": offset,
+        "limit": limit,
+        "total": len(matches),
+        "has_more": offset + limit < len(matches),
+        "au_km": AU_KM,
+        "earth_position": earth_position,
+        "bodies": bodies,
     }
 
 
@@ -1146,13 +1576,11 @@ def orbit_payload_for_item(
     }
 
 
-def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> dict[str, Any]:
+def body_payloads(timestamp: datetime, catalog_objects: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, float]]:
     timescale, ephemeris = skyfield_context()
     time = timescale.from_datetime(timestamp)
     sun = ephemeris["sun"]
     earth = ephemeris["earth"]
-    selected_groups = groups or list(DEFAULT_CATALOG_GROUPS)
-    catalog_objects = catalog_objects_for_groups(selected_groups)
 
     bodies: list[dict[str, Any]] = []
     state_cache: dict[tuple[str, str], dict[str, Any]] = {}
@@ -1208,6 +1636,7 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
             earth_distance_km = 0.0 if item["key"] == "earth" else float((target - earth).at(time).distance().km)
 
         positions_by_key[item["key"]] = position
+        state_vector = None if item.get("source_type") in STATIC_CATALOG_SOURCE_TYPES else body_state_vector_payload(item, timestamp, state_cache)
 
         bodies.append(
             {
@@ -1220,13 +1649,23 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
                 "catalog_group": item["catalog_group"],
                 "catalog": catalog_object_payload(item),
                 "position": position,
-                "state_vector": body_state_vector_payload(item, timestamp, state_cache),
+                "state_vector": state_vector,
                 "orbit": orbit_payload_for_item(item, timestamp, state_cache),
-                "stellar": stellar_catalog_payload(item) if item.get("source_type") == "stellar_catalog" else None,
+                "stellar": stellar_catalog_payload(item) if item.get("source_type") in {"stellar_catalog", "exoplanet_archive_system", "bright_star_catalog"} else None,
+                "exoplanet_system": exoplanet_system_payload(item) if item.get("source_type") == "exoplanet_archive_system" else None,
                 "deep_sky": deep_sky_catalog_payload(item) if item.get("source_type") == "deep_sky_catalog" else None,
                 "distance_from_earth_km": earth_distance_km,
             }
         )
+
+    return bodies, earth_position
+
+
+def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None, keys: list[str] | None = None) -> dict[str, Any]:
+    selected_groups = list(STARTUP_CATALOG_GROUPS) if groups is None else groups
+    selected_keys = keys or []
+    catalog_objects = catalog_objects_for_selection(selected_groups, selected_keys)
+    bodies, earth_position = body_payloads(timestamp, catalog_objects)
 
     return {
         "timestamp_utc": isoformat_utc(timestamp),
@@ -1241,7 +1680,8 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None) -> d
             "time": "UTC ISO-8601 and days",
         },
         "au_km": AU_KM,
-        "catalog": catalog_summary_payload(selected_groups, catalog_objects),
+        "catalog": catalog_summary_payload(selected_groups, catalog_objects, include_objects=False),
+        "hydrated_keys": selected_keys,
         "earth_position": earth_position,
         "bodies": bodies,
     }
@@ -1254,6 +1694,7 @@ def orbits_payload(timestamp: datetime, groups: list[str] | None = None) -> dict
     bodies: list[dict[str, Any]] = []
 
     for item in catalog_objects:
+        state_vector = None if item.get("source_type") in STATIC_CATALOG_SOURCE_TYPES else body_state_vector_payload(item, timestamp, state_cache)
         bodies.append(
             {
                 "key": item["key"],
@@ -1262,9 +1703,10 @@ def orbits_payload(timestamp: datetime, groups: list[str] | None = None) -> dict
                 "parent_key": item.get("parent_key"),
                 "catalog_group": item["catalog_group"],
                 "catalog": catalog_object_payload(item),
-                "state_vector": body_state_vector_payload(item, timestamp, state_cache),
+                "state_vector": state_vector,
                 "orbit": orbit_payload_for_item(item, timestamp, state_cache),
-                "stellar": stellar_catalog_payload(item) if item.get("source_type") == "stellar_catalog" else None,
+                "stellar": stellar_catalog_payload(item) if item.get("source_type") in {"stellar_catalog", "exoplanet_archive_system", "bright_star_catalog"} else None,
+                "exoplanet_system": exoplanet_system_payload(item) if item.get("source_type") == "exoplanet_archive_system" else None,
                 "deep_sky": deep_sky_catalog_payload(item) if item.get("source_type") == "deep_sky_catalog" else None,
             }
         )
@@ -1280,7 +1722,7 @@ def orbits_payload(timestamp: datetime, groups: list[str] | None = None) -> dict
             "angle": "degrees",
             "time": "UTC ISO-8601 and days",
         },
-        "catalog": catalog_summary_payload(selected_groups, catalog_objects),
+        "catalog": catalog_summary_payload(selected_groups, catalog_objects, include_objects=False),
         "bodies": bodies,
         "limitations": [
             "Elements are osculating values derived from one epoch state vector; they are not permanent catalog orbits.",
@@ -1376,11 +1818,40 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 timestamp = parse_timestamp(query.get("timestamp", [None])[0])
-                groups = parse_catalog_groups(query)
-                key = cache_key_payload("ephemeris", timestamp_utc=isoformat_utc(timestamp), groups=groups)
-                self.respond(cached_payload("api", key, lambda: ephemeris_payload(timestamp, groups)))
+                groups = parse_catalog_groups(query, STARTUP_CATALOG_GROUPS)
+                keys = parse_catalog_keys(query)
+                key = cache_key_payload("ephemeris", timestamp_utc=isoformat_utc(timestamp), groups=groups, keys=keys)
+                self.respond(cached_payload("api", key, lambda: ephemeris_payload(timestamp, groups, keys)))
             except QueryInputError as exc:
                 payload: dict[str, Any] = {"error": str(exc)}
+                if exc.details is not None:
+                    payload["details"] = exc.details
+                self.respond(payload, status=HTTPStatus.BAD_REQUEST)
+            except Exception as exc:
+                self.respond({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if parsed.path == "/api/catalog/search":
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                timestamp = parse_timestamp(query.get("timestamp", [None])[0])
+                groups = parse_catalog_groups(query)
+                object_types = parse_catalog_object_types(query)
+                query_text = query.get("q", [""])[0]
+                offset = parse_int_param(query, "offset", 0, 0, 10_000_000)
+                limit = parse_int_param(query, "limit", CATALOG_SEARCH_DEFAULT_LIMIT, 1, CATALOG_SEARCH_MAX_LIMIT)
+                key = cache_key_payload(
+                    "catalog_search",
+                    timestamp_utc=isoformat_utc(timestamp),
+                    groups=groups,
+                    types=object_types,
+                    query=query_text,
+                    offset=offset,
+                    limit=limit,
+                )
+                self.respond(cached_payload("api", key, lambda: catalog_search_payload(timestamp, groups, object_types, query_text, offset, limit)))
+            except QueryInputError as exc:
+                payload = {"error": str(exc)}
                 if exc.details is not None:
                     payload["details"] = exc.details
                 self.respond(payload, status=HTTPStatus.BAD_REQUEST)
@@ -1393,8 +1864,9 @@ class Handler(BaseHTTPRequestHandler):
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 groups = parse_catalog_groups(query)
                 objects = catalog_objects_for_groups(groups)
-                key = cache_key_payload("catalog", groups=groups)
-                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, objects)))
+                include_objects = parse_bool_param(query, "include_objects", True)
+                key = cache_key_payload("catalog", groups=groups, include_objects=include_objects)
+                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, objects, include_objects=include_objects)))
             except QueryInputError as exc:
                 payload = {"error": str(exc)}
                 if exc.details is not None:
@@ -1449,7 +1921,7 @@ class Handler(BaseHTTPRequestHandler):
         print(f"{self.address_string()} - {format % args}")
 
     def respond(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
-        body = json.dumps(payload, indent=2).encode("utf-8")
+        body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

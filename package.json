@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "dev:all": "bash scripts/dev.sh",
     "build": "tsc && vite build",
+    "build:phoenix": "tsc && vite build --outDir backend_phoenix/priv/static --emptyOutDir false",
     "preview": "vite preview --host 127.0.0.1"
   },
   "devDependencies": {
