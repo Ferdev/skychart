@@ -4,6 +4,7 @@ import json
 import hashlib
 import math
 import re
+import threading
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -485,6 +486,7 @@ _timescale: Any | None = None
 _ephemeris: Any | None = None
 _satellite_kernels: dict[str, Any] = {}
 _horizons_vectors: dict[tuple[str, str], dict[str, float]] = {}
+_kernel_lock = threading.Lock()
 
 
 class QueryInputError(ValueError):
@@ -495,13 +497,14 @@ class QueryInputError(ValueError):
 
 def skyfield_context() -> tuple[Any, Any]:
     global _loader, _timescale, _ephemeris
-    if _loader is None:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        _loader = Loader(str(DATA_DIR))
-    if _timescale is None:
-        _timescale = _loader.timescale()
-    if _ephemeris is None:
-        _ephemeris = _loader("de440s.bsp")
+    with _kernel_lock:
+        if _loader is None:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            _loader = Loader(str(DATA_DIR))
+        if _timescale is None:
+            _timescale = _loader.timescale()
+        if _ephemeris is None:
+            _ephemeris = _loader("de440s.bsp")
     return _timescale, _ephemeris
 
 
@@ -509,16 +512,17 @@ def satellite_kernel(filename: str) -> Any:
     if filename not in SATELLITE_KERNEL_URLS:
         raise RuntimeError(f"Unknown satellite kernel: {filename}")
 
-    if filename not in _satellite_kernels:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        path = DATA_DIR / filename
-        if not path.exists():
-            temporary_path = path.with_suffix(f"{path.suffix}.download")
-            if temporary_path.exists():
-                temporary_path.unlink()
-            urlretrieve(SATELLITE_KERNEL_URLS[filename], str(temporary_path))
-            temporary_path.replace(path)
-        _satellite_kernels[filename] = load_file(str(path))
+    with _kernel_lock:
+        if filename not in _satellite_kernels:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            path = DATA_DIR / filename
+            if not path.exists():
+                temporary_path = path.with_suffix(f"{path.suffix}.download")
+                if temporary_path.exists():
+                    temporary_path.unlink()
+                urlretrieve(SATELLITE_KERNEL_URLS[filename], str(temporary_path))
+                temporary_path.replace(path)
+            _satellite_kernels[filename] = load_file(str(path))
 
     return _satellite_kernels[filename]
 
