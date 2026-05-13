@@ -16,7 +16,7 @@ import {
 } from "./destinationPicker";
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
 import { educationalComparisons } from "./navigationMetrics";
-import { objectMediaFor } from "./objectMedia";
+import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
 import { WebglPointRenderer, type PointLayerSource } from "./webglPointRenderer";
 
 type AtlasTab = "catalog" | "object";
@@ -54,6 +54,8 @@ type BodyCatalog = {
   aliases?: readonly string[];
   parent_key?: string | null;
   catalog_group?: string;
+  ra_deg?: number | null;
+  dec_deg?: number | null;
 };
 
 type BodyStateVector = {
@@ -282,6 +284,9 @@ type CatalogObjectPayload = {
   external_links?: readonly { provider: string; label: string; url: string }[] | null;
   facts?: Record<string, unknown> | null;
   astrometry?: {
+    ra_deg?: number | null;
+    dec_deg?: number | null;
+    distance_pc?: number | null;
     distance_ly?: number | null;
     apparent_magnitude?: number | null;
     absolute_magnitude?: number | null;
@@ -2251,7 +2256,9 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
       preview: true,
       parent_key: object.parent_key,
       catalog_group: object.catalog_group ?? undefined,
-      aliases: object.aliases ?? []
+      aliases: object.aliases ?? [],
+      ra_deg: finiteOptionalNumber(astrometry.ra_deg),
+      dec_deg: finiteOptionalNumber(astrometry.dec_deg)
     },
     stellar:
       objectType === "star"
@@ -2593,12 +2600,28 @@ function updateBodyInfo() {
 
 function renderObjectMedia(body: Body) {
   const media = objectMediaFor(body);
-  if (!media) return "";
+  if (!media) {
+    const status = objectMediaStatusFor(body);
+    return `
+      <section class="object-media object-media--empty" aria-label="Object media status">
+        <div class="object-media__empty">
+          <span class="object-media__badge">${escapeHtml(status.badge)}</span>
+          <strong>${escapeHtml(status.title)}</strong>
+          <p>${escapeHtml(status.description)}</p>
+        </div>
+      </section>
+    `;
+  }
+
   return `
-    <section class="object-media" aria-label="Curated object media">
-      <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+    <section class="object-media object-media--${escapeHtml(media.kind)}" aria-label="Object media">
+      <div class="object-media__image">
+        <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+        <span class="object-media__badge">${escapeHtml(media.badge)}</span>
+      </div>
       <div class="object-media__caption">
         <strong>${escapeHtml(media.title)}</strong>
+        ${media.description ? `<p>${escapeHtml(media.description)}</p>` : ""}
         <span>${escapeHtml(media.credit)}</span>
         <a href="${escapeHtml(media.sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(media.license)}</a>
       </div>

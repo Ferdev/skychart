@@ -113,7 +113,7 @@ SIMBAD extragalactic objects are loaded from `data/catalogs/simbad_extragalactic
 
 The Milky Way view layer is a procedural frontend context layer, not a catalog of individual stars. It defines the Galactic center, outer disk, solar circle, and major spiral-arm density guides in Galactic coordinates, then rotates diffuse haze, dust lanes, and reference geometry into the same heliocentric ecliptic frame used by the canvas. Real Gaia point primitives render over that context layer; the Milky Way renderer does not add fake selectable-looking stars.
 
-Curated object media is defined in `src/objectMedia.ts`. The first manifest covers Earth, Mars, Jupiter, Saturn, M31, and M42 using stable NASA Image and Video Library assets and visible attribution. The app does not live-search media on every object load.
+Object media is resolved in `src/objectMedia.ts`. Curated NASA Image and Video Library assets cover the Sun, major planets, Pluto, the Moon, M31, M42, M45, and M57 with visible attribution. Objects with right ascension and declination but no curated image use a deterministic CDS/Aladin DSS2 survey cutout, so searched catalog objects can still show real sky imagery without live media search. Objects without either source show an explicit catalog-only state instead of an empty media gap.
 
 The API exposes the scientific catalog layer:
 

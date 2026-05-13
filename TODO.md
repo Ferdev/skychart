@@ -30,9 +30,11 @@
 
 - [x] Add a curated object media manifest for the first high-value planets and deep-sky objects.
 - [x] Show curated media inside selected-object detail with title, credit, license, and source link.
-- [ ] Expand curated NASA/JPL planet and major-moon media coverage.
-- [ ] Expand curated Messier media coverage for M31, M42, M45, M57, M13, and other common targets.
-- [ ] Add a survey-cutout fallback for RA/Dec objects using a stable sky-survey service when no curated image exists.
+- [x] Expand curated NASA/JPL planet media coverage.
+- [x] Expand curated Messier media coverage for M31, M42, M45, and M57.
+- [x] Add a survey-cutout fallback for RA/Dec objects using a stable sky-survey service when no curated image exists.
+- [ ] Expand curated major-moon media coverage.
+- [ ] Add curated media for M13 and other common clusters that are not covered well by NASA Image Library searches.
 - [ ] Split object detail into clearer sections: Overview, Position, Motion/Orbit, Stellar/Deep-sky/Small-body facts, Media, and Source links.
 - [ ] Show aliases and external lookup links as first-class provenance, not hidden metadata.
 
