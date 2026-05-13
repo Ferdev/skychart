@@ -1,0 +1,51 @@
+service: skychart
+retain_containers: 2
+image: ferdev/skychart
+
+minimum_version: 2.4.0
+
+deploy_timeout: 20
+drain_timeout: 20
+readiness_delay: 7
+
+servers:
+  web:
+    hosts:
+      - 5.161.73.221
+
+ssh:
+  user: deploy
+  <% unless ENV["CI"] %>
+  keys_only: true
+  keys:
+    - <%= File.expand_path("~/.ssh/kai_estimo") %>
+  <% end %>
+
+registry:
+  server: ghcr.io
+  username: ferdev
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+
+env:
+  secret:
+    - SECRET_KEY_BASE
+    - DATABASE_URL
+
+proxy:
+  app_port: 4000
+  ssl: true
+  forward_headers: true
+  healthcheck:
+    path: /api/health
+    interval: 3
+    timeout: 3
+
+logging:
+  driver: json-file
+  options:
+    max-size: 50m
+    max-file: "3"

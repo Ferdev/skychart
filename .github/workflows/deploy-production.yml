@@ -1,8 +1,8 @@
-name: Deploy Staging
+name: Deploy Production
 
 on:
   push:
-    branches: [trunk]
+    branches: [production]
   workflow_dispatch:
 
 permissions:
@@ -10,20 +10,23 @@ permissions:
   packages: write
 
 concurrency:
-  group: deploy-staging
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    environment:
+      name: production
+      url: https://skychart.org
 
     env:
       DOCKER_BUILDKIT: 1
       KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD || github.token }}
       SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      DATABASE_URL: ecto://skychart:${{ secrets.POSTGRES_PASSWORD }}@skychart-staging-postgres/skychart
+      DATABASE_URL: ecto://skychart:${{ secrets.POSTGRES_PASSWORD }}@skychart-production-postgres/skychart
 
     steps:
       - uses: actions/checkout@v5
@@ -85,24 +88,24 @@ jobs:
         run: |
           mkdir -p .kamal
           umask 077
-          cat > .kamal/secrets.staging <<'SECRETS_EOF'
+          cat > .kamal/secrets.production <<'SECRETS_EOF'
           KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD
           SECRET_KEY_BASE=$SECRET_KEY_BASE
           POSTGRES_PASSWORD=$POSTGRES_PASSWORD
           DATABASE_URL=$DATABASE_URL
           SECRETS_EOF
-          sed -i 's/^[[:space:]]*//' .kamal/secrets.staging
-          cp .kamal/secrets.staging .kamal/secrets-common
-          cat .kamal/secrets.staging
+          sed -i 's/^[[:space:]]*//' .kamal/secrets.production
+          cp .kamal/secrets.production .kamal/secrets-common
+          cat .kamal/secrets.production
 
       - name: Release stale deploy lock
-        run: kamal lock release -d staging || true
+        run: kamal lock release -d production || true
 
       - name: Boot Postgres accessory
-        run: kamal accessory boot postgres -d staging || true
+        run: kamal accessory boot postgres -d production || true
 
-      - name: Deploy to staging
-        run: kamal deploy -d staging
+      - name: Deploy to production
+        run: kamal deploy -d production
 
-      - name: Smoke test staging
-        run: curl -fsS https://staging.skychart.org/api/health
+      - name: Smoke test production
+        run: curl -fsS https://skychart.org/api/health

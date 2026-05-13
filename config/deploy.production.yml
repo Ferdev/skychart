@@ -1,0 +1,27 @@
+service: skychart-production
+
+accessories:
+  postgres:
+    image: postgres:16-alpine
+    host: 5.161.73.221
+    env:
+      clear:
+        POSTGRES_USER: skychart
+        POSTGRES_DB: skychart
+      secret:
+        - POSTGRES_PASSWORD
+    volumes:
+      - skychart-production-postgres-data:/var/lib/postgresql/data
+
+env:
+  clear:
+    PHX_HOST: skychart.org
+    PORT: "4000"
+    PYTHON_BACKEND_URL: http://127.0.0.1:8765
+  secret:
+    - SECRET_KEY_BASE
+    - DATABASE_URL
+
+proxy:
+  hosts:
+    - skychart.org

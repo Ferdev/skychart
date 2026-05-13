@@ -1,64 +1,73 @@
 # Deployment
 
-SkyChart deploys from GitHub Actions by branch:
+SkyChart deploys with Kamal from GitHub Actions:
 
 - `trunk` deploys to `https://staging.skychart.org`
 - `production` deploys to `https://skychart.org`
 
-The deploy workflow uploads the repository to the server over SSH, builds the Phoenix-served frontend, runs Phoenix migrations/catalog import, updates the `current` symlink, and restarts the configured systemd services.
+The image is published to GHCR as `ghcr.io/ferdev/skychart`. Kamal runs one Phoenix/Python container per environment plus one Postgres accessory per environment.
+
+## Branches
+
+```bash
+# staging
+git push origin trunk
+
+# production
+git checkout production
+git merge trunk
+git push origin production
+```
 
 ## Required GitHub secrets
 
-Common secrets:
+- `SSH_PRIVATE_KEY`: private key accepted by `deploy@5.161.73.221`.
+- `SECRET_KEY_BASE`: Phoenix secret key base.
+- `POSTGRES_PASSWORD`: password for the Kamal Postgres accessories.
+- `KAMAL_REGISTRY_PASSWORD`: optional; defaults to the GitHub Actions token if absent.
 
-- `DEPLOY_SSH_KEY`: private SSH key accepted by the deploy user on the server.
-- `DEPLOY_SSH_HOST`: fallback SSH host, used when environment-specific host is absent.
-- `DEPLOY_SSH_USER`: fallback SSH user.
-- `DEPLOY_SSH_PORT`: optional fallback SSH port; defaults to `22`.
+The workflows derive each `DATABASE_URL` from `POSTGRES_PASSWORD`:
 
-Staging secrets:
+- staging: `ecto://skychart:<password>@skychart-staging-postgres/skychart`
+- production: `ecto://skychart:<password>@skychart-production-postgres/skychart`
 
-- `STAGING_DEPLOY_PATH`, for example `/srv/skychart/staging`
-- `STAGING_SSH_HOST` and `STAGING_SSH_USER` if different from the common values
-- `STAGING_SSH_PORT` if different from the common value
-- `STAGING_PHOENIX_SERVICE`, for example `skychart-staging-phoenix.service`
-- `STAGING_PYTHON_SERVICE`, for example `skychart-staging-python.service`
+## Kamal commands
 
-Production secrets:
-
-- `PRODUCTION_DEPLOY_PATH`, for example `/srv/skychart/production`
-- `PRODUCTION_SSH_HOST` and `PRODUCTION_SSH_USER` if different from the common values
-- `PRODUCTION_SSH_PORT` if different from the common value
-- `PRODUCTION_PHOENIX_SERVICE`, for example `skychart-production-phoenix.service`
-- `PRODUCTION_PYTHON_SERVICE`, for example `skychart-production-python.service`
-
-## Server-side environment
-
-Each deploy path may include a shared `.env` file loaded by `scripts/deploy-remote.sh` before build/migration:
+From a machine with the deploy SSH key and GHCR credentials:
 
 ```bash
-# /srv/skychart/staging/.env or /srv/skychart/production/.env
-DATABASE_URL=ecto://USER:PASS@127.0.0.1/DB_NAME
-SECRET_KEY_BASE=...
-PYTHON_BACKEND_URL=http://127.0.0.1:8765
-POOL_SIZE=10
+kamal accessory boot postgres -d staging
+kamal deploy -d staging
+kamal app logs -d staging
+
+kamal accessory boot postgres -d production
+kamal deploy -d production
+kamal app logs -d production
 ```
 
-The workflow sets `PHX_HOST` automatically:
+## Runtime shape
+
+The Docker image contains:
+
+- Phoenix release from `backend_phoenix/`
+- built frontend assets served by Phoenix
+- Python ephemeris backend from `backend/server.py`
+- catalog snapshots under `data/`
+
+Container startup does:
+
+1. start the Python backend on `127.0.0.1:8765`
+2. run Phoenix migrations
+3. import catalog snapshots into Postgres
+4. start Phoenix on `PORT=4000`
+
+Kamal health checks hit `/api/health`.
+
+## Domains
+
+Kamal proxy handles:
 
 - staging: `staging.skychart.org`
 - production: `skychart.org`
 
-## Server layout
-
-The workflow creates this structure under each deploy path:
-
-```text
-/srv/skychart/staging/
-  .env
-  current -> releases/<git-sha>
-  releases/<git-sha>/
-  shared/
-```
-
-Systemd units should run from the `current` symlink so each deploy can atomically switch releases.
+The Hetzner Caddy edge proxy must route those hosts to Kamal proxy, matching the existing SwarmKit/Taleomatic/Estimo setup.

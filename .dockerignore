@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+dist
+backend_phoenix/deps
+backend_phoenix/_build
+backend_phoenix/.elixir_ls
+.venv
+.pytest_cache
+playwright-report
+test-results
+npm-debug.log*
+.DS_Store
