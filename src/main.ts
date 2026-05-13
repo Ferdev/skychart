@@ -271,6 +271,8 @@ type CatalogPointTile = {
   source?: PointLayerSource;
   abortController?: AbortController;
   loadedAt?: number;
+  failedAt?: number;
+  retryCount?: number;
   lastUsedAt: number;
 };
 
@@ -408,11 +410,13 @@ const POINT_LAYER_MAX_WIDTH_LY = 150_000;
 const POINT_LAYER_VIEWPORT_PADDING = 0.35;
 const POINT_TILE_TARGET_VIEW_DIVISIONS = 2;
 const POINT_TILE_MAX_ACTIVE = 18;
-const POINT_TILE_MAX_ACTIVE_WIDE = 8;
+const POINT_TILE_MAX_ACTIVE_WIDE = 18;
 const POINT_TILE_MAX_POINTS = 24_000;
 const POINT_TILE_MAX_POINTS_WIDE = 8_000;
 const POINT_TILE_CACHE_LIMIT = 72;
-const POINT_TILE_FETCH_CONCURRENCY = 3;
+const POINT_TILE_FETCH_CONCURRENCY = 2;
+const POINT_TILE_RETRY_BASE_MS = 1_200;
+const POINT_TILE_RETRY_MAX_MS = 8_000;
 const POINT_BINARY_HEADER_BYTES = 8;
 const POINT_BINARY_RECORD_BYTES = 12;
 const POINT_VERTEX_STRIDE_FLOATS = 6;
@@ -1893,9 +1897,10 @@ function scheduleCatalogPointLoad() {
   }
 
   evictCatalogPointTiles();
+  const now = performance.now();
   const missingRequests = requests.filter((request) => {
     const tile = catalogPointTiles.get(request.key);
-    return tile && !tile.source && !tile.abortController;
+    return tile && !tile.source && !tile.abortController && canRetryCatalogPointTile(tile, now);
   });
 
   updateStats();
@@ -1923,6 +1928,7 @@ async function loadCatalogPointTiles(requests: CatalogPointTileRequest[], signat
   await Promise.all(workers);
   if (requestId === catalogPointRequestId && catalogPointInFlightSignature === signature) catalogPointInFlightSignature = "";
   perfLastPointMs = performance.now() - startedAt;
+  scheduleCatalogPointRetryIfNeeded(requestId);
   requestRender();
 }
 
@@ -1947,13 +1953,42 @@ async function loadCatalogPointTile(request: CatalogPointTileRequest, requestId:
     tile.payload = payload;
     tile.source = catalogPointLayerFromPayload(payload, request.signature);
     tile.loadedAt = performance.now();
+    tile.failedAt = undefined;
+    tile.retryCount = 0;
     tile.lastUsedAt = tile.loadedAt;
     perfPointTileLoads += 1;
   } catch (error) {
-    if (!abortController.signal.aborted) console.warn("Unable to load catalog point tile.", error);
+    if (!abortController.signal.aborted) {
+      tile.failedAt = performance.now();
+      tile.retryCount = (tile.retryCount ?? 0) + 1;
+      console.warn("Unable to load catalog point tile.", error);
+    }
   } finally {
     if (tile.abortController === abortController) tile.abortController = undefined;
   }
+}
+
+function canRetryCatalogPointTile(tile: CatalogPointTile, now: number) {
+  if (!tile.failedAt) return true;
+  const retryDelay = Math.min(POINT_TILE_RETRY_MAX_MS, POINT_TILE_RETRY_BASE_MS * 2 ** Math.max(0, (tile.retryCount ?? 1) - 1));
+  return now - tile.failedAt >= retryDelay;
+}
+
+function scheduleCatalogPointRetryIfNeeded(requestId: number) {
+  if (requestId !== catalogPointRequestId || catalogPointTimer !== null) return;
+  const now = performance.now();
+  let retryDelay = Number.POSITIVE_INFINITY;
+  for (const key of activeCatalogPointTileKeys) {
+    const tile = catalogPointTiles.get(key);
+    if (!tile || tile.source || tile.abortController || !tile.failedAt) continue;
+    const delay = Math.min(POINT_TILE_RETRY_MAX_MS, POINT_TILE_RETRY_BASE_MS * 2 ** Math.max(0, (tile.retryCount ?? 1) - 1));
+    retryDelay = Math.min(retryDelay, Math.max(0, tile.failedAt + delay - now));
+  }
+  if (!Number.isFinite(retryDelay)) return;
+  catalogPointTimer = window.setTimeout(() => {
+    catalogPointTimer = null;
+    scheduleCatalogPointLoad();
+  }, retryDelay);
 }
 
 function catalogPointPayloadFromBinary(buffer: ArrayBuffer, params: URLSearchParams, response: Response): CatalogPointPayload {

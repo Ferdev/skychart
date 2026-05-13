@@ -20,6 +20,9 @@ defmodule StarsmapApi.Catalog do
   @default_point_limit 250_000
   @max_point_limit 1_000_000
   @summary_timeout 120_000
+  @point_query_timeout 10_000
+  @point_layer_groups ~w(gaia_local_stars gaia_500pc_stars gaia_10kpc_bright_stars)
+  @point_layer_rgb {224, 196, 128}
   @point_binary_magic "SMP2"
   @upsert_replace_fields [
     :name,
@@ -364,15 +367,26 @@ defmodule StarsmapApi.Catalog do
       total = if include_total?, do: Repo.aggregate(base_query, :count, :id), else: nil
 
       points =
-        base_query
-        |> order_by([object], asc_nulls_last: object.apparent_magnitude)
-        |> limit(^limit)
-        |> select([object], [
-          object.x_au,
-          object.y_au,
-          object.color
-        ])
-        |> Repo.all()
+        if point_layer_query?(groups, types) do
+          base_query
+          |> limit(^limit)
+          |> select([object], [
+            object.x_au,
+            object.y_au,
+            object.catalog_group
+          ])
+          |> Repo.all(timeout: @point_query_timeout)
+        else
+          base_query
+          |> order_by([object], asc_nulls_last: object.apparent_magnitude)
+          |> limit(^limit)
+          |> select([object], [
+            object.x_au,
+            object.y_au,
+            object.color
+          ])
+          |> Repo.all(timeout: @point_query_timeout)
+        end
 
       binary = points |> encode_point_binary() |> IO.iodata_to_binary()
 
@@ -454,12 +468,17 @@ defmodule StarsmapApi.Catalog do
     |> maybe_filter_types(types)
   end
 
+  defp point_layer_query?(groups, types) do
+    groups != [] and Enum.all?(groups, &(&1 in @point_layer_groups)) and
+      (types == [] or types == ["star"])
+  end
+
   defp encode_point_binary(points) do
     count = length(points)
 
     records =
-      Enum.map(points, fn [x_au, y_au, color] ->
-        {red, green, blue} = rgb_for_color(color)
+      Enum.map(points, fn [x_au, y_au, color_or_group] ->
+        {red, green, blue} = rgb_for_point_value(color_or_group)
 
         <<
           float32(x_au)::binary,
@@ -476,6 +495,16 @@ defmodule StarsmapApi.Catalog do
 
   defp float32(value) when is_number(value), do: <<value::little-float-size(32)>>
   defp float32(_value), do: <<0.0::little-float-size(32)>>
+
+  defp rgb_for_point_value(value) when is_binary(value) do
+    if value in @point_layer_groups do
+      @point_layer_rgb
+    else
+      rgb_for_color(value)
+    end
+  end
+
+  defp rgb_for_point_value(value), do: rgb_for_color(value)
 
   defp rgb_for_color("#" <> hex) when byte_size(hex) == 6 do
     with {red, ""} <- Integer.parse(binary_part(hex, 0, 2), 16),
