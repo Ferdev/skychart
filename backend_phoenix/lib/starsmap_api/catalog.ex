@@ -19,6 +19,7 @@ defmodule StarsmapApi.Catalog do
   @max_density_cells 20_000
   @default_point_limit 250_000
   @max_point_limit 1_000_000
+  @summary_timeout 120_000
   @point_binary_magic "SMP2"
   @upsert_replace_fields [
     :name,
@@ -77,21 +78,21 @@ defmodule StarsmapApi.Catalog do
       CatalogObject
       |> group_by([object], object.catalog_group)
       |> select([object], {object.catalog_group, count(object.id)})
-      |> Repo.all()
+      |> Repo.all(timeout: @summary_timeout)
       |> Map.new()
 
     type_counts =
       CatalogObject
       |> group_by([object], object.object_type)
       |> select([object], {object.object_type, count(object.id)})
-      |> Repo.all()
+      |> Repo.all(timeout: @summary_timeout)
       |> Map.new()
 
     source_counts =
       CatalogObject
       |> group_by([object], object.source_type)
       |> select([object], {object.source_type, count(object.id)})
-      |> Repo.all()
+      |> Repo.all(timeout: @summary_timeout)
       |> Map.new()
 
     %{
