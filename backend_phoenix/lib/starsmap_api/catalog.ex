@@ -11,6 +11,7 @@ defmodule StarsmapApi.Catalog do
   import Ecto.Query
 
   alias StarsmapApi.Catalog.CatalogObject
+  alias StarsmapApi.Catalog.PointTileCache
   alias StarsmapApi.Repo
 
   @default_limit 80
@@ -21,6 +22,9 @@ defmodule StarsmapApi.Catalog do
   @max_point_limit 1_000_000
   @summary_timeout 120_000
   @point_query_timeout 10_000
+  @point_cache_version 1
+  @point_cache_max_limit 50_000
+  @point_cache_max_binary_bytes 2_000_000
   @point_layer_groups ~w(gaia_local_stars gaia_500pc_stars gaia_10kpc_bright_stars)
   @point_layer_rgb {224, 196, 128}
   @point_binary_magic "SMP2"
@@ -63,17 +67,22 @@ defmodule StarsmapApi.Catalog do
         |> Map.put(:updated_at, now)
       end)
 
-    rows
-    |> Enum.chunk_every(1_000)
-    |> Enum.reduce({0, nil}, fn chunk, {count, _returning} ->
-      {inserted_count, returning} =
-        Repo.insert_all(CatalogObject, chunk,
-          on_conflict: {:replace, @upsert_replace_fields},
-          conflict_target: :key
-        )
+    result =
+      rows
+      |> Enum.chunk_every(1_000)
+      |> Enum.reduce({0, nil}, fn chunk, {count, _returning} ->
+        {inserted_count, returning} =
+          Repo.insert_all(CatalogObject, chunk,
+            on_conflict: {:replace, @upsert_replace_fields},
+            conflict_target: :key
+          )
 
-      {count + inserted_count, returning}
-    end)
+        {count + inserted_count, returning}
+      end)
+
+    PointTileCache.clear()
+
+    result
   end
 
   def summary do
@@ -360,47 +369,85 @@ defmodule StarsmapApi.Catalog do
       groups = csv_param(params["groups"])
       types = csv_param(params["types"])
       include_total? = truthy_param?(params["include_total"])
+      cache_key = point_binary_cache_key(bounds, groups, types, limit, include_total?)
 
-      base_query =
-        point_base_query(bounds, groups, types)
+      if cacheable_point_binary_request?(limit) do
+        case PointTileCache.fetch(cache_key) do
+          {:ok, payload} ->
+            {:ok, Map.put(payload, :cache_status, :hit)}
 
-      total = if include_total?, do: Repo.aggregate(base_query, :count, :id), else: nil
+          :miss ->
+            payload = build_points_binary_payload(bounds, groups, types, limit, include_total?)
 
-      points =
-        if point_layer_query?(groups, types) do
-          base_query
-          |> limit(^limit)
-          |> select([object], [
-            object.x_au,
-            object.y_au,
-            object.catalog_group
-          ])
-          |> Repo.all(timeout: @point_query_timeout)
-        else
-          base_query
-          |> order_by([object], asc_nulls_last: object.apparent_magnitude)
-          |> limit(^limit)
-          |> select([object], [
-            object.x_au,
-            object.y_au,
-            object.color
-          ])
-          |> Repo.all(timeout: @point_query_timeout)
+            if byte_size(payload.binary) <= @point_cache_max_binary_bytes do
+              PointTileCache.put(cache_key, payload)
+            end
+
+            {:ok, Map.put(payload, :cache_status, :miss)}
         end
-
-      binary = points |> encode_point_binary() |> IO.iodata_to_binary()
-
-      {:ok,
-       %{
-         bounds: bounds,
-         groups: groups,
-         types: types,
-         limit: limit,
-         total: total || length(points),
-         returned: length(points),
-         binary: binary
-       }}
+      else
+        payload = build_points_binary_payload(bounds, groups, types, limit, include_total?)
+        {:ok, Map.put(payload, :cache_status, :bypass)}
+      end
     end
+  end
+
+  defp cacheable_point_binary_request?(limit), do: limit <= @point_cache_max_limit
+
+  defp build_points_binary_payload(bounds, groups, types, limit, include_total?) do
+    base_query =
+      point_base_query(bounds, groups, types)
+
+    total = if include_total?, do: Repo.aggregate(base_query, :count, :id), else: nil
+
+    points =
+      if point_layer_query?(groups, types) do
+        base_query
+        |> limit(^limit)
+        |> select([object], [
+          object.x_au,
+          object.y_au,
+          object.catalog_group
+        ])
+        |> Repo.all(timeout: @point_query_timeout)
+      else
+        base_query
+        |> order_by([object], asc_nulls_last: object.apparent_magnitude)
+        |> limit(^limit)
+        |> select([object], [
+          object.x_au,
+          object.y_au,
+          object.color
+        ])
+        |> Repo.all(timeout: @point_query_timeout)
+      end
+
+    binary = points |> encode_point_binary() |> IO.iodata_to_binary()
+
+    %{
+      bounds: bounds,
+      groups: groups,
+      types: types,
+      limit: limit,
+      total: total || length(points),
+      returned: length(points),
+      binary: binary
+    }
+  end
+
+  defp point_binary_cache_key(bounds, groups, types, limit, include_total?) do
+    {
+      :points_binary,
+      @point_cache_version,
+      bounds.min_x_au,
+      bounds.max_x_au,
+      bounds.min_y_au,
+      bounds.max_y_au,
+      Enum.sort(groups),
+      Enum.sort(types),
+      limit,
+      include_total?
+    }
   end
 
   def nearest(params) do

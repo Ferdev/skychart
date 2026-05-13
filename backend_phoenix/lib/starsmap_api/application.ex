@@ -14,6 +14,7 @@ defmodule StarsmapApi.Application do
     children = [
       StarsmapApiWeb.Telemetry,
       StarsmapApi.Repo,
+      StarsmapApi.Catalog.PointTileCache,
       {DNSCluster, query: Application.get_env(:starsmap_api, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: StarsmapApi.PubSub},
       # Start a worker by calling: StarsmapApi.Worker.start_link(arg)

@@ -66,4 +66,19 @@ test.describe("Cosmic Atlas performance guardrails", () => {
 
     issues.assertClean();
   });
+
+  test("galaxy-scale point layer loads with a bounded tile fanout", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+
+    await page.locator('[data-zoom-preset="galaxy"]').click();
+    await waitForCatalogRequestsToSettle(page, 1_200, 20_000);
+
+    const afterGalaxyZoom = await readAtlasPerf(page);
+    const pointTileRequests = catalogEndpointEntries(afterGalaxyZoom).filter((entry) => entry.url.includes("/api/catalog/points.bin"));
+
+    expect(pointTileRequests.length, "wide galaxy preset point tile requests").toBeLessThanOrEqual(4);
+    expect(pointTileRequests.filter((entry) => entry.failed || (entry.status !== null && entry.status >= 500))).toEqual([]);
+
+    issues.assertClean();
+  });
 });

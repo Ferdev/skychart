@@ -52,6 +52,8 @@ defmodule StarsmapApiWeb.CatalogController do
       {:ok, payload} ->
         conn
         |> put_resp_content_type("application/octet-stream")
+        |> put_resp_header("cache-control", "public, max-age=600, stale-while-revalidate=3600")
+        |> put_resp_header("x-starsmap-cache", Atom.to_string(payload.cache_status))
         |> put_resp_header("x-starsmap-total", Integer.to_string(payload.total))
         |> put_resp_header("x-starsmap-returned", Integer.to_string(payload.returned))
         |> send_resp(200, payload.binary)

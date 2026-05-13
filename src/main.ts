@@ -409,10 +409,11 @@ const POINT_LAYER_MIN_WIDTH_LY = 12;
 const POINT_LAYER_MAX_WIDTH_LY = 250_000;
 const POINT_LAYER_VIEWPORT_PADDING = 0.35;
 const POINT_TILE_TARGET_VIEW_DIVISIONS = 2;
+const POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE = 1;
 const POINT_TILE_MAX_ACTIVE = 18;
-const POINT_TILE_MAX_ACTIVE_WIDE = 18;
+const POINT_TILE_MAX_ACTIVE_WIDE = 8;
 const POINT_TILE_MAX_POINTS = 24_000;
-const POINT_TILE_MAX_POINTS_WIDE = 8_000;
+const POINT_TILE_MAX_POINTS_WIDE = 12_000;
 const POINT_TILE_CACHE_LIMIT = 72;
 const POINT_TILE_FETCH_CONCURRENCY = 2;
 const POINT_TILE_RETRY_BASE_MS = 1_200;
@@ -2065,7 +2066,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
   if (!filterParams) return [];
 
   const bounds = viewportWorldBounds(POINT_LAYER_VIEWPORT_PADDING);
-  const tileSpanAu = catalogPointTileSpanAu(bounds);
+  const tileSpanAu = catalogPointTileSpanAu(bounds, viewWidthLy);
   const minTileX = Math.floor(bounds.minXAu / tileSpanAu);
   const maxTileX = Math.floor(bounds.maxXAu / tileSpanAu);
   const minTileY = Math.floor(bounds.minYAu / tileSpanAu);
@@ -2144,9 +2145,10 @@ function activeCatalogPointCount() {
   return activeCatalogPointTiles().reduce((sum, tile) => sum + (tile.payload?.returned ?? 0), 0);
 }
 
-function catalogPointTileSpanAu(bounds: { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number }) {
+function catalogPointTileSpanAu(bounds: { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number }, viewWidthLy: number) {
   const spanAu = Math.max(bounds.maxXAu - bounds.minXAu, bounds.maxYAu - bounds.minYAu, 1);
-  const rawSpan = spanAu / POINT_TILE_TARGET_VIEW_DIVISIONS;
+  const divisions = viewWidthLy > 70_000 ? POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE : POINT_TILE_TARGET_VIEW_DIVISIONS;
+  const rawSpan = spanAu / divisions;
   return Math.pow(2, Math.max(0, Math.round(Math.log2(rawSpan))));
 }
 
