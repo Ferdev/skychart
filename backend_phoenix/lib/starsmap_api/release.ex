@@ -7,7 +7,8 @@ defmodule StarsmapApi.Release do
     load_app()
 
     for repo <- repos() do
-      {:ok, _fun_return, _apps} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :up, all: true))
+      {:ok, _fun_return, _apps} =
+        Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :up, all: true))
     end
   end
 
@@ -29,6 +30,15 @@ defmodule StarsmapApi.Release do
     result.groups
     |> Enum.sort()
     |> Enum.each(fn {group, count} -> IO.puts("  #{group}: #{count}") end)
+  end
+
+  def refresh_catalog_summary_counts do
+    load_app()
+
+    {:ok, _started} = Application.ensure_all_started(@app)
+    :ok = StarsmapApi.Catalog.refresh_summary_counts!()
+
+    IO.puts("Refreshed catalog summary counts")
   end
 
   defp repos do

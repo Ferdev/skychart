@@ -53,6 +53,16 @@ python3 "$repo_root/scripts/import_gaia_bulk_catalog.py" \
   --preset 10kpc-g12 \
   --skip-if-existing-at-least "$gaia_10kpc_min_count"
 
+echo "[catalog-import] Refreshing catalog summary counts..."
+if [ -x "$release_bin" ]; then
+  "$release_bin" eval "StarsmapApi.Release.refresh_catalog_summary_counts()"
+else
+  (
+    cd "$repo_root/backend_phoenix"
+    mix run -e 'StarsmapApi.Catalog.refresh_summary_counts!()'
+  )
+fi
+
 echo "[catalog-import] Final catalog summary:"
 if [ "${CATALOG_IMPORT_SUMMARY:-1}" = "0" ]; then
   echo "[catalog-import] Skipping final catalog summary."

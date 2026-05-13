@@ -74,6 +74,75 @@ defmodule StarsmapApi.Catalog do
   end
 
   def summary do
+    case cached_summary() do
+      {:ok, summary} -> summary
+      :error -> live_summary()
+    end
+  end
+
+  def refresh_summary_counts! do
+    sql = """
+    INSERT INTO catalog_summary_counts (bucket, name, count, inserted_at, updated_at)
+    SELECT bucket, name, total, now(), now()
+    FROM (
+      SELECT 'total'::text AS bucket, 'object_count'::text AS name, COUNT(*)::bigint AS total
+      FROM catalog_objects
+      UNION ALL
+      SELECT 'catalog_group'::text AS bucket, catalog_group AS name, COUNT(*)::bigint AS total
+      FROM catalog_objects
+      GROUP BY catalog_group
+      UNION ALL
+      SELECT 'object_type'::text AS bucket, object_type AS name, COUNT(*)::bigint AS total
+      FROM catalog_objects
+      GROUP BY object_type
+      UNION ALL
+      SELECT 'source_type'::text AS bucket, source_type AS name, COUNT(*)::bigint AS total
+      FROM catalog_objects
+      GROUP BY source_type
+    ) counts
+    ON CONFLICT (bucket, name)
+    DO UPDATE SET count = EXCLUDED.count, updated_at = EXCLUDED.updated_at
+    """
+
+    Repo.transaction(
+      fn ->
+        Repo.query!("TRUNCATE catalog_summary_counts", [], timeout: @summary_timeout)
+        Repo.query!(sql, [], timeout: @summary_timeout)
+      end,
+      timeout: @summary_timeout
+    )
+
+    :ok
+  end
+
+  defp cached_summary do
+    rows =
+      Repo.query!("SELECT bucket, name, count FROM catalog_summary_counts", [], timeout: 5_000).rows
+
+    counts =
+      Enum.reduce(rows, %{}, fn [bucket, name, count], acc ->
+        Map.update(acc, bucket, %{name => count}, &Map.put(&1, name, count))
+      end)
+
+    group_counts = Map.get(counts, "catalog_group", %{})
+    object_count = get_in(counts, ["total", "object_count"])
+
+    if object_count && map_size(group_counts) > 0 do
+      {:ok,
+       %{
+         object_count: object_count,
+         group_counts: group_counts,
+         type_counts: Map.get(counts, "object_type", %{}),
+         source_counts: Map.get(counts, "source_type", %{})
+       }}
+    else
+      :error
+    end
+  rescue
+    Postgrex.Error -> :error
+  end
+
+  defp live_summary do
     group_counts =
       CatalogObject
       |> group_by([object], object.catalog_group)
