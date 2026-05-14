@@ -131,6 +131,8 @@ kamal app exec -d production --primary --env MIX_ENV:prod --env CATALOG_IMPORT_S
 The Gaia importer accepts either standard `PG*` environment variables or `DATABASE_URL` for its `psql` connection.
 Production uses an `ecto://` `DATABASE_URL`; the importer converts that to a PostgreSQL URL for `psql`.
 
+Static point tiles are built separately from normal deploys. Production should use the manual `Build Production Catalog Tiles` GitHub workflow after the image is deployed; that workflow builds the `/catalog-tiles/v1` pyramid inside the production app container with low CPU priority and uploads it to the configured S3-compatible bucket/CDN. Normal deploys only inject `CATALOG_TILE_MANIFEST_URL` into the HTML so the browser can load the CDN manifest and immutable `.bin` tile files.
+
 ## Data Source
 
 The backend uses [Skyfield](https://rhodesmill.org/skyfield/) with the NASA/JPL `de440s.bsp` planetary ephemeris kernel. It also loads the NAIF `mar099s.bsp` satellite SPK for Mars' moons. Jupiter and Saturn major moons are fetched from the NASA/JPL Horizons API as parent-relative vectors and then placed into the same heliocentric ecliptic coordinate space as the Skyfield bodies.
@@ -158,7 +160,8 @@ The API exposes the scientific catalog layer:
 - `/api/catalog` returns loaded object metadata without positions.
 - `/api/catalog/search` searches the Phoenix/Postgres catalog index by name, aliases, object type, source group, and source facts.
 - `/api/catalog/density` returns binned viewport counts for diagnostics and future server-side summary views.
-- `/api/catalog/points` returns real catalog point primitives for bulk star rendering.
+- `/catalog-tiles/v1/manifest.json` and `/catalog-tiles/v1/.../*.bin` serve immutable static point tiles for bulk star rendering; production can load the same manifest and tile files from object storage/CDN.
+- `/api/catalog/points` and `/api/catalog/points.bin` remain temporary development fallbacks for point rendering when static tiles are missing.
 - `/api/catalog/nearest` returns the nearest catalog object to a clicked map coordinate so point-layer stars can hydrate into selectable objects.
 - `/api/catalog/viewport` returns only catalog objects inside the current map bounds, so zooming hydrates visible stars, small bodies, or deep-sky objects without inflating startup.
 - `/api/objects/:key` returns a Phoenix catalog object with facts, astrometry, position, source metadata, and external lookup links.

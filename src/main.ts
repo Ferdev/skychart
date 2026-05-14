@@ -259,6 +259,7 @@ type CatalogPointTileRequest = {
   layerId: string;
   signature: string;
   params: URLSearchParams;
+  staticUrl?: string;
   bounds: CatalogPointPayload["bounds"];
   groups: string[];
   types: DestinationBodyType[];
@@ -275,6 +276,25 @@ type CatalogPointTile = {
   retryCount?: number;
   lastUsedAt: number;
 };
+
+type CatalogPointTileManifestLevel = {
+  span_log2: number;
+  span_au: number;
+  sample_buckets?: number;
+  max_points_per_tile?: number;
+  tile_count?: number;
+  point_count?: number;
+};
+
+type CatalogPointTileManifest = {
+  version: string;
+  format: "SMP2";
+  tile_url_template: string;
+  groups: string[];
+  levels: CatalogPointTileManifestLevel[];
+};
+
+type CatalogPointTileManifestState = "loading" | "ready" | "missing";
 
 type CatalogNearestPayload = {
   object?: CatalogObjectPayload | null;
@@ -427,6 +447,11 @@ const POINT_TILE_RETRY_MAX_MS = 8_000;
 const POINT_BINARY_HEADER_BYTES = 8;
 const POINT_BINARY_RECORD_BYTES = 12;
 const POINT_VERTEX_STRIDE_FLOATS = 6;
+const CATALOG_TILE_MANIFEST_URL = catalogTileManifestUrl();
+const ALLOW_DYNAMIC_POINT_FALLBACK =
+  window.location.hostname === "127.0.0.1" ||
+  window.location.hostname === "localhost" ||
+  new URLSearchParams(window.location.search).has("dynamicPointFallback");
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
 const POINT_SAMPLE_BUCKET_COUNT = 1_024;
@@ -607,6 +632,9 @@ let catalogPointInFlightSignature = "";
 let catalogPointTiles = new Map<string, CatalogPointTile>();
 let activeCatalogPointTileKeys = new Set<string>();
 let renderedCatalogPointLayerIds = new Set<string>();
+let catalogPointTileManifest: CatalogPointTileManifest | null = null;
+let catalogPointTileManifestState: CatalogPointTileManifestState = "loading";
+let catalogPointTileManifestPromise: Promise<void> | null = null;
 let visibleBodiesFrameCache: Body[] | null = null;
 let bodyHitGrid = new Map<string, BodyHitEntry[]>();
 let bodyHitGridValid = false;
@@ -627,6 +655,7 @@ let perfPointTileLoads = 0;
 resizeCanvas();
 bindEvents();
 initializeUi();
+void loadCatalogTileManifest();
 loadAtlas();
 requestRender({ data: true });
 
@@ -1632,6 +1661,7 @@ function updatePerfHud() {
   const loadingTiles = [...catalogPointTiles.values()].filter((tile) => activeCatalogPointTileKeys.has(tile.request.key) && tile.abortController).length;
   const visibleCount = visibleBodies().length;
   const fps = perfFrameMs > 0 ? 1000 / perfFrameMs : 0;
+  const pointTileSource = catalogPointTileManifestState === "ready" ? "static" : catalogPointTileManifestState;
 
   perfHud.innerHTML = `
     <strong>Perf</strong>
@@ -1639,6 +1669,7 @@ function updatePerfHud() {
       <dt>Frame</dt><dd>${formatCompactMs(perfDrawMs)} / ${formatCompactNumber(fps)} fps</dd>
       <dt>WebGL</dt><dd>${formatCompactMs(perfWebglMs)} render · ${formatCompactMs(perfBufferMs)} buffer</dd>
       <dt>Points</dt><dd>${formatInteger(activePoints)} in ${loadedTileCount}/${activeTileCount} tiles</dd>
+      <dt>Tiles</dt><dd>${pointTileSource}</dd>
       <dt>Catalog</dt><dd>${loadingTiles} loading · ${formatCompactMs(perfLastPointMs)} points · ${formatCompactMs(perfLastViewportMs)} objects</dd>
       <dt>Selectable</dt><dd>${formatInteger(visibleCount)} visible · ${formatCompactMs(perfHitTestMs)} hit</dd>
       <dt>Requests</dt><dd>${perfPointTileLoads} point tiles · ${perfViewportLoads} object loads</dd>
@@ -1884,6 +1915,78 @@ async function loadViewportCatalog(request: { signature: string; params: URLSear
   }
 }
 
+async function loadCatalogTileManifest() {
+  if (catalogPointTileManifestPromise) return catalogPointTileManifestPromise;
+
+  catalogPointTileManifestPromise = (async () => {
+    try {
+      const response = await fetch(CATALOG_TILE_MANIFEST_URL, { cache: "force-cache" });
+      if (response.status === 404) {
+        catalogPointTileManifestState = "missing";
+        return;
+      }
+      if (!response.ok) throw new Error(`Static catalog tile manifest failed with ${response.status}`);
+
+      const manifest = parseCatalogTileManifest(await response.json());
+      if (!manifest) throw new Error("Static catalog tile manifest had an invalid shape.");
+      catalogPointTileManifest = manifest;
+      catalogPointTileManifestState = "ready";
+    } catch (error) {
+      catalogPointTileManifest = null;
+      catalogPointTileManifestState = "missing";
+      console.warn("Static catalog point tiles unavailable.", error);
+    } finally {
+      updatePerfHud();
+      if (ephemeris) requestDataRefresh({ immediate: true });
+    }
+  })();
+
+  return catalogPointTileManifestPromise;
+}
+
+function catalogTileManifestUrl() {
+  const configuredUrl = document
+    .querySelector<HTMLMetaElement>('meta[name="catalog-tile-manifest-url"]')
+    ?.content.trim();
+  return configuredUrl || "/catalog-tiles/v1/manifest.json";
+}
+
+function parseCatalogTileManifest(value: unknown): CatalogPointTileManifest | null {
+  if (!value || typeof value !== "object") return null;
+  const manifest = value as Partial<CatalogPointTileManifest>;
+  if (manifest.format !== "SMP2") return null;
+  if (typeof manifest.tile_url_template !== "string" || !manifest.tile_url_template) return null;
+  if (!Array.isArray(manifest.groups) || !Array.isArray(manifest.levels)) return null;
+
+  const levels = manifest.levels
+    .map((level) => ({
+      span_log2: Number(level.span_log2),
+      span_au: Number(level.span_au),
+      sample_buckets: optionalNumber(level.sample_buckets),
+      max_points_per_tile: optionalNumber(level.max_points_per_tile),
+      tile_count: optionalNumber(level.tile_count),
+      point_count: optionalNumber(level.point_count)
+    }))
+    .filter((level) => Number.isFinite(level.span_log2) && Number.isFinite(level.span_au) && level.span_au > 0)
+    .sort((a, b) => a.span_au - b.span_au);
+
+  if (levels.length === 0) return null;
+
+  return {
+    version: String(manifest.version ?? "v1"),
+    format: "SMP2",
+    tile_url_template: manifest.tile_url_template,
+    groups: manifest.groups.filter((group): group is string => typeof group === "string" && group.length > 0),
+    levels
+  };
+}
+
+function optionalNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return undefined;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : undefined;
+}
+
 function scheduleCatalogPointLoad(options: DataRefreshOptions = {}) {
   if (!ephemeris) return;
   const requests = catalogPointRequests();
@@ -1966,7 +2069,17 @@ async function loadCatalogPointTile(request: CatalogPointTileRequest, requestId:
   tile.abortController = abortController;
 
   try {
-    const response = await fetch(`/api/catalog/points.bin?${request.params.toString()}`, { signal: abortController.signal });
+    const response = await fetch(request.staticUrl ?? `/api/catalog/points.bin?${request.params.toString()}`, { signal: abortController.signal });
+    if (request.staticUrl && response.status === 404) {
+      if (requestId !== catalogPointRequestId || abortController.signal.aborted) return;
+      tile.payload = emptyCatalogPointPayload(request);
+      tile.source = catalogPointLayerFromPayload(tile.payload, request.signature);
+      tile.loadedAt = performance.now();
+      tile.failedAt = undefined;
+      tile.retryCount = 0;
+      tile.lastUsedAt = tile.loadedAt;
+      return;
+    }
     if (!response.ok) throw new Error(`Catalog points failed with ${response.status}`);
     const buffer = await response.arrayBuffer();
     const payload = catalogPointPayloadFromBinary(buffer, request.params, response);
@@ -1988,6 +2101,18 @@ async function loadCatalogPointTile(request: CatalogPointTileRequest, requestId:
   } finally {
     if (tile.abortController === abortController) tile.abortController = undefined;
   }
+}
+
+function emptyCatalogPointPayload(request: CatalogPointTileRequest): CatalogPointPayload {
+  return {
+    bounds: request.bounds,
+    groups: request.groups,
+    types: request.types,
+    limit: request.limit,
+    total: 0,
+    returned: 0,
+    vertices: new Float32Array()
+  };
 }
 
 function canRetryCatalogPointTile(tile: CatalogPointTile, now: number) {
@@ -2083,18 +2208,21 @@ function clearCatalogPointTiles(update = true) {
 function catalogPointRequests(): CatalogPointTileRequest[] {
   const viewWidthLy = currentViewWidthLy();
   if (!shouldUseCatalogPoints(viewWidthLy)) return [];
+  if (catalogPointTileManifestState === "loading") return [];
+  if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return [];
   const filterParams = catalogPointFilterParams();
   if (!filterParams) return [];
 
   const bounds = viewportWorldBounds(POINT_LAYER_VIEWPORT_PADDING);
   const tileSpanAu = catalogPointTileSpanAu(bounds, viewWidthLy);
+  const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu);
   const minTileX = Math.floor(bounds.minXAu / tileSpanAu);
   const maxTileX = Math.floor(bounds.maxXAu / tileSpanAu);
   const minTileY = Math.floor(bounds.minYAu / tileSpanAu);
   const maxTileY = Math.floor(bounds.maxYAu / tileSpanAu);
   const requests: CatalogPointTileRequest[] = [];
-  const limit = catalogPointTileLimit(viewWidthLy);
-  const sampleBuckets = catalogPointSampleBuckets(viewWidthLy);
+  const limit = staticLevel?.max_points_per_tile ?? catalogPointTileLimit(viewWidthLy);
+  const sampleBuckets = staticLevel?.sample_buckets ?? catalogPointSampleBuckets(viewWidthLy);
   const maxActiveTiles = catalogPointMaxActiveTiles(viewWidthLy);
   const groupSignature = filterParams.groups.join("+");
   const typeSignature = filterParams.types.join("+");
@@ -2107,7 +2235,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
         min_y_au: tileY * tileSpanAu,
         max_y_au: (tileY + 1) * tileSpanAu
       };
-      const tileKey = `z${Math.round(Math.log2(tileSpanAu) * 100) / 100}:x${tileX}:y${tileY}:g${groupSignature}:t${typeSignature}:l${limit}:s${sampleBuckets}`;
+      const tileKey = `z${Math.round(Math.log2(tileSpanAu) * 100) / 100}:x${tileX}:y${tileY}:g${groupSignature}:t${typeSignature}:l${limit}:s${sampleBuckets}:m${staticLevel ? "static" : "api"}`;
       const params = new URLSearchParams();
       params.set("min_x_au", String(tileBounds.min_x_au));
       params.set("max_x_au", String(tileBounds.max_x_au));
@@ -2122,6 +2250,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
         layerId: `catalog:${tileKey}`,
         signature: `points:${tileKey}`,
         params,
+        staticUrl: staticLevel ? catalogStaticTileUrl(staticLevel, tileX, tileY) : undefined,
         bounds: tileBounds,
         groups: filterParams.groups,
         types: filterParams.types,
@@ -2149,7 +2278,7 @@ function shouldUseCatalogPoints(viewWidthLy: number) {
 }
 
 function hasActiveCatalogPointLayer() {
-  return activeCatalogPointTiles().some((tile) => Boolean(tile.source));
+  return activeCatalogPointTiles().some((tile) => (tile.payload?.returned ?? 0) > 0);
 }
 
 function activeCatalogPointTiles() {
@@ -2172,7 +2301,30 @@ function catalogPointTileSpanAu(bounds: { minXAu: number; maxXAu: number; minYAu
   const spanAu = Math.max(bounds.maxXAu - bounds.minXAu, bounds.maxYAu - bounds.minYAu, 1);
   const divisions = viewWidthLy > 70_000 ? POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE : POINT_TILE_TARGET_VIEW_DIVISIONS;
   const rawSpan = spanAu / divisions;
-  return Math.pow(2, Math.max(0, Math.round(Math.log2(rawSpan))));
+  const dynamicSpan = Math.pow(2, Math.max(0, Math.round(Math.log2(rawSpan))));
+  const staticLevel = catalogStaticTileLevelNearest(dynamicSpan);
+  return staticLevel?.span_au ?? dynamicSpan;
+}
+
+function catalogStaticTileLevelNearest(spanAu: number): CatalogPointTileManifestLevel | null {
+  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return null;
+  return catalogPointTileManifest.levels.reduce<CatalogPointTileManifestLevel | null>((best, level) => {
+    if (!best) return level;
+    return Math.abs(Math.log2(level.span_au / spanAu)) < Math.abs(Math.log2(best.span_au / spanAu)) ? level : best;
+  }, null);
+}
+
+function catalogStaticTileLevelForSpan(spanAu: number): CatalogPointTileManifestLevel | null {
+  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return null;
+  return catalogPointTileManifest.levels.find((level) => level.span_au === spanAu) ?? null;
+}
+
+function catalogStaticTileUrl(level: CatalogPointTileManifestLevel, tileX: number, tileY: number) {
+  const template = catalogPointTileManifest?.tile_url_template ?? "/catalog-tiles/v1/s{span_log2}/x{x}/y{y}.bin";
+  return template
+    .replace(/\{span_log2\}/g, String(level.span_log2))
+    .replace(/\{x\}/g, String(tileX))
+    .replace(/\{y\}/g, String(tileY));
 }
 
 function catalogPointTileLimit(viewWidthLy: number) {

@@ -30,6 +30,15 @@ Cosmic Atlas should become useful as a scientific object browser, not just an im
 - [ ] Add dedicated Explore views for Solar System, Nearby stars, Messier, Galaxies, Exoplanet systems, and Small bodies.
 - [ ] Keep filtered map visibility and filtered result lists fully aligned.
 
+## P0 - Catalog Tile Architecture
+
+- [ ] Make normal pan/zoom issue zero Postgres-backed point-tile queries; point visualization should load immutable static tile files like a map layer.
+- [ ] Build a versioned catalog point-tile pyramid after imports, with a manifest at `/catalog-tiles/v1/manifest.json` and binary `SMP2` tile files served by Phoenix static assets.
+- [x] Add a manual GitHub/Kamal workflow that builds point tiles under a production lock and uploads them to S3-compatible CDN storage without doing tile work during normal deploys.
+- [ ] Keep `/api/catalog/search`, `/api/objects/:key`, `/api/catalog/nearest`, compare, and viewport object hydration as product APIs backed by Postgres.
+- [ ] Treat `/api/catalog/points.bin` as a temporary development fallback only, then remove it from the production rendering path once static tiles are proven.
+- [ ] Add a load test that proves common pan/zoom sessions do not touch `/api/catalog/points.bin` and can be served from static tile files/CDN.
+
 ## P1 - Catalog Scale And Data Architecture
 
 - [ ] Replace the shared `catalog_objects` table with source-specific tables before scaling Gaia beyond single-digit millions.
@@ -58,9 +67,9 @@ Cosmic Atlas should become useful as a scientific object browser, not just an im
 - [x] Cache WebGL body point buffers when visible body identities do not change.
 - [x] Build hit-test grids lazily instead of rebuilding them on every render frame.
 - [x] Limit concurrent point-tile fetches to avoid UI stalls during zoom and pan.
-- [ ] Move heavy point-tile decoding into a Web Worker if binary decode time remains visible.
+- [ ] Move heavy static tile decoding into a Web Worker if binary decode time remains visible.
 - [ ] Add level-of-detail rules that keep point density readable at Milky Way scale.
-- [ ] Add tile cancellation and prioritization based on the newest camera position.
+- [ ] Add static tile cancellation and prioritization based on the newest camera position.
 - [ ] Profile and simplify the Milky Way overlay so it does not dominate frame time at wide zooms.
 - [ ] Keep a diagnostics mode that reports frame cost, active tile count, and request pressure without affecting normal users.
 

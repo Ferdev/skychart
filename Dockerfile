@@ -75,12 +75,15 @@ COPY --chown=app:app requirements.txt requirements.txt
 COPY --chown=app:app scripts/docker-entrypoint.sh scripts/docker-entrypoint.sh
 COPY --chown=app:app scripts/import_catalogs_if_needed.sh scripts/import_catalogs_if_needed.sh
 COPY --chown=app:app scripts/import_gaia_bulk_catalog.py scripts/import_gaia_bulk_catalog.py
+COPY --chown=app:app scripts/build_static_point_tiles.py scripts/build_static_point_tiles.py
+COPY --chown=app:app scripts/build_static_tiles_if_needed.sh scripts/build_static_tiles_if_needed.sh
+COPY --chown=app:app scripts/build_and_upload_static_tiles.sh scripts/build_and_upload_static_tiles.sh
 
 RUN python3 -m venv /app/.venv && \
   /app/.venv/bin/pip install --no-cache-dir --upgrade pip && \
   /app/.venv/bin/pip install --no-cache-dir -r requirements.txt && \
   chown -R app:app /app && \
-  chmod +x /app/scripts/docker-entrypoint.sh /app/scripts/import_catalogs_if_needed.sh && \
+  chmod +x /app/scripts/docker-entrypoint.sh /app/scripts/import_catalogs_if_needed.sh /app/scripts/build_static_point_tiles.py /app/scripts/build_static_tiles_if_needed.sh /app/scripts/build_and_upload_static_tiles.sh && \
   ln -s /app/erts-*/bin/epmd /usr/local/bin/epmd
 
 USER app

@@ -1,1 +1,2 @@
 skyfield>=1.49,<2
+awscli>=1.33,<2

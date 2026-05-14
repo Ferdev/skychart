@@ -4,6 +4,7 @@ dist/
 test-results/
 playwright-report/
 backend_phoenix/priv/static/assets/
+backend_phoenix/priv/static/catalog-tiles/
 backend_phoenix/priv/static/index.html
 .venv/
 __pycache__/

@@ -6,6 +6,19 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 gaia_500pc_min_count="${GAIA_500PC_MIN_COUNT:-1597012}"
 gaia_10kpc_min_count="${GAIA_10KPC_MIN_COUNT:-1339910}"
 release_bin="${STARSMAP_RELEASE_BIN:-$repo_root/bin/starsmap_api}"
+release_static_dir=""
+if [ -d "$repo_root/lib" ]; then
+  release_static_dir="$(find "$repo_root/lib" -maxdepth 3 -path '*/priv/static' -type d | head -n 1)"
+fi
+
+default_tile_output="$repo_root/backend_phoenix/priv/static/catalog-tiles/v1"
+if [ -n "$release_static_dir" ]; then
+  default_tile_output="$release_static_dir/catalog-tiles/v1"
+elif [ -d "$repo_root/priv/static" ]; then
+  default_tile_output="$repo_root/priv/static/catalog-tiles/v1"
+fi
+catalog_tile_output="${CATALOG_TILE_OUTPUT_DIR:-$default_tile_output}"
+catalog_tile_public_base_url="${CATALOG_TILE_PUBLIC_BASE_URL:-/catalog-tiles/v1}"
 
 elixir_string() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
@@ -82,6 +95,16 @@ if [ "${CATALOG_IMPORT_VACUUM:-1}" != "0" ]; then
 SET maintenance_work_mem = '16MB';
 VACUUM (ANALYZE, PARALLEL 0) catalog_objects;
 SQL
+fi
+
+if [ "${CATALOG_STATIC_TILES:-0}" = "1" ]; then
+  echo "[catalog-import] Building static catalog point tiles..."
+  python3 "$repo_root/scripts/build_static_point_tiles.py" \
+    --output "$catalog_tile_output" \
+    --tile-url-base "$catalog_tile_public_base_url" \
+    --skip-if-current
+else
+  echo "[catalog-import] Skipping static catalog point tiles. Set CATALOG_STATIC_TILES=1 to build them."
 fi
 
 echo "[catalog-import] Final catalog summary:"
