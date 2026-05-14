@@ -1,6 +1,8 @@
 defmodule StarsmapApi.Catalog.PointsTest do
   use StarsmapApi.DataCase, async: false
 
+  import Ecto.Query
+
   alias StarsmapApi.Catalog
   alias StarsmapApi.Catalog.CatalogObject
   alias StarsmapApi.Catalog.PointTileCache
@@ -59,6 +61,36 @@ defmodule StarsmapApi.Catalog.PointsTest do
     assert {:ok, refreshed_payload} = Catalog.points_binary(params)
     assert refreshed_payload.returned == 2
     assert refreshed_payload.cache_status == :miss
+  end
+
+  test "points_binary can hash-sample dense Gaia point-layer tiles" do
+    Enum.each(1..200, fn index ->
+      insert_object!("gaia-sample-#{index}", "gaia_500pc_stars", index, index, nil)
+    end)
+
+    expected_count =
+      CatalogObject
+      |> where(
+        [object],
+        fragment("mod(hashtext(?)::bigint + 2147483648, 1024) < ?", object.key, 128)
+      )
+      |> Repo.aggregate(:count)
+
+    assert expected_count > 0
+    assert expected_count < 200
+
+    assert {:ok, payload} =
+             Catalog.points_binary(%{
+               "min_x_au" => "0",
+               "max_x_au" => "250",
+               "min_y_au" => "0",
+               "max_y_au" => "250",
+               "groups" => "gaia_500pc_stars",
+               "limit" => "500",
+               "sample_buckets" => "128"
+             })
+
+    assert payload.returned == expected_count
   end
 
   defp insert_object!(key, group, x_au, y_au, color) do

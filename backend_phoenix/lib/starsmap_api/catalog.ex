@@ -26,6 +26,7 @@ defmodule StarsmapApi.Catalog do
   @point_cache_version 1
   @point_cache_max_limit 50_000
   @point_cache_max_binary_bytes 2_000_000
+  @point_sample_bucket_count 1_024
   @point_layer_groups ~w(gaia_local_stars gaia_500pc_stars gaia_10kpc_bright_stars)
   @point_layer_rgb {224, 196, 128}
   @point_binary_magic "SMP2"
@@ -391,7 +392,17 @@ defmodule StarsmapApi.Catalog do
       groups = csv_param(params["groups"])
       types = csv_param(params["types"])
       include_total? = truthy_param?(params["include_total"])
-      cache_key = point_binary_cache_key(bounds, groups, types, limit, include_total?)
+
+      sample_buckets =
+        bounded_integer(
+          params["sample_buckets"],
+          @point_sample_bucket_count,
+          1,
+          @point_sample_bucket_count
+        )
+
+      cache_key =
+        point_binary_cache_key(bounds, groups, types, limit, include_total?, sample_buckets)
 
       if cacheable_point_binary_request?(limit) do
         case PointTileCache.fetch(cache_key) do
@@ -399,7 +410,15 @@ defmodule StarsmapApi.Catalog do
             {:ok, Map.put(payload, :cache_status, :hit)}
 
           :miss ->
-            payload = build_points_binary_payload(bounds, groups, types, limit, include_total?)
+            payload =
+              build_points_binary_payload(
+                bounds,
+                groups,
+                types,
+                limit,
+                include_total?,
+                sample_buckets
+              )
 
             if byte_size(payload.binary) <= @point_cache_max_binary_bytes do
               PointTileCache.put(cache_key, payload)
@@ -408,7 +427,16 @@ defmodule StarsmapApi.Catalog do
             {:ok, Map.put(payload, :cache_status, :miss)}
         end
       else
-        payload = build_points_binary_payload(bounds, groups, types, limit, include_total?)
+        payload =
+          build_points_binary_payload(
+            bounds,
+            groups,
+            types,
+            limit,
+            include_total?,
+            sample_buckets
+          )
+
         {:ok, Map.put(payload, :cache_status, :bypass)}
       end
     end
@@ -416,7 +444,7 @@ defmodule StarsmapApi.Catalog do
 
   defp cacheable_point_binary_request?(limit), do: limit <= @point_cache_max_limit
 
-  defp build_points_binary_payload(bounds, groups, types, limit, include_total?) do
+  defp build_points_binary_payload(bounds, groups, types, limit, include_total?, sample_buckets) do
     base_query =
       point_base_query(bounds, groups, types)
 
@@ -425,6 +453,7 @@ defmodule StarsmapApi.Catalog do
     points =
       if point_layer_query?(groups, types) do
         base_query
+        |> maybe_sample_point_layer(sample_buckets)
         |> limit(^limit)
         |> select([object], [
           object.x_au,
@@ -457,7 +486,7 @@ defmodule StarsmapApi.Catalog do
     }
   end
 
-  defp point_binary_cache_key(bounds, groups, types, limit, include_total?) do
+  defp point_binary_cache_key(bounds, groups, types, limit, include_total?, sample_buckets) do
     {
       :points_binary,
       @point_cache_version,
@@ -468,7 +497,8 @@ defmodule StarsmapApi.Catalog do
       Enum.sort(groups),
       Enum.sort(types),
       limit,
-      include_total?
+      include_total?,
+      sample_buckets
     }
   end
 
@@ -540,6 +570,20 @@ defmodule StarsmapApi.Catalog do
   defp point_layer_query?(groups, types) do
     groups != [] and Enum.all?(groups, &(&1 in @point_layer_groups)) and
       (types == [] or types == ["star"])
+  end
+
+  defp maybe_sample_point_layer(query, @point_sample_bucket_count), do: query
+
+  defp maybe_sample_point_layer(query, sample_buckets) do
+    where(
+      query,
+      [object],
+      fragment(
+        "mod(hashtext(?)::bigint + 2147483648, 1024) < ?",
+        object.key,
+        ^sample_buckets
+      )
+    )
   end
 
   defp encode_point_binary(points) do

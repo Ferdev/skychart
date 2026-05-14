@@ -429,6 +429,7 @@ const POINT_BINARY_RECORD_BYTES = 12;
 const POINT_VERTEX_STRIDE_FLOATS = 6;
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
+const POINT_SAMPLE_BUCKET_COUNT = 1_024;
 const BODY_HIT_GRID_CELL_PX = 56;
 const MAP_POINT_RADIUS_PX = 1.3;
 const MAP_POINT_ALPHA = 0.82;
@@ -2093,6 +2094,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
   const maxTileY = Math.floor(bounds.maxYAu / tileSpanAu);
   const requests: CatalogPointTileRequest[] = [];
   const limit = catalogPointTileLimit(viewWidthLy);
+  const sampleBuckets = catalogPointSampleBuckets(viewWidthLy);
   const maxActiveTiles = catalogPointMaxActiveTiles(viewWidthLy);
   const groupSignature = filterParams.groups.join("+");
   const typeSignature = filterParams.types.join("+");
@@ -2105,7 +2107,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
         min_y_au: tileY * tileSpanAu,
         max_y_au: (tileY + 1) * tileSpanAu
       };
-      const tileKey = `z${Math.round(Math.log2(tileSpanAu) * 100) / 100}:x${tileX}:y${tileY}:g${groupSignature}:t${typeSignature}:l${limit}`;
+      const tileKey = `z${Math.round(Math.log2(tileSpanAu) * 100) / 100}:x${tileX}:y${tileY}:g${groupSignature}:t${typeSignature}:l${limit}:s${sampleBuckets}`;
       const params = new URLSearchParams();
       params.set("min_x_au", String(tileBounds.min_x_au));
       params.set("max_x_au", String(tileBounds.max_x_au));
@@ -2114,6 +2116,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
       params.set("groups", filterParams.groups.join(","));
       if (filterParams.types.length > 0) params.set("types", filterParams.types.join(","));
       params.set("limit", String(limit));
+      if (sampleBuckets < POINT_SAMPLE_BUCKET_COUNT) params.set("sample_buckets", String(sampleBuckets));
       requests.push({
         key: tileKey,
         layerId: `catalog:${tileKey}`,
@@ -2177,6 +2180,14 @@ function catalogPointTileLimit(viewWidthLy: number) {
   if (viewWidthLy < 80) return Math.min(POINT_TILE_MAX_POINTS, 18_000);
   if (viewWidthLy > 10_000) return Math.min(POINT_TILE_MAX_POINTS, 16_000);
   return POINT_TILE_MAX_POINTS;
+}
+
+function catalogPointSampleBuckets(viewWidthLy: number) {
+  if (viewWidthLy < 120) return POINT_SAMPLE_BUCKET_COUNT;
+  if (viewWidthLy < 2_000) return 32;
+  if (viewWidthLy < 15_000) return 16;
+  if (viewWidthLy < 70_000) return 8;
+  return 3;
 }
 
 function catalogPointMaxActiveTiles(viewWidthLy: number) {
