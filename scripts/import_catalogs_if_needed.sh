@@ -11,6 +11,19 @@ elixir_string() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
+psql_command() {
+  local database_url="${DATABASE_URL:-}"
+  if [[ "$database_url" == ecto://* ]]; then
+    database_url="postgresql://${database_url#ecto://}"
+  fi
+
+  if [ -n "$database_url" ]; then
+    psql -v ON_ERROR_STOP=1 --dbname "$database_url" "$@"
+  else
+    psql -v ON_ERROR_STOP=1 "$@"
+  fi
+}
+
 for command in python3 psql; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "[catalog-import] Missing required command: $command" >&2
@@ -61,6 +74,14 @@ else
     cd "$repo_root/backend_phoenix"
     mix run -e 'StarsmapApi.Catalog.refresh_summary_counts!()'
   )
+fi
+
+if [ "${CATALOG_IMPORT_VACUUM:-1}" != "0" ]; then
+  echo "[catalog-import] Vacuuming catalog query indexes..."
+  psql_command <<'SQL'
+SET maintenance_work_mem = '16MB';
+VACUUM (ANALYZE, PARALLEL 0) catalog_objects;
+SQL
 fi
 
 echo "[catalog-import] Final catalog summary:"
