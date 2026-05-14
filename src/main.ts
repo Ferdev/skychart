@@ -2184,9 +2184,9 @@ function catalogPointTileLimit(viewWidthLy: number) {
 
 function catalogPointSampleBuckets(viewWidthLy: number) {
   if (viewWidthLy < 120) return POINT_SAMPLE_BUCKET_COUNT;
-  if (viewWidthLy < 2_000) return 32;
-  if (viewWidthLy < 15_000) return 16;
-  if (viewWidthLy < 70_000) return 8;
+  if (viewWidthLy < 2_000) return 8;
+  if (viewWidthLy < 15_000) return 6;
+  if (viewWidthLy < 70_000) return 4;
   return 3;
 }
 
