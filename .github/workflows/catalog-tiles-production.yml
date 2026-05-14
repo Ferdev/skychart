@@ -113,17 +113,18 @@ jobs:
         shell: bash
         run: |
           env_args=(
-            --env AWS_ACCESS_KEY_ID:"$AWS_ACCESS_KEY_ID"
-            --env AWS_SECRET_ACCESS_KEY:"$AWS_SECRET_ACCESS_KEY"
-            --env CATALOG_TILE_S3_BUCKET:"$CATALOG_TILE_S3_BUCKET"
-            --env CATALOG_TILE_S3_ENDPOINT_URL:"$CATALOG_TILE_S3_ENDPOINT_URL"
-            --env CATALOG_TILE_S3_REGION:"$CATALOG_TILE_S3_REGION"
-            --env CATALOG_TILE_S3_PREFIX:"$CATALOG_TILE_S3_PREFIX"
-            --env CATALOG_TILE_PUBLIC_BASE_URL:"$CATALOG_TILE_PUBLIC_BASE_URL"
-            --env CATALOG_TILE_NICE:"$CATALOG_TILE_NICE"
+            --env
+            AWS_ACCESS_KEY_ID:"$AWS_ACCESS_KEY_ID"
+            AWS_SECRET_ACCESS_KEY:"$AWS_SECRET_ACCESS_KEY"
+            CATALOG_TILE_S3_BUCKET:"$CATALOG_TILE_S3_BUCKET"
+            CATALOG_TILE_S3_ENDPOINT_URL:"$CATALOG_TILE_S3_ENDPOINT_URL"
+            CATALOG_TILE_S3_REGION:"$CATALOG_TILE_S3_REGION"
+            CATALOG_TILE_S3_PREFIX:"$CATALOG_TILE_S3_PREFIX"
+            CATALOG_TILE_PUBLIC_BASE_URL:"$CATALOG_TILE_PUBLIC_BASE_URL"
+            CATALOG_TILE_NICE:"$CATALOG_TILE_NICE"
           )
           if [ -n "$CATALOG_TILE_S3_ACL" ]; then
-            env_args+=(--env CATALOG_TILE_S3_ACL:"$CATALOG_TILE_S3_ACL")
+            env_args+=(CATALOG_TILE_S3_ACL:"$CATALOG_TILE_S3_ACL")
           fi
 
           kamal app exec -d production --primary --reuse "${env_args[@]}" -- ./scripts/build_and_upload_static_tiles.sh
