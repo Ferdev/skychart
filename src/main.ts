@@ -440,8 +440,11 @@ const POINT_TILE_MAX_ACTIVE = 18;
 const POINT_TILE_MAX_ACTIVE_WIDE = 8;
 const POINT_TILE_MAX_POINTS = 24_000;
 const POINT_TILE_MAX_POINTS_WIDE = 12_000;
-const POINT_TILE_CACHE_LIMIT = 72;
+const POINT_TILE_CACHE_LIMIT = 192;
 const POINT_TILE_FETCH_CONCURRENCY = 2;
+const POINT_TILE_PREFETCH_LEVEL_RADIUS = 5;
+const POINT_TILE_PREFETCH_MAX_REQUESTS = 144;
+const POINT_TILE_PREFETCH_DELAY_MS = 500;
 const POINT_TILE_RETRY_BASE_MS = 1_200;
 const POINT_TILE_RETRY_MAX_MS = 8_000;
 const POINT_BINARY_HEADER_BYTES = 8;
@@ -626,9 +629,11 @@ let catalogDensityRequestId = 0;
 let catalogDensitySignature = "";
 let catalogDensityInFlightSignature = "";
 let catalogPointTimer: number | null = null;
+let catalogPointPrefetchTimer: number | null = null;
 let catalogPointRequestId = 0;
 let catalogPointSignature = "";
 let catalogPointInFlightSignature = "";
+let catalogPointPrefetchSignature = "";
 let catalogPointTiles = new Map<string, CatalogPointTile>();
 let activeCatalogPointTileKeys = new Set<string>();
 let renderedCatalogPointLayerIds = new Set<string>();
@@ -2024,18 +2029,56 @@ function scheduleCatalogPointLoad(options: DataRefreshOptions = {}) {
   });
 
   updateStats();
-  if (missingRequests.length === 0 || signature === catalogPointInFlightSignature) return;
+  const schedulePrefetch = () => scheduleCatalogPointPrefetch(requests, signature);
+  if (missingRequests.length === 0 || signature === catalogPointInFlightSignature) {
+    schedulePrefetch();
+    return;
+  }
   if (catalogPointTimer !== null) window.clearTimeout(catalogPointTimer);
   if (options.immediate) {
     catalogPointTimer = null;
-    void loadCatalogPointTiles(missingRequests, signature);
+    void loadCatalogPointTiles(missingRequests, signature).then(schedulePrefetch);
     return;
   }
   catalogPointTimer = window.setTimeout(() => {
     catalogPointTimer = null;
-    void loadCatalogPointTiles(missingRequests, signature);
+    void loadCatalogPointTiles(missingRequests, signature).then(schedulePrefetch);
   }, VIEWPORT_CATALOG_DEBOUNCE_MS);
   catalogPointInFlightSignature = signature;
+}
+
+function scheduleCatalogPointPrefetch(activeRequests: CatalogPointTileRequest[], activeSignature: string) {
+  if (catalogPointPrefetchTimer !== null) {
+    window.clearTimeout(catalogPointPrefetchTimer);
+    catalogPointPrefetchTimer = null;
+  }
+  if (catalogPointTileManifestState !== "ready" || activeRequests.length === 0 || activeSignature !== catalogPointSignature) return;
+
+  const requests = catalogPointPrefetchRequests(activeRequests);
+  if (requests.length === 0) return;
+
+  const signature = `${activeSignature}::prefetch::${requests.map((request) => request.key).join("|")}`;
+  if (signature === catalogPointPrefetchSignature) return;
+  catalogPointPrefetchSignature = signature;
+  catalogPointPrefetchTimer = window.setTimeout(() => {
+    catalogPointPrefetchTimer = null;
+    void loadCatalogPointPrefetchTiles(requests, signature);
+  }, POINT_TILE_PREFETCH_DELAY_MS);
+}
+
+async function loadCatalogPointPrefetchTiles(requests: CatalogPointTileRequest[], signature: string) {
+  if (signature !== catalogPointPrefetchSignature || !signature.startsWith(`${catalogPointSignature}::prefetch::`) || catalogPointInFlightSignature) return;
+  const requestId = catalogPointRequestId;
+  const queue = [...requests];
+  while (queue.length > 0 && requestId === catalogPointRequestId && signature === catalogPointPrefetchSignature) {
+    const request = queue.shift();
+    if (!request) continue;
+    const tile = catalogPointTiles.get(request.key);
+    if (tile?.source || tile?.abortController) continue;
+    await loadCatalogPointTile(request, requestId);
+  }
+  evictCatalogPointTiles();
+  if (catalogPointPrefetchSignature === signature) catalogPointPrefetchSignature = "";
 }
 
 async function loadCatalogPointTiles(requests: CatalogPointTileRequest[], signature: string) {
@@ -2184,14 +2227,17 @@ function cancelCatalogPointRequest() {
     window.clearTimeout(catalogPointTimer);
     catalogPointTimer = null;
   }
+  if (catalogPointPrefetchTimer !== null) {
+    window.clearTimeout(catalogPointPrefetchTimer);
+    catalogPointPrefetchTimer = null;
+  }
+  catalogPointPrefetchSignature = "";
   for (const tile of catalogPointTiles.values()) {
     tile.abortController?.abort();
     tile.abortController = undefined;
   }
-  if (catalogPointInFlightSignature) {
-    catalogPointRequestId += 1;
-    catalogPointInFlightSignature = "";
-  }
+  catalogPointRequestId += 1;
+  catalogPointInFlightSignature = "";
 }
 
 function clearCatalogPointTiles(update = true) {
@@ -2202,20 +2248,100 @@ function clearCatalogPointTiles(update = true) {
   activeCatalogPointTileKeys = new Set();
   renderedCatalogPointLayerIds = new Set();
   catalogPointSignature = "";
+  catalogPointPrefetchSignature = "";
   if (update) updateStats();
 }
 
 function catalogPointRequests(): CatalogPointTileRequest[] {
-  const viewWidthLy = currentViewWidthLy();
-  if (!shouldUseCatalogPoints(viewWidthLy)) return [];
-  if (catalogPointTileManifestState === "loading") return [];
-  if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return [];
-  const filterParams = catalogPointFilterParams();
-  if (!filterParams) return [];
+  const requestContext = catalogPointRequestContext();
+  if (!requestContext) return [];
 
-  const bounds = viewportWorldBounds(POINT_LAYER_VIEWPORT_PADDING);
-  const tileSpanAu = catalogPointTileSpanAu(bounds, viewWidthLy);
+  const tileSpanAu = catalogPointTileSpanAu(requestContext.bounds, requestContext.viewWidthLy);
   const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu);
+  return catalogPointRequestsForLevel(requestContext, tileSpanAu, staticLevel, catalogPointMaxActiveTiles(requestContext.viewWidthLy));
+}
+
+function catalogPointPrefetchRequests(activeRequests: CatalogPointTileRequest[]): CatalogPointTileRequest[] {
+  const requestContext = catalogPointRequestContext();
+  if (!requestContext || catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return [];
+
+  const activeSpanAu = catalogPointTileSpanAu(requestContext.bounds, requestContext.viewWidthLy);
+  const activeLevel = catalogStaticTileLevelForSpan(activeSpanAu);
+  if (!activeLevel) return [];
+
+  const activeLevelIndex = catalogPointTileManifest.levels.findIndex((level) => level.span_au === activeLevel.span_au);
+  if (activeLevelIndex < 0) return [];
+
+  const activeKeys = new Set(activeRequests.map((request) => request.key));
+  const requests: CatalogPointTileRequest[] = [];
+  const firstLevelIndex = Math.max(0, activeLevelIndex - POINT_TILE_PREFETCH_LEVEL_RADIUS);
+  const lastLevelIndex = Math.min(catalogPointTileManifest.levels.length - 1, activeLevelIndex + POINT_TILE_PREFETCH_LEVEL_RADIUS);
+
+  for (let levelIndex = firstLevelIndex; levelIndex <= lastLevelIndex; levelIndex += 1) {
+    if (levelIndex === activeLevelIndex) continue;
+    const level = catalogPointTileManifest.levels[levelIndex];
+    const prefetchContext = catalogPointRequestContextForTileSpan(requestContext, level.span_au);
+    requests.push(...catalogPointRequestsForLevel(prefetchContext, level.span_au, level, catalogPointMaxActiveTiles(prefetchContext.viewWidthLy)));
+  }
+
+  const now = performance.now();
+  return requests
+    .filter((request) => {
+      if (activeKeys.has(request.key)) return false;
+      const tile = catalogPointTiles.get(request.key);
+      return !tile || (!tile.source && !tile.abortController && canRetryCatalogPointTile(tile, now));
+    })
+    .sort((a, b) => {
+      const levelDelta = Math.abs(Math.log2(a.bounds.max_x_au - a.bounds.min_x_au) - Math.log2(activeLevel.span_au)) - Math.abs(Math.log2(b.bounds.max_x_au - b.bounds.min_x_au) - Math.log2(activeLevel.span_au));
+      return levelDelta || tileDistanceToCamera(a) - tileDistanceToCamera(b);
+    })
+    .slice(0, POINT_TILE_PREFETCH_MAX_REQUESTS);
+}
+
+function catalogPointRequestContextForTileSpan(
+  requestContext: NonNullable<ReturnType<typeof catalogPointRequestContext>>,
+  tileSpanAu: number
+): NonNullable<ReturnType<typeof catalogPointRequestContext>> {
+  const rect = usableViewportRect();
+  const normalViewWidthLy = (tileSpanAu * POINT_TILE_TARGET_VIEW_DIVISIONS) / AU_PER_LIGHT_YEAR;
+  const divisions = normalViewWidthLy > 70_000 ? POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE : POINT_TILE_TARGET_VIEW_DIVISIONS;
+  const viewWidthAu = tileSpanAu * divisions;
+  const viewHeightAu = viewWidthAu * (rect.height / Math.max(1, rect.width));
+  const paddingXAu = viewWidthAu * POINT_LAYER_VIEWPORT_PADDING;
+  const paddingYAu = viewHeightAu * POINT_LAYER_VIEWPORT_PADDING;
+  return {
+    ...requestContext,
+    viewWidthLy: viewWidthAu / AU_PER_LIGHT_YEAR,
+    bounds: {
+      minXAu: camera.xAu - viewWidthAu / 2 - paddingXAu,
+      maxXAu: camera.xAu + viewWidthAu / 2 + paddingXAu,
+      minYAu: camera.yAu - viewHeightAu / 2 - paddingYAu,
+      maxYAu: camera.yAu + viewHeightAu / 2 + paddingYAu
+    }
+  };
+}
+
+function catalogPointRequestContext() {
+  const viewWidthLy = currentViewWidthLy();
+  if (!shouldUseCatalogPoints(viewWidthLy)) return null;
+  if (catalogPointTileManifestState === "loading") return null;
+  if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
+  const filterParams = catalogPointFilterParams();
+  if (!filterParams) return null;
+  return {
+    viewWidthLy,
+    bounds: viewportWorldBounds(POINT_LAYER_VIEWPORT_PADDING),
+    filterParams
+  };
+}
+
+function catalogPointRequestsForLevel(
+  requestContext: NonNullable<ReturnType<typeof catalogPointRequestContext>>,
+  tileSpanAu: number,
+  staticLevel: CatalogPointTileManifestLevel | null,
+  maxRequests: number
+): CatalogPointTileRequest[] {
+  const { bounds, filterParams, viewWidthLy } = requestContext;
   const minTileX = Math.floor(bounds.minXAu / tileSpanAu);
   const maxTileX = Math.floor(bounds.maxXAu / tileSpanAu);
   const minTileY = Math.floor(bounds.minYAu / tileSpanAu);
@@ -2223,7 +2349,6 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
   const requests: CatalogPointTileRequest[] = [];
   const limit = staticLevel?.max_points_per_tile ?? catalogPointTileLimit(viewWidthLy);
   const sampleBuckets = staticLevel?.sample_buckets ?? catalogPointSampleBuckets(viewWidthLy);
-  const maxActiveTiles = catalogPointMaxActiveTiles(viewWidthLy);
   const groupSignature = filterParams.groups.join("+");
   const typeSignature = filterParams.types.join("+");
 
@@ -2261,7 +2386,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
 
   return requests
     .sort((a, b) => tileDistanceToCamera(a) - tileDistanceToCamera(b))
-    .slice(0, maxActiveTiles);
+    .slice(0, maxRequests);
 }
 
 function catalogPointFilterParams(): { groups: string[]; types: DestinationBodyType[] } | null {
