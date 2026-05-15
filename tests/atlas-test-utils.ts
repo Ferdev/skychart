@@ -143,7 +143,7 @@ export async function readAtlasPerf(page: Page): Promise<AtlasPerfState> {
 }
 
 export function catalogEndpointEntries(state: AtlasPerfState) {
-  return state.fetches.filter((entry) => /\/api\/catalog\/(points\.bin|viewport)/.test(entry.url));
+  return state.fetches.filter((entry) => /(?:\/api\/catalog\/(points\.bin|viewport)|\/catalog-tiles\/v1\/.*\.bin)/.test(entry.url));
 }
 
 export async function waitForCatalogRequestsToSettle(page: Page, quietMs = 800, timeoutMs = 12_000) {
@@ -151,7 +151,7 @@ export async function waitForCatalogRequestsToSettle(page: Page, quietMs = 800, 
     ({ quietMs }) => {
       const state = (window as Window & { __atlasPerf?: AtlasPerfState }).__atlasPerf;
       if (!state) return true;
-      const relevant = state.fetches.filter((entry) => /\/api\/catalog\/(points\.bin|viewport)/.test(entry.url));
+      const relevant = state.fetches.filter((entry) => /(?:\/api\/catalog\/(points\.bin|viewport)|\/catalog-tiles\/v1\/.*\.bin)/.test(entry.url));
       if (relevant.some((entry) => entry.finishedAt === null)) return false;
       const latestStartedAt = Math.max(0, ...relevant.map((entry) => entry.startedAt));
       return performance.now() - latestStartedAt >= quietMs;

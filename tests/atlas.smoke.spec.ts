@@ -49,6 +49,19 @@ test.describe("Cosmic Atlas browser smoke", () => {
     issues.assertClean();
   });
 
+  test("language selector localizes common controls", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+
+    await page.locator("#locale-select").selectOption("es");
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.locator('[data-tab="catalog"]')).toHaveText("Buscar");
+    await expect(page.locator("#focus-body")).toHaveText("Enfocar");
+    await expect(page.locator("#body-search")).toHaveAttribute("placeholder", "Nombre del objeto o designación de catálogo");
+
+    issues.assertClean();
+  });
+
   test("catalog filters constrain the picker to the selected object family", async ({ page }) => {
     const issues = collectBrowserIssues(page);
 

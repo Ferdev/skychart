@@ -67,6 +67,36 @@ test.describe("Cosmic Atlas performance guardrails", () => {
     issues.assertClean();
   });
 
+  test("zoom changes start replacement point tiles before the camera debounce", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+
+    await resetAtlasPerf(page);
+    const before = await page.evaluate(() => performance.now());
+    await page.locator('[data-zoom-preset="nearby"]').click();
+
+    await page.waitForFunction(
+      ({ before }) => {
+        const state = (window as Window & { __atlasPerf?: { fetches: { url: string; startedAt: number }[] } }).__atlasPerf;
+        return Boolean(
+          state?.fetches.some(
+            (entry) => entry.startedAt >= before && /(?:\/api\/catalog\/points\.bin|\/catalog-tiles\/v1\/.*\.bin)/.test(entry.url)
+          )
+        );
+      },
+      { before },
+      { timeout: 150 }
+    );
+
+    const afterZoom = await readAtlasPerf(page);
+    const firstPointTile = catalogEndpointEntries(afterZoom)
+      .filter((entry) => entry.startedAt >= before && /(?:\/api\/catalog\/points\.bin|\/catalog-tiles\/v1\/.*\.bin)/.test(entry.url))
+      .sort((a, b) => a.startedAt - b.startedAt)[0];
+
+    expect(firstPointTile, "replacement point tile request after zoom change").toBeTruthy();
+    expect(firstPointTile.startedAt - before, "replacement point tile request delay").toBeLessThan(150);
+    issues.assertClean();
+  });
+
   test("galaxy-scale point layer loads with a bounded tile fanout", async ({ page }) => {
     const issues = collectBrowserIssues(page);
 

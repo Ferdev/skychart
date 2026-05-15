@@ -17,6 +17,7 @@ import {
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
 import { educationalComparisons } from "./navigationMetrics";
 import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
+import { initI18n } from "./i18n";
 import { WebglPointRenderer, type PointLayerSource } from "./webglPointRenderer";
 
 type AtlasTab = "catalog" | "object";
@@ -659,6 +660,7 @@ let perfViewportLoads = 0;
 let perfPointTileLoads = 0;
 
 resizeCanvas();
+initI18n();
 bindEvents();
 initializeUi();
 void loadCatalogTileManifest();
@@ -3781,7 +3783,10 @@ function applyZoomPreset(preset: ZoomPreset, update = true) {
   }
   updateZoomPresetButtons();
   updateScaleUi();
-  if (update) requestRender({ data: true });
+  if (update) {
+    requestRender();
+    requestDataRefresh({ immediate: true });
+  }
 }
 
 function presetBodies(preset: ZoomPreset) {
@@ -3856,6 +3861,7 @@ function setZoomFromSlider() {
   updateZoomPresetButtons();
   updateScaleUi();
   requestRender();
+  scheduleCatalogPointLoad({ immediate: true });
   scheduleCameraDataRefresh();
 }
 
@@ -3885,8 +3891,16 @@ function zoomAt(x: number, y: number, factor: number, clearPreset = false, dataM
     updateZoomPresetButtons();
   }
   updateScaleUi();
-  requestRender(dataMode === "immediate" ? { data: true } : {});
-  if (dataMode === "deferred") scheduleCameraDataRefresh();
+  if (dataMode === "immediate") {
+    requestRender();
+    requestDataRefresh({ immediate: true });
+  } else {
+    requestRender();
+    if (dataMode === "deferred") {
+      scheduleCatalogPointLoad({ immediate: true });
+      scheduleCameraDataRefresh();
+    }
+  }
 }
 
 async function handleMapClick(point: ScreenPoint) {
