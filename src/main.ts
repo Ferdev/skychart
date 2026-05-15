@@ -337,6 +337,7 @@ type CatalogObjectPayload = {
 type CatalogSearchResult = {
   bodies: Body[];
   source: "phoenix" | "local";
+  fallback?: boolean;
 };
 
 const STARTUP_EPHEMERIS_GROUPS = [
@@ -401,6 +402,7 @@ type BodyHitEntry = {
 type PickerSearchState = {
   requestId: number;
   latestBodies: Body[];
+  activeOptionKey: string | null;
   abortController?: AbortController;
 };
 
@@ -413,6 +415,8 @@ type PickerSearchConfig = {
   activeKey: string | null;
   currentTargetKey: string | null;
   emptyMessage: string;
+  loadingMessage: string;
+  fallbackMessage: string;
   guidedSet?: { labelKey: string } | null;
   excludeKeys?: string[];
   queryForSearch?: (query: string) => string;
@@ -606,8 +610,8 @@ let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
 let hoverKey: string | null = null;
 let compareTargetKey: string | null = null;
 let recentDestinations: RecentDestination[] = readRecentDestinations();
-const catalogSearchState: PickerSearchState = { requestId: 0, latestBodies: [] };
-const compareSearchState: PickerSearchState = { requestId: 0, latestBodies: [] };
+const catalogSearchState: PickerSearchState = { requestId: 0, latestBodies: [], activeOptionKey: null };
+const compareSearchState: PickerSearchState = { requestId: 0, latestBodies: [], activeOptionKey: null };
 let mapDragging = false;
 let mapDragMoved = false;
 let dragStart: ScreenPoint | null = null;
@@ -747,14 +751,27 @@ function bindEvents() {
   bodySearch.addEventListener("input", () => {
     activeGuidedSetId = null;
     catalogSearchState.latestBodies = [];
+    catalogSearchState.activeOptionKey = null;
     updateGuidedSets();
     scheduleBodyPickerUpdate();
   });
 
   bodySearch.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
+    if (
+      handlePickerKeyboard(event, {
+        state: catalogSearchState,
+        input: bodySearch,
+        picker: bodyPicker,
+        onSelect: (key) => void selectBodyByKey(key, { center: true }),
+        onFallbackEnter: () => void focusSearchResult(),
+        onEscapeClear: () => {
+          activeGuidedSetId = null;
+          catalogSearchState.latestBodies = [];
+          void updateBodyPicker();
+        }
+      })
+    ) {
       event.preventDefault();
-      void focusSearchResult();
     }
   });
 
@@ -799,6 +816,7 @@ function bindEvents() {
     activeGuidedSetId = null;
     bodySearch.value = "";
     catalogSearchState.latestBodies = [];
+    catalogSearchState.activeOptionKey = null;
     cancelCatalogPointRequest();
     clearCatalogPointTiles(false);
     updateBodyFilters();
@@ -838,13 +856,22 @@ function bindEvents() {
 
   compareSearch.addEventListener("input", () => {
     compareSearchState.latestBodies = [];
+    compareSearchState.activeOptionKey = null;
     scheduleComparePickerUpdate();
   });
 
   compareSearch.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
+    if (
+      handlePickerKeyboard(event, {
+        state: compareSearchState,
+        input: compareSearch,
+        picker: comparePicker,
+        onSelect: (key) => void setCompareTargetByKey(key),
+        onFallbackEnter: () => void focusCompareResult(),
+        onEscapeClear: () => void updateComparePicker()
+      })
+    ) {
       event.preventDefault();
-      void focusCompareResult();
     }
   });
 
@@ -858,6 +885,7 @@ function bindEvents() {
     activeCompareFilter = (button.dataset.bodyFilter as BodyFilter) ?? "all";
     compareSearch.value = "";
     compareSearchState.latestBodies = [];
+    compareSearchState.activeOptionKey = null;
     updateCompareFilters();
     void updateComparePicker();
   });
@@ -872,6 +900,7 @@ function bindEvents() {
     compareTargetKey = null;
     compareSearch.value = "";
     compareSearchState.latestBodies = [];
+    compareSearchState.activeOptionKey = null;
     activeCompareFilter = "all";
     void updateComparePicker();
     updateCompareFilters();
@@ -994,6 +1023,10 @@ function bindEvents() {
 }
 
 function initializeUi() {
+  bodySearch.setAttribute("aria-controls", bodyPicker.id);
+  bodySearch.setAttribute("aria-autocomplete", "list");
+  compareSearch.setAttribute("aria-controls", comparePicker.id);
+  compareSearch.setAttribute("aria-autocomplete", "list");
   updateTabs();
   updateBodyFilters();
   updateCompareFilters();
@@ -1867,7 +1900,7 @@ async function searchCatalog(options: { query: string; filter?: BodyFilterDefini
   } catch (error) {
     if (options.signal?.aborted) return { bodies: [], source: "local" };
     console.warn("Phoenix catalog search unavailable; using loaded ephemeris catalog.", error);
-    return { bodies: localCatalogSearch(options), source: "local" };
+    return { bodies: localCatalogSearch(options), source: "local", fallback: true };
   }
 }
 
@@ -2758,7 +2791,9 @@ async function updateBodyPicker() {
     activeKey: selectedKey,
     currentTargetKey: selectedKey,
     guidedSet: activeGuidedSet(),
-    emptyMessage: t("search.noObjects")
+    emptyMessage: t("search.noObjects"),
+    loadingMessage: t("search.loading"),
+    fallbackMessage: t("search.fallback")
   });
 }
 
@@ -2789,6 +2824,11 @@ async function updateSearchPicker(config: PickerSearchConfig) {
   const shouldUseCatalogSearch = !guidedSet && (query.length >= 3 || (query.length === 0 && config.filter.key !== "all"));
   const abortController = shouldUseCatalogSearch ? new AbortController() : undefined;
   config.state.abortController = abortController;
+  if (shouldUseCatalogSearch) {
+    config.state.activeOptionKey = null;
+    config.input.removeAttribute("aria-activedescendant");
+    renderPickerStatus(config.picker, config.loadingMessage, "loading");
+  }
   const catalogResult = shouldUseCatalogSearch ? await searchCatalog({ query, filter: config.filter, limit: query ? 80 : 240, signal: abortController?.signal }) : null;
   if (config.state.abortController === abortController) config.state.abortController = undefined;
   if (requestId !== config.state.requestId) return;
@@ -2819,22 +2859,41 @@ async function updateSearchPicker(config: PickerSearchConfig) {
   if (guidedSet || config.filter.key !== "all" || query) {
     const items = buildDestinationPickerItems(sourceBodies, buildOptions);
     const label = query ? t("search.resultsLabel") : guidedSet ? t(guidedSet.labelKey) : t(config.filter.labelKey);
-    renderPickerSections(config.picker, [{ label, items }], config.emptyMessage, config.activeKey);
+    renderPickerSections(config.picker, [{ label, items }], config.emptyMessage, config.activeKey, config.state.activeOptionKey);
   } else {
     const sections = buildDestinationPickerSections(sourceBodies, buildOptions);
-    renderPickerSections(config.picker, sections.filter((section) => section.kind === "all"), config.emptyMessage, config.activeKey);
+    renderPickerSections(config.picker, sections.filter((section) => section.kind === "all"), config.emptyMessage, config.activeKey, config.state.activeOptionKey);
   }
+  if (catalogResult?.fallback) {
+    prependPickerStatus(config.picker, config.fallbackMessage, "fallback");
+  }
+  syncActivePickerOption(config.state, config.input, config.picker);
   config.afterRender?.();
 }
 
-function renderPickerSections(container: HTMLElement, sections: { label: string; items: DestinationPickerItem[] }[], emptyMessage: string, activeKey: string | null) {
+function renderPickerStatus(container: HTMLElement, message: string, tone: "loading" | "fallback") {
+  container.innerHTML = `<div class="picker-status picker-status--${tone}" role="status">${escapeHtml(message)}</div>`;
+  container.scrollTop = 0;
+}
+
+function prependPickerStatus(container: HTMLElement, message: string, tone: "loading" | "fallback") {
+  container.insertAdjacentHTML("afterbegin", `<div class="picker-status picker-status--${tone}" role="status">${escapeHtml(message)}</div>`);
+}
+
+function renderPickerSections(
+  container: HTMLElement,
+  sections: { label: string; items: DestinationPickerItem[] }[],
+  emptyMessage: string,
+  selectedKey: string | null,
+  activeOptionKey: string | null
+) {
   container.innerHTML = sections
     .filter((section) => section.items.length > 0)
     .map(
       (section) => `
         <section class="destination-picker__section">
           <h3 class="destination-picker__section-title">${escapeHtml(section.label)}</h3>
-          <div class="destination-picker__list">${section.items.map((item) => renderPickerItem(item, activeKey)).join("")}</div>
+          <div class="destination-picker__list" role="listbox">${section.items.map((item) => renderPickerItem(item, selectedKey, activeOptionKey, container.id)).join("")}</div>
         </section>
       `
     )
@@ -2846,14 +2905,19 @@ function renderPickerSections(container: HTMLElement, sections: { label: string;
   container.scrollTop = 0;
 }
 
-function renderPickerItem(item: DestinationPickerItem, activeKey: string | null = selectedKey) {
+function renderPickerItem(item: DestinationPickerItem, selectedKey: string | null = null, activeOptionKey: string | null = null, pickerId = "body-picker") {
   const style = destinationPickerColorStyle(item);
+  const isSelected = item.key === selectedKey;
+  const isActive = item.key === activeOptionKey;
   return `
     <button
+      id="${escapeHtml(pickerOptionId(pickerId, item.key))}"
       type="button"
-      class="destination-picker__item${item.key === activeKey ? " is-selected" : ""}"
+      role="option"
+      class="destination-picker__item${isSelected ? " is-selected" : ""}${isActive ? " is-active" : ""}"
       data-body-key="${escapeHtml(item.key)}"
       aria-label="${escapeHtml(item.ariaLabel)}"
+      aria-selected="${isActive ? "true" : "false"}"
       style="--destination-color: ${escapeHtml(style["--destination-color"])}"
     >
       <span class="destination-picker__orb" aria-hidden="true"></span>
@@ -2864,6 +2928,82 @@ function renderPickerItem(item: DestinationPickerItem, activeKey: string | null 
       <span class="destination-picker__distance">${escapeHtml(item.distanceLabel)}</span>
     </button>
   `;
+}
+
+function pickerOptionId(pickerId: string, key: string) {
+  return `${pickerId}-option-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+function visiblePickerOptions(picker: HTMLElement) {
+  return Array.from(picker.querySelectorAll<HTMLButtonElement>(".destination-picker__item[data-body-key]"));
+}
+
+function syncActivePickerOption(state: PickerSearchState, input: HTMLInputElement, picker: HTMLElement) {
+  const options = visiblePickerOptions(picker);
+  const activeButton = options.find((button) => button.dataset.bodyKey === state.activeOptionKey) ?? null;
+  options.forEach((button) => {
+    const isActive = button === activeButton;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+  if (activeButton) {
+    state.activeOptionKey = activeButton.dataset.bodyKey ?? null;
+    input.setAttribute("aria-activedescendant", activeButton.id);
+    activeButton.scrollIntoView({ block: "nearest" });
+  } else {
+    state.activeOptionKey = null;
+    input.removeAttribute("aria-activedescendant");
+  }
+}
+
+function moveActivePickerOption(state: PickerSearchState, input: HTMLInputElement, picker: HTMLElement, destination: "next" | "previous" | "first" | "last") {
+  const options = visiblePickerOptions(picker);
+  if (options.length === 0) return false;
+  const currentIndex = options.findIndex((button) => button.dataset.bodyKey === state.activeOptionKey);
+  let nextIndex = 0;
+  if (destination === "last") nextIndex = options.length - 1;
+  else if (destination === "next") nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, options.length - 1);
+  else if (destination === "previous") nextIndex = currentIndex < 0 ? options.length - 1 : Math.max(currentIndex - 1, 0);
+  state.activeOptionKey = options[nextIndex]?.dataset.bodyKey ?? null;
+  syncActivePickerOption(state, input, picker);
+  return true;
+}
+
+function handlePickerKeyboard(
+  event: KeyboardEvent,
+  options: {
+    state: PickerSearchState;
+    input: HTMLInputElement;
+    picker: HTMLElement;
+    onSelect: (key: string) => void;
+    onFallbackEnter: () => void;
+    onEscapeClear: () => void;
+  }
+) {
+  if (event.key === "ArrowDown") return moveActivePickerOption(options.state, options.input, options.picker, "next");
+  if (event.key === "ArrowUp") return moveActivePickerOption(options.state, options.input, options.picker, "previous");
+  if (event.key === "Home") return moveActivePickerOption(options.state, options.input, options.picker, "first");
+  if (event.key === "End") return moveActivePickerOption(options.state, options.input, options.picker, "last");
+  if (event.key === "Enter") {
+    const activeKey = options.state.activeOptionKey;
+    if (activeKey) options.onSelect(activeKey);
+    else options.onFallbackEnter();
+    return true;
+  }
+  if (event.key === "Escape") {
+    if (options.state.activeOptionKey) {
+      options.state.activeOptionKey = null;
+      syncActivePickerOption(options.state, options.input, options.picker);
+    } else if (options.input.value) {
+      options.input.value = "";
+      options.state.latestBodies = [];
+      options.onEscapeClear();
+    } else {
+      return false;
+    }
+    return true;
+  }
+  return false;
 }
 
 function updateGuidedSets() {
@@ -3380,6 +3520,8 @@ async function updateComparePicker() {
     currentTargetKey: selected?.key ?? null,
     excludeKeys: [selected.key],
     emptyMessage: t("compare.noMatches"),
+    loadingMessage: t("search.loading"),
+    fallbackMessage: t("search.fallback"),
     queryForSearch: (query) => (target && query.toLowerCase() === target.name.toLowerCase() ? "" : query),
     afterRender: updateSelectedPanelMetrics
   });
@@ -3609,6 +3751,7 @@ function setCompareTarget(key: string) {
   if (!body || body.key === selectedKey) return;
   compareTargetKey = body.key;
   compareSearch.value = body.name;
+  compareSearchState.activeOptionKey = null;
   recentDestinations = recordRecentDestination(body.key, { distanceFromEarthKm: body.distance_from_earth_km });
   updateCompareUi();
   requestRender();
@@ -3629,12 +3772,14 @@ function selectBody(key: string, options: { center?: boolean; zoom?: "local"; an
     compareTargetKey = null;
     compareSearch.value = "";
     compareSearchState.latestBodies = [];
+    compareSearchState.activeOptionKey = null;
   }
   ensureCompareTarget();
   activeTab = "object";
   recentDestinations = recordRecentDestination(body.key, { distanceFromEarthKm: body.distance_from_earth_km });
   if (options.center) centerOnBody(body, options.zoom === "local", options.animate ?? false);
   bodySearch.value = body.name;
+  catalogSearchState.activeOptionKey = null;
   hidePopover();
   updateAllUi();
   requestRender({ data: Boolean(options.center && !options.animate) });
@@ -3645,6 +3790,7 @@ function clearSelectedObject(options: { openSearch?: boolean } = {}) {
   compareTargetKey = null;
   compareSearch.value = "";
   compareSearchState.latestBodies = [];
+  compareSearchState.activeOptionKey = null;
   if (options.openSearch) {
     activeGuidedSetId = null;
     bodySearch.value = "";
