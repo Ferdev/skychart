@@ -4216,19 +4216,21 @@ function usableViewportRect(): Rect {
   const bar = document.querySelector<HTMLElement>(".atlas-bar");
   const selection = document.querySelector<HTMLElement>(".selection-strip");
   const visibleModeRail = document.querySelector<HTMLElement>(".mode-rail:not([hidden])");
+  const scaleRail = document.querySelector<HTMLElement>(".scale-rail");
   const workspaceRect = workspace?.getBoundingClientRect();
   const barRect = bar?.getBoundingClientRect();
   const selectionRect = selection?.getBoundingClientRect();
   const modeRailRect = visibleModeRail?.getBoundingClientRect();
+  const scaleRailRect = scaleRail?.getBoundingClientRect();
   const isWide = window.innerWidth >= 900;
   const left = 0;
-  const topBoundary = Math.max(barRect?.bottom ?? 0, isWide ? 0 : selectionRect?.bottom ?? 0);
+  const topBoundary = Math.max(barRect?.bottom ?? 0, !isWide ? modeRailRect?.bottom ?? 0 : 0, !isWide ? selectionRect?.bottom ?? 0 : 0);
   const top = Math.max(0, topBoundary + 8);
   const rightObstructions = [workspaceRect?.left, selectionRect && !selectedObjectPanel.hidden ? selectionRect.left : undefined].filter(
     (value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0
   );
   const right = isWide && rightObstructions.length > 0 ? Math.max(240, Math.min(...rightObstructions) - 12) : window.innerWidth;
-  const bottomBoundary = !isWide ? modeRailRect?.top ?? window.innerHeight : window.innerHeight;
+  const bottomBoundary = !isWide ? scaleRailRect?.top ?? window.innerHeight : window.innerHeight;
   const bottom = Math.max(top + 160, bottomBoundary - 10);
   return {
     left,

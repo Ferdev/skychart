@@ -47,6 +47,16 @@ export default defineConfig({
         launchOptions: chromiumLaunchOptions,
         viewport: { width: 1600, height: 1000 }
       }
+    },
+    {
+      name: "mobile",
+      testMatch: /.*\.mobile\.spec\.ts/,
+      use: {
+        browserName: "chromium",
+        launchOptions: chromiumLaunchOptions,
+        viewport: { width: 390, height: 844 },
+        isMobile: true
+      }
     }
   ]
 });
