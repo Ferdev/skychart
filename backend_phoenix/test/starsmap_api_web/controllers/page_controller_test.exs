@@ -13,7 +13,7 @@ defmodule StarsmapApiWeb.PageControllerTest do
     end)
   end
 
-  test "injects the configured catalog tile manifest URL", %{conn: conn} do
+  test "injects the same-origin catalog tile manifest proxy URL", %{conn: conn} do
     System.put_env(
       "CATALOG_TILE_MANIFEST_URL",
       "https://cdn.example.test/catalog-tiles/v1/manifest.json?cache=short&env=prod"
@@ -22,6 +22,6 @@ defmodule StarsmapApiWeb.PageControllerTest do
     conn = get(conn, ~p"/")
 
     assert html_response(conn, 200) =~
-             ~s(<meta name="catalog-tile-manifest-url" content="https://cdn.example.test/catalog-tiles/v1/manifest.json?cache=short&amp;env=prod">)
+             ~s(<meta name="catalog-tile-manifest-url" content="/catalog-tiles/v1/manifest.json">)
   end
 end
