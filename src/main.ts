@@ -17,7 +17,7 @@ import {
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
 import { educationalComparisons } from "./navigationMetrics";
 import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
-import { initI18n } from "./i18n";
+import { initI18n, t } from "./i18n";
 import { WebglPointRenderer, type PointLayerSource } from "./webglPointRenderer";
 
 type AtlasTab = "catalog" | "object";
@@ -413,7 +413,7 @@ type PickerSearchConfig = {
   activeKey: string | null;
   currentTargetKey: string | null;
   emptyMessage: string;
-  guidedSet?: { label: string } | null;
+  guidedSet?: { labelKey: string } | null;
   excludeKeys?: string[];
   queryForSearch?: (query: string) => string;
   afterRender?: () => void;
@@ -463,54 +463,54 @@ const BODY_HIT_GRID_CELL_PX = 56;
 const MAP_POINT_RADIUS_PX = 1.3;
 const MAP_POINT_ALPHA = 0.82;
 const MAP_POINT_SELECTION_RING_PX = 8.5;
-const WORKSPACE_LABELS: Record<AtlasTab, string> = {
-  catalog: "Search catalog",
-  object: "Selected object"
+const WORKSPACE_LABEL_KEYS: Record<AtlasTab, string> = {
+  catalog: "workspace.searchCatalog",
+  object: "workspace.selectedObject"
 };
-type BodyFilterDefinition = { key: BodyFilter; label: string; types?: DestinationBodyType[]; groups?: string[] };
+type BodyFilterDefinition = { key: BodyFilter; labelKey: string; types?: DestinationBodyType[]; groups?: string[] };
 
 const BODY_FILTERS: BodyFilterDefinition[] = [
-  { key: "all", label: "All" },
-  { key: "planet", label: "Planets", types: ["planet"], groups: ["core"] },
-  { key: "moon", label: "Moons", types: ["moon"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
+  { key: "all", labelKey: "filters.all" },
+  { key: "planet", labelKey: "filters.planets", types: ["planet"], groups: ["core"] },
+  { key: "moon", labelKey: "filters.moons", types: ["moon"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
   {
     key: "star",
-    label: "Stars",
+    labelKey: "filters.stars",
     types: ["star"],
     groups: ["core", "bright_stars", "nearby_exoplanet_systems", "exoplanet_systems", "gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"]
   },
-  { key: "bright_star", label: "Bright", types: ["star"], groups: ["bright_stars"] },
-  { key: "gaia_star", label: "Gaia", types: ["star"], groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"] },
-  { key: "exoplanet_system", label: "Exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems"] },
-  { key: "dwarf_planet", label: "Dwarf", types: ["dwarf_planet"], groups: ["core"] },
-  { key: "small_body", label: "Small bodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
-  { key: "galaxy", label: "Galaxies", types: ["galaxy"], groups: ["messier_deep_sky", "simbad_extragalactic"] },
-  { key: "quasar", label: "Quasars", types: ["quasar"], groups: ["simbad_extragalactic"] },
-  { key: "active_galaxy", label: "AGN", types: ["active_galaxy"], groups: ["simbad_extragalactic"] },
-  { key: "nebula", label: "Nebulae", types: ["nebula"], groups: ["messier_deep_sky"] },
-  { key: "star_cluster", label: "Clusters", types: ["star_cluster"], groups: ["messier_deep_sky"] }
+  { key: "bright_star", labelKey: "filters.bright", types: ["star"], groups: ["bright_stars"] },
+  { key: "gaia_star", labelKey: "filters.gaia", types: ["star"], groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"] },
+  { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems"] },
+  { key: "dwarf_planet", labelKey: "filters.dwarf", types: ["dwarf_planet"], groups: ["core"] },
+  { key: "small_body", labelKey: "filters.smallBodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
+  { key: "galaxy", labelKey: "filters.galaxies", types: ["galaxy"], groups: ["messier_deep_sky", "simbad_extragalactic"] },
+  { key: "quasar", labelKey: "filters.quasars", types: ["quasar"], groups: ["simbad_extragalactic"] },
+  { key: "active_galaxy", labelKey: "filters.agn", types: ["active_galaxy"], groups: ["simbad_extragalactic"] },
+  { key: "nebula", labelKey: "filters.nebulae", types: ["nebula"], groups: ["messier_deep_sky"] },
+  { key: "star_cluster", labelKey: "filters.clusters", types: ["star_cluster"], groups: ["messier_deep_sky"] }
 ];
-const GUIDED_SETS: { id: string; label: string; keys: string[] }[] = [
-  { id: "solar-neighborhood", label: "Solar neighborhood", keys: ["sun", "earth", "moon", "mars", "jupiter", "saturn"] },
-  { id: "bright-stars", label: "Bright stars", keys: ["hip-32349", "hip-30438", "hip-69673", "hip-71683", "hip-91262", "hip-24436", "hip-24608"] },
-  { id: "nearby-stars", label: "Nearby stars", keys: ["proxima-cen", "barnards-star", "eps-eri", "tau-cet", "gj-411"] },
-  { id: "small-bodies", label: "Small bodies", keys: ["jpl-sbdb-20000001", "jpl-sbdb-20000004", "jpl-sbdb-20000433", "jpl-sbdb-1000036"] },
-  { id: "exoplanets", label: "Exoplanet systems", keys: ["exosys-trappist-1", "exosys-55-cnc", "exosys-hr-8799", "exosys-kepler-11", "exosys-toi-700", "exosys-lhs-1140"] },
-  { id: "deep-sky", label: "Messier highlights", keys: ["m1", "m13", "m31", "m42", "m45", "m57"] },
-  { id: "galaxies", label: "Galaxies", keys: ["m31", "m33", "m51", "m81", "m82", "m87"] },
-  { id: "active-galaxies", label: "Active galaxies", keys: ["simbad-m-87", "simbad-3c-273", "simbad-ngc-1068", "simbad-3c-279"] },
-  { id: "nebulae", label: "Nebulae", keys: ["m1", "m8", "m16", "m17", "m20", "m42", "m57"] }
+const GUIDED_SETS: { id: string; labelKey: string; keys: string[] }[] = [
+  { id: "solar-neighborhood", labelKey: "guided.solarNeighborhood", keys: ["sun", "earth", "moon", "mars", "jupiter", "saturn"] },
+  { id: "bright-stars", labelKey: "guided.brightStars", keys: ["hip-32349", "hip-30438", "hip-69673", "hip-71683", "hip-91262", "hip-24436", "hip-24608"] },
+  { id: "nearby-stars", labelKey: "guided.nearbyStars", keys: ["proxima-cen", "barnards-star", "eps-eri", "tau-cet", "gj-411"] },
+  { id: "small-bodies", labelKey: "guided.smallBodies", keys: ["jpl-sbdb-20000001", "jpl-sbdb-20000004", "jpl-sbdb-20000433", "jpl-sbdb-1000036"] },
+  { id: "exoplanets", labelKey: "guided.exoplanetSystems", keys: ["exosys-trappist-1", "exosys-55-cnc", "exosys-hr-8799", "exosys-kepler-11", "exosys-toi-700", "exosys-lhs-1140"] },
+  { id: "deep-sky", labelKey: "guided.messierHighlights", keys: ["m1", "m13", "m31", "m42", "m45", "m57"] },
+  { id: "galaxies", labelKey: "guided.galaxies", keys: ["m31", "m33", "m51", "m81", "m82", "m87"] },
+  { id: "active-galaxies", labelKey: "guided.activeGalaxies", keys: ["simbad-m-87", "simbad-3c-273", "simbad-ngc-1068", "simbad-3c-279"] },
+  { id: "nebulae", labelKey: "guided.nebulae", keys: ["m1", "m8", "m16", "m17", "m20", "m42", "m57"] }
 ];
 const TIME_STEPS = [
-  { label: "1 day", days: 1 },
-  { label: "1 week", days: 7 },
-  { label: "1 month", days: 30 },
-  { label: "1 year", days: 365.25 },
-  { label: "10 years", days: 3652.5 },
-  { label: "1 century", days: 36_525 },
-  { label: "1 millennium", days: 365_250 },
-  { label: "10,000 years", days: 3_652_500 },
-  { label: "1 million years", days: 365_250_000 }
+  { labelKey: "time.oneDay", days: 1 },
+  { labelKey: "time.oneWeek", days: 7 },
+  { labelKey: "time.oneMonth", days: 30 },
+  { labelKey: "time.oneYear", days: 365.25 },
+  { labelKey: "time.tenYears", days: 3652.5 },
+  { labelKey: "time.oneCentury", days: 36_525 },
+  { labelKey: "time.oneMillennium", days: 365_250 },
+  { labelKey: "time.tenThousandYears", days: 3_652_500 },
+  { labelKey: "time.oneMillionYears", days: 365_250_000 }
 ];
 const MAX_COMPARISON_DIAMETER_PX = 112;
 
@@ -669,9 +669,9 @@ requestRender({ data: true });
 
 async function loadAtlas(timestampIso?: string) {
   loadingStartedAt = performance.now();
-  setLoading("api", 8, "Connecting to local API");
+  setLoading("api", 8, t("loading.connecting"));
   setError("");
-  loadState.textContent = "loading";
+  loadState.textContent = t("status.loading");
 
   try {
     const query = new URLSearchParams();
@@ -679,14 +679,14 @@ async function loadAtlas(timestampIso?: string) {
     if (timestampIso) query.set("timestamp", timestampIso);
     const preservedBodies = [selectedKey ? bodyByKey.get(selectedKey) : null, compareTargetKey ? bodyByKey.get(compareTargetKey) : null].filter(isPresent);
     const url = `/api/ephemeris${query.toString() ? `?${query.toString()}` : ""}`;
-    setLoading("download", 28, "Loading core ephemeris payload");
+    setLoading("download", 28, t("loading.corePayload"));
     const response = await fetch(url);
     if (!response.ok) {
       const message = await response.text();
       throw new Error(message || `API request failed with ${response.status}`);
     }
 
-    setLoading("parse", 64, "Indexing celestial objects");
+    setLoading("parse", 64, t("loading.indexing"));
     const payload = (await response.json()) as Ephemeris;
     const bodies = mergeBodyList(payload.bodies, preservedBodies);
     ephemeris = { ...payload, bodies };
@@ -705,24 +705,32 @@ async function loadAtlas(timestampIso?: string) {
     timeInput.value = toDatetimeLocalValue(new Date(payload.timestamp_utc));
     recentDestinations = readRecentDestinations();
 
-    setLoading("render", 88, "Preparing scientific controls");
+    setLoading("render", 88, t("loading.controls"));
     updateAllUi();
     if (payload.bodies.length > 0 && activeZoomPreset) {
       applyZoomPreset(activeZoomPreset, false);
     }
     requestDataRefresh({ immediate: true });
     loadingScreen.hidden = true;
-    loadState.textContent = "ready";
+    loadState.textContent = t("status.ready");
     requestRender();
   } catch (error) {
-    loadState.textContent = "error";
+    loadState.textContent = t("status.error");
     setError(error instanceof Error ? error.message : String(error));
-    loadingDetail.textContent = "Unable to load the atlas data.";
-    loadingProgressLabel.textContent = "error";
+    loadingDetail.textContent = t("error.unableLoad");
+    loadingProgressLabel.textContent = t("status.error");
   }
 }
 
 function bindEvents() {
+  window.addEventListener("cosmic-atlas:locale-change", () => {
+    if (loadingScreen.hidden) loadState.textContent = errorPanel.hidden ? t("status.ready") : t("status.error");
+    updateAllUi();
+    updateTimeSummary();
+    updateTimeStepUi();
+    requestRender({ data: true });
+  });
+
   window.addEventListener("resize", () => {
     resizeCanvas();
     updateSelectedPanelMetrics();
@@ -781,7 +789,7 @@ function bindEvents() {
   mobileScaleToggle?.addEventListener("click", () => {
     const isExpanded = mapHud.classList.toggle("scale-expanded");
     mobileScaleToggle.setAttribute("aria-expanded", String(isExpanded));
-    mobileScaleToggle.setAttribute("aria-label", isExpanded ? "Collapse scale controls" : "Expand scale controls");
+    mobileScaleToggle.setAttribute("aria-label", isExpanded ? t("scale.collapse") : t("scale.expand"));
   });
 
   bodyFilterButtons.addEventListener("click", (event) => {
@@ -1649,17 +1657,17 @@ function updateStats() {
   const pointLayerShown = activeCatalogPointCount();
   const representedTotal = visibleBodies().length + pointLayerShown;
   atlasStats.innerHTML = `
-    <div title="${formatInteger(catalogTotal)} indexed objects"><dt>Catalog</dt><dd>${formatCount(catalogTotal)}</dd></div>
-    <div title="${formatInteger(representedTotal)} selectable objects and real catalog points in the current view"><dt>Shown</dt><dd>${formatCount(representedTotal)}</dd></div>
-    <div title="${formatInteger(starTotal)} catalog stars"><dt>Stars</dt><dd>${formatCount(starTotal)}</dd></div>
-    <div title="${formatInteger(smallBodyTotal)} catalog small bodies"><dt>Small bodies</dt><dd>${formatCount(smallBodyTotal)}</dd></div>
-    <div title="${formatInteger(deepSkyTotal)} catalog deep-sky objects"><dt>Deep sky</dt><dd>${formatCount(deepSkyTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.indexedObjects", { count: formatInteger(catalogTotal) }))}"><dt>${escapeHtml(t("status.catalog"))}</dt><dd>${formatCount(catalogTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.selectableObjects", { count: formatInteger(representedTotal) }))}"><dt>${escapeHtml(t("status.shown"))}</dt><dd>${formatCount(representedTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.catalogStars", { count: formatInteger(starTotal) }))}"><dt>${escapeHtml(t("status.stars"))}</dt><dd>${formatCount(starTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.catalogSmallBodies", { count: formatInteger(smallBodyTotal) }))}"><dt>${escapeHtml(t("status.smallBodies"))}</dt><dd>${formatCount(smallBodyTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.catalogDeepSky", { count: formatInteger(deepSkyTotal) }))}"><dt>${escapeHtml(t("status.deepSky"))}</dt><dd>${formatCount(deepSkyTotal)}</dd></div>
   `;
-  const representedLabel = pointLayerShown > 0 ? `${formatCount(representedTotal)} shown · ` : "";
+  const representedLabel = pointLayerShown > 0 ? `${t("status.shownInline", { count: formatCount(representedTotal) })} · ` : "";
   catalogCount.textContent =
     catalogTotal > ephemeris.bodies.length
-      ? `${formatCount(catalogTotal)} indexed · ${representedLabel}${formatInteger(ephemeris.bodies.length)} selectable`
-      : `${formatInteger(ephemeris.bodies.length)} objects`;
+      ? `${t("status.indexedInline", { count: formatCount(catalogTotal) })} · ${representedLabel}${t("status.selectableInline", { count: formatInteger(ephemeris.bodies.length) })}`
+      : t("status.objects", { count: formatInteger(ephemeris.bodies.length) });
 }
 
 function updatePerfHud() {
@@ -1736,7 +1744,7 @@ function updateSelectedSummary() {
   selectedObjectPanel.hidden = false;
   const typeLabel = classifyBody(body).label;
   selectedSummaryName.textContent = body.name;
-  selectedSummaryMeta.textContent = `${typeLabel} · ${formatDistance(body.distance_from_earth_km)} from Earth`;
+  selectedSummaryMeta.textContent = `${typeLabel} · ${formatDistance(body.distance_from_earth_km)} ${t("object.fromEarth")}`;
   selectedSummaryOrb.style.setProperty("--body-color", body.color || "#d8a23f");
   centerSelected.disabled = false;
   zoomSelected.disabled = false;
@@ -1773,9 +1781,9 @@ function updateTabs() {
   }
   workspaceSearchLink.hidden = activeTab !== "object" || !hasSelectedBody;
   workspaceLabel.hidden = activeTab === "object" && hasSelectedBody;
-  workspaceLabel.textContent = activeTab ? WORKSPACE_LABELS[activeTab] : "Workspace";
-  closePanel.textContent = activeTab === "object" && hasSelectedBody ? "Deselect" : "Close";
-  closePanel.setAttribute("aria-label", activeTab === "object" && hasSelectedBody ? "Deselect current object" : "Close workspace");
+  workspaceLabel.textContent = activeTab ? t(WORKSPACE_LABEL_KEYS[activeTab]) : t("workspace.title");
+  closePanel.textContent = activeTab === "object" && hasSelectedBody ? t("workspace.deselect") : t("workspace.close");
+  closePanel.setAttribute("aria-label", activeTab === "object" && hasSelectedBody ? t("workspace.deselectCurrent") : t("workspace.close"));
   for (const button of tabButtons) {
     button.classList.toggle("active", button.dataset.tab === activeTab);
     button.setAttribute("aria-selected", String(button.dataset.tab === activeTab));
@@ -1810,7 +1818,7 @@ function renderFilterButtons(active: BodyFilter) {
   return BODY_FILTERS.map(
     (filter) => `
       <button type="button" data-body-filter="${filter.key}" class="${filter.key === active ? "active" : ""}">
-        ${escapeHtml(filter.label)}
+        ${escapeHtml(t(filter.labelKey))}
       </button>
     `
   ).join("");
@@ -2750,7 +2758,7 @@ async function updateBodyPicker() {
     activeKey: selectedKey,
     currentTargetKey: selectedKey,
     guidedSet: activeGuidedSet(),
-    emptyMessage: "No objects match this view."
+    emptyMessage: t("search.noObjects")
   });
 }
 
@@ -2810,7 +2818,7 @@ async function updateSearchPicker(config: PickerSearchConfig) {
 
   if (guidedSet || config.filter.key !== "all" || query) {
     const items = buildDestinationPickerItems(sourceBodies, buildOptions);
-    const label = query ? "Results" : guidedSet?.label ?? config.filter.label;
+    const label = query ? t("search.resultsLabel") : guidedSet ? t(guidedSet.labelKey) : t(config.filter.labelKey);
     renderPickerSections(config.picker, [{ label, items }], config.emptyMessage, config.activeKey);
   } else {
     const sections = buildDestinationPickerSections(sourceBodies, buildOptions);
@@ -2864,8 +2872,8 @@ function updateGuidedSets() {
     if (available.length === 0) return "";
     return `
       <button type="button" data-tour-id="${escapeHtml(tour.id)}" class="${tour.id === activeGuidedSetId ? "active" : ""}">
-        <strong>${escapeHtml(tour.label)}</strong>
-        <span>${available.length} objects</span>
+        <strong>${escapeHtml(t(tour.labelKey))}</strong>
+        <span>${escapeHtml(t("search.objectsCount", { count: available.length }))}</span>
       </button>
     `;
   }).join("");
@@ -2892,21 +2900,21 @@ function updateBodyInfo() {
   const positionModel = readablePositionModel(body.catalog?.position_model ?? body.catalog?.source_type ?? "");
   const parentBody = body.parent_key ? bodyByKey.get(body.parent_key) ?? null : null;
   const overviewRows = [
-    ["Type", classification.label],
-    ["Radius", body.radius_km > 0 ? formatDistance(body.radius_km) : "Unknown"],
-    ["Parent", parentBody?.name ?? body.parent_key ?? null],
-    ["Catalog group", readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)]
+    [t("field.type"), classification.label],
+    [t("field.radius"), body.radius_km > 0 ? formatDistance(body.radius_km) : t("value.unknown")],
+    [t("field.parent"), parentBody?.name ?? body.parent_key ?? null],
+    [t("field.catalogGroup"), readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)]
   ];
   const primaryStats = [
-    ["Earth distance", formatDistance(body.distance_from_earth_km)],
-    ["Diameter", body.radius_km > 0 ? formatDistance(body.radius_km * 2) : "Unknown"],
-    ["Heliocentric", formatDistance(body.position.heliocentric_distance_km)]
+    [t("field.earthDistance"), formatDistance(body.distance_from_earth_km)],
+    [t("field.diameter"), body.radius_km > 0 ? formatDistance(body.radius_km * 2) : t("value.unknown")],
+    [t("field.heliocentric"), formatDistance(body.position.heliocentric_distance_km)]
   ];
 
   const positionRows = [
-    ["Coordinate frame", ephemeris?.coordinate_frame ?? null],
-    ["Position model", positionModel],
-    ["RA / Dec", formatRaDec(body)],
+    [t("field.coordinateFrame"), ephemeris?.coordinate_frame ?? null],
+    [t("field.positionModel"), positionModel],
+    [t("field.raDec"), formatRaDec(body)],
     ["X", formatAuCoordinate(body.position.x_au)],
     ["Y", formatAuCoordinate(body.position.y_au)],
     ["Z", formatAuCoordinate(body.position.z_au)]
@@ -2914,24 +2922,24 @@ function updateBodyInfo() {
 
   const stateRows = body.state_vector
     ? [
-        ["Parent-relative speed", `${formatNumber(body.state_vector.speed_km_s)} km/s`],
-        ["Heliocentric speed", `${formatNumber(body.state_vector.heliocentric_speed_km_s)} km/s`],
-        ["Parent-relative distance", formatDistance(body.state_vector.distance_km)]
+        [t("field.parentRelativeSpeed"), `${formatNumber(body.state_vector.speed_km_s)} km/s`],
+        [t("field.heliocentricSpeed"), `${formatNumber(body.state_vector.heliocentric_speed_km_s)} km/s`],
+        [t("field.parentRelativeDistance"), formatDistance(body.state_vector.distance_km)]
       ]
     : [];
 
   const orbitRows = body.orbit
     ? [
-        ["Orbit class", body.orbit.orbit_class],
-        ["Semi-major axis", nullableDistance(body.orbit.semi_major_axis_km)],
-        ["Eccentricity", nullableNumber(body.orbit.eccentricity, 4)],
-        ["Inclination", nullableDegrees(body.orbit.inclination_deg)],
-        ["Periapsis", nullableDistance(body.orbit.periapsis_km)],
-        ["Apoapsis", nullableDistance(body.orbit.apoapsis_km)],
-        ["Ascending node", nullableDegrees(body.orbit.longitude_of_ascending_node_deg)],
-        ["Argument of periapsis", nullableDegrees(body.orbit.argument_of_periapsis_deg)],
-        ["True anomaly", nullableDegrees(body.orbit.true_anomaly_deg)],
-        ["Period", nullableDays(body.orbit.orbital_period_days)]
+        [t("field.orbitClass"), body.orbit.orbit_class],
+        [t("field.semiMajorAxis"), nullableDistance(body.orbit.semi_major_axis_km)],
+        [t("field.eccentricity"), nullableNumber(body.orbit.eccentricity, 4)],
+        [t("field.inclination"), nullableDegrees(body.orbit.inclination_deg)],
+        [t("field.periapsis"), nullableDistance(body.orbit.periapsis_km)],
+        [t("field.apoapsis"), nullableDistance(body.orbit.apoapsis_km)],
+        [t("field.ascendingNode"), nullableDegrees(body.orbit.longitude_of_ascending_node_deg)],
+        [t("field.argumentOfPeriapsis"), nullableDegrees(body.orbit.argument_of_periapsis_deg)],
+        [t("field.trueAnomaly"), nullableDegrees(body.orbit.true_anomaly_deg)],
+        [t("field.period"), nullableDays(body.orbit.orbital_period_days)]
       ]
     : [];
 
@@ -2939,57 +2947,57 @@ function updateBodyInfo() {
     ? [
         ["HIP", body.stellar.hip ? `HIP ${body.stellar.hip}` : null],
         ["HD", body.stellar.hd ? `HD ${body.stellar.hd}` : null],
-        ["Catalog distance", nullableLightYears(body.stellar.distance_ly)],
-        ["Parallax", body.stellar.parallax_mas ? `${formatNumber(body.stellar.parallax_mas)} mas` : null],
-        ["Apparent magnitude", nullableNumber(body.stellar.apparent_magnitude, 2)],
-        ["Absolute magnitude", nullableNumber(body.stellar.absolute_magnitude, 2)],
-        ["B-V color index", nullableNumber(body.stellar.bv_color_index, 3)],
-        ...(body.stellar.exoplanet_count != null ? [["Known planets", nullableNumber(body.stellar.exoplanet_count, 0)]] : []),
-        ...(body.stellar.stellar_teff_k ? [["Temperature", `${formatNumber(body.stellar.stellar_teff_k)} K`]] : []),
-        ...(body.stellar.stellar_mass_solar ? [["Mass", `${formatNumber(body.stellar.stellar_mass_solar)} Solar masses`]] : []),
-        ...(body.stellar.stellar_radius_solar ? [["Radius", `${formatNumber(body.stellar.stellar_radius_solar)} Solar radii`]] : []),
-        ...(body.stellar.spectral_type ? [["Spectral type", body.stellar.spectral_type]] : []),
-        ["Radius source", body.stellar.stellar_radius_source ?? null]
+        [t("field.catalogDistance"), nullableLightYears(body.stellar.distance_ly)],
+        [t("field.parallax"), body.stellar.parallax_mas ? `${formatNumber(body.stellar.parallax_mas)} mas` : null],
+        [t("field.apparentMagnitude"), nullableNumber(body.stellar.apparent_magnitude, 2)],
+        [t("field.absoluteMagnitude"), nullableNumber(body.stellar.absolute_magnitude, 2)],
+        [t("field.bvColorIndex"), nullableNumber(body.stellar.bv_color_index, 3)],
+        ...(body.stellar.exoplanet_count != null ? [[t("field.knownPlanets"), nullableNumber(body.stellar.exoplanet_count, 0)]] : []),
+        ...(body.stellar.stellar_teff_k ? [[t("field.temperature"), `${formatNumber(body.stellar.stellar_teff_k)} K`]] : []),
+        ...(body.stellar.stellar_mass_solar ? [[t("field.mass"), `${formatNumber(body.stellar.stellar_mass_solar)} ${t("value.solarMasses")}`]] : []),
+        ...(body.stellar.stellar_radius_solar ? [[t("field.radius"), `${formatNumber(body.stellar.stellar_radius_solar)} ${t("value.solarRadii")}`]] : []),
+        ...(body.stellar.spectral_type ? [[t("field.spectralType"), body.stellar.spectral_type]] : []),
+        [t("field.radiusSource"), body.stellar.stellar_radius_source ?? null]
       ]
     : [];
 
   const exoplanetRows = body.exoplanet_system
     ? [
-        ["Confirmed planets", nullableNumber(body.exoplanet_system.confirmed_planet_count ?? body.exoplanet_system.planets?.length, 0)],
-        ["Stars in system", nullableNumber(body.exoplanet_system.system_star_count, 0)],
-        ["Moons in archive", nullableNumber(body.exoplanet_system.system_moon_count, 0)]
+        [t("field.confirmedPlanets"), nullableNumber(body.exoplanet_system.confirmed_planet_count ?? body.exoplanet_system.planets?.length, 0)],
+        [t("field.starsInSystem"), nullableNumber(body.exoplanet_system.system_star_count, 0)],
+        [t("field.moonsInArchive"), nullableNumber(body.exoplanet_system.system_moon_count, 0)]
       ]
     : [];
 
   const deepSkyRows = body.deep_sky
     ? [
-        ["Common name", body.deep_sky.common_name ?? null],
-        ["Deep-sky type", body.deep_sky.deep_sky_type_label ?? "Unknown"],
-        ["Magnitude", nullableNumber(body.deep_sky.apparent_magnitude, 1)],
-        ["Constellation", body.deep_sky.constellation ?? "Unknown"],
-        ["Viewing season", body.deep_sky.viewing_season ?? "Unknown"],
-        ["Angular size", body.deep_sky.angular_size_arcmin ?? "Unknown"],
-        ["Physical diameter", body.deep_sky.physical_diameter_ly ? `${formatNumber(body.deep_sky.physical_diameter_ly)} ly` : "Unknown"],
-        ["Minor diameter", body.deep_sky.physical_minor_diameter_ly ? `${formatNumber(body.deep_sky.physical_minor_diameter_ly)} ly` : null],
-        ["Size note", body.deep_sky.physical_size_note ?? null],
-        ["Equipment", body.deep_sky.observing_equipment ?? null]
+        [t("field.commonName"), body.deep_sky.common_name ?? null],
+        [t("field.deepSkyType"), body.deep_sky.deep_sky_type_label ?? t("value.unknown")],
+        [t("field.magnitude"), nullableNumber(body.deep_sky.apparent_magnitude, 1)],
+        [t("field.constellation"), body.deep_sky.constellation ?? t("value.unknown")],
+        [t("field.viewingSeason"), body.deep_sky.viewing_season ?? t("value.unknown")],
+        [t("field.angularSize"), body.deep_sky.angular_size_arcmin ?? t("value.unknown")],
+        [t("field.physicalDiameter"), body.deep_sky.physical_diameter_ly ? `${formatNumber(body.deep_sky.physical_diameter_ly)} ly` : t("value.unknown")],
+        [t("field.minorDiameter"), body.deep_sky.physical_minor_diameter_ly ? `${formatNumber(body.deep_sky.physical_minor_diameter_ly)} ly` : null],
+        [t("field.sizeNote"), body.deep_sky.physical_size_note ?? null],
+        [t("field.equipment"), body.deep_sky.observing_equipment ?? null]
       ]
     : [];
 
   const smallBodyRows = body.small_body
     ? [
-        ["Orbit class", body.small_body.orbit_class ?? "Unknown"],
-        ["Near-Earth object", body.small_body.neo == null ? null : body.small_body.neo ? "Yes" : "No"],
-        ["Potentially hazardous", body.small_body.pha == null ? null : body.small_body.pha ? "Yes" : "No"],
-        ["Diameter", body.small_body.diameter_km ? formatDistance(body.small_body.diameter_km) : body.small_body.estimated_diameter_km ? `${formatDistance(body.small_body.estimated_diameter_km)} estimated` : null],
-        ["Absolute magnitude H", nullableNumber(body.small_body.h_absolute_magnitude, 2)],
-        ["Semi-major axis", body.small_body.semi_major_axis_au ? `${formatNumber(body.small_body.semi_major_axis_au)} AU` : null],
-        ["Perihelion", body.small_body.perihelion_au ? `${formatNumber(body.small_body.perihelion_au)} AU` : null],
-        ["Aphelion", body.small_body.aphelion_au ? `${formatNumber(body.small_body.aphelion_au)} AU` : null],
-        ["Eccentricity", nullableNumber(body.small_body.eccentricity, 4)],
-        ["Inclination", nullableDegrees(body.small_body.inclination_deg)],
-        ["Period", nullableDays(body.small_body.orbital_period_days)],
-        ["Earth MOID", body.small_body.earth_moid_au ? `${formatNumber(body.small_body.earth_moid_au)} AU` : null]
+        [t("field.orbitClass"), body.small_body.orbit_class ?? t("value.unknown")],
+        [t("field.nearEarthObject"), body.small_body.neo == null ? null : body.small_body.neo ? t("value.yes") : t("value.no")],
+        [t("field.potentiallyHazardous"), body.small_body.pha == null ? null : body.small_body.pha ? t("value.yes") : t("value.no")],
+        [t("field.diameter"), body.small_body.diameter_km ? formatDistance(body.small_body.diameter_km) : body.small_body.estimated_diameter_km ? `${formatDistance(body.small_body.estimated_diameter_km)} ${t("value.estimated")}` : null],
+        [t("field.absoluteMagnitudeH"), nullableNumber(body.small_body.h_absolute_magnitude, 2)],
+        [t("field.semiMajorAxis"), body.small_body.semi_major_axis_au ? `${formatNumber(body.small_body.semi_major_axis_au)} AU` : null],
+        [t("field.perihelion"), body.small_body.perihelion_au ? `${formatNumber(body.small_body.perihelion_au)} AU` : null],
+        [t("field.aphelion"), body.small_body.aphelion_au ? `${formatNumber(body.small_body.aphelion_au)} AU` : null],
+        [t("field.eccentricity"), nullableNumber(body.small_body.eccentricity, 4)],
+        [t("field.inclination"), nullableDegrees(body.small_body.inclination_deg)],
+        [t("field.period"), nullableDays(body.small_body.orbital_period_days)],
+        [t("field.earthMoid"), body.small_body.earth_moid_au ? `${formatNumber(body.small_body.earth_moid_au)} AU` : null]
       ]
     : [];
 
@@ -3000,14 +3008,14 @@ function updateBodyInfo() {
         ${renderFactTiles(primaryStats)}
         ${renderIdentifierSection(body)}
         ${renderMediaSection(body)}
-        ${renderDataSection("Overview", overviewRows)}
-        ${renderDataSection("Position", positionRows)}
-        ${renderDataSection("Motion", stateRows)}
-        ${renderDataSection("Orbit", orbitRows)}
-        ${renderDataSection("Stellar facts", stellarRows)}
-        ${renderDataSection("Confirmed exoplanets", exoplanetRows, renderExoplanetList(body.exoplanet_system?.planets ?? []))}
-        ${renderDataSection("Deep-sky facts", deepSkyRows)}
-        ${renderDataSection("Small-body facts", smallBodyRows)}
+        ${renderDataSection(t("section.overview"), overviewRows)}
+        ${renderDataSection(t("section.position"), positionRows)}
+        ${renderDataSection(t("section.motion"), stateRows)}
+        ${renderDataSection(t("section.orbit"), orbitRows)}
+        ${renderDataSection(t("section.stellarFacts"), stellarRows)}
+        ${renderDataSection(t("section.confirmedExoplanets"), exoplanetRows, renderExoplanetList(body.exoplanet_system?.planets ?? []))}
+        ${renderDataSection(t("section.deepSkyFacts"), deepSkyRows)}
+        ${renderDataSection(t("section.smallBodyFacts"), smallBodyRows)}
         ${renderObjectNotes(body)}
         ${renderSourceSection(body)}
         ${renderRelatedObjects(body)}
@@ -3019,8 +3027,8 @@ function updateBodyInfo() {
 function renderObjectEmptyState() {
   return `
     <section class="object-empty-state">
-      <h2>No object selected</h2>
-      <p>Search the catalog or select a point on the atlas to open its scientific object page.</p>
+      <h2>${escapeHtml(t("object.noSelectionTitle"))}</h2>
+      <p>${escapeHtml(t("object.noSelectionBody"))}</p>
     </section>
   `;
 }
@@ -3029,8 +3037,8 @@ function renderObjectDetailState(body: Body) {
   if (!body.catalog?.preview) return "";
   return `
     <section class="object-detail-state" aria-label="Object detail state">
-      <strong>Catalog preview</strong>
-      <span>Showing the indexed catalog record. Full orbital or physical detail appears when that source exposes it.</span>
+      <strong>${escapeHtml(t("object.catalogPreview"))}</strong>
+      <span>${escapeHtml(t("object.catalogPreviewBody"))}</span>
     </section>
   `;
 }
@@ -3041,7 +3049,7 @@ function renderIdentifierSection(body: Body) {
   if (aliases.length === 0 && identifiers.length === 0) return "";
   return `
     <section class="data-section object-identifiers">
-      <h4>Aliases and IDs</h4>
+      <h4>${escapeHtml(t("object.aliasesIds"))}</h4>
       ${aliases.length ? `<div class="identifier-chips">${aliases.map((alias) => `<span>${escapeHtml(alias)}</span>`).join("")}</div>` : ""}
       ${
         identifiers.length
@@ -3057,7 +3065,7 @@ function renderIdentifierSection(body: Body) {
 function renderMediaSection(body: Body) {
   return `
     <section class="data-section object-media-section">
-      <h4>Media</h4>
+      <h4>${escapeHtml(t("object.media"))}</h4>
       ${renderObjectMedia(body)}
     </section>
   `;
@@ -3068,7 +3076,7 @@ function renderObjectNotes(body: Body) {
   if (notes.length === 0) return "";
   return `
     <section class="data-section object-notes">
-      <h4>Scientific notes</h4>
+      <h4>${escapeHtml(t("object.scientificNotes"))}</h4>
       ${notes.map((note) => `<p class="object-note">${escapeHtml(note)}</p>`).join("")}
     </section>
   `;
@@ -3077,17 +3085,17 @@ function renderObjectNotes(body: Body) {
 function renderSourceSection(body: Body) {
   const links = externalLinksForBody(body);
   const sourceRows = [
-    ["Catalog source", readableOptionalModel(body.catalog?.source_type)],
-    ["Position model", readableOptionalModel(body.catalog?.position_model)],
-    ["Catalog group", readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)],
-    ["Atlas source", ephemeris?.data_source ?? null],
-    ["Epoch", ephemeris?.timestamp_utc ? formatFullDate(ephemeris.timestamp_utc) : null]
+    [t("field.catalogSource"), readableOptionalModel(body.catalog?.source_type)],
+    [t("field.positionModel"), readableOptionalModel(body.catalog?.position_model)],
+    [t("field.catalogGroup"), readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)],
+    [t("field.atlasSource"), ephemeris?.data_source ?? null],
+    [t("field.epoch"), ephemeris?.timestamp_utc ? formatFullDate(ephemeris.timestamp_utc) : null]
   ];
   const rows = renderRows(sourceRows);
   if (!rows && links.length === 0) return "";
   return `
     <section class="data-section object-sources">
-      <h4>Source links</h4>
+      <h4>${escapeHtml(t("object.sourceLinks"))}</h4>
       ${rows ? `<dl class="detail-grid">${rows}</dl>` : ""}
       ${
         links.length
@@ -3095,8 +3103,8 @@ function renderSourceSection(body: Body) {
               .map(
                 (link) => `
                   <a href="${escapeHtml(link.url ?? "")}" target="_blank" rel="noreferrer">
-                    <span>${escapeHtml(link.provider ?? "Source")}</span>
-                    <strong>${escapeHtml(link.label ?? "Open source record")}</strong>
+                    <span>${escapeHtml(link.provider ?? t("object.source"))}</span>
+                    <strong>${escapeHtml(link.label ?? t("object.openSourceRecord"))}</strong>
                   </a>
                 `
               )
@@ -3112,7 +3120,7 @@ function renderRelatedObjects(body: Body) {
   if (sections.length === 0) return "";
   return `
     <section class="data-section object-related">
-      <h4>Related objects</h4>
+      <h4>${escapeHtml(t("object.relatedObjects"))}</h4>
       <div class="related-section-list">
         ${sections
           .map(
@@ -3136,7 +3144,7 @@ function renderObjectMedia(body: Body) {
   if (!media) {
     const status = objectMediaStatusFor(body);
     return `
-      <section class="object-media object-media--empty" aria-label="Object media status">
+      <section class="object-media object-media--empty" aria-label="${escapeHtml(t("object.mediaStatus"))}">
         <div class="object-media__empty">
           <span class="object-media__badge">${escapeHtml(status.badge)}</span>
           <strong>${escapeHtml(status.title)}</strong>
@@ -3147,7 +3155,7 @@ function renderObjectMedia(body: Body) {
   }
 
   return `
-    <section class="object-media object-media--${escapeHtml(media.kind)}" aria-label="Object media">
+    <section class="object-media object-media--${escapeHtml(media.kind)}" aria-label="${escapeHtml(t("object.mediaLabel"))}">
       <div class="object-media__image">
         <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
         <span class="object-media__badge">${escapeHtml(media.badge)}</span>
@@ -3225,10 +3233,10 @@ function relatedObjectSections(body: Body): { title: string; bodies: Body[] }[] 
   };
 
   const parent = body.parent_key ? bodyByKey.get(body.parent_key) ?? null : null;
-  append("Parent body", parent ? [parent] : []);
-  append("Moons and children", childrenForBody(body).slice(0, 8));
-  append("Nearby in view", nearbyVisibleBodies(body).slice(0, 6));
-  append("Same catalog", sameCatalogNeighbors(body).slice(0, 6));
+  append(t("object.parentBody"), parent ? [parent] : []);
+  append(t("object.moonsChildren"), childrenForBody(body).slice(0, 8));
+  append(t("object.nearbyInView"), nearbyVisibleBodies(body).slice(0, 6));
+  append(t("object.sameCatalog"), sameCatalogNeighbors(body).slice(0, 6));
 
   return sections;
 }
@@ -3241,7 +3249,7 @@ function renderRelatedObjectButton(source: Body, related: Body) {
       <span class="body-orb"></span>
       <span>
         <strong>${escapeHtml(shortBodyName(related.name))}</strong>
-        <small>${escapeHtml(classification.label)} · ${escapeHtml(distanceLabel)} from ${escapeHtml(shortBodyName(source.name))}</small>
+        <small>${escapeHtml(classification.label)} · ${escapeHtml(distanceLabel)} ${escapeHtml(t("object.fromSource", { name: shortBodyName(source.name) }))}</small>
       </span>
     </button>
   `;
@@ -3286,11 +3294,11 @@ function renderExoplanetList(planets: BodyExoplanet[]) {
             planet.radius_earth ? `${formatNumber(planet.radius_earth)} Earth radii` : null,
             planet.discovery_year ? String(planet.discovery_year) : null
           ].filter(isPresent);
-          return `<li><strong>${escapeHtml(planet.name)}</strong><span>${escapeHtml(facts.join(" · ") || "Planet parameters incomplete")}</span></li>`;
+          return `<li><strong>${escapeHtml(planet.name)}</strong><span>${escapeHtml(facts.join(" · ") || t("object.planetParametersIncomplete"))}</span></li>`;
         })
         .join("")}
     </ol>
-    ${hiddenCount ? `<p class="object-note">${hiddenCount} more confirmed ${hiddenCount === 1 ? "planet" : "planets"} in this system.</p>` : ""}
+    ${hiddenCount ? `<p class="object-note">${escapeHtml(t("object.moreConfirmedPlanets", { count: hiddenCount, planetWord: t(hiddenCount === 1 ? "object.planetSingular" : "object.planetPlural") }))}</p>` : ""}
   `;
 }
 
@@ -3318,7 +3326,7 @@ function renderDataSection(title: string, rows: (string | number | null | undefi
 function renderRows(rows: (string | number | null | undefined)[][]) {
   return rows
     .filter(([, value]) => value !== null && value !== undefined && value !== "")
-    .map(([label, value]) => `<dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value ?? "Unknown"))}</dd>`)
+    .map(([label, value]) => `<dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value ?? t("value.unknown")))}</dd>`)
     .join("");
 }
 
@@ -3326,8 +3334,8 @@ function normalizeExternalLinks(links: readonly ExternalLink[]) {
   const seen = new Set<string>();
   return links
     .map((link) => ({
-      provider: typeof link.provider === "string" && link.provider.trim() ? link.provider.trim() : "Source",
-      label: typeof link.label === "string" && link.label.trim() ? link.label.trim() : "Open source record",
+      provider: typeof link.provider === "string" && link.provider.trim() ? link.provider.trim() : t("object.source"),
+      label: typeof link.label === "string" && link.label.trim() ? link.label.trim() : t("object.openSourceRecord"),
       url: typeof link.url === "string" ? link.url.trim() : ""
     }))
     .filter((link) => {
@@ -3371,7 +3379,7 @@ async function updateComparePicker() {
     activeKey: compareTargetKey,
     currentTargetKey: selected?.key ?? null,
     excludeKeys: [selected.key],
-    emptyMessage: "No comparison matches.",
+    emptyMessage: t("compare.noMatches"),
     queryForSearch: (query) => (target && query.toLowerCase() === target.name.toLowerCase() ? "" : query),
     afterRender: updateSelectedPanelMetrics
   });
@@ -3381,13 +3389,13 @@ function updateComparePanel() {
   const selected = selectedBody();
   const target = compareTarget();
   if (!selected) {
-    compareHeading.textContent = "Compare with another object";
+    compareHeading.textContent = t("compare.heading");
     comparePanel.innerHTML = "";
     updateSelectedPanelMetrics();
     return;
   }
 
-  compareHeading.textContent = `Compare ${selected.name}`;
+  compareHeading.textContent = t("compare.compareObject", { name: selected.name });
   if (!target) {
     comparePanel.innerHTML = `
       <section class="compare-card compare-card--empty">
@@ -3396,8 +3404,8 @@ function updateComparePanel() {
           <article class="compare-object compare-object--empty">
             <span>B</span>
             <div>
-              <strong>Choose object B</strong>
-              <small>Search below to compare distance and true size.</small>
+              <strong>${escapeHtml(t("compare.chooseObjectB"))}</strong>
+              <small>${escapeHtml(t("compare.searchToCompare"))}</small>
             </div>
           </article>
         </div>
@@ -3413,7 +3421,7 @@ function updateComparePanel() {
   comparePanel.innerHTML = `
     <section class="compare-card">
       <div class="compare-distance compare-distance--hero">
-        <span>Current distance</span>
+        <span>${escapeHtml(t("compare.currentDistance"))}</span>
         <strong>${escapeHtml(formatDistance(distanceKm))}</strong>
         <small>${escapeHtml(formatNumber(distanceKm / auKm()))} AU</small>
       </div>
@@ -3428,7 +3436,7 @@ function updateComparePanel() {
     <section class="size-compare-card">
       <div class="panel-head compact">
         <div>
-          <p class="eyebrow">True diameter ratio</p>
+          <p class="eyebrow">${escapeHtml(t("compare.trueDiameterRatio"))}</p>
           <h3>${escapeHtml(sizeComparison.ratioLabel)}</h3>
           <small>${escapeHtml(sizeComparison.scaleLabel)}</small>
         </div>
@@ -3444,7 +3452,7 @@ function updateComparePanel() {
 
 function renderCompareObject(body: Body, label: string) {
   const classification = classifyBody(body);
-  const radiusLabel = body.radius_km > 0 ? `${formatDistance(body.radius_km)} radius` : "radius unknown";
+  const radiusLabel = body.radius_km > 0 ? `${formatDistance(body.radius_km)} ${t("picker.radius")}` : t("compare.radiusUnknown");
   return `
     <article class="compare-object" style="--body-color: ${escapeHtml(body.color)}">
       <span>${label}</span>
@@ -3467,8 +3475,8 @@ function renderSizeDisk(body: Body, visual: SizeVisual) {
       </div>
       <figcaption>
         <strong>${escapeHtml(body.name)}</strong>
-        <span>${escapeHtml(formatDistance(body.radius_km * 2))} diameter</span>
-        ${visual.isSubpixel ? `<span class="size-subpixel-note">&lt;1 px at this scale</span>` : ""}
+        <span>${escapeHtml(formatDistance(body.radius_km * 2))} ${escapeHtml(t("field.diameter"))}</span>
+        ${visual.isSubpixel ? `<span class="size-subpixel-note">${escapeHtml(t("compare.subpixel"))}</span>` : ""}
       </figcaption>
     </figure>
   `;
@@ -3481,7 +3489,7 @@ function updateTimeSummary() {
 
 function updateTimeStepUi() {
   const step = currentTimeStep();
-  timeStepLabel.textContent = step.label;
+  timeStepLabel.textContent = t(step.labelKey);
 }
 
 function currentTimeStep() {
@@ -3514,11 +3522,11 @@ function updateScaleUi() {
   const pixelScale = formatDistance(auKm() / camera.pxPerAu);
   const viewScale = formatDistance(scaleAu * auKm());
   zoomScaleSlider.value = String(zoomLevel);
-  zoomScaleSlider.title = `1 px = ${pixelScale}`;
-  zoomScaleSlider.setAttribute("aria-valuetext", `${pixelScale} per pixel`);
+  zoomScaleSlider.title = t("scale.pixelEquals", { value: pixelScale });
+  zoomScaleSlider.setAttribute("aria-valuetext", t("scale.perPixel", { value: pixelScale }));
   zoomScaleLabel.textContent = `${zoomLevel} / ${ZOOM_SLIDER_STEPS}`;
-  zoomPixelScale.textContent = `1 px = ${pixelScale}`;
-  zoomViewScale.textContent = `View = ${viewScale}`;
+  zoomPixelScale.textContent = t("scale.pixelEquals", { value: pixelScale });
+  zoomViewScale.textContent = t("scale.viewEquals", { value: viewScale });
 }
 
 function currentViewWidthAu() {
@@ -4400,25 +4408,25 @@ function formatDistance(km: number) {
 }
 
 function nullableDistance(km: number | null | undefined) {
-  return typeof km === "number" && Number.isFinite(km) ? formatDistance(km) : "Unknown";
+  return typeof km === "number" && Number.isFinite(km) ? formatDistance(km) : t("value.unknown");
 }
 
 function nullableNumber(value: number | null | undefined, digits: number) {
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "Unknown";
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : t("value.unknown");
 }
 
 function nullableDegrees(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)} deg` : "Unknown";
+  return typeof value === "number" && Number.isFinite(value) ? t("value.degrees", { value: value.toFixed(2) }) : t("value.unknown");
 }
 
 function nullableDays(value: number | null | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "Unknown";
-  if (value >= 365) return `${(value / 365.25).toFixed(2)} years`;
-  return `${value.toFixed(2)} days`;
+  if (typeof value !== "number" || !Number.isFinite(value)) return t("value.unknown");
+  if (value >= 365) return t("value.years", { value: (value / 365.25).toFixed(2) });
+  return t("value.days", { value: value.toFixed(2) });
 }
 
 function nullableLightYears(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${formatNumber(value)} ly` : "Unknown";
+  return typeof value === "number" && Number.isFinite(value) ? `${formatNumber(value)} ly` : t("value.unknown");
 }
 
 function formatRaDec(body: Body) {
@@ -4524,7 +4532,7 @@ function formatFullDate(value: string) {
 }
 
 function readablePositionModel(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) || "Unknown";
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) || t("value.unknown");
 }
 
 function shortBodyName(name: string) {

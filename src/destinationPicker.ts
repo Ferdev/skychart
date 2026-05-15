@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 const DEFAULT_AU_KM = 149_597_870.7;
 const LIGHT_YEAR_KM = 9_460_730_472_580.8;
 const DEFAULT_COLOR = "#d9b86f";
@@ -258,23 +259,23 @@ const SOLAR_ORDER = new Map<string, number>([
   ["charon", 91]
 ]);
 
-const TYPE_LABELS: Record<DestinationBodyType, string> = {
-  star: "Star",
-  planet: "Planet",
-  moon: "Moon",
-  dwarf_planet: "Dwarf planet",
-  galaxy: "Galaxy",
-  quasar: "Quasar",
-  active_galaxy: "Active galaxy",
-  black_hole: "Black hole",
-  nebula: "Nebula",
-  star_cluster: "Star cluster",
-  asterism: "Asterism",
-  milky_way_patch: "Milky Way patch",
-  asteroid: "Asteroid",
-  comet: "Comet",
-  small_body: "Small body",
-  unknown: "Object"
+const TYPE_LABEL_KEYS: Record<DestinationBodyType, string> = {
+  star: "type.star",
+  planet: "type.planet",
+  moon: "type.moon",
+  dwarf_planet: "type.dwarfPlanet",
+  galaxy: "type.galaxy",
+  quasar: "type.quasar",
+  active_galaxy: "type.activeGalaxy",
+  black_hole: "type.blackHole",
+  nebula: "type.nebula",
+  star_cluster: "type.starCluster",
+  asterism: "type.asterism",
+  milky_way_patch: "type.milkyWayPatch",
+  asteroid: "type.asteroid",
+  comet: "type.comet",
+  small_body: "type.smallBody",
+  unknown: "type.object"
 };
 
 const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
@@ -322,7 +323,7 @@ export function classifyBody(body: Pick<DestinationBody, "key" | "name" | "radiu
 
   return {
     type,
-    label: TYPE_LABELS[type],
+    label: t(TYPE_LABEL_KEYS[type]),
     icon: TYPE_ICONS[type],
     sortGroup: TYPE_SORT_GROUPS[type]
   };
@@ -376,7 +377,7 @@ export function buildDestinationPickerSections(
   const query = normalizeText(options.query ?? "");
 
   if (query) {
-    return [{ kind: "results", label: "Results", items }];
+    return [{ kind: "results", label: t("picker.results"), items }];
   }
 
   const sections: DestinationPickerSection[] = [];
@@ -386,7 +387,7 @@ export function buildDestinationPickerSections(
 
   const favoriteItems = items.filter((item) => item.isFavorite).slice(0, maxFavorites);
   if (favoriteItems.length > 0) {
-    sections.push({ kind: "favorites", label: "Favorites", items: favoriteItems });
+    sections.push({ kind: "favorites", label: t("picker.favorites"), items: favoriteItems });
   }
 
   const promotedKeys = new Set(favoriteItems.map((item) => normalizeBodyKey(item.key)));
@@ -395,7 +396,7 @@ export function buildDestinationPickerSections(
     .sort((a, b) => b.frequencyCount - a.frequencyCount || compareNullableDateDesc(a.lastSelectedAtUtc, b.lastSelectedAtUtc))
     .slice(0, maxFrequent);
   if (frequentItems.length > 0) {
-    sections.push({ kind: "frequent", label: "Frequent", items: frequentItems });
+    sections.push({ kind: "frequent", label: t("picker.frequent"), items: frequentItems });
   }
   for (const item of frequentItems) promotedKeys.add(normalizeBodyKey(item.key));
 
@@ -404,11 +405,11 @@ export function buildDestinationPickerSections(
     .sort((a, b) => compareNullableDateDesc(a.lastSelectedAtUtc, b.lastSelectedAtUtc))
     .slice(0, maxRecent);
   if (recentItems.length > 0) {
-    sections.push({ kind: "recent", label: "Recent", items: recentItems });
+    sections.push({ kind: "recent", label: t("picker.recent"), items: recentItems });
   }
 
   if (options.includeAllSection ?? true) {
-    sections.push({ kind: "all", label: "All bodies", items });
+    sections.push({ kind: "all", label: t("picker.allBodies"), items });
   }
 
   return sections;
@@ -697,13 +698,13 @@ function destinationMetaLabel(body: DestinationBody, classification: BodyClassif
   if (exoplanetSystem) {
     const planetCount = exoplanetSystem.confirmed_planet_count ?? exoplanetSystem.planets?.length ?? 0;
     const starCount = exoplanetSystem.system_star_count;
-    const parts = ["Exoplanet system", `${planetCount} confirmed ${planetCount === 1 ? "planet" : "planets"}`];
-    if (starCount && starCount > 1) parts.push(`${starCount} stars`);
+    const parts = [t("picker.exoplanetSystem"), t("picker.confirmedPlanets", { count: planetCount, planetWord: t(planetCount === 1 ? "object.planetSingular" : "object.planetPlural") })];
+    if (starCount && starCount > 1) parts.push(t("picker.stars", { count: starCount }));
     return parts.join(" · ");
   }
 
   if (body.catalog_group === "bright_stars" && body.stellar) {
-    const parts = ["Bright star"];
+    const parts = [t("picker.brightStar")];
     if (typeof body.stellar.apparent_magnitude === "number") parts.push(`mag ${formatMagnitude(body.stellar.apparent_magnitude)}`);
     if (body.stellar.spectral_type) parts.push(body.stellar.spectral_type);
     if (body.stellar.hip) parts.push(`HIP ${body.stellar.hip}`);
@@ -711,7 +712,7 @@ function destinationMetaLabel(body: DestinationBody, classification: BodyClassif
   }
 
   const deepSky = body.deep_sky;
-  if (!deepSky) return `${classification.label} · ${radiusLabel} radius`;
+  if (!deepSky) return `${classification.label} · ${radiusLabel} ${t("picker.radius")}`;
 
   const parts = [deepSky.deep_sky_type_label || classification.label];
   if (typeof deepSky.apparent_magnitude === "number") parts.push(`mag ${formatMagnitude(deepSky.apparent_magnitude)}`);
@@ -818,11 +819,11 @@ function destinationBadges(flags: {
   isRecent: boolean;
 }): DestinationPickerBadge[] {
   const badges: DestinationPickerBadge[] = [];
-  if (flags.isCurrentTarget) badges.push({ kind: "target", label: "Target" });
-  if (flags.isSelected) badges.push({ kind: "selected", label: "Selected" });
-  if (flags.isFavorite) badges.push({ kind: "favorite", label: "Favorite" });
-  if (flags.isFrequent) badges.push({ kind: "frequent", label: "Frequent" });
-  if (flags.isRecent) badges.push({ kind: "recent", label: "Recent" });
+  if (flags.isCurrentTarget) badges.push({ kind: "target", label: t("picker.target") });
+  if (flags.isSelected) badges.push({ kind: "selected", label: t("picker.selected") });
+  if (flags.isFavorite) badges.push({ kind: "favorite", label: t("picker.favorite") });
+  if (flags.isFrequent) badges.push({ kind: "frequent", label: t("picker.frequent") });
+  if (flags.isRecent) badges.push({ kind: "recent", label: t("picker.recent") });
   return badges;
 }
 
@@ -833,7 +834,7 @@ function destinationAriaLabel(
   badges: readonly DestinationPickerBadge[]
 ): string {
   const badgeText = badges.length > 0 ? `, ${badges.map((badge) => badge.label).join(", ")}` : "";
-  return `${name}, ${typeLabel}, ${distanceLabel} from Earth${badgeText}`;
+  return `${name}, ${typeLabel}, ${distanceLabel} ${t("picker.fromEarth")}${badgeText}`;
 }
 
 function recentDestinationMap(destinations: readonly RecentDestination[]): Map<string, RecentDestination> {

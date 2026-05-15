@@ -96,7 +96,7 @@
             <button type="button" data-zoom-preset="solar"><span data-i18n="scale.solar">Solar</span><small>80 AU</small></button>
             <button type="button" data-zoom-preset="nearby"><span data-i18n="scale.nearby">Nearby</span><small>25 ly</small></button>
             <button type="button" data-zoom-preset="galaxy"><span data-i18n="scale.galaxy">Galaxy</span><small>100k ly</small></button>
-            <button type="button" data-zoom-preset="messier"><span>Messier</span><small>M catalog</small></button>
+            <button type="button" data-zoom-preset="messier"><span data-i18n="scale.messier">Messier</span><small data-i18n="scale.mCatalog">M catalog</small></button>
             <button type="button" data-zoom-preset="all"><span data-i18n="scale.all">All</span><small data-i18n="scale.deepSky">deep sky</small></button>
           </div>
           <div class="scale-options">
@@ -112,7 +112,7 @@
             </details>
             <details class="scale-collapse">
               <summary data-i18n="scale.overlays">Map overlays</summary>
-              <div class="display-toggles" id="display-toggles" aria-label="Display toggles">
+              <div class="display-toggles" id="display-toggles" aria-label="Display toggles" data-i18n-attrs="aria-label:scale.displayToggles">
                 <label><input type="checkbox" data-layer="labels" checked /> <span data-i18n="scale.labels">Labels</span></label>
                 <label><input type="checkbox" data-layer="orbits" checked /> <span data-i18n="scale.orbits">Orbits</span></label>
                 <label><input type="checkbox" data-layer="grid" checked /> <span data-i18n="scale.grid">Grid</span></label>
@@ -122,7 +122,7 @@
             </details>
             <details class="scale-collapse">
               <summary data-i18n="time.title">Time</summary>
-              <section class="scale-time" aria-label="Time controls">
+              <section class="scale-time" aria-label="Time controls" data-i18n-attrs="aria-label:time.controls">
                 <div class="section-heading">
                   <span data-i18n="time.position">Time position</span>
                   <button id="time-now" class="text-action" type="button" data-i18n="time.now">Now</button>
@@ -154,7 +154,7 @@
 
         <aside class="workspace-panel" id="workspace-panel" aria-label="Atlas workspace" data-i18n-attrs="aria-label:workspace.label" hidden>
           <div class="workspace-titlebar">
-            <div class="workspace-path" aria-label="Workspace path">
+            <div class="workspace-path" aria-label="Workspace path" data-i18n-attrs="aria-label:workspace.path">
               <button id="workspace-search-link" class="workspace-search-link" type="button" hidden data-i18n="workspace.search">Search</button>
               <span id="workspace-label" data-i18n="workspace.title">Workspace</span>
             </div>
@@ -170,13 +170,13 @@
                   <span id="selected-summary-meta"></span>
                 </div>
               </div>
-              <div class="object-actions" aria-label="Selected object actions">
+              <div class="object-actions" aria-label="Selected object actions" data-i18n-attrs="aria-label:object.actions">
                 <button id="center-selected" class="text-action" type="button" data-i18n="object.center">Center</button>
                 <button id="zoom-selected" class="text-action" type="button" data-i18n="object.zoom">Zoom</button>
               </div>
             </div>
             <div id="body-info" class="selected-object-details"></div>
-            <section class="selection-compare" aria-label="Compare selected object">
+            <section class="selection-compare" aria-label="Compare selected object" data-i18n-attrs="aria-label:compare.label">
               <div class="selection-compare-head">
                 <div>
                   <p class="eyebrow" data-i18n="compare.eyebrow">Compare</p>
@@ -186,24 +186,24 @@
               </div>
               <div id="compare-panel" class="compare-panel"></div>
               <div class="compare-target-card compare-search-workspace">
-                <section class="workspace-card search-primary" aria-label="Comparison lookup">
+                <section class="workspace-card search-primary" aria-label="Comparison lookup" data-i18n-attrs="aria-label:compare.lookup">
                   <label class="field-label" for="compare-search" data-i18n="search.query">Catalog query</label>
                   <div class="search-control catalog-search compare-search">
                     <input id="compare-search" type="search" autocomplete="off" placeholder="Object name or catalog designation" data-i18n-attrs="placeholder:search.placeholder" />
                     <button id="compare-focus" class="primary-action" type="button" data-i18n="search.use">Use</button>
                   </div>
                 </section>
-                <section class="workspace-section scope-section" aria-label="Comparison scope">
+                <section class="workspace-section scope-section" aria-label="Comparison scope" data-i18n-attrs="aria-label:compare.scope">
                   <div class="section-heading">
                     <span data-i18n="search.scope">Scope</span>
                   </div>
-                  <div class="body-picker-filters" id="compare-filter-buttons" aria-label="Comparison filters"></div>
+                  <div class="body-picker-filters" id="compare-filter-buttons" aria-label="Comparison filters" data-i18n-attrs="aria-label:compare.filters"></div>
                 </section>
-                <div class="workspace-section results-section" aria-label="Comparison results">
+                <div class="workspace-section results-section" aria-label="Comparison results" data-i18n-attrs="aria-label:compare.results">
                   <div class="section-heading">
                     <span data-i18n="search.matches">Matches</span>
                   </div>
-                  <div class="body-picker compare-picker" id="compare-picker" role="listbox" aria-label="Comparison objects"></div>
+                  <div class="body-picker compare-picker" id="compare-picker" role="listbox" aria-label="Comparison objects" data-i18n-attrs="aria-label:compare.objects"></div>
                 </div>
               </div>
             </section>
@@ -217,31 +217,31 @@
               </div>
               <span id="catalog-count"></span>
             </div>
-            <section class="workspace-card search-primary" aria-label="Catalog lookup">
+            <section class="workspace-card search-primary" aria-label="Catalog lookup" data-i18n-attrs="aria-label:search.lookup">
               <label class="field-label" for="body-search" data-i18n="search.query">Catalog query</label>
               <div class="search-control catalog-search">
                 <input id="body-search" type="search" autocomplete="off" placeholder="Object name or catalog designation" data-i18n-attrs="placeholder:search.placeholder" />
                 <button id="focus-body" class="primary-action" type="button" data-i18n="search.focus">Focus</button>
               </div>
-              <div class="quick-focus" id="quick-focus-buttons" aria-label="Featured objects" hidden></div>
+              <div class="quick-focus" id="quick-focus-buttons" aria-label="Featured objects" data-i18n-attrs="aria-label:search.featured" hidden></div>
             </section>
-            <section class="workspace-section scope-section" aria-label="Catalog scope">
+            <section class="workspace-section scope-section" aria-label="Catalog scope" data-i18n-attrs="aria-label:search.scope">
               <div class="section-heading">
                 <span data-i18n="search.scope">Scope</span>
               </div>
-              <div class="body-picker-filters" id="body-filter-buttons" aria-label="Object filters"></div>
+              <div class="body-picker-filters" id="body-filter-buttons" aria-label="Object filters" data-i18n-attrs="aria-label:search.filters"></div>
             </section>
-            <section class="workspace-section results-section" aria-label="Catalog results">
+            <section class="workspace-section results-section" aria-label="Catalog results" data-i18n-attrs="aria-label:search.results">
               <div class="section-heading">
                 <span data-i18n="search.matches">Matches</span>
               </div>
-              <div class="body-picker" id="body-picker" role="listbox" aria-label="Loaded celestial objects"></div>
+              <div class="body-picker" id="body-picker" role="listbox" aria-label="Loaded celestial objects" data-i18n-attrs="aria-label:search.loadedObjects"></div>
             </section>
-            <section class="workspace-section" aria-label="Guided object sets" hidden>
+            <section class="workspace-section" aria-label="Guided object sets" data-i18n-attrs="aria-label:guided.label" hidden>
               <div class="section-heading">
                 <span data-i18n="guided.title">Guided sets</span>
               </div>
-              <div class="tour-grid" id="guided-tours" aria-label="Guided object sets"></div>
+              <div class="tour-grid" id="guided-tours" aria-label="Guided object sets" data-i18n-attrs="aria-label:guided.label"></div>
             </section>
           </section>
           </div>
