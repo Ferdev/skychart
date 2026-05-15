@@ -813,9 +813,31 @@ button:disabled {
 }
 
 .destination-picker__item:hover,
-.destination-picker__item.is-selected {
+.destination-picker__item.is-selected,
+.destination-picker__item.is-active {
   border-color: rgba(216, 162, 63, 0.58);
   background: #fffaf0;
+}
+
+.destination-picker__item.is-active {
+  outline: 2px solid rgba(216, 162, 63, 0.72);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgba(216, 162, 63, 0.12);
+}
+
+.picker-status {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(21, 23, 20, 0.08);
+  border-radius: 8px;
+  color: rgba(21, 23, 20, 0.68);
+  background: rgba(255, 250, 240, 0.72);
+  font-size: 0.82rem;
+}
+
+.picker-status--fallback {
+  border-color: rgba(216, 162, 63, 0.32);
+  background: rgba(216, 162, 63, 0.1);
 }
 
 .destination-picker__orb {
