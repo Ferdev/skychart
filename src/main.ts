@@ -572,6 +572,7 @@ const timeStepSlider = requiredElement<HTMLInputElement>("#time-step-slider");
 const timeStepBack = requiredElement<HTMLButtonElement>("#time-step-back");
 const timeStepForward = requiredElement<HTMLButtonElement>("#time-step-forward");
 const zoomPresets = requiredElement<HTMLElement>("#zoom-presets");
+const mobileScaleToggle = document.querySelector<HTMLButtonElement>("#mobile-scale-toggle");
 const zoomOut = requiredElement<HTMLButtonElement>("#zoom-out");
 const zoomIn = requiredElement<HTMLButtonElement>("#zoom-in");
 const zoomScaleSlider = requiredElement<HTMLInputElement>("#zoom-scale-slider");
@@ -775,6 +776,11 @@ function bindEvents() {
     else setActiveTab(null);
   });
   workspaceSearchLink.addEventListener("click", () => clearSelectedObject({ openSearch: true }));
+  mobileScaleToggle?.addEventListener("click", () => {
+    const isExpanded = mapHud.classList.toggle("scale-expanded");
+    mobileScaleToggle.setAttribute("aria-expanded", String(isExpanded));
+    mobileScaleToggle.setAttribute("aria-label", isExpanded ? "Collapse scale controls" : "Expand scale controls");
+  });
 
   bodyFilterButtons.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
