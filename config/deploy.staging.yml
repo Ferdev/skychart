@@ -1,4 +1,5 @@
 service: skychart-staging
+image: ferdev/skychart-staging
 
 accessories:
   postgres:
