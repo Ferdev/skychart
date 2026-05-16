@@ -88,8 +88,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--group", default=DEFAULT_GROUP, help=f"Catalog group to write. Default: {DEFAULT_GROUP}")
     parser.add_argument(
         "--preset",
-        choices=["500pc-g14", "10kpc-g12"],
-        help="Import a known safe binned preset. 500pc-g14 imports G<=14 stars between 50 and 500 pc; 10kpc-g12 imports bright G<=12 stars between 500 pc and 10 kpc.",
+        choices=["500pc-g14", "10kpc-g12", "10kpc-g14"],
+        help="Import a known safe binned preset. 500pc-g14 imports G<=14 stars between 50 and 500 pc; 10kpc-g12 imports bright G<=12 stars between 500 pc and 10 kpc; 10kpc-g14 imports a denser G<=14 slice between 500 pc and 10 kpc.",
     )
     parser.add_argument("--limit", type=int, default=None, help="Optional TOP N limit for smoke tests.")
     parser.add_argument("--min-g-mag", type=float, default=DEFAULT_MIN_G_MAG)
@@ -437,7 +437,7 @@ def import_range(args: argparse.Namespace, *, delete_existing: bool) -> tuple[in
 
 def main() -> None:
     args = parse_args()
-    if args.preset == "10kpc-g12" and args.group == DEFAULT_GROUP:
+    if args.preset in {"10kpc-g12", "10kpc-g14"} and args.group == DEFAULT_GROUP:
         args.group = TEN_KPC_GROUP
 
     if args.skip_if_existing_at_least is not None:
@@ -476,20 +476,35 @@ def main() -> None:
         print(f"Preset {args.preset} imported {total_imported:,}{expected_label} Gaia rows into {args.group}.", flush=True)
         return
 
-    if args.preset == "10kpc-g12":
+    if args.preset in {"10kpc-g12", "10kpc-g14"}:
         args.min_parallax_mas = 0.1
         args.max_parallax_mas = 2.0
         args.min_parallax_over_error = 3.0
-        bins = [
-            (None, 8.0),
-            (8.0, 9.0),
-            (9.0, 10.0),
-            (10.0, 11.0),
-            (11.0, 11.25),
-            (11.25, 11.5),
-            (11.5, 11.75),
-            (11.75, 12.0)
-        ]
+        if args.preset == "10kpc-g14":
+            bins = [
+                (None, 8.0),
+                (8.0, 9.0),
+                (9.0, 10.0),
+                (10.0, 11.0),
+                (11.0, 12.0),
+                (12.0, 12.5),
+                (12.5, 13.0),
+                (13.0, 13.25),
+                (13.25, 13.5),
+                (13.5, 13.75),
+                (13.75, 14.0),
+            ]
+        else:
+            bins = [
+                (None, 8.0),
+                (8.0, 9.0),
+                (9.0, 10.0),
+                (10.0, 11.0),
+                (11.0, 11.25),
+                (11.25, 11.5),
+                (11.5, 11.75),
+                (11.75, 12.0),
+            ]
         total_imported = 0
         total_expected = 0
         for index, (min_g_mag, max_g_mag) in enumerate(bins):
