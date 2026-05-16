@@ -35,6 +35,16 @@ class StaticTileDefaultsTest(unittest.TestCase):
         self.assertEqual(sample_by_span[32], builder.POINT_SAMPLE_BUCKET_COUNT)
         self.assertEqual(sample_by_span[34], builder.POINT_SAMPLE_BUCKET_COUNT)
 
+    def test_default_layers_do_not_duplicate_heavy_gaia_rows(self) -> None:
+        builder = load_tile_builder()
+
+        layers = builder.parse_layers(",".join(builder.DEFAULT_LAYERS))
+        gaia_groups = set(builder.DEFAULT_GROUPS)
+        heavy_layers = [layer for layer in layers if gaia_groups.intersection(layer.groups)]
+
+        self.assertEqual([layer.id for layer in heavy_layers], ["gaia_stars"])
+        self.assertEqual(set(heavy_layers[0].groups), gaia_groups)
+
     def test_catalog_tile_workflow_supports_staging_and_production_shared_artifacts(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "catalog-tiles.yml").read_text(encoding="utf-8")
 
