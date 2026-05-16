@@ -275,7 +275,7 @@ function surveyFieldOfViewDeg(body: MediaLookupBody): number {
   if (angularMajorArcmin) return clamp((angularMajorArcmin / 60) * 2.1, 0.12, 1.6);
   if (body.object_type === "galaxy" || body.object_type === "nebula") return 0.5;
   if (body.object_type === "star_cluster" || body.object_type === "asterism") return 0.35;
-  if (body.object_type === "quasar" || body.object_type === "active_galaxy" || body.object_type === "black_hole") return 0.18;
+  if (body.object_type === "quasar" || body.object_type === "active_galaxy" || body.object_type === "black_hole" || body.object_type === "pulsar") return 0.18;
   return 0.12;
 }
 

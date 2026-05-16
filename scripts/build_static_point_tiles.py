@@ -31,13 +31,15 @@ DEFAULT_GROUPS = (
 )
 DEFAULT_LAYERS = (
     "gaia_stars:gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
-    "stars:core|bright_stars|nearby_exoplanet_systems|exoplanet_systems|gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
-    "exoplanet_systems:nearby_exoplanet_systems|exoplanet_systems:",
+    "stars:core|bright_stars|nearby_exoplanet_systems|exoplanet_systems|exoplanets|gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
+    "exoplanet_systems:nearby_exoplanet_systems|exoplanet_systems|exoplanets:",
     "small_bodies:jpl_small_bodies:asteroid|comet|small_body",
-    "deep_sky:messier_deep_sky|simbad_extragalactic:galaxy|quasar|active_galaxy|nebula|star_cluster",
+    "deep_sky:messier_deep_sky|simbad_extragalactic|simbad_compact_objects:galaxy|quasar|active_galaxy|black_hole|pulsar|nebula|star_cluster",
     "galaxies:messier_deep_sky|simbad_extragalactic:galaxy",
     "quasars:simbad_extragalactic:quasar",
     "active_galaxies:simbad_extragalactic:active_galaxy",
+    "black_holes:simbad_compact_objects:black_hole",
+    "pulsars:simbad_compact_objects:pulsar",
     "nebulae:messier_deep_sky:nebula",
     "star_clusters:messier_deep_sky:star_cluster",
 )

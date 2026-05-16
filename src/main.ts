@@ -45,6 +45,8 @@ type BodyFilter =
   | "galaxy"
   | "quasar"
   | "active_galaxy"
+  | "black_hole"
+  | "pulsar"
   | "nebula"
   | "star_cluster";
 type DisplayLayer = "labels" | "orbits" | "grid" | "milkyWay" | "references";
@@ -512,13 +514,15 @@ const BODY_FILTERS: BodyFilterDefinition[] = [
   },
   { key: "bright_star", labelKey: "filters.bright", types: ["star"], groups: ["bright_stars"] },
   { key: "gaia_star", labelKey: "filters.gaia", types: ["star"], groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"] },
-  { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems"] },
+  { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"] },
   { key: "dwarf_planet", labelKey: "filters.dwarf", types: ["dwarf_planet"], groups: ["core"] },
   { key: "small_body", labelKey: "filters.smallBodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
-  { key: "deep_sky", labelKey: "filters.deepSky", types: ["galaxy", "quasar", "active_galaxy", "nebula", "star_cluster"], groups: ["messier_deep_sky", "simbad_extragalactic"] },
+  { key: "deep_sky", labelKey: "filters.deepSky", types: ["galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"], groups: ["messier_deep_sky", "simbad_extragalactic", "simbad_compact_objects"] },
   { key: "galaxy", labelKey: "filters.galaxies", types: ["galaxy"], groups: ["messier_deep_sky", "simbad_extragalactic"] },
   { key: "quasar", labelKey: "filters.quasars", types: ["quasar"], groups: ["simbad_extragalactic"] },
   { key: "active_galaxy", labelKey: "filters.agn", types: ["active_galaxy"], groups: ["simbad_extragalactic"] },
+  { key: "black_hole", labelKey: "filters.blackHoles", types: ["black_hole"], groups: ["simbad_compact_objects"] },
+  { key: "pulsar", labelKey: "filters.pulsars", types: ["pulsar"], groups: ["simbad_compact_objects"] },
   { key: "nebula", labelKey: "filters.nebulae", types: ["nebula"], groups: ["messier_deep_sky"] },
   { key: "star_cluster", labelKey: "filters.clusters", types: ["star_cluster"], groups: ["messier_deep_sky"] }
 ];
@@ -2763,10 +2767,10 @@ function viewportCatalogRequest() {
 
 function viewportCatalogGroups(viewWidthLy: number) {
   if (viewWidthLy < 0.08) return ["jpl_small_bodies"];
-  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", "exoplanet_systems"];
-  if (viewWidthLy < 6_000) return ["bright_stars", "gaia_local_stars", "gaia_500pc_stars", "exoplanet_systems"];
-  if (viewWidthLy < 25_000) return ["bright_stars"];
-  return ["simbad_extragalactic", "messier_deep_sky"];
+  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", "exoplanet_systems", "exoplanets"];
+  if (viewWidthLy < 6_000) return ["bright_stars", "gaia_local_stars", "gaia_500pc_stars", "exoplanet_systems", "exoplanets", "simbad_compact_objects"];
+  if (viewWidthLy < 25_000) return ["bright_stars", "simbad_compact_objects"];
+  return ["simbad_extragalactic", "simbad_compact_objects", "messier_deep_sky"];
 }
 
 function viewportCatalogLimit(viewWidthLy: number) {
@@ -2846,7 +2850,7 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
   const facts = object.facts ?? {};
   const astrometry = object.astrometry ?? {};
   const objectType = normalizeDestinationType(object.object_type);
-  const isDeepSkyLike = ["galaxy", "nebula", "star_cluster", "quasar", "active_galaxy", "black_hole"].includes(objectType);
+  const isDeepSkyLike = ["galaxy", "nebula", "star_cluster", "quasar", "active_galaxy", "black_hole", "pulsar"].includes(objectType);
   const isSmallBodyLike = ["asteroid", "comet", "small_body"].includes(objectType);
 
   return {
@@ -2901,13 +2905,13 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
           }
         : null,
     exoplanet_system:
-      object.catalog_group === "exoplanet_systems" || object.catalog_group === "nearby_exoplanet_systems"
+      object.catalog_group === "exoplanet_systems" || object.catalog_group === "nearby_exoplanet_systems" || object.catalog_group === "exoplanets"
         ? {
-            confirmed_planet_count: finiteOptionalNumber(facts.exoplanet_count) ?? finiteOptionalNumber(facts.system_planet_count),
+            confirmed_planet_count: object.catalog_group === "exoplanets" ? 1 : finiteOptionalNumber(facts.exoplanet_count) ?? finiteOptionalNumber(facts.system_planet_count),
             system_star_count: finiteOptionalNumber(facts.system_star_count),
             system_planet_count: finiteOptionalNumber(facts.system_planet_count),
             system_moon_count: finiteOptionalNumber(facts.system_moon_count),
-            planets: Array.isArray(facts.planets) ? (facts.planets as BodyExoplanet[]) : [],
+            planets: object.catalog_group === "exoplanets" ? [catalogObjectToExoplanet(object)] : Array.isArray(facts.planets) ? (facts.planets as BodyExoplanet[]) : [],
             why_interesting: stringFact(facts.why_interesting)
           }
         : null,
@@ -2941,6 +2945,19 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
   };
 }
 
+function catalogObjectToExoplanet(object: CatalogObjectPayload): BodyExoplanet {
+  const facts = object.facts ?? {};
+  return {
+    name: object.name,
+    radius_earth: finiteOptionalNumber(facts.radius_earth),
+    mass_earth: finiteOptionalNumber(facts.mass_earth),
+    period_days: finiteOptionalNumber(facts.period_days),
+    semi_major_axis_au: finiteOptionalNumber(facts.semi_major_axis_au),
+    discovery_method: stringFact(facts.discovery_method),
+    discovery_year: finiteOptionalNumber(facts.discovery_year)
+  };
+}
+
 function normalizeDestinationType(type: string | null | undefined): DestinationBodyType {
   const allowed = new Set<DestinationBodyType>([
     "star",
@@ -2951,6 +2968,7 @@ function normalizeDestinationType(type: string | null | undefined): DestinationB
     "quasar",
     "active_galaxy",
     "black_hole",
+    "pulsar",
     "nebula",
     "star_cluster",
     "asterism",
