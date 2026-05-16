@@ -18,9 +18,9 @@ Cosmic Atlas is a scientific 2D celestial atlas. It renders Solar System bodies,
 - Curated NASA/JPL and NASA/Hubble media for selected high-value objects, with title, credit, license, and source link shown directly in object detail.
 - Distance measurement between selected objects or map points, including light-time and scale comparisons.
 - UTC time controls: apply a timestamp, jump to now, or step by days/weeks/months.
-- Map view controls for object labels, orbit guides, scale grid, Milky Way projection, edge references, zoom presets, and readable/hybrid/true-size rendering.
-- Guided object sets for Solar neighborhood, bright stars, nearby stars, small bodies, Messier highlights, galaxies, active galaxies, and nebulae.
-- A scale ladder that marks whether the current viewport is planetary, Solar System, nearby-star, Milky Way, or Local Group scale.
+- Map view controls for object labels, orbit guides, scale grid, Milky Way projection, Local Group structure, galaxy-cluster context, quasar fields, cosmic-web filaments, edge references, zoom presets, and readable/hybrid/true-size rendering.
+- Guided object sets for Solar neighborhood, bright stars, nearby stars, small bodies, Messier highlights, galaxies, active galaxies, nebulae, and universe-scale exploration.
+- A scale ladder that marks whether the current viewport is planetary, Solar System, nearby-star, Milky Way, Local Group, galaxy-cluster, or cosmic-web scale.
 
 The old piloting/game prototype has been split out to the `game/ship-prototype` branch.
 
@@ -156,6 +156,8 @@ SIMBAD extragalactic objects are loaded from `data/catalogs/simbad_extragalactic
 
 The Milky Way view layer is a procedural frontend context layer, not a catalog of individual stars. It defines the Galactic center, outer disk, solar circle, and major spiral-arm density guides in Galactic coordinates, then rotates diffuse haze, dust lanes, and reference geometry into the same heliocentric ecliptic frame used by the canvas. Real Gaia point primitives render over that context layer; the Milky Way renderer does not add fake selectable-looking stars.
 
+The Local Group and cosmic-web layers in `src/universeModel.ts` are also procedural context, not catalog objects. They add non-selectable, labeled scale scaffolding for the Milky Way/Andromeda neighborhood, Virgo/Fornax/Coma clusters, Local Supercluster/Laniakea-scale flow, Great Attractor context, quasar fields, and redshift-survey shells so the map remains interpretable after zooming beyond real point-catalog density. Real Messier, OpenNGC, SIMBAD galaxy/quasar, and Gaia tiles render above or alongside those guides where the catalog has data.
+
 Object media is resolved in `src/objectMedia.ts`. Curated NASA Image and Video Library assets cover the Sun, major planets, Pluto, the Moon, M31, M42, M45, and M57 with visible attribution. Objects with right ascension and declination but no curated image use a deterministic CDS/Aladin DSS2 survey cutout, so searched catalog objects can still show real sky imagery without live media search. Objects without either source show an explicit catalog-only state instead of an empty media gap.
 
 The API exposes the scientific catalog layer:
@@ -215,6 +217,7 @@ The timestamp input is treated as UTC. Changing time recomputes every dynamic ce
 - Messier deep-sky objects use static catalog RA/Dec and distance estimates. Their distances and physical sizes are educational catalog values, not mission-grade astrometric solutions.
 - SIMBAD extragalactic distances are redshift-derived estimates. Local peculiar velocities and cosmology assumptions can dominate nearby-galaxy placement error.
 - The Milky Way layer is an oriented procedural context model. Its diffuse haze, dust lanes, core glow, and spiral-arm density guides are for spatial context, not a high-precision structural model. Catalog stars are rendered by the real Gaia point layer instead.
+- The Local Group, galaxy-cluster, quasar-field, and cosmic-web overlays are non-selectable context guides. They preserve true coordinate scale but summarize structures that cannot be represented as complete shipped catalogs; use them as navigation scaffolding around real catalog points, not as precision survey data.
 - NGC/IC support currently comes through aliases attached to Messier objects, not the full NGC/IC catalog.
 - Osculating orbital elements are computed from a single instantaneous state vector. They are useful for inspection and rough comparison, but they are not permanent catalog elements or mission-grade propagated orbits.
 - The map is a top-down ecliptic projection, so it does not show vertical displacement visually.

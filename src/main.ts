@@ -21,6 +21,7 @@ import {
   formatRightAscension
 } from "./coordinates";
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
+import { COSMIC_WEB_MODEL, LOCAL_GROUP_MODEL, type UniverseFilament, type UniverseModel, type UniversePoint, type UniverseRing } from "./universeModel";
 import { educationalComparisons } from "./navigationMetrics";
 import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
 import { initI18n, t } from "./i18n";
@@ -29,7 +30,7 @@ import { WebglPointRenderer, type PointLayerSource } from "./webglPointRenderer"
 type AtlasTab = "catalog" | "object";
 type ActiveAtlasTab = AtlasTab | null;
 type SizeMode = "readable" | "hybrid" | "true";
-type ZoomPreset = "inner" | "solar" | "nearby" | "galaxy" | "messier" | "all";
+type ZoomPreset = "inner" | "solar" | "nearby" | "galaxy" | "localGroup" | "messier" | "cosmicWeb" | "all";
 type BodyFilter =
   | "all"
   | "solar_system"
@@ -49,7 +50,7 @@ type BodyFilter =
   | "pulsar"
   | "nebula"
   | "star_cluster";
-type DisplayLayer = "labels" | "orbits" | "grid" | "milkyWay" | "references";
+type DisplayLayer = "labels" | "orbits" | "grid" | "milkyWay" | "localGroup" | "galaxyPoints" | "quasars" | "cosmicWeb" | "references";
 
 type ExternalLink = {
   provider?: string | null;
@@ -441,7 +442,7 @@ type PickerSearchConfig = {
 
 const AU_KM_FALLBACK = 149_597_870.7;
 const LIGHT_YEAR_KM = 9_460_730_472_580.8;
-const MIN_ZOOM = 1e-10;
+const MIN_ZOOM = 1e-12;
 const MAX_ZOOM = 50_000_000;
 const ZOOM_SLIDER_STEPS = 1000;
 const LOCAL_ZOOM_DIAMETER_PX = 170;
@@ -454,6 +455,8 @@ const CAMERA_DATA_REFRESH_DEBOUNCE_MS = 180;
 const SEARCH_INPUT_DEBOUNCE_MS = 180;
 const POINT_LAYER_MIN_WIDTH_LY = 12;
 const POINT_LAYER_MAX_WIDTH_LY = 250_000;
+const POINT_LAYER_DEEP_SKY_MAX_WIDTH_LY = 750_000_000;
+const POINT_LAYER_QUASAR_MAX_WIDTH_LY = 2_000_000_000;
 const POINT_LAYER_VIEWPORT_PADDING = 0.35;
 const POINT_TILE_TARGET_VIEW_DIVISIONS = 2;
 const POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE = 1;
@@ -474,6 +477,7 @@ const POINT_VERTEX_STRIDE_FLOATS = 6;
 const CATALOG_TILE_MANIFEST_URL = catalogTileManifestUrl();
 const ALLOW_DYNAMIC_POINT_FALLBACK = dynamicPointFallbackEnabled();
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
+const DEEP_SKY_POINT_GROUPS = ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects"];
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
 const POINT_SAMPLE_BUCKET_COUNT = 1_024;
 const BODY_HIT_GRID_CELL_PX = 56;
@@ -573,6 +577,18 @@ const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
     guidedSetId: "galaxies",
     zoomPreset: "all",
     count: (summary, bodies) => summary?.type_counts?.galaxy ?? bodies.filter((body) => classifyBody(body).type === "galaxy").length
+  },
+  {
+    id: "universe-scale",
+    titleKey: "explore.universe.title",
+    descriptionKey: "explore.universe.description",
+    filterKey: "deep_sky",
+    guidedSetId: "galaxies",
+    zoomPreset: "cosmicWeb",
+    count: (summary, bodies) => {
+      const catalogDeepSky = (summary?.type_counts?.galaxy ?? 0) + (summary?.type_counts?.quasar ?? 0) + (summary?.type_counts?.active_galaxy ?? 0);
+      return catalogDeepSky || bodies.filter((body) => ["galaxy", "quasar", "active_galaxy"].includes(classifyBody(body).type)).length;
+    }
   },
   {
     id: "exoplanet-systems",
@@ -693,6 +709,10 @@ let displayLayers: Record<DisplayLayer, boolean> = {
   orbits: true,
   grid: true,
   milkyWay: true,
+  localGroup: true,
+  galaxyPoints: true,
+  quasars: true,
+  cosmicWeb: true,
   references: true
 };
 let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
@@ -1170,6 +1190,10 @@ function render() {
   if (ephemeris) {
     drawWebglPointLayers();
     if (displayLayers.milkyWay) drawMilkyWayLayer();
+    if (displayLayers.localGroup) drawLocalGroupLayer();
+    if (displayLayers.galaxyPoints) drawGalaxyContextLayer();
+    if (displayLayers.quasars) drawQuasarContextLayer();
+    if (displayLayers.cosmicWeb) drawCosmicWebLayer();
     if (displayLayers.grid) drawGrid();
     if (displayLayers.orbits) drawOrbitGuides();
     drawComparisonGuide();
@@ -1280,7 +1304,8 @@ function catalogPointLayerFromPayload(payload: CatalogPointPayload, signature: s
 
 function drawCatalogPointLayer2dFallback() {
   const viewWidthLy = currentViewWidthLy();
-  if (!shouldUseCatalogPoints(viewWidthLy)) {
+  const filterParams = catalogPointFilterParams();
+  if (!filterParams || !shouldUseCatalogPoints(viewWidthLy, filterParams)) {
     return;
   }
 
@@ -1525,6 +1550,158 @@ function galacticPointToScreen(point: GalacticModelPoint): ScreenPoint {
 
 function galacticLyToPx(valueLy: number) {
   return lightYearsToAu(valueLy) * camera.pxPerAu;
+}
+
+function drawLocalGroupLayer() {
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < 80_000 || viewWidthLy > 9_000_000) return;
+  const alpha = clamp((Math.log10(viewWidthLy) - 4.9) / 0.7, 0, 1) * clamp((7.1 - Math.log10(viewWidthLy)) / 0.45, 0, 1);
+  if (alpha <= 0) return;
+  drawUniverseModelLayer(LOCAL_GROUP_MODEL, alpha, {
+    rings: true,
+    filaments: true,
+    labels: viewWidthLy > 250_000,
+    pointScale: 1,
+    labelColor: "rgba(213, 231, 255, 0.78)"
+  });
+}
+
+function drawGalaxyContextLayer() {
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < 4_000_000 || viewWidthLy > 850_000_000) return;
+  const alpha = clamp((Math.log10(viewWidthLy) - 6.4) / 0.9, 0, 1) * clamp((9.0 - Math.log10(viewWidthLy)) / 0.65, 0, 1);
+  if (alpha <= 0) return;
+  drawUniverseModelLayer(COSMIC_WEB_MODEL, alpha * 0.72, {
+    rings: true,
+    filaments: true,
+    labels: viewWidthLy > 18_000_000,
+    pointScale: 1.15,
+    labelColor: "rgba(203, 222, 255, 0.7)",
+    kinds: new Set<UniversePoint["kind"]>(["cluster", "supercluster"])
+  });
+}
+
+function drawQuasarContextLayer() {
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < 75_000_000) return;
+  const alpha = clamp((Math.log10(viewWidthLy) - 7.85) / 0.75, 0, 1);
+  if (alpha <= 0) return;
+  drawUniverseModelLayer(COSMIC_WEB_MODEL, alpha * 0.55, {
+    rings: false,
+    filaments: false,
+    labels: viewWidthLy > 160_000_000,
+    pointScale: 1.45,
+    labelColor: "rgba(255, 226, 147, 0.62)",
+    kinds: new Set<UniversePoint["kind"]>(["quasar-field"])
+  });
+}
+
+function drawCosmicWebLayer() {
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < 35_000_000) return;
+  const alpha = clamp((Math.log10(viewWidthLy) - 7.3) / 0.8, 0, 1);
+  if (alpha <= 0) return;
+  drawUniverseModelLayer(COSMIC_WEB_MODEL, alpha, {
+    rings: viewWidthLy < 420_000_000,
+    filaments: true,
+    labels: viewWidthLy > 90_000_000,
+    pointScale: 0.8,
+    labelColor: "rgba(190, 177, 255, 0.62)"
+  });
+}
+
+function drawUniverseModelLayer(
+  model: UniverseModel,
+  alpha: number,
+  options: { rings: boolean; filaments: boolean; labels: boolean; pointScale: number; labelColor: string; kinds?: Set<UniversePoint["kind"]> }
+) {
+  const rect = expandedRect(usableViewportRect(), 220);
+  const occupiedLabels: Rect[] = [];
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalCompositeOperation = "screen";
+
+  if (options.rings) {
+    for (const ring of model.rings) drawUniverseRing(ring, alpha, rect, occupiedLabels, options.labels, options.labelColor);
+  }
+  if (options.filaments) {
+    for (const filament of model.filaments) drawUniverseFilament(filament, alpha, rect, occupiedLabels, options.labels, options.labelColor);
+  }
+  for (const point of model.points) {
+    if (options.kinds && !options.kinds.has(point.kind)) continue;
+    drawUniversePoint(point, alpha, rect, occupiedLabels, options.labels, options.pointScale, options.labelColor);
+  }
+  ctx.restore();
+}
+
+function drawUniverseRing(ring: UniverseRing, alpha: number, rect: Rect, occupiedLabels: Rect[], labels: boolean, labelColor: string) {
+  const center = worldToScreen(ring.xAu, ring.yAu);
+  const radius = lightYearsToAu(ring.radiusLy) * camera.pxPerAu;
+  if (radius < 3 || !rectsOverlap(pointRect(center, radius * 2), rect)) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = ring.color;
+  ctx.lineWidth = clamp(radius / 450, 0.7, 2.2);
+  ctx.setLineDash([5, 9]);
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  if (labels && radius > 32) drawMilkyWayLabel(ring.label, center.x + radius * 0.64, center.y - radius * 0.2, labelColor, occupiedLabels);
+  ctx.restore();
+}
+
+function drawUniverseFilament(filament: UniverseFilament, alpha: number, rect: Rect, occupiedLabels: Rect[], labels: boolean, labelColor: string) {
+  const screens = filament.points.map((point) => worldToScreen(point.xAu, point.yAu));
+  if (!screenPathNearRect(screens, rect)) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = filament.color;
+  ctx.lineWidth = clamp(currentViewWidthLy() / 25_000_000, 1.2, 7);
+  ctx.filter = `blur(${clamp(currentViewWidthLy() / 80_000_000, 0.6, 4)}px)`;
+  ctx.setLineDash([]);
+  traceScreenPath(screens, false);
+  ctx.stroke();
+  ctx.filter = "none";
+  ctx.globalAlpha = alpha * 0.36;
+  ctx.lineWidth = 0.9;
+  traceScreenPath(screens, false);
+  ctx.stroke();
+  if (labels && screens.length > 0) {
+    const anchor = screens[Math.floor(screens.length / 2)];
+    drawMilkyWayLabel(filament.label, anchor.x + 10, anchor.y - 8, labelColor, occupiedLabels);
+  }
+  ctx.restore();
+}
+
+function colorWithAlpha(color: string, alphaMultiplier: number) {
+  const match = color.match(/rgba\(([^,]+),([^,]+),([^,]+),([^\)]+)\)/);
+  if (!match) return color;
+  const alpha = clamp(Number(match[4].trim()) * alphaMultiplier, 0, 1);
+  return `rgba(${match[1].trim()}, ${match[2].trim()}, ${match[3].trim()}, ${alpha})`;
+}
+
+function drawUniversePoint(point: UniversePoint, alpha: number, rect: Rect, occupiedLabels: Rect[], labels: boolean, pointScale: number, labelColor: string) {
+  const screen = worldToScreen(point.xAu, point.yAu);
+  const radius = clamp(lightYearsToAu(point.radiusLy) * camera.pxPerAu * pointScale, 2.2, point.kind === "quasar-field" ? 46 : 72);
+  if (!rectsOverlap(pointRect(screen, radius * 2.4), rect)) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
+  gradient.addColorStop(0, point.color);
+  gradient.addColorStop(0.35, colorWithAlpha(point.color, 0.42));
+  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = Math.min(1, alpha * 1.3);
+  ctx.fillStyle = point.color;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, clamp(radius * 0.12, 1.4, 4.5), 0, Math.PI * 2);
+  ctx.fill();
+  if (labels && radius > 3.5) drawMilkyWayLabel(point.label, screen.x + radius * 0.72 + 7, screen.y - radius * 0.3, labelColor, occupiedLabels);
+  ctx.restore();
 }
 
 function traceScreenPath(points: ScreenPoint[], closePath: boolean) {
@@ -2545,11 +2722,10 @@ function catalogPointRequestContextForTileSpan(
 
 function catalogPointRequestContext() {
   const viewWidthLy = currentViewWidthLy();
-  if (!shouldUseCatalogPoints(viewWidthLy)) return null;
+  const filterParams = catalogPointFilterParams();
+  if (!filterParams || !shouldUseCatalogPoints(viewWidthLy, filterParams)) return null;
   if (catalogPointTileManifestState === "loading") return null;
   if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
-  const filterParams = catalogPointFilterParams();
-  if (!filterParams) return null;
   const staticLayer = catalogStaticTileLayerForFilter(filterParams);
   if (catalogPointTileManifestState === "ready" && !staticLayer && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
   return {
@@ -2616,10 +2792,10 @@ function catalogPointRequestsForLevel(
 
 function catalogPointFilterParams(): { groups: string[]; types: DestinationBodyType[] } | null {
   const filter = activeBodyFilterDefinition();
-  const sourceGroups = filter.key === "all" || !filter.groups ? POINT_LAYER_GROUPS : filter.groups;
+  const sourceGroups = filter.key === "all" || !filter.groups ? [...POINT_LAYER_GROUPS, ...DEEP_SKY_POINT_GROUPS] : filter.groups;
   const groups = sourceGroups.filter((group) => POINT_LAYER_GROUP_SET.has(group) || catalogPointManifestGroupSet().has(group));
   if (groups.length === 0) return null;
-  return { groups, types: filter.types ?? [] };
+  return { groups: uniqueStrings(groups), types: filter.types ?? [] };
 }
 
 function catalogPointManifestGroups() {
@@ -2646,8 +2822,12 @@ function uniqueStrings(values: readonly string[]) {
   return Array.from(new Set(values));
 }
 
-function shouldUseCatalogPoints(viewWidthLy: number) {
-  return Number.isFinite(viewWidthLy) && viewWidthLy >= POINT_LAYER_MIN_WIDTH_LY && viewWidthLy <= POINT_LAYER_MAX_WIDTH_LY;
+function shouldUseCatalogPoints(viewWidthLy: number, filterParams: { groups: string[]; types: DestinationBodyType[] }) {
+  if (!Number.isFinite(viewWidthLy) || viewWidthLy < POINT_LAYER_MIN_WIDTH_LY) return false;
+  const hasQuasarScale = filterParams.types.some((type) => type === "quasar" || type === "active_galaxy") || filterParams.groups.includes("simbad_extragalactic");
+  const hasDeepSkyScale = filterParams.groups.some((group) => DEEP_SKY_POINT_GROUPS.includes(group));
+  const maxWidthLy = hasQuasarScale ? POINT_LAYER_QUASAR_MAX_WIDTH_LY : hasDeepSkyScale ? POINT_LAYER_DEEP_SKY_MAX_WIDTH_LY : POINT_LAYER_MAX_WIDTH_LY;
+  return viewWidthLy <= maxWidthLy;
 }
 
 function hasActiveCatalogPointLayer() {
@@ -4222,6 +4402,10 @@ function applyZoomPreset(preset: ZoomPreset, update = true) {
   if (!ephemeris) return;
   if (preset === "galaxy") {
     fitMilkyWayModel(0.14);
+  } else if (preset === "localGroup") {
+    fitUniverseModel(LOCAL_GROUP_MODEL, 0.12);
+  } else if (preset === "cosmicWeb") {
+    fitUniverseModel(COSMIC_WEB_MODEL, 0.10);
   } else {
     const bodies = presetBodies(preset);
     if (bodies.length > 0) fitBodies(bodies, 0.16);
@@ -4245,7 +4429,7 @@ function presetBodies(preset: ZoomPreset) {
   if (preset === "nearby") {
     return ephemeris.bodies.filter((body) => body.catalog_group === "nearby_exoplanet_systems" || body.key === "sun");
   }
-  if (preset === "galaxy") {
+  if (preset === "galaxy" || preset === "localGroup" || preset === "cosmicWeb") {
     return [];
   }
   if (preset === "messier") {
@@ -4270,6 +4454,12 @@ function fitBodies(bodies: Body[], paddingRatio: number) {
 function fitMilkyWayModel(paddingRatio: number) {
   cancelCameraAnimation();
   const bounds = MILKY_WAY_MODEL.bounds;
+  fitWorldBounds(bounds.minXAu, bounds.maxXAu, bounds.minYAu, bounds.maxYAu, paddingRatio);
+}
+
+function fitUniverseModel(model: UniverseModel, paddingRatio: number) {
+  cancelCameraAnimation();
+  const bounds = model.bounds;
   fitWorldBounds(bounds.minXAu, bounds.maxXAu, bounds.minYAu, bounds.maxYAu, paddingRatio);
 }
 
@@ -4382,9 +4572,8 @@ async function handleMapClick(point: ScreenPoint) {
 }
 
 async function nearestCatalogPointAt(point: ScreenPoint): Promise<Body | null> {
-  if (!hasActiveCatalogPointLayer() || !shouldUseCatalogPoints(currentViewWidthLy())) return null;
   const filterParams = catalogPointFilterParams();
-  if (!filterParams) return null;
+  if (!filterParams || !hasActiveCatalogPointLayer() || !shouldUseCatalogPoints(currentViewWidthLy(), filterParams)) return null;
   const world = screenToWorld(point.x, point.y);
   const radiusAu = clamp(8 / Math.max(camera.pxPerAu, MIN_ZOOM), 0.000001, 10_000_000);
   const params = new URLSearchParams();

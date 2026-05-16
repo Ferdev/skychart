@@ -92,7 +92,9 @@
             </div>
           </div>
           <div class="zoom-presets" id="zoom-presets" aria-label="Scale landmarks" data-i18n-attrs="aria-label:scale.landmarks">
+            <button type="button" data-zoom-preset="cosmicWeb"><span data-i18n="scale.cosmicWeb">Universe</span><small>300M ly</small></button>
             <button type="button" data-zoom-preset="all"><span data-i18n="scale.all">All</span><small data-i18n="scale.deepSky">deep sky</small></button>
+            <button type="button" data-zoom-preset="localGroup"><span data-i18n="scale.localGroup">Local Group</span><small>5M ly</small></button>
             <button type="button" data-zoom-preset="messier"><span data-i18n="scale.messier">Messier</span><small data-i18n="scale.mCatalog">M catalog</small></button>
             <button type="button" data-zoom-preset="galaxy"><span data-i18n="scale.galaxy">Galaxy</span><small>100k ly</small></button>
             <button type="button" data-zoom-preset="nearby"><span data-i18n="scale.nearby">Nearby</span><small>25 ly</small></button>
@@ -117,6 +119,10 @@
                 <label><input type="checkbox" data-layer="orbits" checked /> <span data-i18n="scale.orbits">Orbits</span></label>
                 <label><input type="checkbox" data-layer="grid" checked /> <span data-i18n="scale.grid">Grid</span></label>
                 <label><input type="checkbox" data-layer="milkyWay" checked /> <span data-i18n="scale.milkyWay">Milky Way</span></label>
+                <label><input type="checkbox" data-layer="localGroup" checked /> <span data-i18n="scale.localGroup">Local Group</span></label>
+                <label><input type="checkbox" data-layer="galaxyPoints" checked /> <span data-i18n="scale.galaxyPoints">Galaxy structure</span></label>
+                <label><input type="checkbox" data-layer="quasars" checked /> <span data-i18n="scale.quasars">Quasar fields</span></label>
+                <label><input type="checkbox" data-layer="cosmicWeb" checked /> <span data-i18n="scale.cosmicWeb">Cosmic web</span></label>
                 <label><input type="checkbox" data-layer="references" checked /> <span data-i18n="scale.edgeHints">Edge hints</span></label>
               </div>
             </details>

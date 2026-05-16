@@ -57,6 +57,13 @@ DEFAULT_LEVELS = (
     "30:1024:24000",
     "32:1024:24000",
     "34:1024:24000",
+    # Deep-sky/cosmic-web layers need spans beyond the Milky Way; these keep
+    # galaxy/quasar tiles available at Local Group and redshift-survey scales.
+    "36:512:18000",
+    "38:256:16000",
+    "40:128:14000",
+    "42:128:12000",
+    "44:64:12000",
 )
 
 
