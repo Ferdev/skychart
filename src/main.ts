@@ -14,6 +14,12 @@ import {
   type DestinationPickerItem,
   type RecentDestination
 } from "./destinationPicker";
+import {
+  equatorialToGalactic,
+  formatDecimalDegrees,
+  formatDeclination,
+  formatRightAscension
+} from "./coordinates";
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
 import { educationalComparisons } from "./navigationMetrics";
 import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
@@ -3171,10 +3177,14 @@ function updateBodyInfo() {
   const positionRows = [
     [t("field.coordinateFrame"), ephemeris?.coordinate_frame ?? null],
     [t("field.positionModel"), positionModel],
-    [t("field.raDec"), formatRaDec(body)],
-    ["X", formatAuCoordinate(body.position.x_au)],
-    ["Y", formatAuCoordinate(body.position.y_au)],
-    ["Z", formatAuCoordinate(body.position.z_au)]
+    [t("field.rightAscension"), formatRightAscensionForBody(body)],
+    [t("field.declination"), formatDeclinationForBody(body)],
+    [t("field.raDecDecimal"), formatRaDecDecimal(body)],
+    [t("field.galacticLongitude"), formatGalacticLongitude(body)],
+    [t("field.galacticLatitude"), formatGalacticLatitude(body)],
+    [t("field.eclipticX"), formatAuCoordinate(body.position.x_au)],
+    [t("field.eclipticY"), formatAuCoordinate(body.position.y_au)],
+    [t("field.eclipticZ"), formatAuCoordinate(body.position.z_au)]
   ];
 
   const stateRows = body.state_vector
@@ -3262,6 +3272,7 @@ function updateBodyInfo() {
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
       <section class="object-data-pane">
         ${renderObjectDetailState(body)}
+        ${renderObjectSummaryCard(body, classification.label)}
         ${renderFactTiles(primaryStats)}
         ${renderIdentifierSection(body)}
         ${renderMediaSection(body)}
@@ -3298,6 +3309,76 @@ function renderObjectDetailState(body: Body) {
       <span>${escapeHtml(t("object.catalogPreviewBody"))}</span>
     </section>
   `;
+}
+
+function renderObjectSummaryCard(body: Body, typeLabel: string) {
+  const summary = objectSummaryText(body, typeLabel);
+  const contextItems = objectSummaryContext(body);
+  return `
+    <section class="object-summary-card" aria-label="${escapeHtml(t("object.whyThisMatters"))}">
+      <div>
+        <span>${escapeHtml(t("object.whyThisMatters"))}</span>
+        <p>${escapeHtml(summary)}</p>
+      </div>
+      ${
+        contextItems.length > 0
+          ? `<ul>${contextItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function objectSummaryText(body: Body, typeLabel: string) {
+  const curated = firstText([body.exoplanet_system?.why_interesting, body.deep_sky?.why_interesting]);
+  if (curated) return curated;
+
+  const name = body.name;
+  switch (body.object_type) {
+    case "planet":
+      return t("summary.planet", { name });
+    case "moon":
+      return t("summary.moon", { name });
+    case "star":
+      return body.stellar?.exoplanet_count ? t("summary.exoplanetHost", { name, count: body.stellar.exoplanet_count }) : t("summary.star", { name });
+    case "dwarf_planet":
+      return t("summary.dwarfPlanet", { name });
+    case "galaxy":
+      return t("summary.galaxy", { name });
+    case "quasar":
+      return t("summary.quasar", { name });
+    case "active_galaxy":
+      return t("summary.activeGalaxy", { name });
+    case "nebula":
+      return t("summary.nebula", { name });
+    case "star_cluster":
+      return t("summary.starCluster", { name });
+    case "asteroid":
+    case "comet":
+    case "small_body":
+      return t("summary.smallBody", { name });
+    default:
+      if (body.exoplanet_system) return t("summary.exoplanetSystem", { name });
+      return t("summary.generic", { name, type: typeLabel.toLowerCase() });
+  }
+}
+
+function objectSummaryContext(body: Body) {
+  const items = [
+    body.deep_sky?.constellation ? t("summary.contextConstellation", { value: body.deep_sky.constellation }) : null,
+    body.deep_sky?.viewing_season ? t("summary.contextSeason", { value: body.deep_sky.viewing_season }) : null,
+    body.exoplanet_system?.confirmed_planet_count != null
+      ? t("summary.contextPlanets", { count: body.exoplanet_system.confirmed_planet_count })
+      : null,
+    body.stellar?.distance_ly != null ? t("summary.contextDistance", { value: formatNumber(body.stellar.distance_ly) }) : null,
+    body.small_body?.neo ? t("summary.contextNeo") : null,
+    body.catalog_group ? t("summary.contextCatalog", { value: readableCatalogGroup(body.catalog_group) ?? body.catalog_group }) : null
+  ].filter(isPresent);
+  return items.slice(0, 3);
+}
+
+function firstText(values: readonly (string | null | undefined)[]) {
+  return values.find((value) => typeof value === "string" && value.trim().length > 0)?.trim() ?? null;
 }
 
 function renderIdentifierSection(body: Body) {
@@ -4692,11 +4773,44 @@ function nullableLightYears(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${formatNumber(value)} ly` : t("value.unknown");
 }
 
-function formatRaDec(body: Body) {
+function equatorialCoordinatesForBody(body: Body) {
   const raDeg = finiteOptionalNumber(body.catalog?.ra_deg);
   const decDeg = finiteOptionalNumber(body.catalog?.dec_deg);
   if (raDeg == null || decDeg == null) return null;
-  return `${raDeg.toFixed(5)} deg, ${decDeg.toFixed(5)} deg`;
+  return { raDeg, decDeg };
+}
+
+function formatRightAscensionForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatRightAscension(coordinates.raDeg)} (${formatDecimalDegrees(coordinates.raDeg)})`;
+}
+
+function formatDeclinationForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatDeclination(coordinates.decDeg)} (${formatDecimalDegrees(coordinates.decDeg)})`;
+}
+
+function formatRaDecDecimal(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatDecimalDegrees(coordinates.raDeg)}, ${formatDecimalDegrees(coordinates.decDeg)}`;
+}
+
+function galacticCoordinatesForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  return coordinates ? equatorialToGalactic(coordinates) : null;
+}
+
+function formatGalacticLongitude(body: Body) {
+  const coordinates = galacticCoordinatesForBody(body);
+  return coordinates ? formatDecimalDegrees(coordinates.longitudeDeg, 3) : null;
+}
+
+function formatGalacticLatitude(body: Body) {
+  const coordinates = galacticCoordinatesForBody(body);
+  return coordinates ? formatDecimalDegrees(coordinates.latitudeDeg, 3) : null;
 }
 
 function formatAuCoordinate(value: number) {
