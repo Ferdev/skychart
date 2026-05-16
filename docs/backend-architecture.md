@@ -63,6 +63,18 @@ The first Phoenix migration creates `catalog_objects` as the common searchable p
 
 This table is not the final scientific truth for every object type. It is the fast lookup surface for the UI and the current source for offline visualization tiles. Source-specific tables can be added behind it when Gaia, SIMBAD, NED, JPL small bodies, and detailed exoplanet records need richer schemas.
 
+## Starry-Night Data Roadmap
+
+The current OpenNGC/NGC-IC path is done enough to prove the ingestion shape: source rows are normalized into `catalog_objects`, searchable in Phoenix, and renderable through the point-tile compiler. The next scale steps should add sources deliberately instead of expanding the shared projection into an untyped dump:
+
+1. Keep OpenNGC as the deep-sky baseline and continue validating aliases, object classes, coordinates, and provenance there.
+2. Add source-specific tables before very large imports: Gaia star slices, SIMBAD cross-identifications, NED galaxies/quasars, JPL small bodies/comets, and exoplanet archive systems should each keep their native identifiers, quality flags, photometry/astrometry fields, and import metadata.
+3. Project only the UI/search subset from those source tables into `catalog_objects`; use the source tables for detail pages, provenance audits, and re-compilation.
+4. Build versioned static tile pyramids from the projected render rows after each accepted import batch. Static `/catalog-tiles/v1/*.bin` files are the rendering source of truth for common pan/zoom.
+5. Keep Postgres on the interactive semantic path only: search, object detail, compare hydration, nearest-object lookup, and import/admin validation. It must not be the hot rendering path for millions to hundreds of millions of points.
+
+The hundred-million-object target therefore becomes an offline data-products problem: import into source-specific schemas, validate/count/dedupe, publish a compact static tile pyramid, and then let the browser render immutable files through a CDN while Phoenix serves narrow semantic APIs.
+
 ## Static Point Tiles
 
 Bulk point rendering should work like GIS/map applications such as Carto:

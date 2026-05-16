@@ -32,7 +32,7 @@ export default defineConfig({
   projects: [
     {
       name: "smoke",
-      testMatch: /.*\.smoke\.spec\.ts/,
+      testMatch: [/.*\.smoke\.spec\.ts/, /.*\.guardrail\.spec\.ts/],
       use: {
         browserName: "chromium",
         launchOptions: chromiumLaunchOptions,

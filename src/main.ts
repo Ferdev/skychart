@@ -462,10 +462,7 @@ const POINT_BINARY_HEADER_BYTES = 8;
 const POINT_BINARY_RECORD_BYTES = 12;
 const POINT_VERTEX_STRIDE_FLOATS = 6;
 const CATALOG_TILE_MANIFEST_URL = catalogTileManifestUrl();
-const ALLOW_DYNAMIC_POINT_FALLBACK =
-  window.location.hostname === "127.0.0.1" ||
-  window.location.hostname === "localhost" ||
-  new URLSearchParams(window.location.search).has("dynamicPointFallback");
+const ALLOW_DYNAMIC_POINT_FALLBACK = dynamicPointFallbackEnabled();
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
 const POINT_SAMPLE_BUCKET_COUNT = 1_024;
@@ -2126,6 +2123,14 @@ function catalogTileManifestUrl() {
     .querySelector<HTMLMetaElement>('meta[name="catalog-tile-manifest-url"]')
     ?.content.trim();
   return configuredUrl || "/catalog-tiles/v1/manifest.json";
+}
+
+function dynamicPointFallbackEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  const queryValue = params.get("dynamicPointFallback");
+  if (queryValue === "1" || queryValue === "true") return true;
+  if (queryValue === "0" || queryValue === "false") return false;
+  return window.localStorage.getItem("starsmap:dynamic-point-fallback") === "1";
 }
 
 function parseCatalogTileManifest(value: unknown): CatalogPointTileManifest | null {
