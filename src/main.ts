@@ -32,6 +32,7 @@ type SizeMode = "readable" | "hybrid" | "true";
 type ZoomPreset = "inner" | "solar" | "nearby" | "galaxy" | "messier" | "all";
 type BodyFilter =
   | "all"
+  | "solar_system"
   | "planet"
   | "moon"
   | "star"
@@ -40,6 +41,7 @@ type BodyFilter =
   | "exoplanet_system"
   | "dwarf_planet"
   | "small_body"
+  | "deep_sky"
   | "galaxy"
   | "quasar"
   | "active_galaxy"
@@ -488,6 +490,12 @@ type ExploreDomainDefinition = {
 
 const BODY_FILTERS: BodyFilterDefinition[] = [
   { key: "all", labelKey: "filters.all" },
+  {
+    key: "solar_system",
+    labelKey: "filters.solarSystem",
+    types: ["star", "planet", "moon", "dwarf_planet"],
+    groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"]
+  },
   { key: "planet", labelKey: "filters.planets", types: ["planet"], groups: ["core"] },
   { key: "moon", labelKey: "filters.moons", types: ["moon"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
   {
@@ -501,6 +509,7 @@ const BODY_FILTERS: BodyFilterDefinition[] = [
   { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems"] },
   { key: "dwarf_planet", labelKey: "filters.dwarf", types: ["dwarf_planet"], groups: ["core"] },
   { key: "small_body", labelKey: "filters.smallBodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
+  { key: "deep_sky", labelKey: "filters.deepSky", types: ["galaxy", "quasar", "active_galaxy", "nebula", "star_cluster"], groups: ["messier_deep_sky", "simbad_extragalactic"] },
   { key: "galaxy", labelKey: "filters.galaxies", types: ["galaxy"], groups: ["messier_deep_sky", "simbad_extragalactic"] },
   { key: "quasar", labelKey: "filters.quasars", types: ["quasar"], groups: ["simbad_extragalactic"] },
   { key: "active_galaxy", labelKey: "filters.agn", types: ["active_galaxy"], groups: ["simbad_extragalactic"] },
@@ -523,7 +532,7 @@ const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
     id: "solar-system",
     titleKey: "explore.solarSystem.title",
     descriptionKey: "explore.solarSystem.description",
-    filterKey: "all",
+    filterKey: "solar_system",
     guidedSetId: "solar-neighborhood",
     zoomPreset: "solar",
     count: (_summary, bodies) => bodies.filter(isSolarSystemBody).length
@@ -541,7 +550,7 @@ const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
     id: "messier-deep-sky",
     titleKey: "explore.messier.title",
     descriptionKey: "explore.messier.description",
-    filterKey: "all",
+    filterKey: "deep_sky",
     guidedSetId: "deep-sky",
     zoomPreset: "messier",
     count: (summary, bodies) => summary?.group_counts?.messier_deep_sky ?? bodies.filter((body) => body.catalog_group === "messier_deep_sky").length
