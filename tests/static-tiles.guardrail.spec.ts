@@ -65,12 +65,29 @@ test.describe("static catalog tile guardrails", () => {
         body: JSON.stringify({
           version: "test-static-tiles",
           format: "SMP2",
-          tile_url_template: "/catalog-tiles/v1/s{span_log2}/x{x}/y{y}.bin",
-          groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"],
-          levels: [
-            { span_log2: 18, span_au: 262_144, max_points_per_tile: 4096, sample_buckets: 4 },
-            { span_log2: 22, span_au: 4_194_304, max_points_per_tile: 4096, sample_buckets: 3 },
-            { span_log2: 26, span_au: 67_108_864, max_points_per_tile: 4096, sample_buckets: 2 }
+          layers: [
+            {
+              id: "gaia_stars",
+              tile_url_template: "/catalog-tiles/v1/layers/gaia_stars/s{span_log2}/x{x}/y{y}.bin",
+              groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"],
+              types: ["star"],
+              levels: [
+                { span_log2: 18, span_au: 262_144, max_points_per_tile: 4096, sample_buckets: 4 },
+                { span_log2: 22, span_au: 4_194_304, max_points_per_tile: 4096, sample_buckets: 3 },
+                { span_log2: 26, span_au: 67_108_864, max_points_per_tile: 4096, sample_buckets: 2 }
+              ]
+            },
+            {
+              id: "deep_sky",
+              tile_url_template: "/catalog-tiles/v1/layers/deep_sky/s{span_log2}/x{x}/y{y}.bin",
+              groups: ["messier_deep_sky", "simbad_extragalactic"],
+              types: ["galaxy", "quasar", "active_galaxy", "nebula", "star_cluster"],
+              levels: [
+                { span_log2: 18, span_au: 262_144, max_points_per_tile: 4096, sample_buckets: 4 },
+                { span_log2: 22, span_au: 4_194_304, max_points_per_tile: 4096, sample_buckets: 3 },
+                { span_log2: 26, span_au: 67_108_864, max_points_per_tile: 4096, sample_buckets: 2 }
+              ]
+            }
           ]
         })
       });
@@ -90,10 +107,18 @@ test.describe("static catalog tile guardrails", () => {
     await expect
       .poll(() => staticTileRequests, { timeout: 15_000, message: "static catalog tile requests" })
       .toBeGreaterThan(0);
+
+    await page.evaluate(() => {
+      document.querySelector<HTMLButtonElement>('[aria-label="Object filters"] [data-body-filter="deep_sky"]')?.click();
+    });
+    await expect
+      .poll(() => staticTileRequests, { timeout: 15_000, message: "deep-sky static catalog tile requests" })
+      .toBeGreaterThan(1);
     await waitForCatalogRequestsToSettle(page, 400, 15_000);
 
     const perf = await readAtlasPerf(page);
-    expect(perf.fetches.some((entry) => entry.url.includes("/catalog-tiles/v1/") && entry.url.endsWith(".bin"))).toBe(true);
+    expect(perf.fetches.some((entry) => entry.url.includes("/catalog-tiles/v1/layers/gaia_stars/") && entry.url.endsWith(".bin"))).toBe(true);
+    expect(perf.fetches.some((entry) => entry.url.includes("/catalog-tiles/v1/layers/deep_sky/") && entry.url.endsWith(".bin"))).toBe(true);
     expect(dynamicPointRequests, "dynamic /api/catalog/points.bin requests").toBe(0);
     expect(perf.fetches.filter((entry) => entry.url.includes("/api/catalog/points.bin"))).toEqual([]);
   });

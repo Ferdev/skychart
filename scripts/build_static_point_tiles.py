@@ -29,17 +29,40 @@ DEFAULT_GROUPS = (
     "gaia_500pc_stars",
     "gaia_10kpc_bright_stars",
 )
+DEFAULT_LAYERS = (
+    "gaia_stars:gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
+    "stars:core|bright_stars|nearby_exoplanet_systems|exoplanet_systems|exoplanets|gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
+    "exoplanet_systems:nearby_exoplanet_systems|exoplanet_systems|exoplanets:",
+    "small_bodies:jpl_small_bodies:asteroid|comet|small_body",
+    "deep_sky:messier_deep_sky|simbad_extragalactic|simbad_compact_objects:galaxy|quasar|active_galaxy|black_hole|pulsar|nebula|star_cluster",
+    "galaxies:messier_deep_sky|simbad_extragalactic:galaxy",
+    "quasars:simbad_extragalactic:quasar",
+    "active_galaxies:simbad_extragalactic:active_galaxy",
+    "black_holes:simbad_compact_objects:black_hole",
+    "pulsars:simbad_compact_objects:pulsar",
+    "nebulae:messier_deep_sky:nebula",
+    "star_clusters:messier_deep_sky:star_cluster",
+)
 DEFAULT_LEVELS = (
     # span_log2:sample_buckets:max_points_per_tile
-    "20:1024:24000",
-    "22:1024:24000",
-    "24:5:24000",
-    "26:5:24000",
-    "28:4:24000",
-    "30:3:16000",
-    "32:2:12000",
-    "34:2:12000",
+    # Keep the widest views sampled, then ramp up quickly so close zooms
+    # feel like a dense star field instead of sparse debug data.
+    "20:64:24000",
+    "22:128:24000",
+    "24:256:24000",
+    "26:512:24000",
+    "28:1024:24000",
+    "30:1024:24000",
+    "32:1024:24000",
+    "34:1024:24000",
 )
+
+
+@dataclass(frozen=True)
+class TileLayer:
+    id: str
+    groups: list[str]
+    types: list[str]
 
 
 @dataclass(frozen=True)
@@ -105,8 +128,13 @@ def main() -> int:
     )
     parser.add_argument(
         "--groups",
-        default=",".join(DEFAULT_GROUPS),
-        help="Comma-separated catalog groups to include in the static point layer.",
+        default="",
+        help="Legacy comma-separated catalog groups to include as a single gaia_stars layer.",
+    )
+    parser.add_argument(
+        "--layers",
+        default=",".join(DEFAULT_LAYERS),
+        help="Comma-separated layer specs id:group|group:type|type. Use --groups for the legacy single-layer mode.",
     )
     parser.add_argument(
         "--max-open-files",
@@ -132,21 +160,21 @@ def main() -> int:
     args = parser.parse_args()
 
     levels = parse_levels(args.levels)
-    groups = [group.strip() for group in args.groups.split(",") if group.strip()]
-    if not groups:
+    layers = [TileLayer("gaia_stars", [group.strip() for group in args.groups.split(",") if group.strip()], ["star"])] if args.groups else parse_layers(args.layers)
+    if not layers or any(not layer.groups for layer in layers):
         raise SystemExit("At least one catalog group is required.")
 
     output_dir = args.output.resolve()
-    tile_url_template = f"{normalize_tile_url_base(args.tile_url_base)}/s{{span_log2}}/x{{x}}/y{{y}}.bin"
+    tile_url_base = normalize_tile_url_base(args.tile_url_base)
     if args.skip_if_current:
-        current_counts = query_source_counts(args.database_url, groups)
-        manifest_state = current_manifest_state(output_dir / "manifest.json", levels, groups, current_counts, tile_url_template)
+        current_counts = {layer.id: query_source_counts(args.database_url, layer.groups, layer.types) for layer in layers}
+        manifest_state = current_manifest_state(output_dir / "manifest.json", levels, layers, current_counts, tile_url_base)
         if manifest_state == "current":
             print(f"[catalog-tiles] Existing static tile manifest is current at {output_dir}; skipping build.", flush=True)
             return 0
         if manifest_state == "tile-url-mismatch":
-            rewrite_manifest_tile_url(output_dir / "manifest.json", tile_url_template)
-            print(f"[catalog-tiles] Updated static tile URL template in {output_dir / 'manifest.json'}; skipping rebuild.", flush=True)
+            rewrite_manifest_tile_urls(output_dir / "manifest.json", tile_url_base)
+            print(f"[catalog-tiles] Updated static tile URL templates in {output_dir / 'manifest.json'}; skipping rebuild.", flush=True)
             return 0
 
     staging_dir = output_dir.with_name(f".{output_dir.name}.tmp-{os.getpid()}")
@@ -154,49 +182,58 @@ def main() -> int:
         shutil.rmtree(staging_dir)
     staging_dir.mkdir(parents=True)
 
-    counts: dict[tuple[int, int, int], int] = {}
-    source_counts = {group: 0 for group in groups}
-    level_point_counts = {level.span_log2: 0 for level in levels}
-    level_tile_counts = {level.span_log2: set() for level in levels}
-    writer = TileFileCache(staging_dir, max(32, args.max_open_files))
+    layer_manifests = []
+    total_tiles = 0
+    total_rows = 0
+    for layer in layers:
+        layer_dir = staging_dir / "layers" / layer.id
+        counts: dict[tuple[int, int, int], int] = {}
+        source_counts = {group: 0 for group in layer.groups}
+        level_point_counts = {level.span_log2: 0 for level in levels}
+        level_tile_counts = {level.span_log2: set() for level in levels}
+        writer = TileFileCache(layer_dir, max(32, args.max_open_files))
 
-    rows_seen = 0
-    try:
-        for key, x_au, y_au, catalog_group, sample_bucket in stream_catalog_points(args.database_url, groups):
-            rows_seen += 1
-            source_counts[catalog_group] = source_counts.get(catalog_group, 0) + 1
-            record = struct.pack("<ffBBBB", x_au, y_au, *POINT_RGB, 0)
+        rows_seen = 0
+        try:
+            for key, x_au, y_au, catalog_group, sample_bucket in stream_catalog_points(args.database_url, layer.groups, layer.types):
+                rows_seen += 1
+                source_counts[catalog_group] = source_counts.get(catalog_group, 0) + 1
+                record = struct.pack("<ffBBBB", x_au, y_au, *POINT_RGB, 0)
 
-            for level in levels:
-                if sample_bucket >= level.sample_buckets:
-                    continue
-                tile_x = floor_div(x_au, level.span_au)
-                tile_y = floor_div(y_au, level.span_au)
-                tile_key = (level.span_log2, tile_x, tile_y)
-                current_count = counts.get(tile_key, 0)
-                if current_count >= level.max_points_per_tile:
-                    continue
-                writer.write_record(tile_key, record)
-                counts[tile_key] = current_count + 1
-                level_point_counts[level.span_log2] += 1
-                level_tile_counts[level.span_log2].add((tile_x, tile_y))
+                for level in levels:
+                    if sample_bucket >= level.sample_buckets:
+                        continue
+                    tile_x = floor_div(x_au, level.span_au)
+                    tile_y = floor_div(y_au, level.span_au)
+                    tile_key = (level.span_log2, tile_x, tile_y)
+                    current_count = counts.get(tile_key, 0)
+                    if current_count >= level.max_points_per_tile:
+                        continue
+                    writer.write_record(tile_key, record)
+                    counts[tile_key] = current_count + 1
+                    level_point_counts[level.span_log2] += 1
+                    level_tile_counts[level.span_log2].add((tile_x, tile_y))
 
-            if rows_seen % 100_000 == 0:
-                print(
-                    f"[catalog-tiles] streamed {rows_seen:,} source rows into {len(counts):,} non-empty tiles",
-                    file=sys.stderr,
-                    flush=True,
-                )
-    finally:
-        writer.close_all()
+                if rows_seen % 100_000 == 0:
+                    print(
+                        f"[catalog-tiles] layer {layer.id}: streamed {rows_seen:,} source rows into {len(counts):,} non-empty tiles",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+        finally:
+            writer.close_all()
 
-    patch_tile_headers(staging_dir, counts)
-    write_manifest(staging_dir, levels, groups, source_counts, level_point_counts, level_tile_counts, tile_url_template)
+        patch_tile_headers(layer_dir, counts)
+        layer_manifests.append(layer_manifest(layer, levels, source_counts, level_point_counts, level_tile_counts, tile_url_base))
+        total_tiles += sum(len(items) for items in level_tile_counts.values())
+        total_rows += rows_seen
+
+    write_manifest(staging_dir, layer_manifests)
     replace_output_dir(staging_dir, output_dir)
 
     print(
-        f"[catalog-tiles] built {sum(len(items) for items in level_tile_counts.values()):,} tile files "
-        f"from {rows_seen:,} source rows at {output_dir}",
+        f"[catalog-tiles] built {total_tiles:,} tile files "
+        f"from {total_rows:,} source rows across {len(layers)} layers at {output_dir}",
         flush=True,
     )
     return 0
@@ -224,8 +261,32 @@ def parse_levels(value: str) -> list[TileLevel]:
     return sorted(levels, key=lambda level: level.span_log2)
 
 
-def stream_catalog_points(database_url: str, groups: list[str]):
+def parse_layers(value: str) -> list[TileLayer]:
+    layers: list[TileLayer] = []
+    for raw_entry in value.split(","):
+        entry = raw_entry.strip()
+        if not entry:
+            continue
+        parts = entry.split(":")
+        if len(parts) != 3:
+            raise SystemExit(f"Invalid layer entry {entry!r}; expected id:group|group:type|type.")
+        layer_id, raw_groups, raw_types = parts
+        groups = [group.strip() for group in raw_groups.split("|") if group.strip()]
+        types = [item.strip() for item in raw_types.split("|") if item.strip()]
+        if not layer_id or not groups:
+            raise SystemExit(f"Invalid layer entry {entry!r}; layer id and groups are required.")
+        layers.append(TileLayer(layer_id, groups, types))
+    if not layers:
+        raise SystemExit("At least one tile layer is required.")
+    return layers
+
+
+def stream_catalog_points(database_url: str, groups: list[str], types: list[str] | None = None):
     group_sql = ", ".join(sql_literal(group) for group in groups)
+    type_filter = ""
+    if types:
+        type_sql = ", ".join(sql_literal(item) for item in types)
+        type_filter = f"    AND object_type IN ({type_sql})\n"
     sql = f"""
 COPY (
   SELECT
@@ -238,6 +299,7 @@ COPY (
   WHERE catalog_group IN ({group_sql})
     AND x_au IS NOT NULL
     AND y_au IS NOT NULL
+{type_filter.rstrip()}
 ) TO STDOUT WITH (FORMAT csv)
 """
 
@@ -270,13 +332,18 @@ COPY (
         raise RuntimeError(f"psql catalog point export failed with exit code {return_code}.")
 
 
-def query_source_counts(database_url: str, groups: list[str]) -> dict[str, int]:
+def query_source_counts(database_url: str, groups: list[str], types: list[str] | None = None) -> dict[str, int]:
     group_sql = ", ".join(sql_literal(group) for group in groups)
+    type_filter = ""
+    if types:
+        type_sql = ", ".join(sql_literal(item) for item in types)
+        type_filter = f"    AND object_type IN ({type_sql})\n"
     sql = f"""
 COPY (
   SELECT catalog_group, count(*)::bigint
   FROM catalog_objects
   WHERE catalog_group IN ({group_sql})
+{type_filter.rstrip()}
   GROUP BY catalog_group
 ) TO STDOUT WITH (FORMAT csv)
 """
@@ -300,9 +367,9 @@ COPY (
 def current_manifest_state(
     manifest_path: Path,
     levels: list[TileLevel],
-    groups: list[str],
-    source_counts: dict[str, int],
-    tile_url_template: str,
+    layers: list[TileLayer],
+    source_counts_by_layer: dict[str, dict[str, int]],
+    tile_url_base: str,
 ) -> str:
     if not manifest_path.is_file():
         return "missing"
@@ -313,43 +380,46 @@ def current_manifest_state(
 
     if manifest.get("format") != "SMP2":
         return "invalid"
-    if manifest.get("groups") != groups:
+
+    manifest_layers = manifest.get("layers")
+    if not isinstance(manifest_layers, list):
         return "stale"
-    if manifest.get("source_counts") != source_counts:
+    if len(manifest_layers) != len(layers):
         return "stale"
 
-    expected_levels = [
-        {
-            "span_log2": level.span_log2,
-            "span_au": level.span_au,
-            "sample_buckets": level.sample_buckets,
-            "max_points_per_tile": level.max_points_per_tile,
-        }
-        for level in levels
-    ]
-    try:
-        manifest_levels = [
-            {
-                "span_log2": int(level.get("span_log2", -1)),
-                "span_au": int(level.get("span_au", -1)),
-                "sample_buckets": int(level.get("sample_buckets", -1)),
-                "max_points_per_tile": int(level.get("max_points_per_tile", -1)),
-            }
-            for level in manifest.get("levels", [])
-        ]
-    except (TypeError, ValueError, AttributeError):
-        return "invalid"
-    if manifest_levels != expected_levels:
-        return "stale"
-    if manifest.get("tile_url_template") != tile_url_template:
-        return "tile-url-mismatch"
+    expected_levels = expected_level_headers(levels)
+    for manifest_layer, layer in zip(manifest_layers, layers):
+        if not isinstance(manifest_layer, dict):
+            return "invalid"
+        if manifest_layer.get("id") != layer.id or manifest_layer.get("groups") != layer.groups or manifest_layer.get("types") != layer.types:
+            return "stale"
+        if manifest_layer.get("source_counts") != source_counts_by_layer.get(layer.id, {}):
+            return "stale"
+        if manifest_layer.get("tile_url_template") != tile_url_template_for_layer(tile_url_base, layer.id):
+            return "tile-url-mismatch"
+        try:
+            manifest_levels = [
+                {
+                    "span_log2": int(level.get("span_log2", -1)),
+                    "span_au": int(level.get("span_au", -1)),
+                    "sample_buckets": int(level.get("sample_buckets", -1)),
+                    "max_points_per_tile": int(level.get("max_points_per_tile", -1)),
+                }
+                for level in manifest_layer.get("levels", [])
+            ]
+        except (TypeError, ValueError, AttributeError):
+            return "invalid"
+        if manifest_levels != expected_levels:
+            return "stale"
     return "current"
 
 
-def rewrite_manifest_tile_url(manifest_path: Path, tile_url_template: str) -> None:
+def rewrite_manifest_tile_urls(manifest_path: Path, tile_url_base: str) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["generated_at"] = datetime.now(timezone.utc).isoformat()
-    manifest["tile_url_template"] = tile_url_template
+    for layer in manifest.get("layers", []):
+        if isinstance(layer, dict) and isinstance(layer.get("id"), str):
+            layer["tile_url_template"] = tile_url_template_for_layer(tile_url_base, layer["id"])
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
@@ -386,25 +456,36 @@ def patch_tile_headers(root: Path, counts: dict[tuple[int, int, int], int]) -> N
             handle.write(struct.pack("<I", count))
 
 
-def write_manifest(
-    root: Path,
+def expected_level_headers(levels: list[TileLevel]) -> list[dict[str, int]]:
+    return [
+        {
+            "span_log2": level.span_log2,
+            "span_au": level.span_au,
+            "sample_buckets": level.sample_buckets,
+            "max_points_per_tile": level.max_points_per_tile,
+        }
+        for level in levels
+    ]
+
+
+def tile_url_template_for_layer(tile_url_base: str, layer_id: str) -> str:
+    return f"{tile_url_base}/layers/{layer_id}/s{{span_log2}}/x{{x}}/y{{y}}.bin"
+
+
+def layer_manifest(
+    layer: TileLayer,
     levels: list[TileLevel],
-    groups: list[str],
     source_counts: dict[str, int],
     level_point_counts: dict[int, int],
     level_tile_counts: dict[int, set[tuple[int, int]]],
-    tile_url_template: str,
-) -> None:
-    manifest = {
-        "version": "v1",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "projection": "heliocentric_ecliptic_top_down_au",
-        "format": "SMP2",
-        "record_bytes": 12,
-        "sample_bucket_count": POINT_SAMPLE_BUCKET_COUNT,
-        "groups": groups,
+    tile_url_base: str,
+) -> dict[str, object]:
+    return {
+        "id": layer.id,
+        "groups": layer.groups,
+        "types": layer.types,
         "source_counts": source_counts,
-        "tile_url_template": tile_url_template,
+        "tile_url_template": tile_url_template_for_layer(tile_url_base, layer.id),
         "levels": [
             {
                 "span_log2": level.span_log2,
@@ -416,6 +497,18 @@ def write_manifest(
             }
             for level in levels
         ],
+    }
+
+
+def write_manifest(root: Path, layers: list[dict[str, object]]) -> None:
+    manifest = {
+        "version": "v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "projection": "heliocentric_ecliptic_top_down_au",
+        "format": "SMP2",
+        "record_bytes": 12,
+        "sample_bucket_count": POINT_SAMPLE_BUCKET_COUNT,
+        "layers": layers,
     }
     (root / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 

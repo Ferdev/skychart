@@ -83,6 +83,7 @@ export type DestinationBodyType =
   | "quasar"
   | "active_galaxy"
   | "black_hole"
+  | "pulsar"
   | "nebula"
   | "star_cluster"
   | "asterism"
@@ -100,6 +101,7 @@ export type DestinationIconKey =
   | "galaxy"
   | "quasar"
   | "black_hole"
+  | "pulsar"
   | "nebula"
   | "cluster"
   | "asteroid"
@@ -268,6 +270,7 @@ const TYPE_LABEL_KEYS: Record<DestinationBodyType, string> = {
   quasar: "type.quasar",
   active_galaxy: "type.activeGalaxy",
   black_hole: "type.blackHole",
+  pulsar: "type.pulsar",
   nebula: "type.nebula",
   star_cluster: "type.starCluster",
   asterism: "type.asterism",
@@ -287,6 +290,7 @@ const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
   quasar: "quasar",
   active_galaxy: "galaxy",
   black_hole: "black_hole",
+  pulsar: "pulsar",
   nebula: "nebula",
   star_cluster: "cluster",
   asterism: "cluster",
@@ -306,6 +310,7 @@ const TYPE_SORT_GROUPS: Record<DestinationBodyType, number> = {
   quasar: 5,
   active_galaxy: 5,
   black_hole: 5,
+  pulsar: 5,
   nebula: 5,
   star_cluster: 6,
   asterism: 7,
@@ -681,6 +686,7 @@ function inferBodyType(key: string, normalizedName: string, radiusKm: number): D
   if (DWARF_PLANET_KEYS.has(key)) return "dwarf_planet";
   if (normalizedName.includes("quasar")) return "quasar";
   if (normalizedName.includes("black hole")) return "black_hole";
+  if (normalizedName.includes("pulsar") || normalizedName.includes("psr ")) return "pulsar";
   if (normalizedName.includes("agn") || normalizedName.includes("blazar") || normalizedName.includes("seyfert")) return "active_galaxy";
   if (normalizedName.includes("galaxy")) return "galaxy";
   if (normalizedName.includes("nebula")) return "nebula";

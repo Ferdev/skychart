@@ -32,6 +32,7 @@ type SizeMode = "readable" | "hybrid" | "true";
 type ZoomPreset = "inner" | "solar" | "nearby" | "galaxy" | "messier" | "all";
 type BodyFilter =
   | "all"
+  | "solar_system"
   | "planet"
   | "moon"
   | "star"
@@ -40,9 +41,12 @@ type BodyFilter =
   | "exoplanet_system"
   | "dwarf_planet"
   | "small_body"
+  | "deep_sky"
   | "galaxy"
   | "quasar"
   | "active_galaxy"
+  | "black_hole"
+  | "pulsar"
   | "nebula"
   | "star_cluster";
 type DisplayLayer = "labels" | "orbits" | "grid" | "milkyWay" | "references";
@@ -293,12 +297,18 @@ type CatalogPointTileManifestLevel = {
   point_count?: number;
 };
 
+type CatalogPointTileManifestLayer = {
+  id: string;
+  tile_url_template: string;
+  groups: string[];
+  types: DestinationBodyType[];
+  levels: CatalogPointTileManifestLevel[];
+};
+
 type CatalogPointTileManifest = {
   version: string;
   format: "SMP2";
-  tile_url_template: string;
-  groups: string[];
-  levels: CatalogPointTileManifestLevel[];
+  layers: CatalogPointTileManifestLayer[];
 };
 
 type CatalogPointTileManifestState = "loading" | "ready" | "missing";
@@ -488,6 +498,12 @@ type ExploreDomainDefinition = {
 
 const BODY_FILTERS: BodyFilterDefinition[] = [
   { key: "all", labelKey: "filters.all" },
+  {
+    key: "solar_system",
+    labelKey: "filters.solarSystem",
+    types: ["star", "planet", "moon", "dwarf_planet"],
+    groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"]
+  },
   { key: "planet", labelKey: "filters.planets", types: ["planet"], groups: ["core"] },
   { key: "moon", labelKey: "filters.moons", types: ["moon"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
   {
@@ -498,12 +514,15 @@ const BODY_FILTERS: BodyFilterDefinition[] = [
   },
   { key: "bright_star", labelKey: "filters.bright", types: ["star"], groups: ["bright_stars"] },
   { key: "gaia_star", labelKey: "filters.gaia", types: ["star"], groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"] },
-  { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems"] },
+  { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"] },
   { key: "dwarf_planet", labelKey: "filters.dwarf", types: ["dwarf_planet"], groups: ["core"] },
   { key: "small_body", labelKey: "filters.smallBodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
+  { key: "deep_sky", labelKey: "filters.deepSky", types: ["galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"], groups: ["messier_deep_sky", "simbad_extragalactic", "simbad_compact_objects"] },
   { key: "galaxy", labelKey: "filters.galaxies", types: ["galaxy"], groups: ["messier_deep_sky", "simbad_extragalactic"] },
   { key: "quasar", labelKey: "filters.quasars", types: ["quasar"], groups: ["simbad_extragalactic"] },
   { key: "active_galaxy", labelKey: "filters.agn", types: ["active_galaxy"], groups: ["simbad_extragalactic"] },
+  { key: "black_hole", labelKey: "filters.blackHoles", types: ["black_hole"], groups: ["simbad_compact_objects"] },
+  { key: "pulsar", labelKey: "filters.pulsars", types: ["pulsar"], groups: ["simbad_compact_objects"] },
   { key: "nebula", labelKey: "filters.nebulae", types: ["nebula"], groups: ["messier_deep_sky"] },
   { key: "star_cluster", labelKey: "filters.clusters", types: ["star_cluster"], groups: ["messier_deep_sky"] }
 ];
@@ -523,7 +542,7 @@ const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
     id: "solar-system",
     titleKey: "explore.solarSystem.title",
     descriptionKey: "explore.solarSystem.description",
-    filterKey: "all",
+    filterKey: "solar_system",
     guidedSetId: "solar-neighborhood",
     zoomPreset: "solar",
     count: (_summary, bodies) => bodies.filter(isSolarSystemBody).length
@@ -541,7 +560,7 @@ const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
     id: "messier-deep-sky",
     titleKey: "explore.messier.title",
     descriptionKey: "explore.messier.description",
-    filterKey: "all",
+    filterKey: "deep_sky",
     guidedSetId: "deep-sky",
     zoomPreset: "messier",
     count: (summary, bodies) => summary?.group_counts?.messier_deep_sky ?? bodies.filter((body) => body.catalog_group === "messier_deep_sky").length
@@ -2135,32 +2154,58 @@ function dynamicPointFallbackEnabled() {
 
 function parseCatalogTileManifest(value: unknown): CatalogPointTileManifest | null {
   if (!value || typeof value !== "object") return null;
-  const manifest = value as Partial<CatalogPointTileManifest>;
+  const manifest = value as Record<string, unknown>;
   if (manifest.format !== "SMP2") return null;
-  if (typeof manifest.tile_url_template !== "string" || !manifest.tile_url_template) return null;
-  if (!Array.isArray(manifest.groups) || !Array.isArray(manifest.levels)) return null;
 
-  const levels = manifest.levels
-    .map((level) => ({
-      span_log2: Number(level.span_log2),
-      span_au: Number(level.span_au),
-      sample_buckets: optionalNumber(level.sample_buckets),
-      max_points_per_tile: optionalNumber(level.max_points_per_tile),
-      tile_count: optionalNumber(level.tile_count),
-      point_count: optionalNumber(level.point_count)
-    }))
+  const rawLayers = Array.isArray(manifest.layers)
+    ? manifest.layers
+    : [{ id: "default", tile_url_template: manifest.tile_url_template, groups: manifest.groups, types: [], levels: manifest.levels }];
+  const layers = rawLayers.map(parseCatalogTileManifestLayer).filter(isPresent);
+  if (layers.length === 0) return null;
+
+  return {
+    version: String(manifest.version ?? "v1"),
+    format: "SMP2",
+    layers
+  };
+}
+
+function parseCatalogTileManifestLayer(value: unknown): CatalogPointTileManifestLayer | null {
+  if (!value || typeof value !== "object") return null;
+  const layer = value as Record<string, unknown>;
+  if (typeof layer.tile_url_template !== "string" || !layer.tile_url_template) return null;
+  if (!Array.isArray(layer.groups) || !Array.isArray(layer.levels)) return null;
+
+  const levels = layer.levels
+    .map((level) => {
+      if (!level || typeof level !== "object") return null;
+      const rawLevel = level as Record<string, unknown>;
+      return {
+        span_log2: Number(rawLevel.span_log2),
+        span_au: Number(rawLevel.span_au),
+        sample_buckets: optionalNumber(rawLevel.sample_buckets),
+        max_points_per_tile: optionalNumber(rawLevel.max_points_per_tile),
+        tile_count: optionalNumber(rawLevel.tile_count),
+        point_count: optionalNumber(rawLevel.point_count)
+      };
+    })
+    .filter(isPresent)
     .filter((level) => Number.isFinite(level.span_log2) && Number.isFinite(level.span_au) && level.span_au > 0)
     .sort((a, b) => a.span_au - b.span_au);
 
   if (levels.length === 0) return null;
 
   return {
-    version: String(manifest.version ?? "v1"),
-    format: "SMP2",
-    tile_url_template: manifest.tile_url_template,
-    groups: manifest.groups.filter((group): group is string => typeof group === "string" && group.length > 0),
+    id: typeof layer.id === "string" && layer.id ? layer.id : "default",
+    tile_url_template: layer.tile_url_template,
+    groups: layer.groups.filter((group): group is string => typeof group === "string" && group.length > 0),
+    types: Array.isArray(layer.types) ? layer.types.filter(isDestinationBodyType) : [],
     levels
   };
+}
+
+function isDestinationBodyType(value: unknown): value is DestinationBodyType {
+  return typeof value === "string" && normalizeDestinationType(value) === value;
 }
 
 function optionalNumber(value: unknown) {
@@ -2433,8 +2478,8 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
   const requestContext = catalogPointRequestContext();
   if (!requestContext) return [];
 
-  const tileSpanAu = catalogPointTileSpanAu(requestContext.bounds, requestContext.viewWidthLy);
-  const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu);
+  const tileSpanAu = catalogPointTileSpanAu(requestContext.bounds, requestContext.viewWidthLy, requestContext.staticLayer);
+  const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu, requestContext.staticLayer);
   return catalogPointRequestsForLevel(requestContext, tileSpanAu, staticLevel, catalogPointMaxActiveTiles(requestContext.viewWidthLy));
 }
 
@@ -2442,21 +2487,21 @@ function catalogPointPrefetchRequests(activeRequests: CatalogPointTileRequest[])
   const requestContext = catalogPointRequestContext();
   if (!requestContext || catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return [];
 
-  const activeSpanAu = catalogPointTileSpanAu(requestContext.bounds, requestContext.viewWidthLy);
-  const activeLevel = catalogStaticTileLevelForSpan(activeSpanAu);
-  if (!activeLevel) return [];
+  const activeSpanAu = catalogPointTileSpanAu(requestContext.bounds, requestContext.viewWidthLy, requestContext.staticLayer);
+  const activeLevel = catalogStaticTileLevelForSpan(activeSpanAu, requestContext.staticLayer);
+  if (!activeLevel || !requestContext.staticLayer) return [];
 
-  const activeLevelIndex = catalogPointTileManifest.levels.findIndex((level) => level.span_au === activeLevel.span_au);
+  const activeLevelIndex = requestContext.staticLayer.levels.findIndex((level) => level.span_au === activeLevel.span_au);
   if (activeLevelIndex < 0) return [];
 
   const activeKeys = new Set(activeRequests.map((request) => request.key));
   const requests: CatalogPointTileRequest[] = [];
   const firstLevelIndex = Math.max(0, activeLevelIndex - POINT_TILE_PREFETCH_LEVEL_RADIUS);
-  const lastLevelIndex = Math.min(catalogPointTileManifest.levels.length - 1, activeLevelIndex + POINT_TILE_PREFETCH_LEVEL_RADIUS);
+  const lastLevelIndex = Math.min(requestContext.staticLayer.levels.length - 1, activeLevelIndex + POINT_TILE_PREFETCH_LEVEL_RADIUS);
 
   for (let levelIndex = firstLevelIndex; levelIndex <= lastLevelIndex; levelIndex += 1) {
     if (levelIndex === activeLevelIndex) continue;
-    const level = catalogPointTileManifest.levels[levelIndex];
+    const level = requestContext.staticLayer.levels[levelIndex];
     const prefetchContext = catalogPointRequestContextForTileSpan(requestContext, level.span_au);
     requests.push(...catalogPointRequestsForLevel(prefetchContext, level.span_au, level, catalogPointMaxActiveTiles(prefetchContext.viewWidthLy)));
   }
@@ -2505,10 +2550,13 @@ function catalogPointRequestContext() {
   if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
   const filterParams = catalogPointFilterParams();
   if (!filterParams) return null;
+  const staticLayer = catalogStaticTileLayerForFilter(filterParams);
+  if (catalogPointTileManifestState === "ready" && !staticLayer && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
   return {
     viewWidthLy,
     bounds: viewportWorldBounds(POINT_LAYER_VIEWPORT_PADDING),
-    filterParams
+    filterParams,
+    staticLayer
   };
 }
 
@@ -2537,7 +2585,7 @@ function catalogPointRequestsForLevel(
         min_y_au: tileY * tileSpanAu,
         max_y_au: (tileY + 1) * tileSpanAu
       };
-      const tileKey = `z${Math.round(Math.log2(tileSpanAu) * 100) / 100}:x${tileX}:y${tileY}:g${groupSignature}:t${typeSignature}:l${limit}:s${sampleBuckets}:m${staticLevel ? "static" : "api"}`;
+      const tileKey = `layer${requestContext.staticLayer?.id ?? "api"}:z${Math.round(Math.log2(tileSpanAu) * 100) / 100}:x${tileX}:y${tileY}:g${groupSignature}:t${typeSignature}:l${limit}:s${sampleBuckets}:m${staticLevel ? "static" : "api"}`;
       const params = new URLSearchParams();
       params.set("min_x_au", String(tileBounds.min_x_au));
       params.set("max_x_au", String(tileBounds.max_x_au));
@@ -2552,7 +2600,7 @@ function catalogPointRequestsForLevel(
         layerId: `catalog:${tileKey}`,
         signature: `points:${tileKey}`,
         params,
-        staticUrl: staticLevel ? catalogStaticTileUrl(staticLevel, tileX, tileY) : undefined,
+        staticUrl: staticLevel && requestContext.staticLayer ? catalogStaticTileUrl(requestContext.staticLayer, staticLevel, tileX, tileY) : undefined,
         bounds: tileBounds,
         groups: filterParams.groups,
         types: filterParams.types,
@@ -2568,11 +2616,34 @@ function catalogPointRequestsForLevel(
 
 function catalogPointFilterParams(): { groups: string[]; types: DestinationBodyType[] } | null {
   const filter = activeBodyFilterDefinition();
-  if (filter.key !== "all" && filter.types && !filter.types.includes("star")) return null;
   const sourceGroups = filter.key === "all" || !filter.groups ? POINT_LAYER_GROUPS : filter.groups;
-  const groups = sourceGroups.filter((group) => POINT_LAYER_GROUP_SET.has(group));
+  const groups = sourceGroups.filter((group) => POINT_LAYER_GROUP_SET.has(group) || catalogPointManifestGroupSet().has(group));
   if (groups.length === 0) return null;
   return { groups, types: filter.types ?? [] };
+}
+
+function catalogPointManifestGroups() {
+  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return POINT_LAYER_GROUPS;
+  return uniqueStrings(catalogPointTileManifest.layers.flatMap((layer) => layer.groups));
+}
+
+function catalogPointManifestGroupSet() {
+  return new Set(catalogPointManifestGroups());
+}
+
+function catalogStaticTileLayerForFilter(filterParams: { groups: string[]; types: DestinationBodyType[] }): CatalogPointTileManifestLayer | null {
+  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return null;
+  return catalogPointTileManifest.layers.find((layer) => sameStringSet(layer.groups, filterParams.groups) && layerCoversTypes(layer, filterParams.types)) ?? null;
+}
+
+function layerCoversTypes(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]) {
+  if (layer.types.length === 0 || types.length === 0) return true;
+  return sameStringSet(layer.types, types);
+}
+
+
+function uniqueStrings(values: readonly string[]) {
+  return Array.from(new Set(values));
 }
 
 function shouldUseCatalogPoints(viewWidthLy: number) {
@@ -2599,31 +2670,34 @@ function activeCatalogPointCount() {
   return activeCatalogPointTiles().reduce((sum, tile) => sum + (tile.payload?.returned ?? 0), 0);
 }
 
-function catalogPointTileSpanAu(bounds: { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number }, viewWidthLy: number) {
+function catalogPointTileSpanAu(
+  bounds: { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number },
+  viewWidthLy: number,
+  staticLayer: CatalogPointTileManifestLayer | null = null
+) {
   const spanAu = Math.max(bounds.maxXAu - bounds.minXAu, bounds.maxYAu - bounds.minYAu, 1);
   const divisions = viewWidthLy > 70_000 ? POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE : POINT_TILE_TARGET_VIEW_DIVISIONS;
   const rawSpan = spanAu / divisions;
   const dynamicSpan = Math.pow(2, Math.max(0, Math.round(Math.log2(rawSpan))));
-  const staticLevel = catalogStaticTileLevelNearest(dynamicSpan);
+  const staticLevel = catalogStaticTileLevelNearest(dynamicSpan, staticLayer);
   return staticLevel?.span_au ?? dynamicSpan;
 }
 
-function catalogStaticTileLevelNearest(spanAu: number): CatalogPointTileManifestLevel | null {
-  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return null;
-  return catalogPointTileManifest.levels.reduce<CatalogPointTileManifestLevel | null>((best, level) => {
+function catalogStaticTileLevelNearest(spanAu: number, staticLayer: CatalogPointTileManifestLayer | null = null): CatalogPointTileManifestLevel | null {
+  if (catalogPointTileManifestState !== "ready" || !staticLayer) return null;
+  return staticLayer.levels.reduce<CatalogPointTileManifestLevel | null>((best, level) => {
     if (!best) return level;
     return Math.abs(Math.log2(level.span_au / spanAu)) < Math.abs(Math.log2(best.span_au / spanAu)) ? level : best;
   }, null);
 }
 
-function catalogStaticTileLevelForSpan(spanAu: number): CatalogPointTileManifestLevel | null {
-  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return null;
-  return catalogPointTileManifest.levels.find((level) => level.span_au === spanAu) ?? null;
+function catalogStaticTileLevelForSpan(spanAu: number, staticLayer: CatalogPointTileManifestLayer | null = null): CatalogPointTileManifestLevel | null {
+  if (catalogPointTileManifestState !== "ready" || !staticLayer) return null;
+  return staticLayer.levels.find((level) => level.span_au === spanAu) ?? null;
 }
 
-function catalogStaticTileUrl(level: CatalogPointTileManifestLevel, tileX: number, tileY: number) {
-  const template = catalogPointTileManifest?.tile_url_template ?? "/catalog-tiles/v1/s{span_log2}/x{x}/y{y}.bin";
-  return template
+function catalogStaticTileUrl(layer: CatalogPointTileManifestLayer, level: CatalogPointTileManifestLevel, tileX: number, tileY: number) {
+  return layer.tile_url_template
     .replace(/\{span_log2\}/g, String(level.span_log2))
     .replace(/\{x\}/g, String(tileX))
     .replace(/\{y\}/g, String(tileY));
@@ -2693,10 +2767,10 @@ function viewportCatalogRequest() {
 
 function viewportCatalogGroups(viewWidthLy: number) {
   if (viewWidthLy < 0.08) return ["jpl_small_bodies"];
-  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", "exoplanet_systems"];
-  if (viewWidthLy < 6_000) return ["bright_stars", "gaia_local_stars", "gaia_500pc_stars", "exoplanet_systems"];
-  if (viewWidthLy < 25_000) return ["bright_stars"];
-  return ["simbad_extragalactic", "messier_deep_sky"];
+  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", "exoplanet_systems", "exoplanets"];
+  if (viewWidthLy < 6_000) return ["bright_stars", "gaia_local_stars", "gaia_500pc_stars", "exoplanet_systems", "exoplanets", "simbad_compact_objects"];
+  if (viewWidthLy < 25_000) return ["bright_stars", "simbad_compact_objects"];
+  return ["simbad_extragalactic", "simbad_compact_objects", "messier_deep_sky"];
 }
 
 function viewportCatalogLimit(viewWidthLy: number) {
@@ -2776,7 +2850,7 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
   const facts = object.facts ?? {};
   const astrometry = object.astrometry ?? {};
   const objectType = normalizeDestinationType(object.object_type);
-  const isDeepSkyLike = ["galaxy", "nebula", "star_cluster", "quasar", "active_galaxy", "black_hole"].includes(objectType);
+  const isDeepSkyLike = ["galaxy", "nebula", "star_cluster", "quasar", "active_galaxy", "black_hole", "pulsar"].includes(objectType);
   const isSmallBodyLike = ["asteroid", "comet", "small_body"].includes(objectType);
 
   return {
@@ -2831,13 +2905,13 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
           }
         : null,
     exoplanet_system:
-      object.catalog_group === "exoplanet_systems" || object.catalog_group === "nearby_exoplanet_systems"
+      object.catalog_group === "exoplanet_systems" || object.catalog_group === "nearby_exoplanet_systems" || object.catalog_group === "exoplanets"
         ? {
-            confirmed_planet_count: finiteOptionalNumber(facts.exoplanet_count) ?? finiteOptionalNumber(facts.system_planet_count),
+            confirmed_planet_count: object.catalog_group === "exoplanets" ? 1 : finiteOptionalNumber(facts.exoplanet_count) ?? finiteOptionalNumber(facts.system_planet_count),
             system_star_count: finiteOptionalNumber(facts.system_star_count),
             system_planet_count: finiteOptionalNumber(facts.system_planet_count),
             system_moon_count: finiteOptionalNumber(facts.system_moon_count),
-            planets: Array.isArray(facts.planets) ? (facts.planets as BodyExoplanet[]) : [],
+            planets: object.catalog_group === "exoplanets" ? [catalogObjectToExoplanet(object)] : Array.isArray(facts.planets) ? (facts.planets as BodyExoplanet[]) : [],
             why_interesting: stringFact(facts.why_interesting)
           }
         : null,
@@ -2871,6 +2945,19 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
   };
 }
 
+function catalogObjectToExoplanet(object: CatalogObjectPayload): BodyExoplanet {
+  const facts = object.facts ?? {};
+  return {
+    name: object.name,
+    radius_earth: finiteOptionalNumber(facts.radius_earth),
+    mass_earth: finiteOptionalNumber(facts.mass_earth),
+    period_days: finiteOptionalNumber(facts.period_days),
+    semi_major_axis_au: finiteOptionalNumber(facts.semi_major_axis_au),
+    discovery_method: stringFact(facts.discovery_method),
+    discovery_year: finiteOptionalNumber(facts.discovery_year)
+  };
+}
+
 function normalizeDestinationType(type: string | null | undefined): DestinationBodyType {
   const allowed = new Set<DestinationBodyType>([
     "star",
@@ -2881,6 +2968,7 @@ function normalizeDestinationType(type: string | null | undefined): DestinationB
     "quasar",
     "active_galaxy",
     "black_hole",
+    "pulsar",
     "nebula",
     "star_cluster",
     "asterism",
