@@ -384,6 +384,31 @@ defmodule StarsmapApi.Catalog.Importer do
     })
   end
 
+  def row_for_entry(:curated_extragalactic_survey, entry, source_meta) do
+    position = projected_position(entry)
+
+    base_row(entry, source_meta, position, %{
+      object_type: entry["object_type"] || "galaxy",
+      catalog_group: "curated_extragalactic_survey",
+      source_type: entry["source_type"] || "curated_extragalactic_survey",
+      position_model: entry["position_model"] || "survey_ra_dec_distance_coordinates",
+      radius_km: number(entry["radius_km"], 0.0),
+      aliases: list(entry["aliases"]),
+      external_ids: entry["external_ids"] || %{},
+      facts:
+        (entry["facts"] || %{})
+        |> Map.put_new("why_interesting", entry["why_interesting"])
+        |> reject_nil_values()
+        |> reject_empty_values(),
+      search_values: [
+        entry["why_interesting"],
+        fact(entry, "source_catalog"),
+        fact(entry, "survey_class"),
+        fact(entry, "redshift")
+      ]
+    })
+  end
+
   defp rows_for_file({:exoplanet_system = type, path}) do
     data = path |> File.read!() |> Jason.decode!()
     source_meta = source_meta(type, data, path)
@@ -509,6 +534,7 @@ defmodule StarsmapApi.Catalog.Importer do
   defp entries(:gaia_star, data), do: Map.fetch!(data, "stars")
   defp entries(:simbad_extragalactic, data), do: Map.fetch!(data, "objects")
   defp entries(:simbad_compact_object, data), do: Map.fetch!(data, "objects")
+  defp entries(:curated_extragalactic_survey, data), do: Map.fetch!(data, "objects")
 
   defp exoplanet_planet_entries(system) do
     host_key = system["key"]
@@ -568,7 +594,8 @@ defmodule StarsmapApi.Catalog.Importer do
       {:small_body, Path.join(catalog_dir, "small_bodies.json")},
       {:gaia_star, Path.join(catalog_dir, "gaia_local_stars.json")},
       {:simbad_extragalactic, Path.join(catalog_dir, "simbad_extragalactic.json")},
-      {:simbad_compact_object, Path.join(catalog_dir, "simbad_compact_objects.json")}
+      {:simbad_compact_object, Path.join(catalog_dir, "simbad_compact_objects.json")},
+      {:curated_extragalactic_survey, Path.join(catalog_dir, "curated_extragalactic_survey.json")}
     ]
     |> Enum.filter(fn {_type, path} -> File.exists?(path) end)
   end
