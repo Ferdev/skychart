@@ -473,6 +473,16 @@ const WORKSPACE_LABEL_KEYS: Record<AtlasTab, string> = {
 };
 type BodyFilterDefinition = { key: BodyFilter; labelKey: string; types?: DestinationBodyType[]; groups?: string[] };
 
+type ExploreDomainDefinition = {
+  id: string;
+  titleKey: string;
+  descriptionKey: string;
+  filterKey: BodyFilter;
+  guidedSetId: string;
+  zoomPreset: ZoomPreset;
+  count: (summary: CatalogSummary | null, bodies: Body[]) => number | null;
+};
+
 const BODY_FILTERS: BodyFilterDefinition[] = [
   { key: "all", labelKey: "filters.all" },
   { key: "planet", labelKey: "filters.planets", types: ["planet"], groups: ["core"] },
@@ -504,6 +514,62 @@ const GUIDED_SETS: { id: string; labelKey: string; keys: string[] }[] = [
   { id: "galaxies", labelKey: "guided.galaxies", keys: ["m31", "m33", "m51", "m81", "m82", "m87"] },
   { id: "active-galaxies", labelKey: "guided.activeGalaxies", keys: ["simbad-m-87", "simbad-3c-273", "simbad-ngc-1068", "simbad-3c-279"] },
   { id: "nebulae", labelKey: "guided.nebulae", keys: ["m1", "m8", "m16", "m17", "m20", "m42", "m57"] }
+];
+const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
+  {
+    id: "solar-system",
+    titleKey: "explore.solarSystem.title",
+    descriptionKey: "explore.solarSystem.description",
+    filterKey: "all",
+    guidedSetId: "solar-neighborhood",
+    zoomPreset: "solar",
+    count: (_summary, bodies) => bodies.filter(isSolarSystemBody).length
+  },
+  {
+    id: "nearby-stars",
+    titleKey: "explore.nearbyStars.title",
+    descriptionKey: "explore.nearbyStars.description",
+    filterKey: "star",
+    guidedSetId: "nearby-stars",
+    zoomPreset: "nearby",
+    count: (summary, bodies) => summary?.group_counts?.nearby_exoplanet_systems ?? bodies.filter((body) => body.catalog_group === "nearby_exoplanet_systems").length
+  },
+  {
+    id: "messier-deep-sky",
+    titleKey: "explore.messier.title",
+    descriptionKey: "explore.messier.description",
+    filterKey: "all",
+    guidedSetId: "deep-sky",
+    zoomPreset: "messier",
+    count: (summary, bodies) => summary?.group_counts?.messier_deep_sky ?? bodies.filter((body) => body.catalog_group === "messier_deep_sky").length
+  },
+  {
+    id: "galaxies",
+    titleKey: "explore.galaxies.title",
+    descriptionKey: "explore.galaxies.description",
+    filterKey: "galaxy",
+    guidedSetId: "galaxies",
+    zoomPreset: "all",
+    count: (summary, bodies) => summary?.type_counts?.galaxy ?? bodies.filter((body) => classifyBody(body).type === "galaxy").length
+  },
+  {
+    id: "exoplanet-systems",
+    titleKey: "explore.exoplanets.title",
+    descriptionKey: "explore.exoplanets.description",
+    filterKey: "exoplanet_system",
+    guidedSetId: "exoplanets",
+    zoomPreset: "nearby",
+    count: (summary, bodies) => (summary?.group_counts?.nearby_exoplanet_systems ?? 0) + (summary?.group_counts?.exoplanet_systems ?? 0) || bodies.filter((body) => body.exoplanet_system).length
+  },
+  {
+    id: "small-bodies",
+    titleKey: "explore.smallBodies.title",
+    descriptionKey: "explore.smallBodies.description",
+    filterKey: "small_body",
+    guidedSetId: "small-bodies",
+    zoomPreset: "solar",
+    count: (summary, bodies) => (summary?.type_counts?.asteroid ?? 0) + (summary?.type_counts?.comet ?? 0) + (summary?.type_counts?.small_body ?? 0) || bodies.filter((body) => ["asteroid", "comet", "small_body"].includes(classifyBody(body).type)).length
+  }
 ];
 const TIME_STEPS = [
   { labelKey: "time.oneDay", days: 1 },
@@ -557,6 +623,7 @@ const tabPanels = Array.from(document.querySelectorAll<HTMLElement>("[data-tab-p
 const catalogCount = requiredElement<HTMLElement>("#catalog-count");
 const bodyFilterButtons = requiredElement<HTMLElement>("#body-filter-buttons");
 const bodyPicker = requiredElement<HTMLElement>("#body-picker");
+const exploreDomains = requiredElement<HTMLElement>("#explore-domains");
 const guidedTours = requiredElement<HTMLElement>("#guided-tours");
 const bodyInfo = requiredElement<HTMLElement>("#body-info");
 const centerSelected = requiredElement<HTMLButtonElement>("#center-selected");
@@ -752,6 +819,7 @@ function bindEvents() {
     activeGuidedSetId = null;
     catalogSearchState.latestBodies = [];
     catalogSearchState.activeOptionKey = null;
+    updateExploreDomains();
     updateGuidedSets();
     scheduleBodyPickerUpdate();
   });
@@ -819,11 +887,18 @@ function bindEvents() {
     catalogSearchState.activeOptionKey = null;
     cancelCatalogPointRequest();
     clearCatalogPointTiles(false);
+    updateExploreDomains();
     updateBodyFilters();
     updateGuidedSets();
     updateStats();
     void updateBodyPicker();
     requestRender({ data: true });
+  });
+
+  exploreDomains.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-explore-domain]");
+    if (!button) return;
+    applyExploreDomain(button.dataset.exploreDomain ?? "");
   });
 
   bodyPicker.addEventListener("click", (event) => {
@@ -844,6 +919,7 @@ function bindEvents() {
     bodySearch.value = "";
     fitBodies(bodies, 0.2);
     setActiveTab("catalog");
+    updateExploreDomains();
     updateBodyFilters();
     updateGuidedSets();
     void updateBodyPicker();
@@ -1028,6 +1104,7 @@ function initializeUi() {
   compareSearch.setAttribute("aria-controls", comparePicker.id);
   compareSearch.setAttribute("aria-autocomplete", "list");
   updateTabs();
+  updateExploreDomains();
   updateBodyFilters();
   updateCompareFilters();
   updateSizeModes();
@@ -1042,6 +1119,7 @@ function updateAllUi() {
   updateSelectedSummary();
   updateQuickFocus();
   updateTabs();
+  updateExploreDomains();
   updateBodyFilters();
   updateCompareFilters();
   updateBodyPicker();
@@ -1757,6 +1835,7 @@ async function refreshCatalogSummary() {
     if (!response.ok) throw new Error(`Catalog summary failed with ${response.status}`);
     catalogSummary = (await response.json()) as CatalogSummary;
     updateStats();
+    updateExploreDomains();
   } catch (error) {
     console.warn("Phoenix catalog summary unavailable.", error);
   }
@@ -1841,6 +1920,44 @@ function setActiveTab(tab: ActiveAtlasTab) {
 
 function updateBodyFilters() {
   bodyFilterButtons.innerHTML = renderFilterButtons(activeFilter);
+}
+
+function updateExploreDomains() {
+  const bodies = ephemeris?.bodies ?? [];
+  exploreDomains.innerHTML = EXPLORE_DOMAINS.map((domain) => renderExploreDomain(domain, bodies)).join("");
+}
+
+function renderExploreDomain(domain: ExploreDomainDefinition, bodies: Body[]) {
+  const count = domain.count(catalogSummary, bodies);
+  const active = activeGuidedSetId === domain.guidedSetId && activeFilter === domain.filterKey;
+  return `
+    <button type="button" class="explore-domain-card${active ? " active" : ""}" data-explore-domain="${escapeHtml(domain.id)}" aria-pressed="${active ? "true" : "false"}">
+      <span class="explore-domain-card__copy">
+        <strong>${escapeHtml(t(domain.titleKey))}</strong>
+        <small>${escapeHtml(t(domain.descriptionKey))}</small>
+      </span>
+      ${count === null ? "" : `<span class="explore-domain-card__count">${escapeHtml(t("explore.count", { count: formatCount(count) }))}</span>`}
+    </button>
+  `;
+}
+
+function applyExploreDomain(domainId: string) {
+  const domain = EXPLORE_DOMAINS.find((item) => item.id === domainId);
+  if (!domain) return;
+  activeFilter = domain.filterKey;
+  activeGuidedSetId = domain.guidedSetId;
+  bodySearch.value = "";
+  catalogSearchState.latestBodies = [];
+  catalogSearchState.activeOptionKey = null;
+  cancelCatalogPointRequest();
+  clearCatalogPointTiles(false);
+  updateExploreDomains();
+  updateBodyFilters();
+  updateGuidedSets();
+  void updateBodyPicker();
+  applyZoomPreset(domain.zoomPreset);
+  setActiveTab("catalog");
+  requestRender({ data: true });
 }
 
 function updateCompareFilters() {
