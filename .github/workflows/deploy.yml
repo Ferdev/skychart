@@ -104,8 +104,11 @@ jobs:
       - name: Boot Postgres accessory
         run: kamal accessory boot postgres -d staging || true
 
+      - name: Ensure Kamal proxy
+        run: kamal proxy boot -d staging || true
+
       - name: Deploy to staging
-        run: kamal deploy -d staging
+        run: kamal redeploy -d staging
 
       - name: Smoke test staging
         run: curl -fsS https://staging.skychart.org/api/health
