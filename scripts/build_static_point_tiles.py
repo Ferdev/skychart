@@ -30,8 +30,10 @@ DEFAULT_GROUPS = (
     "gaia_10kpc_bright_stars",
 )
 DEFAULT_LAYERS = (
+    # Keep the heavy Gaia rows in exactly one physical layer. Duplicating them
+    # into both a Gaia layer and a broad "stars" layer exhausts the app
+    # container filesystem before the upload step.
     "gaia_stars:gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
-    "stars:core|bright_stars|nearby_exoplanet_systems|exoplanet_systems|exoplanets|gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
     "exoplanet_systems:nearby_exoplanet_systems|exoplanet_systems|exoplanets:",
     "small_bodies:jpl_small_bodies:asteroid|comet|small_body",
     "deep_sky:messier_deep_sky|simbad_extragalactic|simbad_compact_objects:galaxy|quasar|active_galaxy|black_hole|pulsar|nebula|star_cluster",
