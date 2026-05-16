@@ -55,6 +55,13 @@ class StaticTileDefaultsTest(unittest.TestCase):
         self.assertIn("CATALOG_TILE_S3_PREFIX", workflow)
         self.assertIn("kamal app exec -d \"$TARGET_ENVIRONMENT\"", workflow)
 
+    def test_catalog_import_runs_after_deploy_not_before_healthcheck(self) -> None:
+        entrypoint = (ROOT / "scripts" / "docker-entrypoint.sh").read_text(encoding="utf-8")
+        post_deploy = (ROOT / ".kamal" / "hooks" / "post-deploy").read_text(encoding="utf-8")
+
+        self.assertNotIn("import_catalogs_if_needed.sh", entrypoint)
+        self.assertIn("import_catalogs_if_needed.sh", post_deploy)
+
 
 if __name__ == "__main__":
     unittest.main()
