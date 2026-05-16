@@ -183,6 +183,60 @@ defmodule StarsmapApi.Catalog.Importer do
     })
   end
 
+  def row_for_entry(:ngc_ic_deep_sky, entry, source_meta) do
+    position = projected_position_optional(entry)
+    physical_diameter_ly = number(entry["physical_diameter_ly"]) || angular_diameter_ly(entry)
+
+    base_row(entry, source_meta, position, %{
+      object_type: entry["object_type"] || "deep_sky_object",
+      catalog_group: "ngc_ic_deep_sky",
+      source_type: "openngc_ngc_ic_catalog",
+      position_model: "openngc_j2000_coordinates",
+      radius_km: deep_sky_radius_km(entry),
+      aliases: list(entry["aliases"]),
+      external_ids: %{
+        "messier" => prefixed_id("M", entry["messier"]),
+        "ngc" => prefixed_id("NGC", entry["ngc"]),
+        "ic" => prefixed_id("IC", entry["ic"])
+      },
+      facts:
+        (entry["facts"] || %{})
+        |> Map.merge(
+          take(entry, [
+            "catalog_designation",
+            "messier",
+            "ngc",
+            "ic",
+            "distance_quality",
+            "deep_sky_type",
+            "deep_sky_type_label",
+            "angular_size_arcmin",
+            "constellation",
+            "common_name",
+            "physical_diameter_ly",
+            "physical_minor_diameter_ly",
+            "physical_size_note"
+          ])
+        )
+        |> Map.put("physical_diameter_ly", physical_diameter_ly),
+      search_values: [
+        entry["catalog_designation"],
+        entry["messier"],
+        entry["ngc"],
+        entry["ic"],
+        entry["deep_sky_type"],
+        entry["deep_sky_type_label"],
+        entry["constellation"],
+        fact(entry, "hubble_type"),
+        fact(entry, "openngc_notes"),
+        fact(entry, "ned_notes"),
+        fact(entry, "why_interesting"),
+        fact(entry, "identifiers"),
+        fact(entry, "common_names")
+      ]
+    })
+  end
+
   def row_for_entry(:small_body, entry, source_meta) do
     position = cartesian_position(entry)
 
@@ -374,6 +428,7 @@ defmodule StarsmapApi.Catalog.Importer do
   defp entries(:exoplanet_system, data), do: Map.fetch!(data, "systems")
   defp entries(:bright_star, data), do: Map.fetch!(data, "stars")
   defp entries(:deep_sky, data), do: Map.fetch!(data, "objects")
+  defp entries(:ngc_ic_deep_sky, data), do: Map.fetch!(data, "objects")
   defp entries(:small_body, data), do: Map.fetch!(data, "objects")
   defp entries(:gaia_star, data), do: Map.fetch!(data, "stars")
   defp entries(:simbad_extragalactic, data), do: Map.fetch!(data, "objects")
@@ -401,6 +456,7 @@ defmodule StarsmapApi.Catalog.Importer do
       {:exoplanet_system, Path.join(catalog_dir, "exoplanet_systems.json")},
       {:bright_star, Path.join(catalog_dir, "bright_stars.json")},
       {:deep_sky, Path.join(catalog_dir, "deep_sky_catalog.json")},
+      {:ngc_ic_deep_sky, Path.join(catalog_dir, "ngc_ic_deep_sky.json")},
       {:small_body, Path.join(catalog_dir, "small_bodies.json")},
       {:gaia_star, Path.join(catalog_dir, "gaia_local_stars.json")},
       {:simbad_extragalactic, Path.join(catalog_dir, "simbad_extragalactic.json")}
@@ -492,6 +548,22 @@ defmodule StarsmapApi.Catalog.Importer do
       y_km: y_au * @au_km,
       z_km: z_au * @au_km
     }
+  end
+
+  defp projected_position_optional(entry) do
+    projected_position(entry)
+  rescue
+    ArgumentError ->
+      %{
+        distance_pc: nil,
+        distance_ly: nil,
+        x_au: nil,
+        y_au: nil,
+        z_au: nil,
+        x_km: nil,
+        y_km: nil,
+        z_km: nil
+      }
   end
 
   defp cartesian_position(entry) do

@@ -881,6 +881,67 @@ button:disabled {
   gap: 8px;
 }
 
+.explore-section {
+  background: rgba(130, 203, 179, 0.09);
+}
+
+.explore-domain-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.explore-domain-card {
+  min-height: 116px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(21, 23, 20, 0.1);
+  border-radius: 10px;
+  color: var(--ink);
+  background: linear-gradient(145deg, rgba(255, 250, 240, 0.86), rgba(130, 203, 179, 0.16));
+  text-align: left;
+}
+
+.explore-domain-card:hover,
+.explore-domain-card:focus-visible,
+.explore-domain-card.active {
+  border-color: rgba(21, 23, 20, 0.28);
+  background: linear-gradient(145deg, #fffaf0, rgba(130, 203, 179, 0.28));
+}
+
+.explore-domain-card.active {
+  box-shadow: inset 4px 0 0 var(--teal), 0 8px 24px rgba(21, 23, 20, 0.08);
+}
+
+.explore-domain-card__copy {
+  display: grid;
+  gap: 5px;
+}
+
+.explore-domain-card strong {
+  font-size: 0.92rem;
+  line-height: 1.12;
+}
+
+.explore-domain-card small {
+  color: rgba(21, 23, 20, 0.58);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.explore-domain-card__count {
+  width: fit-content;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: rgba(21, 23, 20, 0.72);
+  background: rgba(21, 23, 20, 0.08);
+  font-size: 0.72rem;
+  font-weight: 820;
+}
+
 .tour-grid button {
   display: grid;
   gap: 2px;
@@ -1280,6 +1341,53 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
+}
+
+.object-summary-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--body-color, #d8a23f) 24%, rgba(21, 23, 20, 0.12));
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--body-color, #d8a23f) 20%, transparent), transparent 42%),
+    rgba(255, 250, 240, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+}
+
+.object-summary-card span {
+  display: block;
+  color: rgba(21, 23, 20, 0.58);
+  font-size: 0.72rem;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.object-summary-card p {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 710;
+  line-height: 1.35;
+}
+
+.object-summary-card ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.object-summary-card li {
+  padding: 4px 7px;
+  border: 1px solid rgba(21, 23, 20, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.42);
+  color: rgba(21, 23, 20, 0.68);
+  font-size: 0.72rem;
+  font-weight: 720;
 }
 
 .fact-tiles div {

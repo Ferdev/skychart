@@ -94,6 +94,8 @@ Useful import/tile environment switches:
 - `CATALOG_TILE_PUBLIC_BASE_URL=https://.../catalog-tiles/v1` controls the tile URL template written into the manifest.
 - `CATALOG_TILE_S3_PREFIX=catalog-tiles/v1` controls where the CDN tile files are uploaded inside the bucket.
 
+- `CATALOG_DYNAMIC_POINT_FALLBACK=1` re-enables `/api/catalog/points.bin` when `CATALOG_TILE_MANIFEST_URL` is configured. Leave this unset in staging/production so a static-manifest deployment cannot silently fall back to Postgres-backed rendering.
+
 Preferred production tile build and CDN upload:
 
 1. Deploy the image normally through `Deploy Production`.

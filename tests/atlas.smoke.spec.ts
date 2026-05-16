@@ -198,6 +198,29 @@ test.describe("Cosmic Atlas browser smoke", () => {
     issues.assertClean();
   });
 
+  test("explore domain cards apply aligned catalog filters and guided results", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+
+    await openSearchWorkspace(page);
+    await page.locator('[data-explore-domain="galaxies"]').click();
+
+    await expect(page.locator('[data-explore-domain="galaxies"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('#body-filter-buttons [data-body-filter="galaxy"]')).toHaveClass(/active/);
+    await expect(page.locator("#body-picker")).toContainText("Galaxies");
+    await expect(page.locator('#body-picker [data-body-key="m31"]')).toBeVisible();
+    await expect(page.locator('#body-picker [data-body-key="jupiter"]')).toHaveCount(0);
+
+    await page.locator('[data-explore-domain="small-bodies"]').press("Enter");
+
+    await expect(page.locator('[data-explore-domain="small-bodies"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('#body-filter-buttons [data-body-filter="small_body"]')).toHaveClass(/active/);
+    await expect(page.locator("#body-picker")).toContainText("Small bodies");
+    await expect(page.locator('#body-picker [data-body-key="jpl-sbdb-20000001"]')).toBeVisible();
+    await expect(page.locator('#body-picker [data-body-key="m31"]')).toHaveCount(0);
+
+    issues.assertClean();
+  });
+
   test("catalog point tiles can ask the backend for nearest-object hydration", async ({ page }) => {
     const issues = collectBrowserIssues(page);
 

@@ -14,6 +14,12 @@ import {
   type DestinationPickerItem,
   type RecentDestination
 } from "./destinationPicker";
+import {
+  equatorialToGalactic,
+  formatDecimalDegrees,
+  formatDeclination,
+  formatRightAscension
+} from "./coordinates";
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
 import { educationalComparisons } from "./navigationMetrics";
 import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
@@ -456,10 +462,7 @@ const POINT_BINARY_HEADER_BYTES = 8;
 const POINT_BINARY_RECORD_BYTES = 12;
 const POINT_VERTEX_STRIDE_FLOATS = 6;
 const CATALOG_TILE_MANIFEST_URL = catalogTileManifestUrl();
-const ALLOW_DYNAMIC_POINT_FALLBACK =
-  window.location.hostname === "127.0.0.1" ||
-  window.location.hostname === "localhost" ||
-  new URLSearchParams(window.location.search).has("dynamicPointFallback");
+const ALLOW_DYNAMIC_POINT_FALLBACK = dynamicPointFallbackEnabled();
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
 const POINT_SAMPLE_BUCKET_COUNT = 1_024;
@@ -472,6 +475,16 @@ const WORKSPACE_LABEL_KEYS: Record<AtlasTab, string> = {
   object: "workspace.selectedObject"
 };
 type BodyFilterDefinition = { key: BodyFilter; labelKey: string; types?: DestinationBodyType[]; groups?: string[] };
+
+type ExploreDomainDefinition = {
+  id: string;
+  titleKey: string;
+  descriptionKey: string;
+  filterKey: BodyFilter;
+  guidedSetId: string;
+  zoomPreset: ZoomPreset;
+  count: (summary: CatalogSummary | null, bodies: Body[]) => number | null;
+};
 
 const BODY_FILTERS: BodyFilterDefinition[] = [
   { key: "all", labelKey: "filters.all" },
@@ -504,6 +517,62 @@ const GUIDED_SETS: { id: string; labelKey: string; keys: string[] }[] = [
   { id: "galaxies", labelKey: "guided.galaxies", keys: ["m31", "m33", "m51", "m81", "m82", "m87"] },
   { id: "active-galaxies", labelKey: "guided.activeGalaxies", keys: ["simbad-m-87", "simbad-3c-273", "simbad-ngc-1068", "simbad-3c-279"] },
   { id: "nebulae", labelKey: "guided.nebulae", keys: ["m1", "m8", "m16", "m17", "m20", "m42", "m57"] }
+];
+const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
+  {
+    id: "solar-system",
+    titleKey: "explore.solarSystem.title",
+    descriptionKey: "explore.solarSystem.description",
+    filterKey: "all",
+    guidedSetId: "solar-neighborhood",
+    zoomPreset: "solar",
+    count: (_summary, bodies) => bodies.filter(isSolarSystemBody).length
+  },
+  {
+    id: "nearby-stars",
+    titleKey: "explore.nearbyStars.title",
+    descriptionKey: "explore.nearbyStars.description",
+    filterKey: "star",
+    guidedSetId: "nearby-stars",
+    zoomPreset: "nearby",
+    count: (summary, bodies) => summary?.group_counts?.nearby_exoplanet_systems ?? bodies.filter((body) => body.catalog_group === "nearby_exoplanet_systems").length
+  },
+  {
+    id: "messier-deep-sky",
+    titleKey: "explore.messier.title",
+    descriptionKey: "explore.messier.description",
+    filterKey: "all",
+    guidedSetId: "deep-sky",
+    zoomPreset: "messier",
+    count: (summary, bodies) => summary?.group_counts?.messier_deep_sky ?? bodies.filter((body) => body.catalog_group === "messier_deep_sky").length
+  },
+  {
+    id: "galaxies",
+    titleKey: "explore.galaxies.title",
+    descriptionKey: "explore.galaxies.description",
+    filterKey: "galaxy",
+    guidedSetId: "galaxies",
+    zoomPreset: "all",
+    count: (summary, bodies) => summary?.type_counts?.galaxy ?? bodies.filter((body) => classifyBody(body).type === "galaxy").length
+  },
+  {
+    id: "exoplanet-systems",
+    titleKey: "explore.exoplanets.title",
+    descriptionKey: "explore.exoplanets.description",
+    filterKey: "exoplanet_system",
+    guidedSetId: "exoplanets",
+    zoomPreset: "nearby",
+    count: (summary, bodies) => (summary?.group_counts?.nearby_exoplanet_systems ?? 0) + (summary?.group_counts?.exoplanet_systems ?? 0) || bodies.filter((body) => body.exoplanet_system).length
+  },
+  {
+    id: "small-bodies",
+    titleKey: "explore.smallBodies.title",
+    descriptionKey: "explore.smallBodies.description",
+    filterKey: "small_body",
+    guidedSetId: "small-bodies",
+    zoomPreset: "solar",
+    count: (summary, bodies) => (summary?.type_counts?.asteroid ?? 0) + (summary?.type_counts?.comet ?? 0) + (summary?.type_counts?.small_body ?? 0) || bodies.filter((body) => ["asteroid", "comet", "small_body"].includes(classifyBody(body).type)).length
+  }
 ];
 const TIME_STEPS = [
   { labelKey: "time.oneDay", days: 1 },
@@ -557,6 +626,7 @@ const tabPanels = Array.from(document.querySelectorAll<HTMLElement>("[data-tab-p
 const catalogCount = requiredElement<HTMLElement>("#catalog-count");
 const bodyFilterButtons = requiredElement<HTMLElement>("#body-filter-buttons");
 const bodyPicker = requiredElement<HTMLElement>("#body-picker");
+const exploreDomains = requiredElement<HTMLElement>("#explore-domains");
 const guidedTours = requiredElement<HTMLElement>("#guided-tours");
 const bodyInfo = requiredElement<HTMLElement>("#body-info");
 const centerSelected = requiredElement<HTMLButtonElement>("#center-selected");
@@ -752,6 +822,7 @@ function bindEvents() {
     activeGuidedSetId = null;
     catalogSearchState.latestBodies = [];
     catalogSearchState.activeOptionKey = null;
+    updateExploreDomains();
     updateGuidedSets();
     scheduleBodyPickerUpdate();
   });
@@ -819,11 +890,18 @@ function bindEvents() {
     catalogSearchState.activeOptionKey = null;
     cancelCatalogPointRequest();
     clearCatalogPointTiles(false);
+    updateExploreDomains();
     updateBodyFilters();
     updateGuidedSets();
     updateStats();
     void updateBodyPicker();
     requestRender({ data: true });
+  });
+
+  exploreDomains.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-explore-domain]");
+    if (!button) return;
+    applyExploreDomain(button.dataset.exploreDomain ?? "");
   });
 
   bodyPicker.addEventListener("click", (event) => {
@@ -844,6 +922,7 @@ function bindEvents() {
     bodySearch.value = "";
     fitBodies(bodies, 0.2);
     setActiveTab("catalog");
+    updateExploreDomains();
     updateBodyFilters();
     updateGuidedSets();
     void updateBodyPicker();
@@ -1028,6 +1107,7 @@ function initializeUi() {
   compareSearch.setAttribute("aria-controls", comparePicker.id);
   compareSearch.setAttribute("aria-autocomplete", "list");
   updateTabs();
+  updateExploreDomains();
   updateBodyFilters();
   updateCompareFilters();
   updateSizeModes();
@@ -1042,6 +1122,7 @@ function updateAllUi() {
   updateSelectedSummary();
   updateQuickFocus();
   updateTabs();
+  updateExploreDomains();
   updateBodyFilters();
   updateCompareFilters();
   updateBodyPicker();
@@ -1757,6 +1838,7 @@ async function refreshCatalogSummary() {
     if (!response.ok) throw new Error(`Catalog summary failed with ${response.status}`);
     catalogSummary = (await response.json()) as CatalogSummary;
     updateStats();
+    updateExploreDomains();
   } catch (error) {
     console.warn("Phoenix catalog summary unavailable.", error);
   }
@@ -1841,6 +1923,44 @@ function setActiveTab(tab: ActiveAtlasTab) {
 
 function updateBodyFilters() {
   bodyFilterButtons.innerHTML = renderFilterButtons(activeFilter);
+}
+
+function updateExploreDomains() {
+  const bodies = ephemeris?.bodies ?? [];
+  exploreDomains.innerHTML = EXPLORE_DOMAINS.map((domain) => renderExploreDomain(domain, bodies)).join("");
+}
+
+function renderExploreDomain(domain: ExploreDomainDefinition, bodies: Body[]) {
+  const count = domain.count(catalogSummary, bodies);
+  const active = activeGuidedSetId === domain.guidedSetId && activeFilter === domain.filterKey;
+  return `
+    <button type="button" class="explore-domain-card${active ? " active" : ""}" data-explore-domain="${escapeHtml(domain.id)}" aria-pressed="${active ? "true" : "false"}">
+      <span class="explore-domain-card__copy">
+        <strong>${escapeHtml(t(domain.titleKey))}</strong>
+        <small>${escapeHtml(t(domain.descriptionKey))}</small>
+      </span>
+      ${count === null ? "" : `<span class="explore-domain-card__count">${escapeHtml(t("explore.count", { count: formatCount(count) }))}</span>`}
+    </button>
+  `;
+}
+
+function applyExploreDomain(domainId: string) {
+  const domain = EXPLORE_DOMAINS.find((item) => item.id === domainId);
+  if (!domain) return;
+  activeFilter = domain.filterKey;
+  activeGuidedSetId = domain.guidedSetId;
+  bodySearch.value = "";
+  catalogSearchState.latestBodies = [];
+  catalogSearchState.activeOptionKey = null;
+  cancelCatalogPointRequest();
+  clearCatalogPointTiles(false);
+  updateExploreDomains();
+  updateBodyFilters();
+  updateGuidedSets();
+  void updateBodyPicker();
+  applyZoomPreset(domain.zoomPreset);
+  setActiveTab("catalog");
+  requestRender({ data: true });
 }
 
 function updateCompareFilters() {
@@ -2003,6 +2123,14 @@ function catalogTileManifestUrl() {
     .querySelector<HTMLMetaElement>('meta[name="catalog-tile-manifest-url"]')
     ?.content.trim();
   return configuredUrl || "/catalog-tiles/v1/manifest.json";
+}
+
+function dynamicPointFallbackEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  const queryValue = params.get("dynamicPointFallback");
+  if (queryValue === "1" || queryValue === "true") return true;
+  if (queryValue === "0" || queryValue === "false") return false;
+  return window.localStorage.getItem("starsmap:dynamic-point-fallback") === "1";
 }
 
 function parseCatalogTileManifest(value: unknown): CatalogPointTileManifest | null {
@@ -3054,10 +3182,14 @@ function updateBodyInfo() {
   const positionRows = [
     [t("field.coordinateFrame"), ephemeris?.coordinate_frame ?? null],
     [t("field.positionModel"), positionModel],
-    [t("field.raDec"), formatRaDec(body)],
-    ["X", formatAuCoordinate(body.position.x_au)],
-    ["Y", formatAuCoordinate(body.position.y_au)],
-    ["Z", formatAuCoordinate(body.position.z_au)]
+    [t("field.rightAscension"), formatRightAscensionForBody(body)],
+    [t("field.declination"), formatDeclinationForBody(body)],
+    [t("field.raDecDecimal"), formatRaDecDecimal(body)],
+    [t("field.galacticLongitude"), formatGalacticLongitude(body)],
+    [t("field.galacticLatitude"), formatGalacticLatitude(body)],
+    [t("field.eclipticX"), formatAuCoordinate(body.position.x_au)],
+    [t("field.eclipticY"), formatAuCoordinate(body.position.y_au)],
+    [t("field.eclipticZ"), formatAuCoordinate(body.position.z_au)]
   ];
 
   const stateRows = body.state_vector
@@ -3145,6 +3277,7 @@ function updateBodyInfo() {
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
       <section class="object-data-pane">
         ${renderObjectDetailState(body)}
+        ${renderObjectSummaryCard(body, classification.label)}
         ${renderFactTiles(primaryStats)}
         ${renderIdentifierSection(body)}
         ${renderMediaSection(body)}
@@ -3181,6 +3314,76 @@ function renderObjectDetailState(body: Body) {
       <span>${escapeHtml(t("object.catalogPreviewBody"))}</span>
     </section>
   `;
+}
+
+function renderObjectSummaryCard(body: Body, typeLabel: string) {
+  const summary = objectSummaryText(body, typeLabel);
+  const contextItems = objectSummaryContext(body);
+  return `
+    <section class="object-summary-card" aria-label="${escapeHtml(t("object.whyThisMatters"))}">
+      <div>
+        <span>${escapeHtml(t("object.whyThisMatters"))}</span>
+        <p>${escapeHtml(summary)}</p>
+      </div>
+      ${
+        contextItems.length > 0
+          ? `<ul>${contextItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function objectSummaryText(body: Body, typeLabel: string) {
+  const curated = firstText([body.exoplanet_system?.why_interesting, body.deep_sky?.why_interesting]);
+  if (curated) return curated;
+
+  const name = body.name;
+  switch (body.object_type) {
+    case "planet":
+      return t("summary.planet", { name });
+    case "moon":
+      return t("summary.moon", { name });
+    case "star":
+      return body.stellar?.exoplanet_count ? t("summary.exoplanetHost", { name, count: body.stellar.exoplanet_count }) : t("summary.star", { name });
+    case "dwarf_planet":
+      return t("summary.dwarfPlanet", { name });
+    case "galaxy":
+      return t("summary.galaxy", { name });
+    case "quasar":
+      return t("summary.quasar", { name });
+    case "active_galaxy":
+      return t("summary.activeGalaxy", { name });
+    case "nebula":
+      return t("summary.nebula", { name });
+    case "star_cluster":
+      return t("summary.starCluster", { name });
+    case "asteroid":
+    case "comet":
+    case "small_body":
+      return t("summary.smallBody", { name });
+    default:
+      if (body.exoplanet_system) return t("summary.exoplanetSystem", { name });
+      return t("summary.generic", { name, type: typeLabel.toLowerCase() });
+  }
+}
+
+function objectSummaryContext(body: Body) {
+  const items = [
+    body.deep_sky?.constellation ? t("summary.contextConstellation", { value: body.deep_sky.constellation }) : null,
+    body.deep_sky?.viewing_season ? t("summary.contextSeason", { value: body.deep_sky.viewing_season }) : null,
+    body.exoplanet_system?.confirmed_planet_count != null
+      ? t("summary.contextPlanets", { count: body.exoplanet_system.confirmed_planet_count })
+      : null,
+    body.stellar?.distance_ly != null ? t("summary.contextDistance", { value: formatNumber(body.stellar.distance_ly) }) : null,
+    body.small_body?.neo ? t("summary.contextNeo") : null,
+    body.catalog_group ? t("summary.contextCatalog", { value: readableCatalogGroup(body.catalog_group) ?? body.catalog_group }) : null
+  ].filter(isPresent);
+  return items.slice(0, 3);
+}
+
+function firstText(values: readonly (string | null | undefined)[]) {
+  return values.find((value) => typeof value === "string" && value.trim().length > 0)?.trim() ?? null;
 }
 
 function renderIdentifierSection(body: Body) {
@@ -4575,11 +4778,44 @@ function nullableLightYears(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? `${formatNumber(value)} ly` : t("value.unknown");
 }
 
-function formatRaDec(body: Body) {
+function equatorialCoordinatesForBody(body: Body) {
   const raDeg = finiteOptionalNumber(body.catalog?.ra_deg);
   const decDeg = finiteOptionalNumber(body.catalog?.dec_deg);
   if (raDeg == null || decDeg == null) return null;
-  return `${raDeg.toFixed(5)} deg, ${decDeg.toFixed(5)} deg`;
+  return { raDeg, decDeg };
+}
+
+function formatRightAscensionForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatRightAscension(coordinates.raDeg)} (${formatDecimalDegrees(coordinates.raDeg)})`;
+}
+
+function formatDeclinationForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatDeclination(coordinates.decDeg)} (${formatDecimalDegrees(coordinates.decDeg)})`;
+}
+
+function formatRaDecDecimal(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatDecimalDegrees(coordinates.raDeg)}, ${formatDecimalDegrees(coordinates.decDeg)}`;
+}
+
+function galacticCoordinatesForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  return coordinates ? equatorialToGalactic(coordinates) : null;
+}
+
+function formatGalacticLongitude(body: Body) {
+  const coordinates = galacticCoordinatesForBody(body);
+  return coordinates ? formatDecimalDegrees(coordinates.longitudeDeg, 3) : null;
+}
+
+function formatGalacticLatitude(body: Body) {
+  const coordinates = galacticCoordinatesForBody(body);
+  return coordinates ? formatDecimalDegrees(coordinates.latitudeDeg, 3) : null;
 }
 
 function formatAuCoordinate(value: number) {
