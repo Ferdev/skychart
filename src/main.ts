@@ -21,7 +21,7 @@ import {
   formatRightAscension
 } from "./coordinates";
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
-import { COSMIC_WEB_MODEL, LOCAL_GROUP_MODEL, type UniverseFilament, type UniverseModel, type UniversePoint, type UniverseRing } from "./universeModel";
+import { COSMIC_WEB_MODEL, LOCAL_GROUP_MODEL, type UniverseDensityRegion, type UniverseFilament, type UniverseModel, type UniversePoint, type UniverseRing } from "./universeModel";
 import { educationalComparisons } from "./navigationMetrics";
 import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
 import { initI18n, t } from "./i18n";
@@ -31,6 +31,7 @@ type AtlasTab = "catalog" | "object";
 type ActiveAtlasTab = AtlasTab | null;
 type SizeMode = "readable" | "hybrid" | "true";
 type ZoomPreset = "inner" | "solar" | "nearby" | "galaxy" | "localGroup" | "messier" | "cosmicWeb" | "all";
+type UniverseNavigationMode = "distance" | "lookback" | "redshift";
 type BodyFilter =
   | "all"
   | "solar_system"
@@ -51,6 +52,13 @@ type BodyFilter =
   | "nebula"
   | "star_cluster";
 type DisplayLayer = "labels" | "orbits" | "grid" | "milkyWay" | "localGroup" | "galaxyPoints" | "quasars" | "cosmicWeb" | "references";
+
+type UniverseShell = {
+  id: string;
+  labelKey: string;
+  radiusLy: number;
+  noteKey: string;
+};
 
 type ExternalLink = {
   provider?: string | null;
@@ -442,7 +450,7 @@ type PickerSearchConfig = {
 
 const AU_KM_FALLBACK = 149_597_870.7;
 const LIGHT_YEAR_KM = 9_460_730_472_580.8;
-const MIN_ZOOM = 1e-12;
+const MIN_ZOOM = 1e-14;
 const MAX_ZOOM = 50_000_000;
 const ZOOM_SLIDER_STEPS = 1000;
 const LOCAL_ZOOM_DIAMETER_PX = 170;
@@ -455,15 +463,17 @@ const CAMERA_DATA_REFRESH_DEBOUNCE_MS = 180;
 const SEARCH_INPUT_DEBOUNCE_MS = 180;
 const POINT_LAYER_MIN_WIDTH_LY = 12;
 const POINT_LAYER_MAX_WIDTH_LY = 250_000;
-const POINT_LAYER_DEEP_SKY_MAX_WIDTH_LY = 750_000_000;
-const POINT_LAYER_QUASAR_MAX_WIDTH_LY = 2_000_000_000;
+const POINT_LAYER_DEEP_SKY_MAX_WIDTH_LY = 1_400_000_000;
+const POINT_LAYER_QUASAR_MAX_WIDTH_LY = 4_000_000_000;
 const POINT_LAYER_VIEWPORT_PADDING = 0.35;
 const POINT_TILE_TARGET_VIEW_DIVISIONS = 2;
 const POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE = 1;
 const POINT_TILE_MAX_ACTIVE = 18;
 const POINT_TILE_MAX_ACTIVE_WIDE = 8;
+const POINT_TILE_MAX_ACTIVE_UNIVERSE = 6;
 const POINT_TILE_MAX_POINTS = 24_000;
 const POINT_TILE_MAX_POINTS_WIDE = 12_000;
+const POINT_TILE_MAX_POINTS_UNIVERSE = 7_500;
 const POINT_TILE_CACHE_LIMIT = 192;
 const POINT_TILE_FETCH_CONCURRENCY = 2;
 const POINT_TILE_PREFETCH_LEVEL_RADIUS = 5;
@@ -484,6 +494,10 @@ const BODY_HIT_GRID_CELL_PX = 56;
 const MAP_POINT_RADIUS_PX = 1.3;
 const MAP_POINT_ALPHA = 0.82;
 const MAP_POINT_SELECTION_RING_PX = 8.5;
+const DENSITY_HAZE_MIN_WIDTH_LY = 4_500_000;
+const DENSITY_SUMMARY_MIN_WIDTH_LY = 85_000_000;
+const DENSITY_HAZE_BIN_PX = 92;
+const DENSITY_HAZE_MAX_CELLS = 180;
 const WORKSPACE_LABEL_KEYS: Record<AtlasTab, string> = {
   catalog: "workspace.searchCatalog",
   object: "workspace.selectedObject"
@@ -621,6 +635,18 @@ const TIME_STEPS = [
   { labelKey: "time.oneMillionYears", days: 365_250_000 }
 ];
 const MAX_COMPARISON_DIAMETER_PX = 112;
+const SPEED_OF_LIGHT_KM_S = 299_792.458;
+const HUBBLE_CONSTANT_KM_S_MPC = 70;
+const MPC_PER_LIGHT_YEAR = 1 / 3_261_563.7769;
+const HUBBLE_DISTANCE_LY = SPEED_OF_LIGHT_KM_S / HUBBLE_CONSTANT_KM_S_MPC / MPC_PER_LIGHT_YEAR;
+const OBSERVABLE_UNIVERSE_RADIUS_LY = 46_500_000_000;
+const UNIVERSE_SHELLS: UniverseShell[] = [
+  { id: "current-view", labelKey: "universe.shell.currentView", radiusLy: 100_000, noteKey: "universe.shell.currentViewNote" },
+  { id: "local-volume", labelKey: "universe.shell.localVolume", radiusLy: 35_000_000, noteKey: "universe.shell.localVolumeNote" },
+  { id: "laniakea", labelKey: "universe.shell.laniakea", radiusLy: 260_000_000, noteKey: "universe.shell.laniakeaNote" },
+  { id: "quasar-epoch", labelKey: "universe.shell.quasarEpoch", radiusLy: 13_000_000_000, noteKey: "universe.shell.quasarEpochNote" },
+  { id: "observable", labelKey: "universe.shell.observable", radiusLy: OBSERVABLE_UNIVERSE_RADIUS_LY, noteKey: "universe.shell.observableNote" }
+];
 
 function requiredElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -689,6 +715,9 @@ const zoomScaleSlider = requiredElement<HTMLInputElement>("#zoom-scale-slider");
 const zoomScaleLabel = requiredElement<HTMLOutputElement>("#zoom-scale-label");
 const zoomPixelScale = requiredElement<HTMLElement>("#zoom-pixel-scale");
 const zoomViewScale = requiredElement<HTMLElement>("#zoom-view-scale");
+const universeModeButtons = requiredElement<HTMLElement>("#universe-mode-buttons");
+const universeContextCard = requiredElement<HTMLElement>("#universe-context-card");
+const universeShells = requiredElement<HTMLElement>("#universe-shells");
 const sizeModeButtons = requiredElement<HTMLElement>("#size-mode-buttons");
 const displayToggles = requiredElement<HTMLElement>("#display-toggles");
 const bodyPopover = requiredElement<HTMLElement>("#body-popover");
@@ -704,6 +733,7 @@ let activeCompareFilter: BodyFilter = "all";
 let activeGuidedSetId: string | null = null;
 let sizeMode: SizeMode = "hybrid";
 let activeZoomPreset: ZoomPreset | null = "solar";
+let universeNavigationMode: UniverseNavigationMode = "distance";
 let displayLayers: Record<DisplayLayer, boolean> = {
   labels: true,
   orbits: true,
@@ -1054,6 +1084,20 @@ function bindEvents() {
   zoomIn.addEventListener("click", () => zoomViewportCenter(2.4));
   zoomScaleSlider.addEventListener("input", () => setZoomFromSlider());
 
+  universeModeButtons.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-universe-mode]");
+    if (!button) return;
+    universeNavigationMode = (button.dataset.universeMode as UniverseNavigationMode) ?? "distance";
+    updateScaleUi();
+  });
+
+  universeShells.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-universe-shell]");
+    const shell = UNIVERSE_SHELLS.find((candidate) => candidate.id === button?.dataset.universeShell);
+    if (!shell) return;
+    setUniverseRadius(shell.radiusLy);
+  });
+
   sizeModeButtons.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-size-mode]");
     if (!button) return;
@@ -1194,6 +1238,7 @@ function render() {
     if (displayLayers.galaxyPoints) drawGalaxyContextLayer();
     if (displayLayers.quasars) drawQuasarContextLayer();
     if (displayLayers.cosmicWeb) drawCosmicWebLayer();
+    drawCatalogDensityLodLayer();
     if (displayLayers.grid) drawGrid();
     if (displayLayers.orbits) drawOrbitGuides();
     drawComparisonGuide();
@@ -1622,6 +1667,11 @@ function drawUniverseModelLayer(
   ctx.lineJoin = "round";
   ctx.globalCompositeOperation = "screen";
 
+  if (model.densityRegions) {
+    const densityAlpha = alpha * universeDensityDetailAlpha();
+    for (const region of model.densityRegions) drawUniverseDensityRegion(region, densityAlpha, rect, occupiedLabels, options.labels, options.labelColor);
+  }
+
   if (options.rings) {
     for (const ring of model.rings) drawUniverseRing(ring, alpha, rect, occupiedLabels, options.labels, options.labelColor);
   }
@@ -1701,6 +1751,123 @@ function drawUniversePoint(point: UniversePoint, alpha: number, rect: Rect, occu
   ctx.arc(screen.x, screen.y, clamp(radius * 0.12, 1.4, 4.5), 0, Math.PI * 2);
   ctx.fill();
   if (labels && radius > 3.5) drawMilkyWayLabel(point.label, screen.x + radius * 0.72 + 7, screen.y - radius * 0.3, labelColor, occupiedLabels);
+  ctx.restore();
+}
+
+function drawUniverseDensityRegion(region: UniverseDensityRegion, alpha: number, rect: Rect, occupiedLabels: Rect[], labels: boolean, labelColor: string) {
+  if (alpha <= 0) return;
+  const screen = worldToScreen(region.xAu, region.yAu);
+  const radius = lightYearsToAu(region.radiusLy) * camera.pxPerAu;
+  if (radius < 2 || !rectsOverlap(pointRect(screen, radius * 2), rect)) return;
+  ctx.save();
+  ctx.globalCompositeOperation = region.kind === "void" ? "source-over" : "screen";
+  ctx.globalAlpha = alpha * region.intensity;
+  const drawRadius = clamp(radius, 4, 240);
+  const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, drawRadius);
+  if (region.kind === "void") {
+    gradient.addColorStop(0, colorWithAlpha(region.color, 0.34));
+    gradient.addColorStop(0.72, colorWithAlpha(region.color, 0.12));
+  } else {
+    gradient.addColorStop(0, region.color);
+    gradient.addColorStop(0.42, colorWithAlpha(region.color, 0.38));
+  }
+  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, drawRadius, 0, Math.PI * 2);
+  ctx.fill();
+  if (labels && radius > 18 && currentViewWidthLy() > 70_000_000) drawMilkyWayLabel(region.label, screen.x + clamp(radius, 20, 160) * 0.44, screen.y + 9, labelColor, occupiedLabels);
+  ctx.restore();
+}
+
+function universeDensityDetailAlpha() {
+  const viewWidthLy = currentViewWidthLy();
+  return clamp((Math.log10(viewWidthLy) - 6.2) / 1.4, 0.18, 1);
+}
+
+function drawCatalogDensityLodLayer() {
+  if (!displayLayers.galaxyPoints && !displayLayers.quasars && !displayLayers.cosmicWeb) return;
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < DENSITY_HAZE_MIN_WIDTH_LY) return;
+  const tiles = activeCatalogPointTiles().filter((tile) => (tile.payload?.returned ?? 0) > 0);
+  if (tiles.length === 0) return;
+  const rect = expandedRect(usableViewportRect(), 120);
+  const cells = catalogPointDensityCells(tiles, rect);
+  if (cells.length === 0) return;
+  const maxCount = Math.max(...cells.map((cell) => cell.count), 1);
+  const alpha = clamp((Math.log10(viewWidthLy) - 6.35) / 1.0, 0, 0.8);
+  if (alpha <= 0) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (const cell of cells.slice(0, DENSITY_HAZE_MAX_CELLS)) {
+    const heat = Math.sqrt(cell.count / maxCount);
+    const radius = clamp(DENSITY_HAZE_BIN_PX * (0.34 + heat * 0.78), 22, 130);
+    const gradient = ctx.createRadialGradient(cell.x, cell.y, 0, cell.x, cell.y, radius);
+    const color = cell.quasarWeight > cell.galaxyWeight ? "255, 226, 147" : cell.deepSkyWeight > cell.galaxyWeight ? "169, 205, 255" : "145, 196, 255";
+    gradient.addColorStop(0, `rgba(${color}, ${alpha * (0.08 + heat * 0.22)})`);
+    gradient.addColorStop(0.52, `rgba(${color}, ${alpha * heat * 0.08})`);
+    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (viewWidthLy >= DENSITY_SUMMARY_MIN_WIDTH_LY) drawCatalogClusterSummaries(cells, maxCount, alpha, rect);
+  ctx.restore();
+}
+
+function catalogPointDensityCells(tiles: CatalogPointTile[], rect: Rect) {
+  const cells = new Map<string, { x: number; y: number; count: number; galaxyWeight: number; quasarWeight: number; deepSkyWeight: number }>();
+  for (const tile of tiles) {
+    const payload = tile.payload;
+    if (!payload) continue;
+    const layerWeight = tile.request.types.includes("quasar") || tile.request.types.includes("active_galaxy") ? "quasarWeight" : tile.request.types.includes("galaxy") ? "galaxyWeight" : "deepSkyWeight";
+    const step = Math.max(1, Math.ceil(payload.returned / 3_500));
+    for (let index = 0; index < payload.returned; index += step) {
+      const offset = index * POINT_VERTEX_STRIDE_FLOATS;
+      const screen = worldToScreen(payload.vertices[offset] ?? 0, payload.vertices[offset + 1] ?? 0);
+      if (!pointInRect(screen, rect)) continue;
+      const binX = Math.floor(screen.x / DENSITY_HAZE_BIN_PX);
+      const binY = Math.floor(screen.y / DENSITY_HAZE_BIN_PX);
+      const key = `${binX}:${binY}`;
+      const cell = cells.get(key) ?? { x: binX * DENSITY_HAZE_BIN_PX + DENSITY_HAZE_BIN_PX / 2, y: binY * DENSITY_HAZE_BIN_PX + DENSITY_HAZE_BIN_PX / 2, count: 0, galaxyWeight: 0, quasarWeight: 0, deepSkyWeight: 0 };
+      cell.count += step;
+      cell[layerWeight] += step;
+      cells.set(key, cell);
+    }
+  }
+  return Array.from(cells.values()).sort((a, b) => b.count - a.count);
+}
+
+function drawCatalogClusterSummaries(
+  cells: { x: number; y: number; count: number; galaxyWeight: number; quasarWeight: number; deepSkyWeight: number }[],
+  maxCount: number,
+  alpha: number,
+  rect: Rect
+) {
+  const occupied: Rect[] = [];
+  ctx.save();
+  ctx.font = "10px Inter, system-ui, sans-serif";
+  for (const cell of cells.slice(0, 10)) {
+    if (cell.count < maxCount * 0.18 || !pointInRect(cell, rect)) continue;
+    const heat = Math.sqrt(cell.count / maxCount);
+    const radius = clamp(4 + heat * 11, 5, 16);
+    ctx.globalAlpha = alpha * (0.28 + heat * 0.36);
+    ctx.strokeStyle = cell.quasarWeight > cell.galaxyWeight ? "rgba(255, 226, 147, 0.74)" : "rgba(166, 211, 255, 0.68)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    const label = formatCount(Math.round(cell.count));
+    const width = ctx.measureText(label).width + 10;
+    const labelRect = { left: cell.x + radius + 4, top: cell.y - 11, right: cell.x + radius + 4 + width, bottom: cell.y + 5, width, height: 16 };
+    if (rectInCanvas(labelRect) && !occupied.some((item) => rectsOverlap(item, labelRect))) {
+      occupied.push(labelRect);
+      ctx.globalAlpha = alpha * 0.68;
+      drawMapLabel(label, labelRect.left + 5, labelRect.top + 12, "rgba(223, 235, 255, 0.68)");
+    }
+  }
   ctx.restore();
 }
 
@@ -2703,7 +2870,7 @@ function catalogPointRequestContextForTileSpan(
 ): NonNullable<ReturnType<typeof catalogPointRequestContext>> {
   const rect = usableViewportRect();
   const normalViewWidthLy = (tileSpanAu * POINT_TILE_TARGET_VIEW_DIVISIONS) / AU_PER_LIGHT_YEAR;
-  const divisions = normalViewWidthLy > 70_000 ? POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE : POINT_TILE_TARGET_VIEW_DIVISIONS;
+  const divisions = catalogPointTileViewDivisions(normalViewWidthLy);
   const viewWidthAu = tileSpanAu * divisions;
   const viewHeightAu = viewWidthAu * (rect.height / Math.max(1, rect.width));
   const paddingXAu = viewWidthAu * POINT_LAYER_VIEWPORT_PADDING;
@@ -2856,7 +3023,7 @@ function catalogPointTileSpanAu(
   staticLayer: CatalogPointTileManifestLayer | null = null
 ) {
   const spanAu = Math.max(bounds.maxXAu - bounds.minXAu, bounds.maxYAu - bounds.minYAu, 1);
-  const divisions = viewWidthLy > 70_000 ? POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE : POINT_TILE_TARGET_VIEW_DIVISIONS;
+  const divisions = catalogPointTileViewDivisions(viewWidthLy);
   const rawSpan = spanAu / divisions;
   const dynamicSpan = Math.pow(2, Math.max(0, Math.round(Math.log2(rawSpan))));
   const staticLevel = catalogStaticTileLevelNearest(dynamicSpan, staticLayer);
@@ -2883,7 +3050,14 @@ function catalogStaticTileUrl(layer: CatalogPointTileManifestLayer, level: Catal
     .replace(/\{y\}/g, String(tileY));
 }
 
+function catalogPointTileViewDivisions(viewWidthLy: number) {
+  if (viewWidthLy > 450_000_000) return 0.5;
+  if (viewWidthLy > 70_000) return POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE;
+  return POINT_TILE_TARGET_VIEW_DIVISIONS;
+}
+
 function catalogPointTileLimit(viewWidthLy: number) {
+  if (viewWidthLy > 450_000_000) return POINT_TILE_MAX_POINTS_UNIVERSE;
   if (viewWidthLy > 70_000) return POINT_TILE_MAX_POINTS_WIDE;
   if (viewWidthLy < 80) return Math.min(POINT_TILE_MAX_POINTS, 18_000);
   if (viewWidthLy > 10_000) return Math.min(POINT_TILE_MAX_POINTS, 16_000);
@@ -2895,10 +3069,13 @@ function catalogPointSampleBuckets(viewWidthLy: number) {
   if (viewWidthLy < 2_000) return 5;
   if (viewWidthLy < 15_000) return 4;
   if (viewWidthLy < 70_000) return 3;
-  return 2;
+  if (viewWidthLy < 8_000_000) return 2;
+  if (viewWidthLy < 450_000_000) return 1;
+  return 1;
 }
 
 function catalogPointMaxActiveTiles(viewWidthLy: number) {
+  if (viewWidthLy > 450_000_000) return POINT_TILE_MAX_ACTIVE_UNIVERSE;
   return viewWidthLy > 70_000 ? POINT_TILE_MAX_ACTIVE_WIDE : POINT_TILE_MAX_ACTIVE;
 }
 
@@ -3547,6 +3724,7 @@ function updateBodyInfo() {
         ${renderObjectDetailState(body)}
         ${renderObjectSummaryCard(body, classification.label)}
         ${renderFactTiles(primaryStats)}
+        ${renderUniverseSciencePanel(body)}
         ${renderIdentifierSection(body)}
         ${renderMediaSection(body)}
         ${renderDataSection(t("section.overview"), overviewRows)}
@@ -3598,6 +3776,29 @@ function renderObjectSummaryCard(body: Body, typeLabel: string) {
           ? `<ul>${contextItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
           : ""
       }
+    </section>
+  `;
+}
+
+function renderUniverseSciencePanel(body: Body) {
+  const distanceLy = body.distance_from_earth_km / 9_460_730_472_580.8;
+  if (distanceLy < 100_000) return "";
+  const shell = universeShellForRadius(distanceLy);
+  const classification = classifyBody(body);
+  const chips = [
+    [t("universe.context.distance"), formatLightYears(distanceLy)],
+    [t("universe.context.lookback"), formatLookbackTime(distanceLy)],
+    [t("universe.context.redshift"), formatRedshiftEstimate(distanceLy)],
+    [t("universe.context.shell"), t(shell.labelKey)]
+  ];
+  return `
+    <section class="object-science-panel">
+      <div class="object-science-panel__heading">
+        <span>${escapeHtml(t("object.scienceContext"))}</span>
+        <strong>${escapeHtml(t("object.cosmicTimeMachine"))}</strong>
+      </div>
+      <p>${escapeHtml(t("object.scienceContextBody", { name: body.name, type: classification.label.toLowerCase() }))}</p>
+      <dl>${chips.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>
     </section>
   `;
 }
@@ -4140,6 +4341,76 @@ function updateScaleUi() {
   zoomScaleLabel.textContent = `${zoomLevel} / ${ZOOM_SLIDER_STEPS}`;
   zoomPixelScale.textContent = t("scale.pixelEquals", { value: pixelScale });
   zoomViewScale.textContent = t("scale.viewEquals", { value: viewScale });
+  updateUniverseNavigator();
+}
+
+function updateUniverseNavigator() {
+  const viewWidthLy = currentViewWidthLy();
+  const radiusLy = Math.max(viewWidthLy / 2, 1);
+  const shell = universeShellForRadius(radiusLy);
+  const lookback = formatLookbackTime(radiusLy);
+  const redshift = formatRedshiftEstimate(radiusLy);
+  const observableShare = clamp(radiusLy / OBSERVABLE_UNIVERSE_RADIUS_LY, 0, 1);
+  const headline = universeNavigationMode === "lookback" ? lookback : universeNavigationMode === "redshift" ? redshift : formatLightYears(radiusLy);
+
+  for (const button of Array.from(universeModeButtons.querySelectorAll<HTMLButtonElement>("[data-universe-mode]"))) {
+    const active = button.dataset.universeMode === universeNavigationMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+
+  universeContextCard.innerHTML = `
+    <div class="universe-context-card__main">
+      <span>${escapeHtml(t("universe.context.viewRadius"))}</span>
+      <strong>${escapeHtml(headline)}</strong>
+      <small>${escapeHtml(t("universe.context.observableShare", { value: `${Math.max(0.01, observableShare * 100).toFixed(observableShare > 0.1 ? 1 : 2)}%` }))}</small>
+    </div>
+    <dl>
+      <div><dt>${escapeHtml(t("universe.context.distance"))}</dt><dd>${escapeHtml(formatLightYears(radiusLy))}</dd></div>
+      <div><dt>${escapeHtml(t("universe.context.lookback"))}</dt><dd>${escapeHtml(lookback)}</dd></div>
+      <div><dt>${escapeHtml(t("universe.context.redshift"))}</dt><dd>${escapeHtml(redshift)}</dd></div>
+    </dl>
+    <p>${escapeHtml(t(shell.noteKey))}</p>
+  `;
+
+  universeShells.innerHTML = UNIVERSE_SHELLS.map((candidate) => {
+    const selected = candidate.id === shell.id;
+    return `
+      <button type="button" data-universe-shell="${escapeHtml(candidate.id)}" class="${selected ? "active" : ""}" aria-pressed="${selected}">
+        <span>${escapeHtml(t(candidate.labelKey))}</span>
+        <small>${escapeHtml(formatLightYears(candidate.radiusLy))}</small>
+      </button>
+    `;
+  }).join("");
+}
+
+function universeShellForRadius(radiusLy: number) {
+  return UNIVERSE_SHELLS.find((shell) => radiusLy <= shell.radiusLy) ?? UNIVERSE_SHELLS[UNIVERSE_SHELLS.length - 1];
+}
+
+function formatLightYears(value: number) {
+  if (value >= 1_000_000_000) return `${formatNumber(value / 1_000_000_000)} Gly`;
+  if (value >= 1_000_000) return `${formatNumber(value / 1_000_000)} Mly`;
+  if (value >= 1_000) return `${formatNumber(value / 1_000)} kly`;
+  return `${formatNumber(value)} ly`;
+}
+
+function formatLookbackTime(distanceLy: number) {
+  if (distanceLy >= 1_000_000_000) return t("universe.context.gyr", { value: formatNumber(distanceLy / 1_000_000_000) });
+  if (distanceLy >= 1_000_000) return t("universe.context.myr", { value: formatNumber(distanceLy / 1_000_000) });
+  if (distanceLy >= 1_000) return t("universe.context.kyr", { value: formatNumber(distanceLy / 1_000) });
+  return t("universe.context.years", { value: formatNumber(distanceLy) });
+}
+
+function redshiftEstimate(distanceLy: number) {
+  const beta = clamp(distanceLy / HUBBLE_DISTANCE_LY, 0, 0.97);
+  return Math.sqrt((1 + beta) / (1 - beta)) - 1;
+}
+
+function formatRedshiftEstimate(distanceLy: number) {
+  const redshift = redshiftEstimate(distanceLy);
+  if (redshift < 0.001) return t("universe.context.redshiftNearby");
+  return `z ≈ ${redshift < 0.1 ? redshift.toFixed(3) : redshift.toFixed(2)}`;
 }
 
 function currentViewWidthAu() {
@@ -4416,6 +4687,21 @@ function applyZoomPreset(preset: ZoomPreset, update = true) {
     requestRender();
     requestDataRefresh({ immediate: true });
   }
+}
+
+function setUniverseRadius(radiusLy: number) {
+  activeZoomPreset = null;
+  cancelCameraAnimation();
+  const rect = usableViewportRect();
+  const targetWidthAu = Math.max(radiusLy * 2 * AU_PER_LIGHT_YEAR, 1);
+  camera = {
+    ...camera,
+    pxPerAu: clamp(rect.width / targetWidthAu, MIN_ZOOM, MAX_ZOOM)
+  };
+  updateZoomPresetButtons();
+  updateScaleUi();
+  requestRender();
+  requestDataRefresh({ immediate: true });
 }
 
 function presetBodies(preset: ZoomPreset) {

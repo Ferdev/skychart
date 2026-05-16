@@ -31,11 +31,23 @@ export type UniverseFilament = {
   color: string;
 };
 
+export type UniverseDensityRegion = {
+  key: string;
+  label: string;
+  xAu: number;
+  yAu: number;
+  radiusLy: number;
+  color: string;
+  intensity: number;
+  kind: "wall" | "cluster-core" | "void" | "quasar-haze";
+};
+
 export type UniverseModel = {
   bounds: { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number };
   points: UniversePoint[];
   rings: UniverseRing[];
   filaments: UniverseFilament[];
+  densityRegions?: UniverseDensityRegion[];
 };
 
 function pointLy(key: string, label: string, xLy: number, yLy: number, radiusLy: number, color: string, kind: UniversePoint["kind"], note?: string): UniversePoint {
@@ -48,6 +60,10 @@ function ringLy(key: string, label: string, xLy: number, yLy: number, radiusLy: 
 
 function filamentLy(key: string, label: string, points: [number, number][], color: string): UniverseFilament {
   return { key, label, points: points.map(([xLy, yLy]) => ({ xAu: lightYearsToAu(xLy), yAu: lightYearsToAu(yLy) })), color };
+}
+
+function densityLy(key: string, label: string, xLy: number, yLy: number, radiusLy: number, color: string, intensity: number, kind: UniverseDensityRegion["kind"]): UniverseDensityRegion {
+  return { key, label, xAu: lightYearsToAu(xLy), yAu: lightYearsToAu(yLy), radiusLy, color, intensity, kind };
 }
 
 export const LOCAL_GROUP_MODEL: UniverseModel = {
@@ -73,6 +89,10 @@ export const LOCAL_GROUP_MODEL: UniverseModel = {
   ],
   filaments: [
     filamentLy("local-group-axis", "Milky Way–Andromeda flow", [[-300_000, -80_000], [0, 0], [1_100_000, 250_000], [2_540_000, 520_000], [2_900_000, 250_000]], "rgba(137, 194, 255, 0.22)")
+  ],
+  densityRegions: [
+    densityLy("local-group-haze", "Local Group galaxy density", 1_150_000, 165_000, 2_900_000, "rgba(137, 194, 255, 0.13)", 0.58, "cluster-core"),
+    densityLy("local-void-edge", "Local Void boundary", -2_400_000, 1_650_000, 1_900_000, "rgba(82, 118, 154, 0.08)", 0.34, "void")
   ]
 };
 
@@ -102,5 +122,13 @@ export const COSMIC_WEB_MODEL: UniverseModel = {
     filamentLy("great-attractor-flow", "Great Attractor flow", [[-210_000_000, -120_000_000], [-150_000_000, -70_000_000], [-80_000_000, -25_000_000], [0, 0], [54_000_000, 18_000_000]], "rgba(255, 175, 107, 0.18)"),
     filamentLy("coma-wall", "Coma / Great Wall context", [[130_000_000, 105_000_000], [210_000_000, 130_000_000], [315_000_000, 92_000_000], [350_000_000, 20_000_000]], "rgba(194, 168, 255, 0.18)"),
     filamentLy("perseus-pisces-chain", "Perseus–Pisces chain", [[70_000_000, -155_000_000], [150_000_000, -145_000_000], [240_000_000, -120_000_000], [320_000_000, -85_000_000]], "rgba(154, 205, 255, 0.17)")
+  ],
+  densityRegions: [
+    densityLy("virgo-density-haze", "Virgo cluster density", 54_000_000, 18_000_000, 32_000_000, "rgba(118, 197, 255, 0.16)", 0.72, "cluster-core"),
+    densityLy("great-wall-haze", "Great Wall density ridge", 240_000_000, 90_000_000, 120_000_000, "rgba(194, 168, 255, 0.12)", 0.68, "wall"),
+    densityLy("perseus-density-haze", "Perseus–Pisces density ridge", 210_000_000, -125_000_000, 95_000_000, "rgba(154, 205, 255, 0.11)", 0.58, "wall"),
+    densityLy("quasar-north-haze", "Distant quasar density field", -280_000_000, 185_000_000, 105_000_000, "rgba(255, 226, 147, 0.12)", 0.5, "quasar-haze"),
+    densityLy("quasar-south-haze", "Distant quasar density field", 180_000_000, -220_000_000, 120_000_000, "rgba(255, 226, 147, 0.1)", 0.48, "quasar-haze"),
+    densityLy("bootes-void-context", "Boötes-like void context", -105_000_000, 145_000_000, 82_000_000, "rgba(84, 105, 145, 0.065)", 0.42, "void")
   ]
 };

@@ -24,6 +24,7 @@ type PointLayer = PointLayerSource & {
 
 const VERTEX_STRIDE_FLOATS = 6;
 const MAX_BACKGROUND_PHYSICAL_POINT_PX = 96.0;
+const MAX_WEBGL_POINTS_PER_FRAME = 280_000;
 
 export class WebglPointRenderer {
   readonly canvas: HTMLCanvasElement;
@@ -92,7 +93,10 @@ export class WebglPointRenderer {
     gl.uniform2f(this.centerLocation, options.centerX, options.centerY);
     gl.uniform2f(this.resolutionLocation, options.width, options.height);
 
-    for (const layer of this.layers.values()) {
+    let pointsDrawn = 0;
+    for (const layer of Array.from(this.layers.values())) {
+      if (pointsDrawn >= MAX_WEBGL_POINTS_PER_FRAME) break;
+      const drawCount = Math.min(layer.count, MAX_WEBGL_POINTS_PER_FRAME - pointsDrawn);
       gl.bindBuffer(gl.ARRAY_BUFFER, layer.buffer);
       gl.enableVertexAttribArray(this.worldLocation);
       gl.vertexAttribPointer(this.worldLocation, 2, gl.FLOAT, false, VERTEX_STRIDE_FLOATS * 4, 0);
@@ -100,7 +104,8 @@ export class WebglPointRenderer {
       gl.vertexAttribPointer(this.colorLocation, 3, gl.FLOAT, false, VERTEX_STRIDE_FLOATS * 4, 2 * 4);
       gl.enableVertexAttribArray(this.radiusLocation);
       gl.vertexAttribPointer(this.radiusLocation, 1, gl.FLOAT, false, VERTEX_STRIDE_FLOATS * 4, 5 * 4);
-      gl.drawArrays(gl.POINTS, 0, layer.count);
+      gl.drawArrays(gl.POINTS, 0, drawCount);
+      pointsDrawn += drawCount;
     }
   }
 
