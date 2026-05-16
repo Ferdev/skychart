@@ -45,14 +45,16 @@ DEFAULT_LAYERS = (
 )
 DEFAULT_LEVELS = (
     # span_log2:sample_buckets:max_points_per_tile
-    "20:1024:24000",
-    "22:1024:24000",
-    "24:5:24000",
-    "26:5:24000",
-    "28:4:24000",
-    "30:3:16000",
-    "32:2:12000",
-    "34:2:12000",
+    # Keep the widest views sampled, then ramp up quickly so close zooms
+    # feel like a dense star field instead of sparse debug data.
+    "20:64:24000",
+    "22:128:24000",
+    "24:256:24000",
+    "26:512:24000",
+    "28:1024:24000",
+    "30:1024:24000",
+    "32:1024:24000",
+    "34:1024:24000",
 )
 
 

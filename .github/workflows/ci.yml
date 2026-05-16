@@ -42,6 +42,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate catalog scripts
+        run: python3 tests/static_tiles_defaults_test.py
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:

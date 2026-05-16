@@ -132,7 +132,7 @@ kamal app exec -d production --primary --env MIX_ENV:prod --env CATALOG_IMPORT_S
 The Gaia importer accepts either standard `PG*` environment variables or `DATABASE_URL` for its `psql` connection.
 Production uses an `ecto://` `DATABASE_URL`; the importer converts that to a PostgreSQL URL for `psql`.
 
-Static point tiles are built separately from normal deploys. Production should use the manual `Build Production Catalog Tiles` GitHub workflow after the image is deployed; that workflow builds the `/catalog-tiles/v1` pyramid inside the production app container with low CPU priority and uploads it to the configured S3-compatible bucket/CDN. Normal deploys only inject `CATALOG_TILE_MANIFEST_URL` into the HTML so the browser can load the CDN manifest and immutable `.bin` tile files.
+Static point tiles are built separately from normal deploys. Use the manual `Build Catalog Tiles` GitHub workflow after the image is deployed; choose `target_environment=staging` or `production` as the source database/container and an immutable `catalog_version` such as `v2`. The workflow builds that `/catalog-tiles/<version>` pyramid inside the selected app container with low CPU priority and uploads it to the configured S3-compatible bucket/CDN. Normal deploys only inject the selected manifest URL into the HTML, so staging and production can share the same verified immutable tile artifact without sharing a writable Postgres database.
 
 ## Data Source
 

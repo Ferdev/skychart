@@ -30,9 +30,9 @@ git push origin production
 
 ## Required GitHub variables
 
-- `CATALOG_TILE_PUBLIC_BASE_URL`: public CDN/object-storage base URL ending in `/catalog-tiles/v1`.
+- `CATALOG_TILE_PUBLIC_BASE_URL`: public CDN/object-storage base URL ending in the active catalog version, for example `/catalog-tiles/v1`.
 - `CATALOG_TILE_MANIFEST_URL`: production manifest URL, usually `CATALOG_TILE_PUBLIC_BASE_URL + /manifest.json`.
-- `STAGING_CATALOG_TILE_MANIFEST_URL`: optional staging manifest URL.
+- `STAGING_CATALOG_TILE_MANIFEST_URL`: optional staging manifest URL. Staging and production may point at the same immutable manifest after a catalog release is verified.
 - `CATALOG_TILE_S3_BUCKET`: object-storage bucket name.
 - `CATALOG_TILE_S3_ENDPOINT_URL`: S3-compatible endpoint URL.
 - `CATALOG_TILE_S3_REGION`: S3-compatible region for the bucket endpoint.
@@ -96,15 +96,21 @@ Useful import/tile environment switches:
 
 - `CATALOG_DYNAMIC_POINT_FALLBACK=1` re-enables `/api/catalog/points.bin` when `CATALOG_TILE_MANIFEST_URL` is configured. Leave this unset in staging/production so a static-manifest deployment cannot silently fall back to Postgres-backed rendering.
 
-Preferred production tile build and CDN upload:
+Preferred shared catalog tile release and CDN upload:
 
-1. Deploy the image normally through `Deploy Production`.
-2. Run the manual `Build Production Catalog Tiles` GitHub workflow.
-3. Verify `CATALOG_TILE_PUBLIC_BASE_URL/manifest.json` returns `200`.
-4. Set or confirm `CATALOG_TILE_MANIFEST_URL` points at that manifest.
-5. Re-run `Deploy Production` so Phoenix injects the CDN manifest URL into the HTML.
+1. Deploy the app image normally to the environment whose database should be used as the catalog source.
+2. Run the manual `Build Catalog Tiles` GitHub workflow.
+   - Choose `target_environment=staging` to build from staging data, or `production` to build from production data.
+   - Choose an immutable `catalog_version` such as `v2`; the default upload path is `catalog-tiles/<catalog_version>`.
+3. Verify `CATALOG_TILE_PUBLIC_BASE_URL/manifest.json` returns `200` and has the expected source counts.
+4. Set or confirm the staging/production manifest vars point at the desired immutable manifest:
+   - `STAGING_CATALOG_TILE_MANIFEST_URL=https://.../catalog-tiles/v2/manifest.json`
+   - `CATALOG_TILE_MANIFEST_URL=https://.../catalog-tiles/v2/manifest.json`
+5. Re-run the environment deploy so Phoenix injects the selected manifest URL into the HTML.
 
-The tile workflow runs `scripts/build_and_upload_static_tiles.sh` through Kamal on the primary production app container, with:
+Staging and production should keep separate writable Postgres databases. Do not point both apps at the same writable DB: staging migrations/importers can then mutate production state. Share the large visual catalog through immutable CDN tile artifacts instead. If a future dedicated catalog database is needed, expose it read-only to apps and version its schema separately from runtime app migrations.
+
+The tile workflow runs `scripts/build_and_upload_static_tiles.sh` through Kamal on the primary app container for the selected environment, with:
 
 - a process lock so two tile jobs cannot build at once
 - `nice` priority, defaulting to `15`
