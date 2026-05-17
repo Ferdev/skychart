@@ -36,10 +36,10 @@ DEFAULT_LAYERS = (
     "gaia_stars:gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
     "exoplanet_systems:nearby_exoplanet_systems|exoplanet_systems|exoplanets:",
     "small_bodies:jpl_small_bodies:asteroid|comet|small_body",
-    "deep_sky:messier_deep_sky|simbad_extragalactic|simbad_compact_objects:galaxy|quasar|active_galaxy|black_hole|pulsar|nebula|star_cluster",
-    "galaxies:messier_deep_sky|simbad_extragalactic:galaxy",
-    "quasars:simbad_extragalactic:quasar",
-    "active_galaxies:simbad_extragalactic:active_galaxy",
+    "deep_sky:messier_deep_sky|simbad_extragalactic|simbad_compact_objects|curated_extragalactic_survey:galaxy|quasar|active_galaxy|black_hole|pulsar|nebula|star_cluster",
+    "galaxies:messier_deep_sky|simbad_extragalactic|curated_extragalactic_survey:galaxy",
+    "quasars:simbad_extragalactic|curated_extragalactic_survey:quasar",
+    "active_galaxies:simbad_extragalactic|curated_extragalactic_survey:active_galaxy",
     "black_holes:simbad_compact_objects:black_hole",
     "pulsars:simbad_compact_objects:pulsar",
     "nebulae:messier_deep_sky:nebula",
@@ -57,7 +57,30 @@ DEFAULT_LEVELS = (
     "30:1024:24000",
     "32:1024:24000",
     "34:1024:24000",
+    # Deep-sky/cosmic-web layers need spans beyond the Milky Way; these keep
+    # galaxy/quasar tiles available at Local Group and redshift-survey scales.
+    "36:512:18000",
+    "38:256:16000",
+    "40:128:14000",
+    "42:128:12000",
+    "44:64:12000",
+    # Universe-scale LOD: sparse survey bins for Local Supercluster, quasar,
+    # and cosmic-web views. These are deliberately capped so a zoomed-out
+    # browser frame can draw haze/cluster summaries without fetching hundreds
+    # of thousands of raw points.
+    "46:48:9000",
+    "48:24:7500",
+    "50:12:6000",
 )
+POINT_RGB_BY_TYPE = {
+    "galaxy": (160, 205, 255),
+    "active_galaxy": (255, 214, 139),
+    "quasar": (255, 226, 147),
+    "black_hole": (211, 176, 255),
+    "pulsar": (138, 218, 255),
+    "nebula": (184, 152, 255),
+    "star_cluster": (207, 228, 255),
+}
 
 
 @dataclass(frozen=True)
@@ -197,10 +220,10 @@ def main() -> int:
 
         rows_seen = 0
         try:
-            for key, x_au, y_au, catalog_group, sample_bucket in stream_catalog_points(args.database_url, layer.groups, layer.types):
+            for key, x_au, y_au, catalog_group, object_type, sample_bucket in stream_catalog_points(args.database_url, layer.groups, layer.types):
                 rows_seen += 1
                 source_counts[catalog_group] = source_counts.get(catalog_group, 0) + 1
-                record = struct.pack("<ffBBBB", x_au, y_au, *POINT_RGB, 0)
+                record = struct.pack("<ffBBBB", x_au, y_au, *POINT_RGB_BY_TYPE.get(object_type, POINT_RGB), 0)
 
                 for level in levels:
                     if sample_bucket >= level.sample_buckets:
@@ -290,12 +313,13 @@ def stream_catalog_points(database_url: str, groups: list[str], types: list[str]
         type_sql = ", ".join(sql_literal(item) for item in types)
         type_filter = f"    AND object_type IN ({type_sql})\n"
     sql = f"""
-COPY (
+    COPY (
   SELECT
     key,
     x_au::double precision,
     y_au::double precision,
     catalog_group,
+    object_type,
     mod(hashtext(key)::bigint + 2147483648, {POINT_SAMPLE_BUCKET_COUNT})::integer AS sample_bucket
   FROM catalog_objects
   WHERE catalog_group IN ({group_sql})
@@ -322,10 +346,10 @@ COPY (
     try:
         reader = csv.reader(process.stdout)
         for row in reader:
-            if len(row) != 5:
+            if len(row) != 6:
                 raise RuntimeError(f"Unexpected point row shape: {row!r}")
-            key, x_au, y_au, catalog_group, sample_bucket = row
-            yield key, float(x_au), float(y_au), catalog_group, int(sample_bucket)
+            key, x_au, y_au, catalog_group, object_type, sample_bucket = row
+            yield key, float(x_au), float(y_au), catalog_group, object_type, int(sample_bucket)
     finally:
         process.stdout.close()
 

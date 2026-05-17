@@ -743,7 +743,8 @@ button:disabled {
 
 .body-picker-filters,
 .zoom-presets,
-.time-step-row {
+.time-step-row,
+.universe-shells {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -752,7 +753,8 @@ button:disabled {
 
 .body-picker-filters button,
 .zoom-presets button,
-.time-step-row button {
+.time-step-row button,
+.universe-shells button {
   padding: 7px 9px;
   color: rgba(21, 23, 20, 0.72);
   background: rgba(21, 23, 20, 0.07);

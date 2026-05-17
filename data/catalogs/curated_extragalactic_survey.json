@@ -1,0 +1,984 @@
+{
+  "generated_at_utc": "2026-05-16T23:40:53.610357Z",
+  "object_count": 24,
+  "objects": [
+    {
+      "aliases": [
+        "Cigar Galaxy",
+        "M82",
+        "NGC 3034"
+      ],
+      "apparent_magnitude": 8.4,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#f2a66b",
+      "dec_deg": 69.6794,
+      "distance_ly": 11400000.0,
+      "external_ids": {
+        "ned_name": "Cigar Galaxy",
+        "primary_name": "Cigar Galaxy",
+        "simbad_name": "Cigar Galaxy"
+      },
+      "facts": {
+        "distance_mly": 11.4,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.02,
+        "redshift": 0.000677,
+        "source_catalog": "NED/SIMBAD; 2MASS Redshift Survey",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "starburst_galaxy",
+        "why_interesting": "Nearby starburst galaxy interacting with M81."
+      },
+      "key": "local-volume-m82",
+      "name": "Cigar Galaxy",
+      "object_type": "active_galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 148.9697,
+      "radius_km": 1.89214609451616e+17,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Nearby starburst galaxy interacting with M81."
+    },
+    {
+      "aliases": [
+        "Centaurus A",
+        "NGC 5128",
+        "Cen A",
+        "PKS 1322-428"
+      ],
+      "apparent_magnitude": 6.8,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#f2c36b",
+      "dec_deg": -43.0191,
+      "distance_ly": 12000000.0,
+      "external_ids": {
+        "ned_name": "Centaurus A",
+        "primary_name": "Centaurus A",
+        "simbad_name": "Centaurus A"
+      },
+      "facts": {
+        "distance_mly": 12.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.04,
+        "redshift": 0.001825,
+        "source_catalog": "NED/SIMBAD; 2MASS Redshift Survey",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "radio_galaxy",
+        "why_interesting": "Nearest prominent radio galaxy and active galactic nucleus."
+      },
+      "key": "local-volume-ngc-5128",
+      "name": "Centaurus A",
+      "object_type": "active_galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 201.3651,
+      "radius_km": 3.78429218903232e+17,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Nearest prominent radio galaxy and active galactic nucleus."
+    },
+    {
+      "aliases": [
+        "Virgo A / M87",
+        "M87",
+        "NGC 4486",
+        "Virgo A",
+        "3C 274"
+      ],
+      "apparent_magnitude": 8.6,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#f2c36b",
+      "dec_deg": 12.3911,
+      "distance_ly": 53500000.0,
+      "external_ids": {
+        "ned_name": "Virgo A / M87",
+        "primary_name": "Virgo A / M87",
+        "simbad_name": "Virgo A / M87"
+      },
+      "facts": {
+        "distance_mly": 53.5,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.065,
+        "redshift": 0.00428,
+        "source_catalog": "NED/SIMBAD; Virgo Cluster Catalog",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "cluster_central_radio_galaxy",
+        "why_interesting": "Central Virgo Cluster elliptical; Event Horizon Telescope black-hole host."
+      },
+      "key": "virgo-m87",
+      "name": "Virgo A / M87",
+      "object_type": "active_galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 187.7059,
+      "radius_km": 6.14947480717752e+17,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Central Virgo Cluster elliptical; Event Horizon Telescope black-hole host."
+    },
+    {
+      "aliases": [
+        "Markarian 421",
+        "Mrk 421",
+        "2MASX J11042731+3812311"
+      ],
+      "apparent_magnitude": 13.3,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#b7b5ff",
+      "dec_deg": 38.2088,
+      "distance_ly": 430000000.0,
+      "external_ids": {
+        "ned_name": "Markarian 421",
+        "primary_name": "Markarian 421",
+        "simbad_name": "Markarian 421"
+      },
+      "facts": {
+        "distance_mly": 430.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.001,
+        "redshift": 0.031,
+        "source_catalog": "Markarian catalog; NED/SIMBAD",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "bl_lac_object",
+        "why_interesting": "Nearby TeV blazar and active-galaxy reference point."
+      },
+      "key": "quasar-markarian-421",
+      "name": "Markarian 421",
+      "object_type": "active_galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 166.1138,
+      "radius_km": 9460730472580800.0,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Nearby TeV blazar and active-galaxy reference point."
+    },
+    {
+      "aliases": [
+        "OJ 287",
+        "PG 0851+203"
+      ],
+      "apparent_magnitude": 14.8,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#b7b5ff",
+      "dec_deg": 20.1085,
+      "distance_ly": 3500000000.0,
+      "external_ids": {
+        "ned_name": "OJ 287",
+        "primary_name": "OJ 287",
+        "simbad_name": "OJ 287"
+      },
+      "facts": {
+        "distance_mly": 3500.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.001,
+        "redshift": 0.306,
+        "source_catalog": "NED/SIMBAD blazar catalogs",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "bl_lac_object",
+        "why_interesting": "BL Lac object with candidate binary-supermassive-black-hole periodicity."
+      },
+      "key": "quasar-oj-287",
+      "name": "OJ 287",
+      "object_type": "active_galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 133.7036,
+      "radius_km": 9460730472580800.0,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "BL Lac object with candidate binary-supermassive-black-hole periodicity."
+    },
+    {
+      "aliases": [
+        "Large Magellanic Cloud",
+        "LMC",
+        "ESO 56-G115"
+      ],
+      "apparent_magnitude": 0.9,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#9ec8ff",
+      "dec_deg": -69.7561,
+      "distance_ly": 163000.0,
+      "external_ids": {
+        "ned_name": "Large Magellanic Cloud",
+        "primary_name": "Large Magellanic Cloud",
+        "simbad_name": "Large Magellanic Cloud"
+      },
+      "facts": {
+        "distance_mly": 0.163,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.007,
+        "redshift": 0.000927,
+        "source_catalog": "NED/SIMBAD; Local Volume Galaxy catalog",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "satellite_galaxy",
+        "why_interesting": "Milky Way satellite galaxy and Local Volume distance anchor."
+      },
+      "key": "local-volume-lmc",
+      "name": "Large Magellanic Cloud",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 80.8939,
+      "radius_km": 6.622511330806561e+16,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Milky Way satellite galaxy and Local Volume distance anchor."
+    },
+    {
+      "aliases": [
+        "Small Magellanic Cloud",
+        "SMC",
+        "NGC 292"
+      ],
+      "apparent_magnitude": 2.7,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#9ec8ff",
+      "dec_deg": -72.8003,
+      "distance_ly": 200000.0,
+      "external_ids": {
+        "ned_name": "Small Magellanic Cloud",
+        "primary_name": "Small Magellanic Cloud",
+        "simbad_name": "Small Magellanic Cloud"
+      },
+      "facts": {
+        "distance_mly": 0.2,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.004,
+        "redshift": 0.000527,
+        "source_catalog": "NED/SIMBAD; Local Volume Galaxy catalog",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "satellite_galaxy",
+        "why_interesting": "Nearby dwarf satellite galaxy with a well-measured Cepheid distance scale."
+      },
+      "key": "local-volume-smc",
+      "name": "Small Magellanic Cloud",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 13.1583,
+      "radius_km": 3.78429218903232e+16,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Nearby dwarf satellite galaxy with a well-measured Cepheid distance scale."
+    },
+    {
+      "aliases": [
+        "Andromeda Galaxy",
+        "M31",
+        "NGC 224"
+      ],
+      "apparent_magnitude": 3.4,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d9b86f",
+      "dec_deg": 41.269,
+      "distance_ly": 2540000.0,
+      "external_ids": {
+        "ned_name": "Andromeda Galaxy",
+        "primary_name": "Andromeda Galaxy",
+        "simbad_name": "Andromeda Galaxy"
+      },
+      "facts": {
+        "distance_mly": 2.54,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.11,
+        "redshift": -0.001001,
+        "source_catalog": "NED/SIMBAD; Local Group catalogs",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "local_group_spiral",
+        "why_interesting": "Nearest giant spiral galaxy; Local Group mass anchor."
+      },
+      "key": "local-volume-andromeda",
+      "name": "Andromeda Galaxy",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 10.6847,
+      "radius_km": 1.0406803519838881e+18,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Nearest giant spiral galaxy; Local Group mass anchor."
+    },
+    {
+      "aliases": [
+        "Triangulum Galaxy",
+        "M33",
+        "NGC 598"
+      ],
+      "apparent_magnitude": 5.7,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d9b86f",
+      "dec_deg": 30.6602,
+      "distance_ly": 2730000.0,
+      "external_ids": {
+        "ned_name": "Triangulum Galaxy",
+        "primary_name": "Triangulum Galaxy",
+        "simbad_name": "Triangulum Galaxy"
+      },
+      "facts": {
+        "distance_mly": 2.73,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.03,
+        "redshift": -0.000607,
+        "source_catalog": "NED/SIMBAD; Local Group catalogs",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "local_group_spiral",
+        "why_interesting": "Third-largest Local Group spiral galaxy."
+      },
+      "key": "local-volume-triangulum",
+      "name": "Triangulum Galaxy",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 23.4621,
+      "radius_km": 2.8382191417742403e+17,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Third-largest Local Group spiral galaxy."
+    },
+    {
+      "aliases": [
+        "Bode's Galaxy",
+        "M81",
+        "NGC 3031"
+      ],
+      "apparent_magnitude": 6.9,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d9b86f",
+      "dec_deg": 69.0653,
+      "distance_ly": 11800000.0,
+      "external_ids": {
+        "ned_name": "Bode's Galaxy",
+        "primary_name": "Bode's Galaxy",
+        "simbad_name": "Bode's Galaxy"
+      },
+      "facts": {
+        "distance_mly": 11.8,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.045,
+        "redshift": -0.000113,
+        "source_catalog": "NED/SIMBAD; 2MASS Redshift Survey",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "nearby_spiral",
+        "why_interesting": "Dominant spiral of the nearby M81 Group."
+      },
+      "key": "local-volume-m81",
+      "name": "Bode's Galaxy",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 148.8882,
+      "radius_km": 4.2573287126613606e+17,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Dominant spiral of the nearby M81 Group."
+    },
+    {
+      "aliases": [
+        "Pinwheel Galaxy",
+        "M101",
+        "NGC 5457"
+      ],
+      "apparent_magnitude": 7.9,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d9b86f",
+      "dec_deg": 54.3489,
+      "distance_ly": 21000000.0,
+      "external_ids": {
+        "ned_name": "Pinwheel Galaxy",
+        "primary_name": "Pinwheel Galaxy",
+        "simbad_name": "Pinwheel Galaxy"
+      },
+      "facts": {
+        "distance_mly": 21.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.085,
+        "redshift": 0.000804,
+        "source_catalog": "NED/SIMBAD; 2MASS Redshift Survey",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "nearby_spiral",
+        "why_interesting": "Grand-design spiral and nearby supernova distance-ladder host."
+      },
+      "key": "local-volume-m101",
+      "name": "Pinwheel Galaxy",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 210.8023,
+      "radius_km": 8.04162090169368e+17,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Grand-design spiral and nearby supernova distance-ladder host."
+    },
+    {
+      "aliases": [
+        "Sombrero Galaxy",
+        "M104",
+        "NGC 4594"
+      ],
+      "apparent_magnitude": 8.0,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d9b86f",
+      "dec_deg": -11.6231,
+      "distance_ly": 31100000.0,
+      "external_ids": {
+        "ned_name": "Sombrero Galaxy",
+        "primary_name": "Sombrero Galaxy",
+        "simbad_name": "Sombrero Galaxy"
+      },
+      "facts": {
+        "distance_mly": 31.1,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.025,
+        "redshift": 0.003416,
+        "source_catalog": "NED/SIMBAD; 2MASS Redshift Survey",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "nearby_lenticular",
+        "why_interesting": "Massive nearby lenticular galaxy with a prominent dust lane."
+      },
+      "key": "local-volume-m104",
+      "name": "Sombrero Galaxy",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 189.9976,
+      "radius_km": 2.3651826181452003e+17,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Massive nearby lenticular galaxy with a prominent dust lane."
+    },
+    {
+      "aliases": [
+        "Virgo Cluster",
+        "VCC",
+        "Virgo I Cluster"
+      ],
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#f2c36b",
+      "dec_deg": 12.3,
+      "distance_ly": 54000000.0,
+      "external_ids": {
+        "ned_name": "Virgo Cluster",
+        "primary_name": "Virgo Cluster",
+        "simbad_name": "Virgo Cluster"
+      },
+      "facts": {
+        "distance_mly": 54.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 3.5,
+        "redshift": 0.0036,
+        "source_catalog": "Virgo Cluster Catalog; NED",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "galaxy_cluster",
+        "why_interesting": "Nearest rich galaxy cluster and core of the Local Supercluster."
+      },
+      "key": "cluster-virgo",
+      "name": "Virgo Cluster",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 187.7,
+      "radius_km": 3.31125566540328e+19,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Nearest rich galaxy cluster and core of the Local Supercluster."
+    },
+    {
+      "aliases": [
+        "Fornax Cluster",
+        "Abell S0373"
+      ],
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#f2c36b",
+      "dec_deg": -35.5,
+      "distance_ly": 65000000.0,
+      "external_ids": {
+        "ned_name": "Fornax Cluster",
+        "primary_name": "Fornax Cluster",
+        "simbad_name": "Fornax Cluster"
+      },
+      "facts": {
+        "distance_mly": 65.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 2.0,
+        "redshift": 0.0046,
+        "source_catalog": "Fornax Cluster Catalog; NED",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "galaxy_cluster",
+        "why_interesting": "Nearby southern galaxy cluster used for supercluster context."
+      },
+      "key": "cluster-fornax",
+      "name": "Fornax Cluster",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 54.6,
+      "radius_km": 1.89214609451616e+19,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Nearby southern galaxy cluster used for supercluster context."
+    },
+    {
+      "aliases": [
+        "NGC 1399 / Fornax Cluster core",
+        "NGC 1399",
+        "Fornax Cluster core"
+      ],
+      "apparent_magnitude": 9.9,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d9b86f",
+      "dec_deg": -35.4507,
+      "distance_ly": 65000000.0,
+      "external_ids": {
+        "ned_name": "NGC 1399 / Fornax Cluster core",
+        "primary_name": "NGC 1399 / Fornax Cluster core",
+        "simbad_name": "NGC 1399 / Fornax Cluster core"
+      },
+      "facts": {
+        "distance_mly": 65.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.055,
+        "redshift": 0.004753,
+        "source_catalog": "NED/SIMBAD; Fornax Cluster Catalog",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "cluster_central_galaxy",
+        "why_interesting": "Central elliptical marking the Fornax Cluster core."
+      },
+      "key": "fornax-ngc-1399",
+      "name": "NGC 1399 / Fornax Cluster core",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 54.6212,
+      "radius_km": 5.2034017599194406e+17,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Central elliptical marking the Fornax Cluster core."
+    },
+    {
+      "aliases": [
+        "Great Attractor region",
+        "Norma Cluster region",
+        "Laniakea attractor"
+      ],
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#e8d49a",
+      "dec_deg": -44.0,
+      "distance_ly": 220000000.0,
+      "external_ids": {
+        "ned_name": "Great Attractor region",
+        "primary_name": "Great Attractor region",
+        "simbad_name": "Great Attractor region"
+      },
+      "facts": {
+        "distance_mly": 220.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 20.0,
+        "redshift": 0.016,
+        "source_catalog": "NED; 2MASS Redshift Survey flow reconstructions",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "flow_anomaly_landmark",
+        "why_interesting": "Mass concentration associated with Local Group peculiar velocity flow."
+      },
+      "key": "supercluster-great-attractor",
+      "name": "Great Attractor region",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 200.0,
+      "radius_km": 1.89214609451616e+20,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Mass concentration associated with Local Group peculiar velocity flow."
+    },
+    {
+      "aliases": [
+        "Perseus Cluster",
+        "Abell 426",
+        "A426"
+      ],
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#f2c36b",
+      "dec_deg": 41.5131,
+      "distance_ly": 240000000.0,
+      "external_ids": {
+        "ned_name": "Perseus Cluster",
+        "primary_name": "Perseus Cluster",
+        "simbad_name": "Perseus Cluster"
+      },
+      "facts": {
+        "distance_mly": 240.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 4.0,
+        "redshift": 0.0179,
+        "source_catalog": "Abell catalog; NED",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "abell_galaxy_cluster",
+        "why_interesting": "Bright X-ray Abell cluster in the Perseus-Pisces supercluster region."
+      },
+      "key": "cluster-perseus-abell-426",
+      "name": "Perseus Cluster",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 49.9467,
+      "radius_km": 3.78429218903232e+19,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Bright X-ray Abell cluster in the Perseus-Pisces supercluster region."
+    },
+    {
+      "aliases": [
+        "Coma Cluster",
+        "Abell 1656",
+        "A1656"
+      ],
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#f2c36b",
+      "dec_deg": 27.98,
+      "distance_ly": 321000000.0,
+      "external_ids": {
+        "ned_name": "Coma Cluster",
+        "primary_name": "Coma Cluster",
+        "simbad_name": "Coma Cluster"
+      },
+      "facts": {
+        "distance_mly": 321.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 5.0,
+        "redshift": 0.0231,
+        "source_catalog": "Abell catalog; NED",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "abell_galaxy_cluster",
+        "why_interesting": "Rich benchmark galaxy cluster in the Coma Supercluster."
+      },
+      "key": "cluster-coma-abell-1656",
+      "name": "Coma Cluster",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 194.95,
+      "radius_km": 4.7303652362904e+19,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Rich benchmark galaxy cluster in the Coma Supercluster."
+    },
+    {
+      "aliases": [
+        "Shapley Supercluster core",
+        "Shapley Concentration",
+        "Shapley Supercluster"
+      ],
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#e8d49a",
+      "dec_deg": -31.0,
+      "distance_ly": 650000000.0,
+      "external_ids": {
+        "ned_name": "Shapley Supercluster core",
+        "primary_name": "Shapley Supercluster core",
+        "simbad_name": "Shapley Supercluster core"
+      },
+      "facts": {
+        "distance_mly": 650.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 30.0,
+        "redshift": 0.048,
+        "source_catalog": "NED; 2MASS/6dF redshift surveys",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "supercluster_landmark",
+        "why_interesting": "One of the most massive nearby supercluster concentrations."
+      },
+      "key": "supercluster-shapley",
+      "name": "Shapley Supercluster core",
+      "object_type": "galaxy",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 202.5,
+      "radius_km": 2.8382191417742403e+20,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "One of the most massive nearby supercluster concentrations."
+    },
+    {
+      "aliases": [
+        "3C 273",
+        "PG 1226+023",
+        "4C +02.32"
+      ],
+      "apparent_magnitude": 12.9,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d7c2ff",
+      "dec_deg": 2.0524,
+      "distance_ly": 2440000000.0,
+      "external_ids": {
+        "ned_name": "3C 273",
+        "primary_name": "3C 273",
+        "simbad_name": "3C 273"
+      },
+      "facts": {
+        "distance_mly": 2440.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.001,
+        "redshift": 0.158,
+        "source_catalog": "3C radio catalog; NED/SIMBAD",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "quasar",
+        "why_interesting": "First identified quasar; bright optical/radio AGN."
+      },
+      "key": "quasar-3c-273",
+      "name": "3C 273",
+      "object_type": "quasar",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 187.2779,
+      "radius_km": 9460730472580800.0,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "First identified quasar; bright optical/radio AGN."
+    },
+    {
+      "aliases": [
+        "3C 279",
+        "4C -05.55"
+      ],
+      "apparent_magnitude": 17.8,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#b7b5ff",
+      "dec_deg": -5.7893,
+      "distance_ly": 5200000000.0,
+      "external_ids": {
+        "ned_name": "3C 279",
+        "primary_name": "3C 279",
+        "simbad_name": "3C 279"
+      },
+      "facts": {
+        "distance_mly": 5200.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.001,
+        "redshift": 0.536,
+        "source_catalog": "3C radio catalog; NED/SIMBAD",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "blazar",
+        "why_interesting": "Gamma-ray bright blazar used as a high-redshift navigation point."
+      },
+      "key": "quasar-3c-279",
+      "name": "3C 279",
+      "object_type": "quasar",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 194.0465,
+      "radius_km": 9460730472580800.0,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Gamma-ray bright blazar used as a high-redshift navigation point."
+    },
+    {
+      "aliases": [
+        "CTA 102",
+        "4C +11.69"
+      ],
+      "apparent_magnitude": 17.3,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#b7b5ff",
+      "dec_deg": 11.7308,
+      "distance_ly": 7600000000.0,
+      "external_ids": {
+        "ned_name": "CTA 102",
+        "primary_name": "CTA 102",
+        "simbad_name": "CTA 102"
+      },
+      "facts": {
+        "distance_mly": 7600.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.001,
+        "redshift": 1.037,
+        "source_catalog": "CTA/4C radio catalogs; NED/SIMBAD",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "blazar",
+        "why_interesting": "Famous variable blazar at cosmological distance."
+      },
+      "key": "quasar-cta-102",
+      "name": "CTA 102",
+      "object_type": "quasar",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 338.1517,
+      "radius_km": 9460730472580800.0,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Famous variable blazar at cosmological distance."
+    },
+    {
+      "aliases": [
+        "TON 618"
+      ],
+      "apparent_magnitude": 15.9,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d7c2ff",
+      "dec_deg": 31.4699,
+      "distance_ly": 18200000000.0,
+      "external_ids": {
+        "ned_name": "TON 618",
+        "primary_name": "TON 618",
+        "simbad_name": "TON 618"
+      },
+      "facts": {
+        "distance_mly": 18200.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.001,
+        "redshift": 2.219,
+        "source_catalog": "Tonantzintla catalog; NED/SIMBAD",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "luminous_quasar",
+        "why_interesting": "Extremely luminous quasar often cited for its very massive black hole."
+      },
+      "key": "quasar-ton-618",
+      "name": "TON 618",
+      "object_type": "quasar",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 186.4963,
+      "radius_km": 9460730472580800.0,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Extremely luminous quasar often cited for its very massive black hole."
+    },
+    {
+      "aliases": [
+        "APM 08279+5255"
+      ],
+      "apparent_magnitude": 15.2,
+      "catalog_group": "curated_extragalactic_survey",
+      "color": "#d7c2ff",
+      "dec_deg": 52.7558,
+      "distance_ly": 23600000000.0,
+      "external_ids": {
+        "ned_name": "APM 08279+5255",
+        "primary_name": "APM 08279+5255",
+        "simbad_name": "APM 08279+5255"
+      },
+      "facts": {
+        "distance_mly": 23600.0,
+        "distance_quality": "curated_literature_or_redshift_distance",
+        "radius_mly": 0.001,
+        "redshift": 3.911,
+        "source_catalog": "APM survey; NED/SIMBAD",
+        "source_urls": [
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ],
+        "survey_class": "gravitationally_lensed_quasar",
+        "why_interesting": "Gravitationally lensed high-redshift quasar."
+      },
+      "key": "quasar-apm-08279",
+      "name": "APM 08279+5255",
+      "object_type": "quasar",
+      "position_model": "survey_ra_dec_distance_coordinates",
+      "ra_deg": 127.923,
+      "radius_km": 9460730472580800.0,
+      "source_type": "curated_extragalactic_survey",
+      "why_interesting": "Gravitationally lensed high-redshift quasar."
+    }
+  ],
+  "schema_version": 1,
+  "selection": {
+    "distance_note": "Distances are rounded literature/redshift distances in million light years for atlas placement, not precision cosmology fitting.",
+    "download_policy": "No bulk survey download; coordinates/distances are compact curated seed rows with source-service provenance.",
+    "included": "High-value named extragalactic landmarks that are useful across Local Group, cluster, supercluster, and quasar-field zooms."
+  },
+  "source": {
+    "description": "Small, static, real-catalog-backed snapshot of Local Volume galaxies, Abell/nearby clusters, supercluster landmarks, and famous quasars/blazars for universe-scale atlas navigation without bulk downloads.",
+    "label": "Curated extragalactic survey landmarks",
+    "primary_services": [
+      "NASA/IPAC Extragalactic Database",
+      "CDS SIMBAD"
+    ],
+    "survey_catalogs": [
+      "Local Volume Galaxy catalog",
+      "Virgo Cluster Catalog",
+      "Fornax Cluster Catalog",
+      "Abell clusters",
+      "3C radio catalog",
+      "2MASS/2MRS",
+      "APM"
+    ],
+    "urls": [
+      "https://ned.ipac.caltech.edu/",
+      "https://simbad.cds.unistra.fr/simbad/",
+      "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+      "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+    ]
+  }
+}
