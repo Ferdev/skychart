@@ -31,7 +31,6 @@ type AtlasTab = "catalog" | "object";
 type ActiveAtlasTab = AtlasTab | null;
 type SizeMode = "readable" | "hybrid" | "true";
 type ZoomPreset = "inner" | "solar" | "nearby" | "galaxy" | "localGroup" | "messier" | "cosmicWeb" | "all";
-type UniverseNavigationMode = "distance" | "lookback" | "redshift";
 type BodyFilter =
   | "all"
   | "solar_system"
@@ -487,7 +486,7 @@ const POINT_VERTEX_STRIDE_FLOATS = 6;
 const CATALOG_TILE_MANIFEST_URL = catalogTileManifestUrl();
 const ALLOW_DYNAMIC_POINT_FALLBACK = dynamicPointFallbackEnabled();
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
-const DEEP_SKY_POINT_GROUPS = ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects"];
+const DEEP_SKY_POINT_GROUPS = ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey"];
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
 const POINT_SAMPLE_BUCKET_COUNT = 1_024;
 const BODY_HIT_GRID_CELL_PX = 56;
@@ -715,9 +714,6 @@ const zoomScaleSlider = requiredElement<HTMLInputElement>("#zoom-scale-slider");
 const zoomScaleLabel = requiredElement<HTMLOutputElement>("#zoom-scale-label");
 const zoomPixelScale = requiredElement<HTMLElement>("#zoom-pixel-scale");
 const zoomViewScale = requiredElement<HTMLElement>("#zoom-view-scale");
-const universeModeButtons = requiredElement<HTMLElement>("#universe-mode-buttons");
-const universeContextCard = requiredElement<HTMLElement>("#universe-context-card");
-const universeShells = requiredElement<HTMLElement>("#universe-shells");
 const sizeModeButtons = requiredElement<HTMLElement>("#size-mode-buttons");
 const displayToggles = requiredElement<HTMLElement>("#display-toggles");
 const bodyPopover = requiredElement<HTMLElement>("#body-popover");
@@ -733,7 +729,6 @@ let activeCompareFilter: BodyFilter = "all";
 let activeGuidedSetId: string | null = null;
 let sizeMode: SizeMode = "hybrid";
 let activeZoomPreset: ZoomPreset | null = "solar";
-let universeNavigationMode: UniverseNavigationMode = "distance";
 let displayLayers: Record<DisplayLayer, boolean> = {
   labels: true,
   orbits: true,
@@ -1084,19 +1079,6 @@ function bindEvents() {
   zoomIn.addEventListener("click", () => zoomViewportCenter(2.4));
   zoomScaleSlider.addEventListener("input", () => setZoomFromSlider());
 
-  universeModeButtons.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-universe-mode]");
-    if (!button) return;
-    universeNavigationMode = (button.dataset.universeMode as UniverseNavigationMode) ?? "distance";
-    updateScaleUi();
-  });
-
-  universeShells.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-universe-shell]");
-    const shell = UNIVERSE_SHELLS.find((candidate) => candidate.id === button?.dataset.universeShell);
-    if (!shell) return;
-    setUniverseRadius(shell.radiusLy);
-  });
 
   sizeModeButtons.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-size-mode]");
@@ -2822,32 +2804,41 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
   const requestContext = catalogPointRequestContext();
   if (!requestContext) return [];
 
-  const tileSpanAu = catalogPointTileSpanAu(requestContext.bounds, requestContext.viewWidthLy, requestContext.staticLayer);
-  const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu, requestContext.staticLayer);
-  return catalogPointRequestsForLevel(requestContext, tileSpanAu, staticLevel, catalogPointMaxActiveTiles(requestContext.viewWidthLy));
+  const staticLayers = requestContext.staticLayers.length > 0 ? requestContext.staticLayers : [requestContext.staticLayer];
+  return staticLayers.flatMap((staticLayer) => {
+    const layerContext = { ...requestContext, staticLayer };
+    const tileSpanAu = catalogPointTileSpanAu(layerContext.bounds, layerContext.viewWidthLy, staticLayer);
+    const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu, staticLayer);
+    return catalogPointRequestsForLevel(layerContext, tileSpanAu, staticLevel, catalogPointMaxActiveTiles(layerContext.viewWidthLy));
+  });
 }
 
 function catalogPointPrefetchRequests(activeRequests: CatalogPointTileRequest[]): CatalogPointTileRequest[] {
   const requestContext = catalogPointRequestContext();
   if (!requestContext || catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return [];
 
-  const activeSpanAu = catalogPointTileSpanAu(requestContext.bounds, requestContext.viewWidthLy, requestContext.staticLayer);
-  const activeLevel = catalogStaticTileLevelForSpan(activeSpanAu, requestContext.staticLayer);
-  if (!activeLevel || !requestContext.staticLayer) return [];
-
-  const activeLevelIndex = requestContext.staticLayer.levels.findIndex((level) => level.span_au === activeLevel.span_au);
-  if (activeLevelIndex < 0) return [];
-
   const activeKeys = new Set(activeRequests.map((request) => request.key));
   const requests: CatalogPointTileRequest[] = [];
-  const firstLevelIndex = Math.max(0, activeLevelIndex - POINT_TILE_PREFETCH_LEVEL_RADIUS);
-  const lastLevelIndex = Math.min(requestContext.staticLayer.levels.length - 1, activeLevelIndex + POINT_TILE_PREFETCH_LEVEL_RADIUS);
+  const staticLayers = requestContext.staticLayers.length > 0 ? requestContext.staticLayers : [requestContext.staticLayer].filter(isPresent);
 
-  for (let levelIndex = firstLevelIndex; levelIndex <= lastLevelIndex; levelIndex += 1) {
-    if (levelIndex === activeLevelIndex) continue;
-    const level = requestContext.staticLayer.levels[levelIndex];
-    const prefetchContext = catalogPointRequestContextForTileSpan(requestContext, level.span_au);
-    requests.push(...catalogPointRequestsForLevel(prefetchContext, level.span_au, level, catalogPointMaxActiveTiles(prefetchContext.viewWidthLy)));
+  for (const staticLayer of staticLayers) {
+    const layerContext = { ...requestContext, staticLayer };
+    const activeSpanAu = catalogPointTileSpanAu(layerContext.bounds, layerContext.viewWidthLy, staticLayer);
+    const activeLevel = catalogStaticTileLevelForSpan(activeSpanAu, staticLayer);
+    if (!activeLevel) continue;
+
+    const activeLevelIndex = staticLayer.levels.findIndex((level) => level.span_au === activeLevel.span_au);
+    if (activeLevelIndex < 0) continue;
+
+    const firstLevelIndex = Math.max(0, activeLevelIndex - POINT_TILE_PREFETCH_LEVEL_RADIUS);
+    const lastLevelIndex = Math.min(staticLayer.levels.length - 1, activeLevelIndex + POINT_TILE_PREFETCH_LEVEL_RADIUS);
+
+    for (let levelIndex = firstLevelIndex; levelIndex <= lastLevelIndex; levelIndex += 1) {
+      if (levelIndex === activeLevelIndex) continue;
+      const level = staticLayer.levels[levelIndex];
+      const prefetchContext = catalogPointRequestContextForTileSpan(layerContext, level.span_au);
+      requests.push(...catalogPointRequestsForLevel(prefetchContext, level.span_au, level, catalogPointMaxActiveTiles(prefetchContext.viewWidthLy)));
+    }
   }
 
   const now = performance.now();
@@ -2857,10 +2848,7 @@ function catalogPointPrefetchRequests(activeRequests: CatalogPointTileRequest[])
       const tile = catalogPointTiles.get(request.key);
       return !tile || (!tile.source && !tile.abortController && canRetryCatalogPointTile(tile, now));
     })
-    .sort((a, b) => {
-      const levelDelta = Math.abs(Math.log2(a.bounds.max_x_au - a.bounds.min_x_au) - Math.log2(activeLevel.span_au)) - Math.abs(Math.log2(b.bounds.max_x_au - b.bounds.min_x_au) - Math.log2(activeLevel.span_au));
-      return levelDelta || tileDistanceToCamera(a) - tileDistanceToCamera(b);
-    })
+    .sort((a, b) => tileDistanceToCamera(a) - tileDistanceToCamera(b))
     .slice(0, POINT_TILE_PREFETCH_MAX_REQUESTS);
 }
 
@@ -2893,13 +2881,15 @@ function catalogPointRequestContext() {
   if (!filterParams || !shouldUseCatalogPoints(viewWidthLy, filterParams)) return null;
   if (catalogPointTileManifestState === "loading") return null;
   if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
-  const staticLayer = catalogStaticTileLayerForFilter(filterParams);
-  if (catalogPointTileManifestState === "ready" && !staticLayer && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
+  const staticLayers = catalogStaticTileLayersForFilter(filterParams);
+  const staticLayer = staticLayers[0] ?? null;
+  if (catalogPointTileManifestState === "ready" && staticLayers.length === 0 && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
   return {
     viewWidthLy,
     bounds: viewportWorldBounds(POINT_LAYER_VIEWPORT_PADDING),
     filterParams,
-    staticLayer
+    staticLayer,
+    staticLayers
   };
 }
 
@@ -2959,7 +2949,7 @@ function catalogPointRequestsForLevel(
 
 function catalogPointFilterParams(): { groups: string[]; types: DestinationBodyType[] } | null {
   const filter = activeBodyFilterDefinition();
-  const sourceGroups = filter.key === "all" || !filter.groups ? [...POINT_LAYER_GROUPS, ...DEEP_SKY_POINT_GROUPS] : filter.groups;
+  const sourceGroups = filter.key === "all" || !filter.groups ? catalogPointManifestGroups() : filter.groups;
   const groups = sourceGroups.filter((group) => POINT_LAYER_GROUP_SET.has(group) || catalogPointManifestGroupSet().has(group));
   if (groups.length === 0) return null;
   return { groups: uniqueStrings(groups), types: filter.types ?? [] };
@@ -2974,14 +2964,15 @@ function catalogPointManifestGroupSet() {
   return new Set(catalogPointManifestGroups());
 }
 
-function catalogStaticTileLayerForFilter(filterParams: { groups: string[]; types: DestinationBodyType[] }): CatalogPointTileManifestLayer | null {
-  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return null;
-  return catalogPointTileManifest.layers.find((layer) => sameStringSet(layer.groups, filterParams.groups) && layerCoversTypes(layer, filterParams.types)) ?? null;
+function catalogStaticTileLayersForFilter(filterParams: { groups: string[]; types: DestinationBodyType[] }): CatalogPointTileManifestLayer[] {
+  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return [];
+  const requestedGroups = new Set(filterParams.groups);
+  return catalogPointTileManifest.layers.filter((layer) => layer.groups.some((group) => requestedGroups.has(group)) && layerCoversAnyType(layer, filterParams.types));
 }
 
-function layerCoversTypes(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]) {
+function layerCoversAnyType(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]) {
   if (layer.types.length === 0 || types.length === 0) return true;
-  return sameStringSet(layer.types, types);
+  return layer.types.some((type) => types.includes(type));
 }
 
 
@@ -4341,47 +4332,6 @@ function updateScaleUi() {
   zoomScaleLabel.textContent = `${zoomLevel} / ${ZOOM_SLIDER_STEPS}`;
   zoomPixelScale.textContent = t("scale.pixelEquals", { value: pixelScale });
   zoomViewScale.textContent = t("scale.viewEquals", { value: viewScale });
-  updateUniverseNavigator();
-}
-
-function updateUniverseNavigator() {
-  const viewWidthLy = currentViewWidthLy();
-  const radiusLy = Math.max(viewWidthLy / 2, 1);
-  const shell = universeShellForRadius(radiusLy);
-  const lookback = formatLookbackTime(radiusLy);
-  const redshift = formatRedshiftEstimate(radiusLy);
-  const observableShare = clamp(radiusLy / OBSERVABLE_UNIVERSE_RADIUS_LY, 0, 1);
-  const headline = universeNavigationMode === "lookback" ? lookback : universeNavigationMode === "redshift" ? redshift : formatLightYears(radiusLy);
-
-  for (const button of Array.from(universeModeButtons.querySelectorAll<HTMLButtonElement>("[data-universe-mode]"))) {
-    const active = button.dataset.universeMode === universeNavigationMode;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", String(active));
-  }
-
-  universeContextCard.innerHTML = `
-    <div class="universe-context-card__main">
-      <span>${escapeHtml(t("universe.context.viewRadius"))}</span>
-      <strong>${escapeHtml(headline)}</strong>
-      <small>${escapeHtml(t("universe.context.observableShare", { value: `${Math.max(0.01, observableShare * 100).toFixed(observableShare > 0.1 ? 1 : 2)}%` }))}</small>
-    </div>
-    <dl>
-      <div><dt>${escapeHtml(t("universe.context.distance"))}</dt><dd>${escapeHtml(formatLightYears(radiusLy))}</dd></div>
-      <div><dt>${escapeHtml(t("universe.context.lookback"))}</dt><dd>${escapeHtml(lookback)}</dd></div>
-      <div><dt>${escapeHtml(t("universe.context.redshift"))}</dt><dd>${escapeHtml(redshift)}</dd></div>
-    </dl>
-    <p>${escapeHtml(t(shell.noteKey))}</p>
-  `;
-
-  universeShells.innerHTML = UNIVERSE_SHELLS.map((candidate) => {
-    const selected = candidate.id === shell.id;
-    return `
-      <button type="button" data-universe-shell="${escapeHtml(candidate.id)}" class="${selected ? "active" : ""}" aria-pressed="${selected}">
-        <span>${escapeHtml(t(candidate.labelKey))}</span>
-        <small>${escapeHtml(formatLightYears(candidate.radiusLy))}</small>
-      </button>
-    `;
-  }).join("");
 }
 
 function universeShellForRadius(radiusLy: number) {
@@ -4687,21 +4637,6 @@ function applyZoomPreset(preset: ZoomPreset, update = true) {
     requestRender();
     requestDataRefresh({ immediate: true });
   }
-}
-
-function setUniverseRadius(radiusLy: number) {
-  activeZoomPreset = null;
-  cancelCameraAnimation();
-  const rect = usableViewportRect();
-  const targetWidthAu = Math.max(radiusLy * 2 * AU_PER_LIGHT_YEAR, 1);
-  camera = {
-    ...camera,
-    pxPerAu: clamp(rect.width / targetWidthAu, MIN_ZOOM, MAX_ZOOM)
-  };
-  updateZoomPresetButtons();
-  updateScaleUi();
-  requestRender();
-  requestDataRefresh({ immediate: true });
 }
 
 function presetBodies(preset: ZoomPreset) {
