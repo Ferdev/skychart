@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 gaia_500pc_min_count="${GAIA_500PC_MIN_COUNT:-1597012}"
-gaia_10kpc_min_count="${GAIA_10KPC_MIN_COUNT:-13151685}"
+gaia_10kpc_min_count="${GAIA_10KPC_MIN_COUNT:-1339910}"
 release_bin="${STARSMAP_RELEASE_BIN:-$repo_root/bin/starsmap_api}"
 release_static_dir=""
 if [ -d "$repo_root/lib" ]; then

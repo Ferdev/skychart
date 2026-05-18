@@ -79,7 +79,7 @@ Container startup does:
 After each Kamal deploy, `.kamal/hooks/post-deploy` runs `scripts/import_catalogs_if_needed.sh` once on the primary app container. That script rechecks migrations and catalog snapshots, then imports the two large Gaia slices only when their catalog groups are below the expected row counts:
 
 - `gaia_500pc_stars`: `1,597,012` rows from the current Gaia TAP sync import.
-- `gaia_10kpc_bright_stars`: `13,151,685` rows from the Gaia G<=14 TAP sync import between 500 pc and 10 kpc.
+- `gaia_10kpc_bright_stars`: `1,339,910` rows from the current Gaia TAP sync import between 500 pc and 10 kpc. The Gaia preflight query can report a much larger theoretical count than the importer can materialize safely on the shared production volume; normal deploys should skip once this operational baseline is present.
 
 Normal deploys skip the Gaia network import after those slices are already present. Static point tiles are not built during normal app startup or post-deploy maintenance because a multi-million-row tile build is CPU, disk, and inode heavy. Build and upload them as a controlled one-off job after the new image is running, then verify the CDN manifest before judging the point-layer path. First-time environments can take much longer, so deploy workflows allow up to 180 minutes.
 
