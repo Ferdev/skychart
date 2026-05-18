@@ -61,6 +61,21 @@ class StaticTileDefaultsTest(unittest.TestCase):
 
         self.assertNotIn("import_catalogs_if_needed.sh", entrypoint)
         self.assertIn("import_catalogs_if_needed.sh", post_deploy)
+        self.assertIn("KAMAL_DESTINATION", post_deploy)
+        self.assertIn("staging", post_deploy)
+
+    def test_staging_uses_shared_catalog_database_not_own_postgres_accessory(self) -> None:
+        deploy = (ROOT / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+        staging_config = (ROOT / "config" / "deploy.staging.yml").read_text(encoding="utf-8")
+        tile_workflow = (ROOT / ".github" / "workflows" / "catalog-tiles.yml").read_text(encoding="utf-8")
+
+        self.assertIn("STAGING_DATABASE_URL", deploy)
+        self.assertIn("STAGING_DATABASE_URL", tile_workflow)
+        self.assertNotIn("@skychart-staging-postgres/skychart", deploy)
+        self.assertNotIn("@skychart-staging-postgres/skychart", tile_workflow)
+        self.assertNotIn("kamal accessory boot postgres -d staging", deploy)
+        self.assertNotIn("skychart-staging-postgres-data", staging_config)
+        self.assertIn('POOL_SIZE: "2"', staging_config)
 
 
 if __name__ == "__main__":
