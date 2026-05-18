@@ -2661,7 +2661,7 @@ async function loadCatalogPointTile(request: CatalogPointTileRequest, requestId:
 
   try {
     const response = await fetch(request.staticUrl ?? `/api/catalog/points.bin?${request.params.toString()}`, { signal: abortController.signal });
-    if (request.staticUrl && response.status === 404) {
+    if (request.staticUrl && (response.status === 403 || response.status === 404)) {
       if (requestId !== catalogPointRequestId || abortController.signal.aborted) return;
       tile.payload = emptyCatalogPointPayload(request);
       tile.source = catalogPointLayerFromPayload(tile.payload, request.signature);
