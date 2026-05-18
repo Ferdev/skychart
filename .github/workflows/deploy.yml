@@ -22,8 +22,7 @@ jobs:
       DOCKER_BUILDKIT: 1
       KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD || github.token }}
       SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      DATABASE_URL: ecto://skychart:${{ secrets.POSTGRES_PASSWORD }}@skychart-staging-postgres/skychart
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       CATALOG_TILE_MANIFEST_URL: ${{ vars.STAGING_CATALOG_TILE_MANIFEST_URL }}
 
@@ -73,7 +72,7 @@ jobs:
         shell: bash
         run: |
           missing=()
-          for v in KAMAL_REGISTRY_PASSWORD SECRET_KEY_BASE POSTGRES_PASSWORD DATABASE_URL SENTRY_DSN; do
+          for v in KAMAL_REGISTRY_PASSWORD SECRET_KEY_BASE DATABASE_URL SENTRY_DSN; do
             if [ -z "${!v}" ]; then missing+=("$v"); fi
           done
           if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then missing+=("SSH_PRIVATE_KEY"); fi
@@ -90,19 +89,14 @@ jobs:
           cat > .kamal/secrets.staging <<'SECRETS_EOF'
           KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD
           SECRET_KEY_BASE=$SECRET_KEY_BASE
-          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
           DATABASE_URL=$DATABASE_URL
           SENTRY_DSN=$SENTRY_DSN
           SECRETS_EOF
           sed -i 's/^[[:space:]]*//' .kamal/secrets.staging
           cp .kamal/secrets.staging .kamal/secrets-common
-          cat .kamal/secrets.staging
 
       - name: Release stale deploy lock
         run: kamal lock release -d staging || true
-
-      - name: Boot Postgres accessory
-        run: kamal accessory boot postgres -d staging || true
 
       - name: Ensure Kamal proxy
         run: kamal proxy boot -d staging || true

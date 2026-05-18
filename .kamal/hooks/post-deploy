@@ -6,6 +6,11 @@ if [ -n "${KAMAL_DESTINATION:-}" ]; then
   DEST_FLAG=(-d "$KAMAL_DESTINATION")
 fi
 
+if [ "${KAMAL_DESTINATION:-}" = "staging" ]; then
+  echo "[post-deploy] Staging uses the shared production catalog database via STAGING_DATABASE_URL; skipping migrations/imports."
+  exit 0
+fi
+
 echo "[post-deploy] Ensuring Cosmic Atlas production catalogs are present..."
 kamal app exec "${DEST_FLAG[@]}" --primary --env MIX_ENV:prod --env CATALOG_IMPORT_SUMMARY:0 -- ./scripts/import_catalogs_if_needed.sh
 echo "[post-deploy] Catalog import check completed."

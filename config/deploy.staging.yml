@@ -1,23 +1,11 @@
 service: skychart-staging
 image: ferdev/skychart-staging
 
-accessories:
-  postgres:
-    image: postgres:16-alpine
-    host: 5.161.73.221
-    env:
-      clear:
-        POSTGRES_USER: skychart
-        POSTGRES_DB: skychart
-      secret:
-        - POSTGRES_PASSWORD
-    volumes:
-      - skychart-staging-postgres-data:/var/lib/postgresql/data
-
 env:
   clear:
     PHX_HOST: staging.skychart.org
     PORT: "4000"
+    POOL_SIZE: "2"
     PYTHON_BACKEND_URL: http://127.0.0.1:8765
     CATALOG_TILE_MANIFEST_URL: '<%= ENV.fetch("CATALOG_TILE_MANIFEST_URL", "") %>'
   secret:
