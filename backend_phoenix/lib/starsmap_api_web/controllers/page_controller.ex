@@ -32,7 +32,7 @@ defmodule StarsmapApiWeb.PageController do
       manifest_url ->
         index_path
         |> File.read!()
-        |> inject_catalog_tile_manifest_url(manifest_url)
+        |> inject_catalog_tile_manifest_url(manifest_url_for_browser(manifest_url))
         |> then(fn html ->
           conn
           |> put_resp_content_type("text/html")
@@ -46,6 +46,8 @@ defmodule StarsmapApiWeb.PageController do
     |> System.get_env("")
     |> String.trim()
   end
+
+  defp manifest_url_for_browser(_manifest_url), do: "/catalog-tiles/v1/manifest.json"
 
   defp inject_catalog_tile_manifest_url(html, manifest_url) do
     tag = ~s(<meta name="catalog-tile-manifest-url" content="#{html_escape(manifest_url)}">)

@@ -14,17 +14,26 @@ import {
   type DestinationPickerItem,
   type RecentDestination
 } from "./destinationPicker";
+import {
+  equatorialToGalactic,
+  formatDecimalDegrees,
+  formatDeclination,
+  formatRightAscension
+} from "./coordinates";
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
+import { COSMIC_WEB_MODEL, LOCAL_GROUP_MODEL, type UniverseDensityRegion, type UniverseFilament, type UniverseModel, type UniversePoint, type UniverseRing } from "./universeModel";
 import { educationalComparisons } from "./navigationMetrics";
 import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
+import { initI18n, t } from "./i18n";
 import { WebglPointRenderer, type PointLayerSource } from "./webglPointRenderer";
 
 type AtlasTab = "catalog" | "object";
 type ActiveAtlasTab = AtlasTab | null;
 type SizeMode = "readable" | "hybrid" | "true";
-type ZoomPreset = "inner" | "solar" | "nearby" | "galaxy" | "messier" | "all";
+type ZoomPreset = "inner" | "solar" | "nearby" | "galaxy" | "localGroup" | "messier" | "cosmicWeb" | "all";
 type BodyFilter =
   | "all"
+  | "solar_system"
   | "planet"
   | "moon"
   | "star"
@@ -33,12 +42,22 @@ type BodyFilter =
   | "exoplanet_system"
   | "dwarf_planet"
   | "small_body"
+  | "deep_sky"
   | "galaxy"
   | "quasar"
   | "active_galaxy"
+  | "black_hole"
+  | "pulsar"
   | "nebula"
   | "star_cluster";
-type DisplayLayer = "labels" | "orbits" | "grid" | "milkyWay" | "references";
+type DisplayLayer = "labels" | "orbits" | "grid" | "milkyWay" | "localGroup" | "galaxyPoints" | "quasars" | "cosmicWeb" | "references";
+
+type UniverseShell = {
+  id: string;
+  labelKey: string;
+  radiusLy: number;
+  noteKey: string;
+};
 
 type ExternalLink = {
   provider?: string | null;
@@ -286,12 +305,18 @@ type CatalogPointTileManifestLevel = {
   point_count?: number;
 };
 
+type CatalogPointTileManifestLayer = {
+  id: string;
+  tile_url_template: string;
+  groups: string[];
+  types: DestinationBodyType[];
+  levels: CatalogPointTileManifestLevel[];
+};
+
 type CatalogPointTileManifest = {
   version: string;
   format: "SMP2";
-  tile_url_template: string;
-  groups: string[];
-  levels: CatalogPointTileManifestLevel[];
+  layers: CatalogPointTileManifestLayer[];
 };
 
 type CatalogPointTileManifestState = "loading" | "ready" | "missing";
@@ -336,6 +361,7 @@ type CatalogObjectPayload = {
 type CatalogSearchResult = {
   bodies: Body[];
   source: "phoenix" | "local";
+  fallback?: boolean;
 };
 
 const STARTUP_EPHEMERIS_GROUPS = [
@@ -400,6 +426,7 @@ type BodyHitEntry = {
 type PickerSearchState = {
   requestId: number;
   latestBodies: Body[];
+  activeOptionKey: string | null;
   abortController?: AbortController;
 };
 
@@ -412,7 +439,9 @@ type PickerSearchConfig = {
   activeKey: string | null;
   currentTargetKey: string | null;
   emptyMessage: string;
-  guidedSet?: { label: string } | null;
+  loadingMessage: string;
+  fallbackMessage: string;
+  guidedSet?: { labelKey: string } | null;
   excludeKeys?: string[];
   queryForSearch?: (query: string) => string;
   afterRender?: () => void;
@@ -420,7 +449,7 @@ type PickerSearchConfig = {
 
 const AU_KM_FALLBACK = 149_597_870.7;
 const LIGHT_YEAR_KM = 9_460_730_472_580.8;
-const MIN_ZOOM = 1e-10;
+const MIN_ZOOM = 1e-14;
 const MAX_ZOOM = 50_000_000;
 const ZOOM_SLIDER_STEPS = 1000;
 const LOCAL_ZOOM_DIAMETER_PX = 170;
@@ -433,82 +462,190 @@ const CAMERA_DATA_REFRESH_DEBOUNCE_MS = 180;
 const SEARCH_INPUT_DEBOUNCE_MS = 180;
 const POINT_LAYER_MIN_WIDTH_LY = 12;
 const POINT_LAYER_MAX_WIDTH_LY = 250_000;
+const POINT_LAYER_DEEP_SKY_MAX_WIDTH_LY = 1_400_000_000;
+const POINT_LAYER_QUASAR_MAX_WIDTH_LY = 4_000_000_000;
 const POINT_LAYER_VIEWPORT_PADDING = 0.35;
 const POINT_TILE_TARGET_VIEW_DIVISIONS = 2;
 const POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE = 1;
 const POINT_TILE_MAX_ACTIVE = 18;
 const POINT_TILE_MAX_ACTIVE_WIDE = 8;
+const POINT_TILE_MAX_ACTIVE_UNIVERSE = 6;
 const POINT_TILE_MAX_POINTS = 24_000;
 const POINT_TILE_MAX_POINTS_WIDE = 12_000;
-const POINT_TILE_CACHE_LIMIT = 72;
+const POINT_TILE_MAX_POINTS_UNIVERSE = 7_500;
+const POINT_TILE_CACHE_LIMIT = 192;
 const POINT_TILE_FETCH_CONCURRENCY = 2;
+const POINT_TILE_PREFETCH_LEVEL_RADIUS = 5;
+const POINT_TILE_PREFETCH_MAX_REQUESTS = 144;
+const POINT_TILE_PREFETCH_DELAY_MS = 500;
 const POINT_TILE_RETRY_BASE_MS = 1_200;
 const POINT_TILE_RETRY_MAX_MS = 8_000;
 const POINT_BINARY_HEADER_BYTES = 8;
 const POINT_BINARY_RECORD_BYTES = 12;
 const POINT_VERTEX_STRIDE_FLOATS = 6;
 const CATALOG_TILE_MANIFEST_URL = catalogTileManifestUrl();
-const ALLOW_DYNAMIC_POINT_FALLBACK =
-  window.location.hostname === "127.0.0.1" ||
-  window.location.hostname === "localhost" ||
-  new URLSearchParams(window.location.search).has("dynamicPointFallback");
+const ALLOW_DYNAMIC_POINT_FALLBACK = dynamicPointFallbackEnabled();
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
+const DEEP_SKY_POINT_GROUPS = ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey"];
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
 const POINT_SAMPLE_BUCKET_COUNT = 1_024;
 const BODY_HIT_GRID_CELL_PX = 56;
 const MAP_POINT_RADIUS_PX = 1.3;
 const MAP_POINT_ALPHA = 0.82;
 const MAP_POINT_SELECTION_RING_PX = 8.5;
-const WORKSPACE_LABELS: Record<AtlasTab, string> = {
-  catalog: "Search catalog",
-  object: "Selected object"
+const DENSITY_HAZE_MIN_WIDTH_LY = 4_500_000;
+const DENSITY_SUMMARY_MIN_WIDTH_LY = 85_000_000;
+const DENSITY_HAZE_BIN_PX = 92;
+const DENSITY_HAZE_MAX_CELLS = 180;
+const WORKSPACE_LABEL_KEYS: Record<AtlasTab, string> = {
+  catalog: "workspace.searchCatalog",
+  object: "workspace.selectedObject"
 };
-type BodyFilterDefinition = { key: BodyFilter; label: string; types?: DestinationBodyType[]; groups?: string[] };
+type BodyFilterDefinition = { key: BodyFilter; labelKey: string; types?: DestinationBodyType[]; groups?: string[] };
+
+type ExploreDomainDefinition = {
+  id: string;
+  titleKey: string;
+  descriptionKey: string;
+  filterKey: BodyFilter;
+  guidedSetId: string;
+  zoomPreset: ZoomPreset;
+  count: (summary: CatalogSummary | null, bodies: Body[]) => number | null;
+};
 
 const BODY_FILTERS: BodyFilterDefinition[] = [
-  { key: "all", label: "All" },
-  { key: "planet", label: "Planets", types: ["planet"], groups: ["core"] },
-  { key: "moon", label: "Moons", types: ["moon"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
+  { key: "all", labelKey: "filters.all" },
+  {
+    key: "solar_system",
+    labelKey: "filters.solarSystem",
+    types: ["star", "planet", "moon", "dwarf_planet"],
+    groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"]
+  },
+  { key: "planet", labelKey: "filters.planets", types: ["planet"], groups: ["core"] },
+  { key: "moon", labelKey: "filters.moons", types: ["moon"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
   {
     key: "star",
-    label: "Stars",
+    labelKey: "filters.stars",
     types: ["star"],
     groups: ["core", "bright_stars", "nearby_exoplanet_systems", "exoplanet_systems", "gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"]
   },
-  { key: "bright_star", label: "Bright", types: ["star"], groups: ["bright_stars"] },
-  { key: "gaia_star", label: "Gaia", types: ["star"], groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"] },
-  { key: "exoplanet_system", label: "Exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems"] },
-  { key: "dwarf_planet", label: "Dwarf", types: ["dwarf_planet"], groups: ["core"] },
-  { key: "small_body", label: "Small bodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
-  { key: "galaxy", label: "Galaxies", types: ["galaxy"], groups: ["messier_deep_sky", "simbad_extragalactic"] },
-  { key: "quasar", label: "Quasars", types: ["quasar"], groups: ["simbad_extragalactic"] },
-  { key: "active_galaxy", label: "AGN", types: ["active_galaxy"], groups: ["simbad_extragalactic"] },
-  { key: "nebula", label: "Nebulae", types: ["nebula"], groups: ["messier_deep_sky"] },
-  { key: "star_cluster", label: "Clusters", types: ["star_cluster"], groups: ["messier_deep_sky"] }
+  { key: "bright_star", labelKey: "filters.bright", types: ["star"], groups: ["bright_stars"] },
+  { key: "gaia_star", labelKey: "filters.gaia", types: ["star"], groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"] },
+  { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"] },
+  { key: "dwarf_planet", labelKey: "filters.dwarf", types: ["dwarf_planet"], groups: ["core"] },
+  { key: "small_body", labelKey: "filters.smallBodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
+  { key: "deep_sky", labelKey: "filters.deepSky", types: ["galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"], groups: ["messier_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey"] },
+  { key: "galaxy", labelKey: "filters.galaxies", types: ["galaxy"], groups: ["messier_deep_sky", "simbad_extragalactic", "curated_extragalactic_survey"] },
+  { key: "quasar", labelKey: "filters.quasars", types: ["quasar"], groups: ["simbad_extragalactic", "curated_extragalactic_survey"] },
+  { key: "active_galaxy", labelKey: "filters.agn", types: ["active_galaxy"], groups: ["simbad_extragalactic", "curated_extragalactic_survey"] },
+  { key: "black_hole", labelKey: "filters.blackHoles", types: ["black_hole"], groups: ["simbad_compact_objects"] },
+  { key: "pulsar", labelKey: "filters.pulsars", types: ["pulsar"], groups: ["simbad_compact_objects"] },
+  { key: "nebula", labelKey: "filters.nebulae", types: ["nebula"], groups: ["messier_deep_sky"] },
+  { key: "star_cluster", labelKey: "filters.clusters", types: ["star_cluster"], groups: ["messier_deep_sky"] }
 ];
-const GUIDED_SETS: { id: string; label: string; keys: string[] }[] = [
-  { id: "solar-neighborhood", label: "Solar neighborhood", keys: ["sun", "earth", "moon", "mars", "jupiter", "saturn"] },
-  { id: "bright-stars", label: "Bright stars", keys: ["hip-32349", "hip-30438", "hip-69673", "hip-71683", "hip-91262", "hip-24436", "hip-24608"] },
-  { id: "nearby-stars", label: "Nearby stars", keys: ["proxima-cen", "barnards-star", "eps-eri", "tau-cet", "gj-411"] },
-  { id: "small-bodies", label: "Small bodies", keys: ["jpl-sbdb-20000001", "jpl-sbdb-20000004", "jpl-sbdb-20000433", "jpl-sbdb-1000036"] },
-  { id: "exoplanets", label: "Exoplanet systems", keys: ["exosys-trappist-1", "exosys-55-cnc", "exosys-hr-8799", "exosys-kepler-11", "exosys-toi-700", "exosys-lhs-1140"] },
-  { id: "deep-sky", label: "Messier highlights", keys: ["m1", "m13", "m31", "m42", "m45", "m57"] },
-  { id: "galaxies", label: "Galaxies", keys: ["m31", "m33", "m51", "m81", "m82", "m87"] },
-  { id: "active-galaxies", label: "Active galaxies", keys: ["simbad-m-87", "simbad-3c-273", "simbad-ngc-1068", "simbad-3c-279"] },
-  { id: "nebulae", label: "Nebulae", keys: ["m1", "m8", "m16", "m17", "m20", "m42", "m57"] }
+const GUIDED_SETS: { id: string; labelKey: string; keys: string[] }[] = [
+  { id: "solar-neighborhood", labelKey: "guided.solarNeighborhood", keys: ["sun", "earth", "moon", "mars", "jupiter", "saturn"] },
+  { id: "bright-stars", labelKey: "guided.brightStars", keys: ["hip-32349", "hip-30438", "hip-69673", "hip-71683", "hip-91262", "hip-24436", "hip-24608"] },
+  { id: "nearby-stars", labelKey: "guided.nearbyStars", keys: ["proxima-cen", "barnards-star", "eps-eri", "tau-cet", "gj-411"] },
+  { id: "small-bodies", labelKey: "guided.smallBodies", keys: ["jpl-sbdb-20000001", "jpl-sbdb-20000004", "jpl-sbdb-20000433", "jpl-sbdb-1000036"] },
+  { id: "exoplanets", labelKey: "guided.exoplanetSystems", keys: ["exosys-trappist-1", "exosys-55-cnc", "exosys-hr-8799", "exosys-kepler-11", "exosys-toi-700", "exosys-lhs-1140"] },
+  { id: "deep-sky", labelKey: "guided.messierHighlights", keys: ["m1", "m13", "m31", "m42", "m45", "m57"] },
+  { id: "galaxies", labelKey: "guided.galaxies", keys: ["m31", "m33", "m51", "m81", "m82", "m87"] },
+  { id: "active-galaxies", labelKey: "guided.activeGalaxies", keys: ["simbad-m-87", "simbad-3c-273", "simbad-ngc-1068", "simbad-3c-279"] },
+  { id: "nebulae", labelKey: "guided.nebulae", keys: ["m1", "m8", "m16", "m17", "m20", "m42", "m57"] }
+];
+const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
+  {
+    id: "solar-system",
+    titleKey: "explore.solarSystem.title",
+    descriptionKey: "explore.solarSystem.description",
+    filterKey: "solar_system",
+    guidedSetId: "solar-neighborhood",
+    zoomPreset: "solar",
+    count: (_summary, bodies) => bodies.filter(isSolarSystemBody).length
+  },
+  {
+    id: "nearby-stars",
+    titleKey: "explore.nearbyStars.title",
+    descriptionKey: "explore.nearbyStars.description",
+    filterKey: "star",
+    guidedSetId: "nearby-stars",
+    zoomPreset: "nearby",
+    count: (summary, bodies) => summary?.group_counts?.nearby_exoplanet_systems ?? bodies.filter((body) => body.catalog_group === "nearby_exoplanet_systems").length
+  },
+  {
+    id: "messier-deep-sky",
+    titleKey: "explore.messier.title",
+    descriptionKey: "explore.messier.description",
+    filterKey: "deep_sky",
+    guidedSetId: "deep-sky",
+    zoomPreset: "messier",
+    count: (summary, bodies) => summary?.group_counts?.messier_deep_sky ?? bodies.filter((body) => body.catalog_group === "messier_deep_sky").length
+  },
+  {
+    id: "galaxies",
+    titleKey: "explore.galaxies.title",
+    descriptionKey: "explore.galaxies.description",
+    filterKey: "galaxy",
+    guidedSetId: "galaxies",
+    zoomPreset: "all",
+    count: (summary, bodies) => summary?.type_counts?.galaxy ?? bodies.filter((body) => classifyBody(body).type === "galaxy").length
+  },
+  {
+    id: "universe-scale",
+    titleKey: "explore.universe.title",
+    descriptionKey: "explore.universe.description",
+    filterKey: "deep_sky",
+    guidedSetId: "galaxies",
+    zoomPreset: "cosmicWeb",
+    count: (summary, bodies) => {
+      const catalogDeepSky = (summary?.type_counts?.galaxy ?? 0) + (summary?.type_counts?.quasar ?? 0) + (summary?.type_counts?.active_galaxy ?? 0);
+      return catalogDeepSky || bodies.filter((body) => ["galaxy", "quasar", "active_galaxy"].includes(classifyBody(body).type)).length;
+    }
+  },
+  {
+    id: "exoplanet-systems",
+    titleKey: "explore.exoplanets.title",
+    descriptionKey: "explore.exoplanets.description",
+    filterKey: "exoplanet_system",
+    guidedSetId: "exoplanets",
+    zoomPreset: "nearby",
+    count: (summary, bodies) => (summary?.group_counts?.nearby_exoplanet_systems ?? 0) + (summary?.group_counts?.exoplanet_systems ?? 0) || bodies.filter((body) => body.exoplanet_system).length
+  },
+  {
+    id: "small-bodies",
+    titleKey: "explore.smallBodies.title",
+    descriptionKey: "explore.smallBodies.description",
+    filterKey: "small_body",
+    guidedSetId: "small-bodies",
+    zoomPreset: "solar",
+    count: (summary, bodies) => (summary?.type_counts?.asteroid ?? 0) + (summary?.type_counts?.comet ?? 0) + (summary?.type_counts?.small_body ?? 0) || bodies.filter((body) => ["asteroid", "comet", "small_body"].includes(classifyBody(body).type)).length
+  }
 ];
 const TIME_STEPS = [
-  { label: "1 day", days: 1 },
-  { label: "1 week", days: 7 },
-  { label: "1 month", days: 30 },
-  { label: "1 year", days: 365.25 },
-  { label: "10 years", days: 3652.5 },
-  { label: "1 century", days: 36_525 },
-  { label: "1 millennium", days: 365_250 },
-  { label: "10,000 years", days: 3_652_500 },
-  { label: "1 million years", days: 365_250_000 }
+  { labelKey: "time.oneDay", days: 1 },
+  { labelKey: "time.oneWeek", days: 7 },
+  { labelKey: "time.oneMonth", days: 30 },
+  { labelKey: "time.oneYear", days: 365.25 },
+  { labelKey: "time.tenYears", days: 3652.5 },
+  { labelKey: "time.oneCentury", days: 36_525 },
+  { labelKey: "time.oneMillennium", days: 365_250 },
+  { labelKey: "time.tenThousandYears", days: 3_652_500 },
+  { labelKey: "time.oneMillionYears", days: 365_250_000 }
 ];
 const MAX_COMPARISON_DIAMETER_PX = 112;
+const SPEED_OF_LIGHT_KM_S = 299_792.458;
+const HUBBLE_CONSTANT_KM_S_MPC = 70;
+const MPC_PER_LIGHT_YEAR = 1 / 3_261_563.7769;
+const HUBBLE_DISTANCE_LY = SPEED_OF_LIGHT_KM_S / HUBBLE_CONSTANT_KM_S_MPC / MPC_PER_LIGHT_YEAR;
+const OBSERVABLE_UNIVERSE_RADIUS_LY = 46_500_000_000;
+const UNIVERSE_SHELLS: UniverseShell[] = [
+  { id: "current-view", labelKey: "universe.shell.currentView", radiusLy: 100_000, noteKey: "universe.shell.currentViewNote" },
+  { id: "local-volume", labelKey: "universe.shell.localVolume", radiusLy: 35_000_000, noteKey: "universe.shell.localVolumeNote" },
+  { id: "laniakea", labelKey: "universe.shell.laniakea", radiusLy: 260_000_000, noteKey: "universe.shell.laniakeaNote" },
+  { id: "quasar-epoch", labelKey: "universe.shell.quasarEpoch", radiusLy: 13_000_000_000, noteKey: "universe.shell.quasarEpochNote" },
+  { id: "observable", labelKey: "universe.shell.observable", radiusLy: OBSERVABLE_UNIVERSE_RADIUS_LY, noteKey: "universe.shell.observableNote" }
+];
 
 function requiredElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -549,6 +686,7 @@ const tabPanels = Array.from(document.querySelectorAll<HTMLElement>("[data-tab-p
 const catalogCount = requiredElement<HTMLElement>("#catalog-count");
 const bodyFilterButtons = requiredElement<HTMLElement>("#body-filter-buttons");
 const bodyPicker = requiredElement<HTMLElement>("#body-picker");
+const exploreDomains = requiredElement<HTMLElement>("#explore-domains");
 const guidedTours = requiredElement<HTMLElement>("#guided-tours");
 const bodyInfo = requiredElement<HTMLElement>("#body-info");
 const centerSelected = requiredElement<HTMLButtonElement>("#center-selected");
@@ -569,6 +707,7 @@ const timeStepSlider = requiredElement<HTMLInputElement>("#time-step-slider");
 const timeStepBack = requiredElement<HTMLButtonElement>("#time-step-back");
 const timeStepForward = requiredElement<HTMLButtonElement>("#time-step-forward");
 const zoomPresets = requiredElement<HTMLElement>("#zoom-presets");
+const mobileScaleToggle = document.querySelector<HTMLButtonElement>("#mobile-scale-toggle");
 const zoomOut = requiredElement<HTMLButtonElement>("#zoom-out");
 const zoomIn = requiredElement<HTMLButtonElement>("#zoom-in");
 const zoomScaleSlider = requiredElement<HTMLInputElement>("#zoom-scale-slider");
@@ -595,14 +734,18 @@ let displayLayers: Record<DisplayLayer, boolean> = {
   orbits: true,
   grid: true,
   milkyWay: true,
+  localGroup: true,
+  galaxyPoints: true,
+  quasars: true,
+  cosmicWeb: true,
   references: true
 };
 let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
 let hoverKey: string | null = null;
 let compareTargetKey: string | null = null;
 let recentDestinations: RecentDestination[] = readRecentDestinations();
-const catalogSearchState: PickerSearchState = { requestId: 0, latestBodies: [] };
-const compareSearchState: PickerSearchState = { requestId: 0, latestBodies: [] };
+const catalogSearchState: PickerSearchState = { requestId: 0, latestBodies: [], activeOptionKey: null };
+const compareSearchState: PickerSearchState = { requestId: 0, latestBodies: [], activeOptionKey: null };
 let mapDragging = false;
 let mapDragMoved = false;
 let dragStart: ScreenPoint | null = null;
@@ -626,9 +769,11 @@ let catalogDensityRequestId = 0;
 let catalogDensitySignature = "";
 let catalogDensityInFlightSignature = "";
 let catalogPointTimer: number | null = null;
+let catalogPointPrefetchTimer: number | null = null;
 let catalogPointRequestId = 0;
 let catalogPointSignature = "";
 let catalogPointInFlightSignature = "";
+let catalogPointPrefetchSignature = "";
 let catalogPointTiles = new Map<string, CatalogPointTile>();
 let activeCatalogPointTileKeys = new Set<string>();
 let renderedCatalogPointLayerIds = new Set<string>();
@@ -653,6 +798,7 @@ let perfViewportLoads = 0;
 let perfPointTileLoads = 0;
 
 resizeCanvas();
+initI18n();
 bindEvents();
 initializeUi();
 void loadCatalogTileManifest();
@@ -661,9 +807,9 @@ requestRender({ data: true });
 
 async function loadAtlas(timestampIso?: string) {
   loadingStartedAt = performance.now();
-  setLoading("api", 8, "Connecting to local API");
+  setLoading("api", 8, t("loading.connecting"));
   setError("");
-  loadState.textContent = "loading";
+  loadState.textContent = t("status.loading");
 
   try {
     const query = new URLSearchParams();
@@ -671,14 +817,14 @@ async function loadAtlas(timestampIso?: string) {
     if (timestampIso) query.set("timestamp", timestampIso);
     const preservedBodies = [selectedKey ? bodyByKey.get(selectedKey) : null, compareTargetKey ? bodyByKey.get(compareTargetKey) : null].filter(isPresent);
     const url = `/api/ephemeris${query.toString() ? `?${query.toString()}` : ""}`;
-    setLoading("download", 28, "Loading core ephemeris payload");
+    setLoading("download", 28, t("loading.corePayload"));
     const response = await fetch(url);
     if (!response.ok) {
       const message = await response.text();
       throw new Error(message || `API request failed with ${response.status}`);
     }
 
-    setLoading("parse", 64, "Indexing celestial objects");
+    setLoading("parse", 64, t("loading.indexing"));
     const payload = (await response.json()) as Ephemeris;
     const bodies = mergeBodyList(payload.bodies, preservedBodies);
     ephemeris = { ...payload, bodies };
@@ -697,24 +843,32 @@ async function loadAtlas(timestampIso?: string) {
     timeInput.value = toDatetimeLocalValue(new Date(payload.timestamp_utc));
     recentDestinations = readRecentDestinations();
 
-    setLoading("render", 88, "Preparing scientific controls");
+    setLoading("render", 88, t("loading.controls"));
     updateAllUi();
     if (payload.bodies.length > 0 && activeZoomPreset) {
       applyZoomPreset(activeZoomPreset, false);
     }
     requestDataRefresh({ immediate: true });
     loadingScreen.hidden = true;
-    loadState.textContent = "ready";
+    loadState.textContent = t("status.ready");
     requestRender();
   } catch (error) {
-    loadState.textContent = "error";
+    loadState.textContent = t("status.error");
     setError(error instanceof Error ? error.message : String(error));
-    loadingDetail.textContent = "Unable to load the atlas data.";
-    loadingProgressLabel.textContent = "error";
+    loadingDetail.textContent = t("error.unableLoad");
+    loadingProgressLabel.textContent = t("status.error");
   }
 }
 
 function bindEvents() {
+  window.addEventListener("cosmic-atlas:locale-change", () => {
+    if (loadingScreen.hidden) loadState.textContent = errorPanel.hidden ? t("status.ready") : t("status.error");
+    updateAllUi();
+    updateTimeSummary();
+    updateTimeStepUi();
+    requestRender({ data: true });
+  });
+
   window.addEventListener("resize", () => {
     resizeCanvas();
     updateSelectedPanelMetrics();
@@ -731,14 +885,28 @@ function bindEvents() {
   bodySearch.addEventListener("input", () => {
     activeGuidedSetId = null;
     catalogSearchState.latestBodies = [];
+    catalogSearchState.activeOptionKey = null;
+    updateExploreDomains();
     updateGuidedSets();
     scheduleBodyPickerUpdate();
   });
 
   bodySearch.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
+    if (
+      handlePickerKeyboard(event, {
+        state: catalogSearchState,
+        input: bodySearch,
+        picker: bodyPicker,
+        onSelect: (key) => void selectBodyByKey(key, { center: true }),
+        onFallbackEnter: () => void focusSearchResult(),
+        onEscapeClear: () => {
+          activeGuidedSetId = null;
+          catalogSearchState.latestBodies = [];
+          void updateBodyPicker();
+        }
+      })
+    ) {
       event.preventDefault();
-      void focusSearchResult();
     }
   });
 
@@ -770,6 +938,11 @@ function bindEvents() {
     else setActiveTab(null);
   });
   workspaceSearchLink.addEventListener("click", () => clearSelectedObject({ openSearch: true }));
+  mobileScaleToggle?.addEventListener("click", () => {
+    const isExpanded = mapHud.classList.toggle("scale-expanded");
+    mobileScaleToggle.setAttribute("aria-expanded", String(isExpanded));
+    mobileScaleToggle.setAttribute("aria-label", isExpanded ? t("scale.collapse") : t("scale.expand"));
+  });
 
   bodyFilterButtons.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
@@ -778,13 +951,21 @@ function bindEvents() {
     activeGuidedSetId = null;
     bodySearch.value = "";
     catalogSearchState.latestBodies = [];
+    catalogSearchState.activeOptionKey = null;
     cancelCatalogPointRequest();
     clearCatalogPointTiles(false);
+    updateExploreDomains();
     updateBodyFilters();
     updateGuidedSets();
     updateStats();
     void updateBodyPicker();
     requestRender({ data: true });
+  });
+
+  exploreDomains.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-explore-domain]");
+    if (!button) return;
+    applyExploreDomain(button.dataset.exploreDomain ?? "");
   });
 
   bodyPicker.addEventListener("click", (event) => {
@@ -805,6 +986,7 @@ function bindEvents() {
     bodySearch.value = "";
     fitBodies(bodies, 0.2);
     setActiveTab("catalog");
+    updateExploreDomains();
     updateBodyFilters();
     updateGuidedSets();
     void updateBodyPicker();
@@ -817,13 +999,22 @@ function bindEvents() {
 
   compareSearch.addEventListener("input", () => {
     compareSearchState.latestBodies = [];
+    compareSearchState.activeOptionKey = null;
     scheduleComparePickerUpdate();
   });
 
   compareSearch.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
+    if (
+      handlePickerKeyboard(event, {
+        state: compareSearchState,
+        input: compareSearch,
+        picker: comparePicker,
+        onSelect: (key) => void setCompareTargetByKey(key),
+        onFallbackEnter: () => void focusCompareResult(),
+        onEscapeClear: () => void updateComparePicker()
+      })
+    ) {
       event.preventDefault();
-      void focusCompareResult();
     }
   });
 
@@ -837,6 +1028,7 @@ function bindEvents() {
     activeCompareFilter = (button.dataset.bodyFilter as BodyFilter) ?? "all";
     compareSearch.value = "";
     compareSearchState.latestBodies = [];
+    compareSearchState.activeOptionKey = null;
     updateCompareFilters();
     void updateComparePicker();
   });
@@ -851,6 +1043,7 @@ function bindEvents() {
     compareTargetKey = null;
     compareSearch.value = "";
     compareSearchState.latestBodies = [];
+    compareSearchState.activeOptionKey = null;
     activeCompareFilter = "all";
     void updateComparePicker();
     updateCompareFilters();
@@ -885,6 +1078,7 @@ function bindEvents() {
   zoomOut.addEventListener("click", () => zoomViewportCenter(1 / 2.4));
   zoomIn.addEventListener("click", () => zoomViewportCenter(2.4));
   zoomScaleSlider.addEventListener("input", () => setZoomFromSlider());
+
 
   sizeModeButtons.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-size-mode]");
@@ -973,7 +1167,12 @@ function bindEvents() {
 }
 
 function initializeUi() {
+  bodySearch.setAttribute("aria-controls", bodyPicker.id);
+  bodySearch.setAttribute("aria-autocomplete", "list");
+  compareSearch.setAttribute("aria-controls", comparePicker.id);
+  compareSearch.setAttribute("aria-autocomplete", "list");
   updateTabs();
+  updateExploreDomains();
   updateBodyFilters();
   updateCompareFilters();
   updateSizeModes();
@@ -988,6 +1187,7 @@ function updateAllUi() {
   updateSelectedSummary();
   updateQuickFocus();
   updateTabs();
+  updateExploreDomains();
   updateBodyFilters();
   updateCompareFilters();
   updateBodyPicker();
@@ -1016,6 +1216,11 @@ function render() {
   if (ephemeris) {
     drawWebglPointLayers();
     if (displayLayers.milkyWay) drawMilkyWayLayer();
+    if (displayLayers.localGroup) drawLocalGroupLayer();
+    if (displayLayers.galaxyPoints) drawGalaxyContextLayer();
+    if (displayLayers.quasars) drawQuasarContextLayer();
+    if (displayLayers.cosmicWeb) drawCosmicWebLayer();
+    drawCatalogDensityLodLayer();
     if (displayLayers.grid) drawGrid();
     if (displayLayers.orbits) drawOrbitGuides();
     drawComparisonGuide();
@@ -1126,7 +1331,8 @@ function catalogPointLayerFromPayload(payload: CatalogPointPayload, signature: s
 
 function drawCatalogPointLayer2dFallback() {
   const viewWidthLy = currentViewWidthLy();
-  if (!shouldUseCatalogPoints(viewWidthLy)) {
+  const filterParams = catalogPointFilterParams();
+  if (!filterParams || !shouldUseCatalogPoints(viewWidthLy, filterParams)) {
     return;
   }
 
@@ -1371,6 +1577,280 @@ function galacticPointToScreen(point: GalacticModelPoint): ScreenPoint {
 
 function galacticLyToPx(valueLy: number) {
   return lightYearsToAu(valueLy) * camera.pxPerAu;
+}
+
+function drawLocalGroupLayer() {
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < 80_000 || viewWidthLy > 9_000_000) return;
+  const alpha = clamp((Math.log10(viewWidthLy) - 4.9) / 0.7, 0, 1) * clamp((7.1 - Math.log10(viewWidthLy)) / 0.45, 0, 1);
+  if (alpha <= 0) return;
+  drawUniverseModelLayer(LOCAL_GROUP_MODEL, alpha, {
+    rings: true,
+    filaments: true,
+    labels: viewWidthLy > 250_000,
+    pointScale: 1,
+    labelColor: "rgba(213, 231, 255, 0.78)"
+  });
+}
+
+function drawGalaxyContextLayer() {
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < 4_000_000 || viewWidthLy > 850_000_000) return;
+  const alpha = clamp((Math.log10(viewWidthLy) - 6.4) / 0.9, 0, 1) * clamp((9.0 - Math.log10(viewWidthLy)) / 0.65, 0, 1);
+  if (alpha <= 0) return;
+  drawUniverseModelLayer(COSMIC_WEB_MODEL, alpha * 0.72, {
+    rings: true,
+    filaments: true,
+    labels: viewWidthLy > 18_000_000,
+    pointScale: 1.15,
+    labelColor: "rgba(203, 222, 255, 0.7)",
+    kinds: new Set<UniversePoint["kind"]>(["cluster", "supercluster"])
+  });
+}
+
+function drawQuasarContextLayer() {
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < 75_000_000) return;
+  const alpha = clamp((Math.log10(viewWidthLy) - 7.85) / 0.75, 0, 1);
+  if (alpha <= 0) return;
+  drawUniverseModelLayer(COSMIC_WEB_MODEL, alpha * 0.55, {
+    rings: false,
+    filaments: false,
+    labels: viewWidthLy > 160_000_000,
+    pointScale: 1.45,
+    labelColor: "rgba(255, 226, 147, 0.62)",
+    kinds: new Set<UniversePoint["kind"]>(["quasar-field"])
+  });
+}
+
+function drawCosmicWebLayer() {
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < 35_000_000) return;
+  const alpha = clamp((Math.log10(viewWidthLy) - 7.3) / 0.8, 0, 1);
+  if (alpha <= 0) return;
+  drawUniverseModelLayer(COSMIC_WEB_MODEL, alpha, {
+    rings: viewWidthLy < 420_000_000,
+    filaments: true,
+    labels: viewWidthLy > 90_000_000,
+    pointScale: 0.8,
+    labelColor: "rgba(190, 177, 255, 0.62)"
+  });
+}
+
+function drawUniverseModelLayer(
+  model: UniverseModel,
+  alpha: number,
+  options: { rings: boolean; filaments: boolean; labels: boolean; pointScale: number; labelColor: string; kinds?: Set<UniversePoint["kind"]> }
+) {
+  const rect = expandedRect(usableViewportRect(), 220);
+  const occupiedLabels: Rect[] = [];
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.globalCompositeOperation = "screen";
+
+  if (model.densityRegions) {
+    const densityAlpha = alpha * universeDensityDetailAlpha();
+    for (const region of model.densityRegions) drawUniverseDensityRegion(region, densityAlpha, rect, occupiedLabels, options.labels, options.labelColor);
+  }
+
+  if (options.rings) {
+    for (const ring of model.rings) drawUniverseRing(ring, alpha, rect, occupiedLabels, options.labels, options.labelColor);
+  }
+  if (options.filaments) {
+    for (const filament of model.filaments) drawUniverseFilament(filament, alpha, rect, occupiedLabels, options.labels, options.labelColor);
+  }
+  for (const point of model.points) {
+    if (options.kinds && !options.kinds.has(point.kind)) continue;
+    drawUniversePoint(point, alpha, rect, occupiedLabels, options.labels, options.pointScale, options.labelColor);
+  }
+  ctx.restore();
+}
+
+function drawUniverseRing(ring: UniverseRing, alpha: number, rect: Rect, occupiedLabels: Rect[], labels: boolean, labelColor: string) {
+  const center = worldToScreen(ring.xAu, ring.yAu);
+  const radius = lightYearsToAu(ring.radiusLy) * camera.pxPerAu;
+  if (radius < 3 || !rectsOverlap(pointRect(center, radius * 2), rect)) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = ring.color;
+  ctx.lineWidth = clamp(radius / 450, 0.7, 2.2);
+  ctx.setLineDash([5, 9]);
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  if (labels && radius > 32) drawMilkyWayLabel(ring.label, center.x + radius * 0.64, center.y - radius * 0.2, labelColor, occupiedLabels);
+  ctx.restore();
+}
+
+function drawUniverseFilament(filament: UniverseFilament, alpha: number, rect: Rect, occupiedLabels: Rect[], labels: boolean, labelColor: string) {
+  const screens = filament.points.map((point) => worldToScreen(point.xAu, point.yAu));
+  if (!screenPathNearRect(screens, rect)) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = filament.color;
+  ctx.lineWidth = clamp(currentViewWidthLy() / 25_000_000, 1.2, 7);
+  ctx.filter = `blur(${clamp(currentViewWidthLy() / 80_000_000, 0.6, 4)}px)`;
+  ctx.setLineDash([]);
+  traceScreenPath(screens, false);
+  ctx.stroke();
+  ctx.filter = "none";
+  ctx.globalAlpha = alpha * 0.36;
+  ctx.lineWidth = 0.9;
+  traceScreenPath(screens, false);
+  ctx.stroke();
+  if (labels && screens.length > 0) {
+    const anchor = screens[Math.floor(screens.length / 2)];
+    drawMilkyWayLabel(filament.label, anchor.x + 10, anchor.y - 8, labelColor, occupiedLabels);
+  }
+  ctx.restore();
+}
+
+function colorWithAlpha(color: string, alphaMultiplier: number) {
+  const match = color.match(/rgba\(([^,]+),([^,]+),([^,]+),([^\)]+)\)/);
+  if (!match) return color;
+  const alpha = clamp(Number(match[4].trim()) * alphaMultiplier, 0, 1);
+  return `rgba(${match[1].trim()}, ${match[2].trim()}, ${match[3].trim()}, ${alpha})`;
+}
+
+function drawUniversePoint(point: UniversePoint, alpha: number, rect: Rect, occupiedLabels: Rect[], labels: boolean, pointScale: number, labelColor: string) {
+  const screen = worldToScreen(point.xAu, point.yAu);
+  const radius = clamp(lightYearsToAu(point.radiusLy) * camera.pxPerAu * pointScale, 2.2, point.kind === "quasar-field" ? 46 : 72);
+  if (!rectsOverlap(pointRect(screen, radius * 2.4), rect)) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radius);
+  gradient.addColorStop(0, point.color);
+  gradient.addColorStop(0.35, colorWithAlpha(point.color, 0.42));
+  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = Math.min(1, alpha * 1.3);
+  ctx.fillStyle = point.color;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, clamp(radius * 0.12, 1.4, 4.5), 0, Math.PI * 2);
+  ctx.fill();
+  if (labels && radius > 3.5) drawMilkyWayLabel(point.label, screen.x + radius * 0.72 + 7, screen.y - radius * 0.3, labelColor, occupiedLabels);
+  ctx.restore();
+}
+
+function drawUniverseDensityRegion(region: UniverseDensityRegion, alpha: number, rect: Rect, occupiedLabels: Rect[], labels: boolean, labelColor: string) {
+  if (alpha <= 0) return;
+  const screen = worldToScreen(region.xAu, region.yAu);
+  const radius = lightYearsToAu(region.radiusLy) * camera.pxPerAu;
+  if (radius < 2 || !rectsOverlap(pointRect(screen, radius * 2), rect)) return;
+  ctx.save();
+  ctx.globalCompositeOperation = region.kind === "void" ? "source-over" : "screen";
+  ctx.globalAlpha = alpha * region.intensity;
+  const drawRadius = clamp(radius, 4, 240);
+  const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, drawRadius);
+  if (region.kind === "void") {
+    gradient.addColorStop(0, colorWithAlpha(region.color, 0.34));
+    gradient.addColorStop(0.72, colorWithAlpha(region.color, 0.12));
+  } else {
+    gradient.addColorStop(0, region.color);
+    gradient.addColorStop(0.42, colorWithAlpha(region.color, 0.38));
+  }
+  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, drawRadius, 0, Math.PI * 2);
+  ctx.fill();
+  if (labels && radius > 18 && currentViewWidthLy() > 70_000_000) drawMilkyWayLabel(region.label, screen.x + clamp(radius, 20, 160) * 0.44, screen.y + 9, labelColor, occupiedLabels);
+  ctx.restore();
+}
+
+function universeDensityDetailAlpha() {
+  const viewWidthLy = currentViewWidthLy();
+  return clamp((Math.log10(viewWidthLy) - 6.2) / 1.4, 0.18, 1);
+}
+
+function drawCatalogDensityLodLayer() {
+  if (!displayLayers.galaxyPoints && !displayLayers.quasars && !displayLayers.cosmicWeb) return;
+  const viewWidthLy = currentViewWidthLy();
+  if (viewWidthLy < DENSITY_HAZE_MIN_WIDTH_LY) return;
+  const tiles = activeCatalogPointTiles().filter((tile) => (tile.payload?.returned ?? 0) > 0);
+  if (tiles.length === 0) return;
+  const rect = expandedRect(usableViewportRect(), 120);
+  const cells = catalogPointDensityCells(tiles, rect);
+  if (cells.length === 0) return;
+  const maxCount = Math.max(...cells.map((cell) => cell.count), 1);
+  const alpha = clamp((Math.log10(viewWidthLy) - 6.35) / 1.0, 0, 0.8);
+  if (alpha <= 0) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  for (const cell of cells.slice(0, DENSITY_HAZE_MAX_CELLS)) {
+    const heat = Math.sqrt(cell.count / maxCount);
+    const radius = clamp(DENSITY_HAZE_BIN_PX * (0.34 + heat * 0.78), 22, 130);
+    const gradient = ctx.createRadialGradient(cell.x, cell.y, 0, cell.x, cell.y, radius);
+    const color = cell.quasarWeight > cell.galaxyWeight ? "255, 226, 147" : cell.deepSkyWeight > cell.galaxyWeight ? "169, 205, 255" : "145, 196, 255";
+    gradient.addColorStop(0, `rgba(${color}, ${alpha * (0.08 + heat * 0.22)})`);
+    gradient.addColorStop(0.52, `rgba(${color}, ${alpha * heat * 0.08})`);
+    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (viewWidthLy >= DENSITY_SUMMARY_MIN_WIDTH_LY) drawCatalogClusterSummaries(cells, maxCount, alpha, rect);
+  ctx.restore();
+}
+
+function catalogPointDensityCells(tiles: CatalogPointTile[], rect: Rect) {
+  const cells = new Map<string, { x: number; y: number; count: number; galaxyWeight: number; quasarWeight: number; deepSkyWeight: number }>();
+  for (const tile of tiles) {
+    const payload = tile.payload;
+    if (!payload) continue;
+    const layerWeight = tile.request.types.includes("quasar") || tile.request.types.includes("active_galaxy") ? "quasarWeight" : tile.request.types.includes("galaxy") ? "galaxyWeight" : "deepSkyWeight";
+    const step = Math.max(1, Math.ceil(payload.returned / 3_500));
+    for (let index = 0; index < payload.returned; index += step) {
+      const offset = index * POINT_VERTEX_STRIDE_FLOATS;
+      const screen = worldToScreen(payload.vertices[offset] ?? 0, payload.vertices[offset + 1] ?? 0);
+      if (!pointInRect(screen, rect)) continue;
+      const binX = Math.floor(screen.x / DENSITY_HAZE_BIN_PX);
+      const binY = Math.floor(screen.y / DENSITY_HAZE_BIN_PX);
+      const key = `${binX}:${binY}`;
+      const cell = cells.get(key) ?? { x: binX * DENSITY_HAZE_BIN_PX + DENSITY_HAZE_BIN_PX / 2, y: binY * DENSITY_HAZE_BIN_PX + DENSITY_HAZE_BIN_PX / 2, count: 0, galaxyWeight: 0, quasarWeight: 0, deepSkyWeight: 0 };
+      cell.count += step;
+      cell[layerWeight] += step;
+      cells.set(key, cell);
+    }
+  }
+  return Array.from(cells.values()).sort((a, b) => b.count - a.count);
+}
+
+function drawCatalogClusterSummaries(
+  cells: { x: number; y: number; count: number; galaxyWeight: number; quasarWeight: number; deepSkyWeight: number }[],
+  maxCount: number,
+  alpha: number,
+  rect: Rect
+) {
+  const occupied: Rect[] = [];
+  ctx.save();
+  ctx.font = "10px Inter, system-ui, sans-serif";
+  for (const cell of cells.slice(0, 10)) {
+    if (cell.count < maxCount * 0.18 || !pointInRect(cell, rect)) continue;
+    const heat = Math.sqrt(cell.count / maxCount);
+    const radius = clamp(4 + heat * 11, 5, 16);
+    ctx.globalAlpha = alpha * (0.28 + heat * 0.36);
+    ctx.strokeStyle = cell.quasarWeight > cell.galaxyWeight ? "rgba(255, 226, 147, 0.74)" : "rgba(166, 211, 255, 0.68)";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    const label = formatCount(Math.round(cell.count));
+    const width = ctx.measureText(label).width + 10;
+    const labelRect = { left: cell.x + radius + 4, top: cell.y - 11, right: cell.x + radius + 4 + width, bottom: cell.y + 5, width, height: 16 };
+    if (rectInCanvas(labelRect) && !occupied.some((item) => rectsOverlap(item, labelRect))) {
+      occupied.push(labelRect);
+      ctx.globalAlpha = alpha * 0.68;
+      drawMapLabel(label, labelRect.left + 5, labelRect.top + 12, "rgba(223, 235, 255, 0.68)");
+    }
+  }
+  ctx.restore();
 }
 
 function traceScreenPath(points: ScreenPoint[], closePath: boolean) {
@@ -1636,17 +2116,17 @@ function updateStats() {
   const pointLayerShown = activeCatalogPointCount();
   const representedTotal = visibleBodies().length + pointLayerShown;
   atlasStats.innerHTML = `
-    <div title="${formatInteger(catalogTotal)} indexed objects"><dt>Catalog</dt><dd>${formatCount(catalogTotal)}</dd></div>
-    <div title="${formatInteger(representedTotal)} selectable objects and real catalog points in the current view"><dt>Shown</dt><dd>${formatCount(representedTotal)}</dd></div>
-    <div title="${formatInteger(starTotal)} catalog stars"><dt>Stars</dt><dd>${formatCount(starTotal)}</dd></div>
-    <div title="${formatInteger(smallBodyTotal)} catalog small bodies"><dt>Small bodies</dt><dd>${formatCount(smallBodyTotal)}</dd></div>
-    <div title="${formatInteger(deepSkyTotal)} catalog deep-sky objects"><dt>Deep sky</dt><dd>${formatCount(deepSkyTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.indexedObjects", { count: formatInteger(catalogTotal) }))}"><dt>${escapeHtml(t("status.catalog"))}</dt><dd>${formatCount(catalogTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.selectableObjects", { count: formatInteger(representedTotal) }))}"><dt>${escapeHtml(t("status.shown"))}</dt><dd>${formatCount(representedTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.catalogStars", { count: formatInteger(starTotal) }))}"><dt>${escapeHtml(t("status.stars"))}</dt><dd>${formatCount(starTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.catalogSmallBodies", { count: formatInteger(smallBodyTotal) }))}"><dt>${escapeHtml(t("status.smallBodies"))}</dt><dd>${formatCount(smallBodyTotal)}</dd></div>
+    <div title="${escapeHtml(t("status.catalogDeepSky", { count: formatInteger(deepSkyTotal) }))}"><dt>${escapeHtml(t("status.deepSky"))}</dt><dd>${formatCount(deepSkyTotal)}</dd></div>
   `;
-  const representedLabel = pointLayerShown > 0 ? `${formatCount(representedTotal)} shown · ` : "";
+  const representedLabel = pointLayerShown > 0 ? `${t("status.shownInline", { count: formatCount(representedTotal) })} · ` : "";
   catalogCount.textContent =
     catalogTotal > ephemeris.bodies.length
-      ? `${formatCount(catalogTotal)} indexed · ${representedLabel}${formatInteger(ephemeris.bodies.length)} selectable`
-      : `${formatInteger(ephemeris.bodies.length)} objects`;
+      ? `${t("status.indexedInline", { count: formatCount(catalogTotal) })} · ${representedLabel}${t("status.selectableInline", { count: formatInteger(ephemeris.bodies.length) })}`
+      : t("status.objects", { count: formatInteger(ephemeris.bodies.length) });
 }
 
 function updatePerfHud() {
@@ -1703,6 +2183,7 @@ async function refreshCatalogSummary() {
     if (!response.ok) throw new Error(`Catalog summary failed with ${response.status}`);
     catalogSummary = (await response.json()) as CatalogSummary;
     updateStats();
+    updateExploreDomains();
   } catch (error) {
     console.warn("Phoenix catalog summary unavailable.", error);
   }
@@ -1723,7 +2204,7 @@ function updateSelectedSummary() {
   selectedObjectPanel.hidden = false;
   const typeLabel = classifyBody(body).label;
   selectedSummaryName.textContent = body.name;
-  selectedSummaryMeta.textContent = `${typeLabel} · ${formatDistance(body.distance_from_earth_km)} from Earth`;
+  selectedSummaryMeta.textContent = `${typeLabel} · ${formatDistance(body.distance_from_earth_km)} ${t("object.fromEarth")}`;
   selectedSummaryOrb.style.setProperty("--body-color", body.color || "#d8a23f");
   centerSelected.disabled = false;
   zoomSelected.disabled = false;
@@ -1760,9 +2241,9 @@ function updateTabs() {
   }
   workspaceSearchLink.hidden = activeTab !== "object" || !hasSelectedBody;
   workspaceLabel.hidden = activeTab === "object" && hasSelectedBody;
-  workspaceLabel.textContent = activeTab ? WORKSPACE_LABELS[activeTab] : "Workspace";
-  closePanel.textContent = activeTab === "object" && hasSelectedBody ? "Deselect" : "Close";
-  closePanel.setAttribute("aria-label", activeTab === "object" && hasSelectedBody ? "Deselect current object" : "Close workspace");
+  workspaceLabel.textContent = activeTab ? t(WORKSPACE_LABEL_KEYS[activeTab]) : t("workspace.title");
+  closePanel.textContent = activeTab === "object" && hasSelectedBody ? t("workspace.deselect") : t("workspace.close");
+  closePanel.setAttribute("aria-label", activeTab === "object" && hasSelectedBody ? t("workspace.deselectCurrent") : t("workspace.close"));
   for (const button of tabButtons) {
     button.classList.toggle("active", button.dataset.tab === activeTab);
     button.setAttribute("aria-selected", String(button.dataset.tab === activeTab));
@@ -1789,6 +2270,44 @@ function updateBodyFilters() {
   bodyFilterButtons.innerHTML = renderFilterButtons(activeFilter);
 }
 
+function updateExploreDomains() {
+  const bodies = ephemeris?.bodies ?? [];
+  exploreDomains.innerHTML = EXPLORE_DOMAINS.map((domain) => renderExploreDomain(domain, bodies)).join("");
+}
+
+function renderExploreDomain(domain: ExploreDomainDefinition, bodies: Body[]) {
+  const count = domain.count(catalogSummary, bodies);
+  const active = activeGuidedSetId === domain.guidedSetId && activeFilter === domain.filterKey;
+  return `
+    <button type="button" class="explore-domain-card${active ? " active" : ""}" data-explore-domain="${escapeHtml(domain.id)}" aria-pressed="${active ? "true" : "false"}">
+      <span class="explore-domain-card__copy">
+        <strong>${escapeHtml(t(domain.titleKey))}</strong>
+        <small>${escapeHtml(t(domain.descriptionKey))}</small>
+      </span>
+      ${count === null ? "" : `<span class="explore-domain-card__count">${escapeHtml(t("explore.count", { count: formatCount(count) }))}</span>`}
+    </button>
+  `;
+}
+
+function applyExploreDomain(domainId: string) {
+  const domain = EXPLORE_DOMAINS.find((item) => item.id === domainId);
+  if (!domain) return;
+  activeFilter = domain.filterKey;
+  activeGuidedSetId = domain.guidedSetId;
+  bodySearch.value = "";
+  catalogSearchState.latestBodies = [];
+  catalogSearchState.activeOptionKey = null;
+  cancelCatalogPointRequest();
+  clearCatalogPointTiles(false);
+  updateExploreDomains();
+  updateBodyFilters();
+  updateGuidedSets();
+  void updateBodyPicker();
+  applyZoomPreset(domain.zoomPreset);
+  setActiveTab("catalog");
+  requestRender({ data: true });
+}
+
 function updateCompareFilters() {
   compareFilterButtons.innerHTML = renderFilterButtons(activeCompareFilter);
 }
@@ -1797,7 +2316,7 @@ function renderFilterButtons(active: BodyFilter) {
   return BODY_FILTERS.map(
     (filter) => `
       <button type="button" data-body-filter="${filter.key}" class="${filter.key === active ? "active" : ""}">
-        ${escapeHtml(filter.label)}
+        ${escapeHtml(t(filter.labelKey))}
       </button>
     `
   ).join("");
@@ -1846,7 +2365,7 @@ async function searchCatalog(options: { query: string; filter?: BodyFilterDefini
   } catch (error) {
     if (options.signal?.aborted) return { bodies: [], source: "local" };
     console.warn("Phoenix catalog search unavailable; using loaded ephemeris catalog.", error);
-    return { bodies: localCatalogSearch(options), source: "local" };
+    return { bodies: localCatalogSearch(options), source: "local", fallback: true };
   }
 }
 
@@ -1951,34 +2470,68 @@ function catalogTileManifestUrl() {
   return configuredUrl || "/catalog-tiles/v1/manifest.json";
 }
 
+function dynamicPointFallbackEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  const queryValue = params.get("dynamicPointFallback");
+  if (queryValue === "1" || queryValue === "true") return true;
+  if (queryValue === "0" || queryValue === "false") return false;
+  return window.localStorage.getItem("starsmap:dynamic-point-fallback") === "1";
+}
+
 function parseCatalogTileManifest(value: unknown): CatalogPointTileManifest | null {
   if (!value || typeof value !== "object") return null;
-  const manifest = value as Partial<CatalogPointTileManifest>;
+  const manifest = value as Record<string, unknown>;
   if (manifest.format !== "SMP2") return null;
-  if (typeof manifest.tile_url_template !== "string" || !manifest.tile_url_template) return null;
-  if (!Array.isArray(manifest.groups) || !Array.isArray(manifest.levels)) return null;
 
-  const levels = manifest.levels
-    .map((level) => ({
-      span_log2: Number(level.span_log2),
-      span_au: Number(level.span_au),
-      sample_buckets: optionalNumber(level.sample_buckets),
-      max_points_per_tile: optionalNumber(level.max_points_per_tile),
-      tile_count: optionalNumber(level.tile_count),
-      point_count: optionalNumber(level.point_count)
-    }))
+  const rawLayers = Array.isArray(manifest.layers)
+    ? manifest.layers
+    : [{ id: "default", tile_url_template: manifest.tile_url_template, groups: manifest.groups, types: [], levels: manifest.levels }];
+  const layers = rawLayers.map(parseCatalogTileManifestLayer).filter(isPresent);
+  if (layers.length === 0) return null;
+
+  return {
+    version: String(manifest.version ?? "v1"),
+    format: "SMP2",
+    layers
+  };
+}
+
+function parseCatalogTileManifestLayer(value: unknown): CatalogPointTileManifestLayer | null {
+  if (!value || typeof value !== "object") return null;
+  const layer = value as Record<string, unknown>;
+  if (typeof layer.tile_url_template !== "string" || !layer.tile_url_template) return null;
+  if (!Array.isArray(layer.groups) || !Array.isArray(layer.levels)) return null;
+
+  const levels = layer.levels
+    .map((level) => {
+      if (!level || typeof level !== "object") return null;
+      const rawLevel = level as Record<string, unknown>;
+      return {
+        span_log2: Number(rawLevel.span_log2),
+        span_au: Number(rawLevel.span_au),
+        sample_buckets: optionalNumber(rawLevel.sample_buckets),
+        max_points_per_tile: optionalNumber(rawLevel.max_points_per_tile),
+        tile_count: optionalNumber(rawLevel.tile_count),
+        point_count: optionalNumber(rawLevel.point_count)
+      };
+    })
+    .filter(isPresent)
     .filter((level) => Number.isFinite(level.span_log2) && Number.isFinite(level.span_au) && level.span_au > 0)
     .sort((a, b) => a.span_au - b.span_au);
 
   if (levels.length === 0) return null;
 
   return {
-    version: String(manifest.version ?? "v1"),
-    format: "SMP2",
-    tile_url_template: manifest.tile_url_template,
-    groups: manifest.groups.filter((group): group is string => typeof group === "string" && group.length > 0),
+    id: typeof layer.id === "string" && layer.id ? layer.id : "default",
+    tile_url_template: layer.tile_url_template,
+    groups: layer.groups.filter((group): group is string => typeof group === "string" && group.length > 0),
+    types: Array.isArray(layer.types) ? layer.types.filter(isDestinationBodyType) : [],
     levels
   };
+}
+
+function isDestinationBodyType(value: unknown): value is DestinationBodyType {
+  return typeof value === "string" && normalizeDestinationType(value) === value;
 }
 
 function optionalNumber(value: unknown) {
@@ -2024,18 +2577,56 @@ function scheduleCatalogPointLoad(options: DataRefreshOptions = {}) {
   });
 
   updateStats();
-  if (missingRequests.length === 0 || signature === catalogPointInFlightSignature) return;
+  const schedulePrefetch = () => scheduleCatalogPointPrefetch(requests, signature);
+  if (missingRequests.length === 0 || signature === catalogPointInFlightSignature) {
+    schedulePrefetch();
+    return;
+  }
   if (catalogPointTimer !== null) window.clearTimeout(catalogPointTimer);
   if (options.immediate) {
     catalogPointTimer = null;
-    void loadCatalogPointTiles(missingRequests, signature);
+    void loadCatalogPointTiles(missingRequests, signature).then(schedulePrefetch);
     return;
   }
   catalogPointTimer = window.setTimeout(() => {
     catalogPointTimer = null;
-    void loadCatalogPointTiles(missingRequests, signature);
+    void loadCatalogPointTiles(missingRequests, signature).then(schedulePrefetch);
   }, VIEWPORT_CATALOG_DEBOUNCE_MS);
   catalogPointInFlightSignature = signature;
+}
+
+function scheduleCatalogPointPrefetch(activeRequests: CatalogPointTileRequest[], activeSignature: string) {
+  if (catalogPointPrefetchTimer !== null) {
+    window.clearTimeout(catalogPointPrefetchTimer);
+    catalogPointPrefetchTimer = null;
+  }
+  if (catalogPointTileManifestState !== "ready" || activeRequests.length === 0 || activeSignature !== catalogPointSignature) return;
+
+  const requests = catalogPointPrefetchRequests(activeRequests);
+  if (requests.length === 0) return;
+
+  const signature = `${activeSignature}::prefetch::${requests.map((request) => request.key).join("|")}`;
+  if (signature === catalogPointPrefetchSignature) return;
+  catalogPointPrefetchSignature = signature;
+  catalogPointPrefetchTimer = window.setTimeout(() => {
+    catalogPointPrefetchTimer = null;
+    void loadCatalogPointPrefetchTiles(requests, signature);
+  }, POINT_TILE_PREFETCH_DELAY_MS);
+}
+
+async function loadCatalogPointPrefetchTiles(requests: CatalogPointTileRequest[], signature: string) {
+  if (signature !== catalogPointPrefetchSignature || !signature.startsWith(`${catalogPointSignature}::prefetch::`) || catalogPointInFlightSignature) return;
+  const requestId = catalogPointRequestId;
+  const queue = [...requests];
+  while (queue.length > 0 && requestId === catalogPointRequestId && signature === catalogPointPrefetchSignature) {
+    const request = queue.shift();
+    if (!request) continue;
+    const tile = catalogPointTiles.get(request.key);
+    if (tile?.source || tile?.abortController) continue;
+    await loadCatalogPointTile(request, requestId);
+  }
+  evictCatalogPointTiles();
+  if (catalogPointPrefetchSignature === signature) catalogPointPrefetchSignature = "";
 }
 
 async function loadCatalogPointTiles(requests: CatalogPointTileRequest[], signature: string) {
@@ -2184,14 +2775,17 @@ function cancelCatalogPointRequest() {
     window.clearTimeout(catalogPointTimer);
     catalogPointTimer = null;
   }
+  if (catalogPointPrefetchTimer !== null) {
+    window.clearTimeout(catalogPointPrefetchTimer);
+    catalogPointPrefetchTimer = null;
+  }
+  catalogPointPrefetchSignature = "";
   for (const tile of catalogPointTiles.values()) {
     tile.abortController?.abort();
     tile.abortController = undefined;
   }
-  if (catalogPointInFlightSignature) {
-    catalogPointRequestId += 1;
-    catalogPointInFlightSignature = "";
-  }
+  catalogPointRequestId += 1;
+  catalogPointInFlightSignature = "";
 }
 
 function clearCatalogPointTiles(update = true) {
@@ -2202,20 +2796,110 @@ function clearCatalogPointTiles(update = true) {
   activeCatalogPointTileKeys = new Set();
   renderedCatalogPointLayerIds = new Set();
   catalogPointSignature = "";
+  catalogPointPrefetchSignature = "";
   if (update) updateStats();
 }
 
 function catalogPointRequests(): CatalogPointTileRequest[] {
-  const viewWidthLy = currentViewWidthLy();
-  if (!shouldUseCatalogPoints(viewWidthLy)) return [];
-  if (catalogPointTileManifestState === "loading") return [];
-  if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return [];
-  const filterParams = catalogPointFilterParams();
-  if (!filterParams) return [];
+  const requestContext = catalogPointRequestContext();
+  if (!requestContext) return [];
 
-  const bounds = viewportWorldBounds(POINT_LAYER_VIEWPORT_PADDING);
-  const tileSpanAu = catalogPointTileSpanAu(bounds, viewWidthLy);
-  const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu);
+  const staticLayers = requestContext.staticLayers.length > 0 ? requestContext.staticLayers : [requestContext.staticLayer];
+  return staticLayers.flatMap((staticLayer) => {
+    const layerContext = { ...requestContext, staticLayer };
+    const tileSpanAu = catalogPointTileSpanAu(layerContext.bounds, layerContext.viewWidthLy, staticLayer);
+    const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu, staticLayer);
+    return catalogPointRequestsForLevel(layerContext, tileSpanAu, staticLevel, catalogPointMaxActiveTiles(layerContext.viewWidthLy));
+  });
+}
+
+function catalogPointPrefetchRequests(activeRequests: CatalogPointTileRequest[]): CatalogPointTileRequest[] {
+  const requestContext = catalogPointRequestContext();
+  if (!requestContext || catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return [];
+
+  const activeKeys = new Set(activeRequests.map((request) => request.key));
+  const requests: CatalogPointTileRequest[] = [];
+  const staticLayers = requestContext.staticLayers.length > 0 ? requestContext.staticLayers : [requestContext.staticLayer].filter(isPresent);
+
+  for (const staticLayer of staticLayers) {
+    const layerContext = { ...requestContext, staticLayer };
+    const activeSpanAu = catalogPointTileSpanAu(layerContext.bounds, layerContext.viewWidthLy, staticLayer);
+    const activeLevel = catalogStaticTileLevelForSpan(activeSpanAu, staticLayer);
+    if (!activeLevel) continue;
+
+    const activeLevelIndex = staticLayer.levels.findIndex((level) => level.span_au === activeLevel.span_au);
+    if (activeLevelIndex < 0) continue;
+
+    const firstLevelIndex = Math.max(0, activeLevelIndex - POINT_TILE_PREFETCH_LEVEL_RADIUS);
+    const lastLevelIndex = Math.min(staticLayer.levels.length - 1, activeLevelIndex + POINT_TILE_PREFETCH_LEVEL_RADIUS);
+
+    for (let levelIndex = firstLevelIndex; levelIndex <= lastLevelIndex; levelIndex += 1) {
+      if (levelIndex === activeLevelIndex) continue;
+      const level = staticLayer.levels[levelIndex];
+      const prefetchContext = catalogPointRequestContextForTileSpan(layerContext, level.span_au);
+      requests.push(...catalogPointRequestsForLevel(prefetchContext, level.span_au, level, catalogPointMaxActiveTiles(prefetchContext.viewWidthLy)));
+    }
+  }
+
+  const now = performance.now();
+  return requests
+    .filter((request) => {
+      if (activeKeys.has(request.key)) return false;
+      const tile = catalogPointTiles.get(request.key);
+      return !tile || (!tile.source && !tile.abortController && canRetryCatalogPointTile(tile, now));
+    })
+    .sort((a, b) => tileDistanceToCamera(a) - tileDistanceToCamera(b))
+    .slice(0, POINT_TILE_PREFETCH_MAX_REQUESTS);
+}
+
+function catalogPointRequestContextForTileSpan(
+  requestContext: NonNullable<ReturnType<typeof catalogPointRequestContext>>,
+  tileSpanAu: number
+): NonNullable<ReturnType<typeof catalogPointRequestContext>> {
+  const rect = usableViewportRect();
+  const normalViewWidthLy = (tileSpanAu * POINT_TILE_TARGET_VIEW_DIVISIONS) / AU_PER_LIGHT_YEAR;
+  const divisions = catalogPointTileViewDivisions(normalViewWidthLy);
+  const viewWidthAu = tileSpanAu * divisions;
+  const viewHeightAu = viewWidthAu * (rect.height / Math.max(1, rect.width));
+  const paddingXAu = viewWidthAu * POINT_LAYER_VIEWPORT_PADDING;
+  const paddingYAu = viewHeightAu * POINT_LAYER_VIEWPORT_PADDING;
+  return {
+    ...requestContext,
+    viewWidthLy: viewWidthAu / AU_PER_LIGHT_YEAR,
+    bounds: {
+      minXAu: camera.xAu - viewWidthAu / 2 - paddingXAu,
+      maxXAu: camera.xAu + viewWidthAu / 2 + paddingXAu,
+      minYAu: camera.yAu - viewHeightAu / 2 - paddingYAu,
+      maxYAu: camera.yAu + viewHeightAu / 2 + paddingYAu
+    }
+  };
+}
+
+function catalogPointRequestContext() {
+  const viewWidthLy = currentViewWidthLy();
+  const filterParams = catalogPointFilterParams();
+  if (!filterParams || !shouldUseCatalogPoints(viewWidthLy, filterParams)) return null;
+  if (catalogPointTileManifestState === "loading") return null;
+  if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
+  const staticLayers = catalogStaticTileLayersForFilter(filterParams);
+  const staticLayer = staticLayers[0] ?? null;
+  if (catalogPointTileManifestState === "ready" && staticLayers.length === 0 && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
+  return {
+    viewWidthLy,
+    bounds: viewportWorldBounds(POINT_LAYER_VIEWPORT_PADDING),
+    filterParams,
+    staticLayer,
+    staticLayers
+  };
+}
+
+function catalogPointRequestsForLevel(
+  requestContext: NonNullable<ReturnType<typeof catalogPointRequestContext>>,
+  tileSpanAu: number,
+  staticLevel: CatalogPointTileManifestLevel | null,
+  maxRequests: number
+): CatalogPointTileRequest[] {
+  const { bounds, filterParams, viewWidthLy } = requestContext;
   const minTileX = Math.floor(bounds.minXAu / tileSpanAu);
   const maxTileX = Math.floor(bounds.maxXAu / tileSpanAu);
   const minTileY = Math.floor(bounds.minYAu / tileSpanAu);
@@ -2223,7 +2907,6 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
   const requests: CatalogPointTileRequest[] = [];
   const limit = staticLevel?.max_points_per_tile ?? catalogPointTileLimit(viewWidthLy);
   const sampleBuckets = staticLevel?.sample_buckets ?? catalogPointSampleBuckets(viewWidthLy);
-  const maxActiveTiles = catalogPointMaxActiveTiles(viewWidthLy);
   const groupSignature = filterParams.groups.join("+");
   const typeSignature = filterParams.types.join("+");
 
@@ -2235,7 +2918,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
         min_y_au: tileY * tileSpanAu,
         max_y_au: (tileY + 1) * tileSpanAu
       };
-      const tileKey = `z${Math.round(Math.log2(tileSpanAu) * 100) / 100}:x${tileX}:y${tileY}:g${groupSignature}:t${typeSignature}:l${limit}:s${sampleBuckets}:m${staticLevel ? "static" : "api"}`;
+      const tileKey = `layer${requestContext.staticLayer?.id ?? "api"}:z${Math.round(Math.log2(tileSpanAu) * 100) / 100}:x${tileX}:y${tileY}:g${groupSignature}:t${typeSignature}:l${limit}:s${sampleBuckets}:m${staticLevel ? "static" : "api"}`;
       const params = new URLSearchParams();
       params.set("min_x_au", String(tileBounds.min_x_au));
       params.set("max_x_au", String(tileBounds.max_x_au));
@@ -2250,7 +2933,7 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
         layerId: `catalog:${tileKey}`,
         signature: `points:${tileKey}`,
         params,
-        staticUrl: staticLevel ? catalogStaticTileUrl(staticLevel, tileX, tileY) : undefined,
+        staticUrl: staticLevel && requestContext.staticLayer ? catalogStaticTileUrl(requestContext.staticLayer, staticLevel, tileX, tileY) : undefined,
         bounds: tileBounds,
         groups: filterParams.groups,
         types: filterParams.types,
@@ -2261,20 +2944,48 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
 
   return requests
     .sort((a, b) => tileDistanceToCamera(a) - tileDistanceToCamera(b))
-    .slice(0, maxActiveTiles);
+    .slice(0, maxRequests);
 }
 
 function catalogPointFilterParams(): { groups: string[]; types: DestinationBodyType[] } | null {
   const filter = activeBodyFilterDefinition();
-  if (filter.key !== "all" && filter.types && !filter.types.includes("star")) return null;
-  const sourceGroups = filter.key === "all" || !filter.groups ? POINT_LAYER_GROUPS : filter.groups;
-  const groups = sourceGroups.filter((group) => POINT_LAYER_GROUP_SET.has(group));
+  const sourceGroups = filter.key === "all" || !filter.groups ? catalogPointManifestGroups() : filter.groups;
+  const groups = sourceGroups.filter((group) => POINT_LAYER_GROUP_SET.has(group) || catalogPointManifestGroupSet().has(group));
   if (groups.length === 0) return null;
-  return { groups, types: filter.types ?? [] };
+  return { groups: uniqueStrings(groups), types: filter.types ?? [] };
 }
 
-function shouldUseCatalogPoints(viewWidthLy: number) {
-  return Number.isFinite(viewWidthLy) && viewWidthLy >= POINT_LAYER_MIN_WIDTH_LY && viewWidthLy <= POINT_LAYER_MAX_WIDTH_LY;
+function catalogPointManifestGroups() {
+  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return POINT_LAYER_GROUPS;
+  return uniqueStrings(catalogPointTileManifest.layers.flatMap((layer) => layer.groups));
+}
+
+function catalogPointManifestGroupSet() {
+  return new Set(catalogPointManifestGroups());
+}
+
+function catalogStaticTileLayersForFilter(filterParams: { groups: string[]; types: DestinationBodyType[] }): CatalogPointTileManifestLayer[] {
+  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return [];
+  const requestedGroups = new Set(filterParams.groups);
+  return catalogPointTileManifest.layers.filter((layer) => layer.groups.some((group) => requestedGroups.has(group)) && layerCoversAnyType(layer, filterParams.types));
+}
+
+function layerCoversAnyType(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]) {
+  if (layer.types.length === 0 || types.length === 0) return true;
+  return layer.types.some((type) => types.includes(type));
+}
+
+
+function uniqueStrings(values: readonly string[]) {
+  return Array.from(new Set(values));
+}
+
+function shouldUseCatalogPoints(viewWidthLy: number, filterParams: { groups: string[]; types: DestinationBodyType[] }) {
+  if (!Number.isFinite(viewWidthLy) || viewWidthLy < POINT_LAYER_MIN_WIDTH_LY) return false;
+  const hasQuasarScale = filterParams.types.some((type) => type === "quasar" || type === "active_galaxy") || filterParams.groups.includes("simbad_extragalactic");
+  const hasDeepSkyScale = filterParams.groups.some((group) => DEEP_SKY_POINT_GROUPS.includes(group));
+  const maxWidthLy = hasQuasarScale ? POINT_LAYER_QUASAR_MAX_WIDTH_LY : hasDeepSkyScale ? POINT_LAYER_DEEP_SKY_MAX_WIDTH_LY : POINT_LAYER_MAX_WIDTH_LY;
+  return viewWidthLy <= maxWidthLy;
 }
 
 function hasActiveCatalogPointLayer() {
@@ -2297,37 +3008,47 @@ function activeCatalogPointCount() {
   return activeCatalogPointTiles().reduce((sum, tile) => sum + (tile.payload?.returned ?? 0), 0);
 }
 
-function catalogPointTileSpanAu(bounds: { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number }, viewWidthLy: number) {
+function catalogPointTileSpanAu(
+  bounds: { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number },
+  viewWidthLy: number,
+  staticLayer: CatalogPointTileManifestLayer | null = null
+) {
   const spanAu = Math.max(bounds.maxXAu - bounds.minXAu, bounds.maxYAu - bounds.minYAu, 1);
-  const divisions = viewWidthLy > 70_000 ? POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE : POINT_TILE_TARGET_VIEW_DIVISIONS;
+  const divisions = catalogPointTileViewDivisions(viewWidthLy);
   const rawSpan = spanAu / divisions;
   const dynamicSpan = Math.pow(2, Math.max(0, Math.round(Math.log2(rawSpan))));
-  const staticLevel = catalogStaticTileLevelNearest(dynamicSpan);
+  const staticLevel = catalogStaticTileLevelNearest(dynamicSpan, staticLayer);
   return staticLevel?.span_au ?? dynamicSpan;
 }
 
-function catalogStaticTileLevelNearest(spanAu: number): CatalogPointTileManifestLevel | null {
-  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return null;
-  return catalogPointTileManifest.levels.reduce<CatalogPointTileManifestLevel | null>((best, level) => {
+function catalogStaticTileLevelNearest(spanAu: number, staticLayer: CatalogPointTileManifestLayer | null = null): CatalogPointTileManifestLevel | null {
+  if (catalogPointTileManifestState !== "ready" || !staticLayer) return null;
+  return staticLayer.levels.reduce<CatalogPointTileManifestLevel | null>((best, level) => {
     if (!best) return level;
     return Math.abs(Math.log2(level.span_au / spanAu)) < Math.abs(Math.log2(best.span_au / spanAu)) ? level : best;
   }, null);
 }
 
-function catalogStaticTileLevelForSpan(spanAu: number): CatalogPointTileManifestLevel | null {
-  if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return null;
-  return catalogPointTileManifest.levels.find((level) => level.span_au === spanAu) ?? null;
+function catalogStaticTileLevelForSpan(spanAu: number, staticLayer: CatalogPointTileManifestLayer | null = null): CatalogPointTileManifestLevel | null {
+  if (catalogPointTileManifestState !== "ready" || !staticLayer) return null;
+  return staticLayer.levels.find((level) => level.span_au === spanAu) ?? null;
 }
 
-function catalogStaticTileUrl(level: CatalogPointTileManifestLevel, tileX: number, tileY: number) {
-  const template = catalogPointTileManifest?.tile_url_template ?? "/catalog-tiles/v1/s{span_log2}/x{x}/y{y}.bin";
-  return template
+function catalogStaticTileUrl(layer: CatalogPointTileManifestLayer, level: CatalogPointTileManifestLevel, tileX: number, tileY: number) {
+  return layer.tile_url_template
     .replace(/\{span_log2\}/g, String(level.span_log2))
     .replace(/\{x\}/g, String(tileX))
     .replace(/\{y\}/g, String(tileY));
 }
 
+function catalogPointTileViewDivisions(viewWidthLy: number) {
+  if (viewWidthLy > 450_000_000) return 0.5;
+  if (viewWidthLy > 70_000) return POINT_TILE_TARGET_VIEW_DIVISIONS_WIDE;
+  return POINT_TILE_TARGET_VIEW_DIVISIONS;
+}
+
 function catalogPointTileLimit(viewWidthLy: number) {
+  if (viewWidthLy > 450_000_000) return POINT_TILE_MAX_POINTS_UNIVERSE;
   if (viewWidthLy > 70_000) return POINT_TILE_MAX_POINTS_WIDE;
   if (viewWidthLy < 80) return Math.min(POINT_TILE_MAX_POINTS, 18_000);
   if (viewWidthLy > 10_000) return Math.min(POINT_TILE_MAX_POINTS, 16_000);
@@ -2339,10 +3060,13 @@ function catalogPointSampleBuckets(viewWidthLy: number) {
   if (viewWidthLy < 2_000) return 5;
   if (viewWidthLy < 15_000) return 4;
   if (viewWidthLy < 70_000) return 3;
-  return 2;
+  if (viewWidthLy < 8_000_000) return 2;
+  if (viewWidthLy < 450_000_000) return 1;
+  return 1;
 }
 
 function catalogPointMaxActiveTiles(viewWidthLy: number) {
+  if (viewWidthLy > 450_000_000) return POINT_TILE_MAX_ACTIVE_UNIVERSE;
   return viewWidthLy > 70_000 ? POINT_TILE_MAX_ACTIVE_WIDE : POINT_TILE_MAX_ACTIVE;
 }
 
@@ -2391,10 +3115,10 @@ function viewportCatalogRequest() {
 
 function viewportCatalogGroups(viewWidthLy: number) {
   if (viewWidthLy < 0.08) return ["jpl_small_bodies"];
-  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", "exoplanet_systems"];
-  if (viewWidthLy < 6_000) return ["bright_stars", "gaia_local_stars", "gaia_500pc_stars", "exoplanet_systems"];
-  if (viewWidthLy < 25_000) return ["bright_stars"];
-  return ["simbad_extragalactic", "messier_deep_sky"];
+  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", "exoplanet_systems", "exoplanets"];
+  if (viewWidthLy < 6_000) return ["bright_stars", "gaia_local_stars", "gaia_500pc_stars", "exoplanet_systems", "exoplanets", "simbad_compact_objects"];
+  if (viewWidthLy < 25_000) return ["bright_stars", "simbad_compact_objects"];
+  return ["simbad_extragalactic", "simbad_compact_objects", "messier_deep_sky"];
 }
 
 function viewportCatalogLimit(viewWidthLy: number) {
@@ -2474,7 +3198,7 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
   const facts = object.facts ?? {};
   const astrometry = object.astrometry ?? {};
   const objectType = normalizeDestinationType(object.object_type);
-  const isDeepSkyLike = ["galaxy", "nebula", "star_cluster", "quasar", "active_galaxy", "black_hole"].includes(objectType);
+  const isDeepSkyLike = ["galaxy", "nebula", "star_cluster", "quasar", "active_galaxy", "black_hole", "pulsar"].includes(objectType);
   const isSmallBodyLike = ["asteroid", "comet", "small_body"].includes(objectType);
 
   return {
@@ -2529,13 +3253,13 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
           }
         : null,
     exoplanet_system:
-      object.catalog_group === "exoplanet_systems" || object.catalog_group === "nearby_exoplanet_systems"
+      object.catalog_group === "exoplanet_systems" || object.catalog_group === "nearby_exoplanet_systems" || object.catalog_group === "exoplanets"
         ? {
-            confirmed_planet_count: finiteOptionalNumber(facts.exoplanet_count) ?? finiteOptionalNumber(facts.system_planet_count),
+            confirmed_planet_count: object.catalog_group === "exoplanets" ? 1 : finiteOptionalNumber(facts.exoplanet_count) ?? finiteOptionalNumber(facts.system_planet_count),
             system_star_count: finiteOptionalNumber(facts.system_star_count),
             system_planet_count: finiteOptionalNumber(facts.system_planet_count),
             system_moon_count: finiteOptionalNumber(facts.system_moon_count),
-            planets: Array.isArray(facts.planets) ? (facts.planets as BodyExoplanet[]) : [],
+            planets: object.catalog_group === "exoplanets" ? [catalogObjectToExoplanet(object)] : Array.isArray(facts.planets) ? (facts.planets as BodyExoplanet[]) : [],
             why_interesting: stringFact(facts.why_interesting)
           }
         : null,
@@ -2569,6 +3293,19 @@ function catalogObjectToBody(object: CatalogObjectPayload): Body {
   };
 }
 
+function catalogObjectToExoplanet(object: CatalogObjectPayload): BodyExoplanet {
+  const facts = object.facts ?? {};
+  return {
+    name: object.name,
+    radius_earth: finiteOptionalNumber(facts.radius_earth),
+    mass_earth: finiteOptionalNumber(facts.mass_earth),
+    period_days: finiteOptionalNumber(facts.period_days),
+    semi_major_axis_au: finiteOptionalNumber(facts.semi_major_axis_au),
+    discovery_method: stringFact(facts.discovery_method),
+    discovery_year: finiteOptionalNumber(facts.discovery_year)
+  };
+}
+
 function normalizeDestinationType(type: string | null | undefined): DestinationBodyType {
   const allowed = new Set<DestinationBodyType>([
     "star",
@@ -2579,6 +3316,7 @@ function normalizeDestinationType(type: string | null | undefined): DestinationB
     "quasar",
     "active_galaxy",
     "black_hole",
+    "pulsar",
     "nebula",
     "star_cluster",
     "asterism",
@@ -2617,7 +3355,9 @@ async function updateBodyPicker() {
     activeKey: selectedKey,
     currentTargetKey: selectedKey,
     guidedSet: activeGuidedSet(),
-    emptyMessage: "No objects match this view."
+    emptyMessage: t("search.noObjects"),
+    loadingMessage: t("search.loading"),
+    fallbackMessage: t("search.fallback")
   });
 }
 
@@ -2648,6 +3388,11 @@ async function updateSearchPicker(config: PickerSearchConfig) {
   const shouldUseCatalogSearch = !guidedSet && (query.length >= 3 || (query.length === 0 && config.filter.key !== "all"));
   const abortController = shouldUseCatalogSearch ? new AbortController() : undefined;
   config.state.abortController = abortController;
+  if (shouldUseCatalogSearch) {
+    config.state.activeOptionKey = null;
+    config.input.removeAttribute("aria-activedescendant");
+    renderPickerStatus(config.picker, config.loadingMessage, "loading");
+  }
   const catalogResult = shouldUseCatalogSearch ? await searchCatalog({ query, filter: config.filter, limit: query ? 80 : 240, signal: abortController?.signal }) : null;
   if (config.state.abortController === abortController) config.state.abortController = undefined;
   if (requestId !== config.state.requestId) return;
@@ -2677,23 +3422,42 @@ async function updateSearchPicker(config: PickerSearchConfig) {
 
   if (guidedSet || config.filter.key !== "all" || query) {
     const items = buildDestinationPickerItems(sourceBodies, buildOptions);
-    const label = query ? "Results" : guidedSet?.label ?? config.filter.label;
-    renderPickerSections(config.picker, [{ label, items }], config.emptyMessage, config.activeKey);
+    const label = query ? t("search.resultsLabel") : guidedSet ? t(guidedSet.labelKey) : t(config.filter.labelKey);
+    renderPickerSections(config.picker, [{ label, items }], config.emptyMessage, config.activeKey, config.state.activeOptionKey);
   } else {
     const sections = buildDestinationPickerSections(sourceBodies, buildOptions);
-    renderPickerSections(config.picker, sections.filter((section) => section.kind === "all"), config.emptyMessage, config.activeKey);
+    renderPickerSections(config.picker, sections.filter((section) => section.kind === "all"), config.emptyMessage, config.activeKey, config.state.activeOptionKey);
   }
+  if (catalogResult?.fallback) {
+    prependPickerStatus(config.picker, config.fallbackMessage, "fallback");
+  }
+  syncActivePickerOption(config.state, config.input, config.picker);
   config.afterRender?.();
 }
 
-function renderPickerSections(container: HTMLElement, sections: { label: string; items: DestinationPickerItem[] }[], emptyMessage: string, activeKey: string | null) {
+function renderPickerStatus(container: HTMLElement, message: string, tone: "loading" | "fallback") {
+  container.innerHTML = `<div class="picker-status picker-status--${tone}" role="status">${escapeHtml(message)}</div>`;
+  container.scrollTop = 0;
+}
+
+function prependPickerStatus(container: HTMLElement, message: string, tone: "loading" | "fallback") {
+  container.insertAdjacentHTML("afterbegin", `<div class="picker-status picker-status--${tone}" role="status">${escapeHtml(message)}</div>`);
+}
+
+function renderPickerSections(
+  container: HTMLElement,
+  sections: { label: string; items: DestinationPickerItem[] }[],
+  emptyMessage: string,
+  selectedKey: string | null,
+  activeOptionKey: string | null
+) {
   container.innerHTML = sections
     .filter((section) => section.items.length > 0)
     .map(
       (section) => `
         <section class="destination-picker__section">
           <h3 class="destination-picker__section-title">${escapeHtml(section.label)}</h3>
-          <div class="destination-picker__list">${section.items.map((item) => renderPickerItem(item, activeKey)).join("")}</div>
+          <div class="destination-picker__list" role="listbox">${section.items.map((item) => renderPickerItem(item, selectedKey, activeOptionKey, container.id)).join("")}</div>
         </section>
       `
     )
@@ -2705,14 +3469,19 @@ function renderPickerSections(container: HTMLElement, sections: { label: string;
   container.scrollTop = 0;
 }
 
-function renderPickerItem(item: DestinationPickerItem, activeKey: string | null = selectedKey) {
+function renderPickerItem(item: DestinationPickerItem, selectedKey: string | null = null, activeOptionKey: string | null = null, pickerId = "body-picker") {
   const style = destinationPickerColorStyle(item);
+  const isSelected = item.key === selectedKey;
+  const isActive = item.key === activeOptionKey;
   return `
     <button
+      id="${escapeHtml(pickerOptionId(pickerId, item.key))}"
       type="button"
-      class="destination-picker__item${item.key === activeKey ? " is-selected" : ""}"
+      role="option"
+      class="destination-picker__item${isSelected ? " is-selected" : ""}${isActive ? " is-active" : ""}"
       data-body-key="${escapeHtml(item.key)}"
       aria-label="${escapeHtml(item.ariaLabel)}"
+      aria-selected="${isActive ? "true" : "false"}"
       style="--destination-color: ${escapeHtml(style["--destination-color"])}"
     >
       <span class="destination-picker__orb" aria-hidden="true"></span>
@@ -2725,14 +3494,90 @@ function renderPickerItem(item: DestinationPickerItem, activeKey: string | null 
   `;
 }
 
+function pickerOptionId(pickerId: string, key: string) {
+  return `${pickerId}-option-${key.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+function visiblePickerOptions(picker: HTMLElement) {
+  return Array.from(picker.querySelectorAll<HTMLButtonElement>(".destination-picker__item[data-body-key]"));
+}
+
+function syncActivePickerOption(state: PickerSearchState, input: HTMLInputElement, picker: HTMLElement) {
+  const options = visiblePickerOptions(picker);
+  const activeButton = options.find((button) => button.dataset.bodyKey === state.activeOptionKey) ?? null;
+  options.forEach((button) => {
+    const isActive = button === activeButton;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+  if (activeButton) {
+    state.activeOptionKey = activeButton.dataset.bodyKey ?? null;
+    input.setAttribute("aria-activedescendant", activeButton.id);
+    activeButton.scrollIntoView({ block: "nearest" });
+  } else {
+    state.activeOptionKey = null;
+    input.removeAttribute("aria-activedescendant");
+  }
+}
+
+function moveActivePickerOption(state: PickerSearchState, input: HTMLInputElement, picker: HTMLElement, destination: "next" | "previous" | "first" | "last") {
+  const options = visiblePickerOptions(picker);
+  if (options.length === 0) return false;
+  const currentIndex = options.findIndex((button) => button.dataset.bodyKey === state.activeOptionKey);
+  let nextIndex = 0;
+  if (destination === "last") nextIndex = options.length - 1;
+  else if (destination === "next") nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, options.length - 1);
+  else if (destination === "previous") nextIndex = currentIndex < 0 ? options.length - 1 : Math.max(currentIndex - 1, 0);
+  state.activeOptionKey = options[nextIndex]?.dataset.bodyKey ?? null;
+  syncActivePickerOption(state, input, picker);
+  return true;
+}
+
+function handlePickerKeyboard(
+  event: KeyboardEvent,
+  options: {
+    state: PickerSearchState;
+    input: HTMLInputElement;
+    picker: HTMLElement;
+    onSelect: (key: string) => void;
+    onFallbackEnter: () => void;
+    onEscapeClear: () => void;
+  }
+) {
+  if (event.key === "ArrowDown") return moveActivePickerOption(options.state, options.input, options.picker, "next");
+  if (event.key === "ArrowUp") return moveActivePickerOption(options.state, options.input, options.picker, "previous");
+  if (event.key === "Home") return moveActivePickerOption(options.state, options.input, options.picker, "first");
+  if (event.key === "End") return moveActivePickerOption(options.state, options.input, options.picker, "last");
+  if (event.key === "Enter") {
+    const activeKey = options.state.activeOptionKey;
+    if (activeKey) options.onSelect(activeKey);
+    else options.onFallbackEnter();
+    return true;
+  }
+  if (event.key === "Escape") {
+    if (options.state.activeOptionKey) {
+      options.state.activeOptionKey = null;
+      syncActivePickerOption(options.state, options.input, options.picker);
+    } else if (options.input.value) {
+      options.input.value = "";
+      options.state.latestBodies = [];
+      options.onEscapeClear();
+    } else {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
 function updateGuidedSets() {
   guidedTours.innerHTML = GUIDED_SETS.map((tour) => {
     const available = tour.keys.map((key) => bodyByKey.get(key)).filter(isPresent);
     if (available.length === 0) return "";
     return `
       <button type="button" data-tour-id="${escapeHtml(tour.id)}" class="${tour.id === activeGuidedSetId ? "active" : ""}">
-        <strong>${escapeHtml(tour.label)}</strong>
-        <span>${available.length} objects</span>
+        <strong>${escapeHtml(t(tour.labelKey))}</strong>
+        <span>${escapeHtml(t("search.objectsCount", { count: available.length }))}</span>
       </button>
     `;
   }).join("");
@@ -2759,46 +3604,50 @@ function updateBodyInfo() {
   const positionModel = readablePositionModel(body.catalog?.position_model ?? body.catalog?.source_type ?? "");
   const parentBody = body.parent_key ? bodyByKey.get(body.parent_key) ?? null : null;
   const overviewRows = [
-    ["Type", classification.label],
-    ["Radius", body.radius_km > 0 ? formatDistance(body.radius_km) : "Unknown"],
-    ["Parent", parentBody?.name ?? body.parent_key ?? null],
-    ["Catalog group", readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)]
+    [t("field.type"), classification.label],
+    [t("field.radius"), body.radius_km > 0 ? formatDistance(body.radius_km) : t("value.unknown")],
+    [t("field.parent"), parentBody?.name ?? body.parent_key ?? null],
+    [t("field.catalogGroup"), readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)]
   ];
   const primaryStats = [
-    ["Earth distance", formatDistance(body.distance_from_earth_km)],
-    ["Diameter", body.radius_km > 0 ? formatDistance(body.radius_km * 2) : "Unknown"],
-    ["Heliocentric", formatDistance(body.position.heliocentric_distance_km)]
+    [t("field.earthDistance"), formatDistance(body.distance_from_earth_km)],
+    [t("field.diameter"), body.radius_km > 0 ? formatDistance(body.radius_km * 2) : t("value.unknown")],
+    [t("field.heliocentric"), formatDistance(body.position.heliocentric_distance_km)]
   ];
 
   const positionRows = [
-    ["Coordinate frame", ephemeris?.coordinate_frame ?? null],
-    ["Position model", positionModel],
-    ["RA / Dec", formatRaDec(body)],
-    ["X", formatAuCoordinate(body.position.x_au)],
-    ["Y", formatAuCoordinate(body.position.y_au)],
-    ["Z", formatAuCoordinate(body.position.z_au)]
+    [t("field.coordinateFrame"), ephemeris?.coordinate_frame ?? null],
+    [t("field.positionModel"), positionModel],
+    [t("field.rightAscension"), formatRightAscensionForBody(body)],
+    [t("field.declination"), formatDeclinationForBody(body)],
+    [t("field.raDecDecimal"), formatRaDecDecimal(body)],
+    [t("field.galacticLongitude"), formatGalacticLongitude(body)],
+    [t("field.galacticLatitude"), formatGalacticLatitude(body)],
+    [t("field.eclipticX"), formatAuCoordinate(body.position.x_au)],
+    [t("field.eclipticY"), formatAuCoordinate(body.position.y_au)],
+    [t("field.eclipticZ"), formatAuCoordinate(body.position.z_au)]
   ];
 
   const stateRows = body.state_vector
     ? [
-        ["Parent-relative speed", `${formatNumber(body.state_vector.speed_km_s)} km/s`],
-        ["Heliocentric speed", `${formatNumber(body.state_vector.heliocentric_speed_km_s)} km/s`],
-        ["Parent-relative distance", formatDistance(body.state_vector.distance_km)]
+        [t("field.parentRelativeSpeed"), `${formatNumber(body.state_vector.speed_km_s)} km/s`],
+        [t("field.heliocentricSpeed"), `${formatNumber(body.state_vector.heliocentric_speed_km_s)} km/s`],
+        [t("field.parentRelativeDistance"), formatDistance(body.state_vector.distance_km)]
       ]
     : [];
 
   const orbitRows = body.orbit
     ? [
-        ["Orbit class", body.orbit.orbit_class],
-        ["Semi-major axis", nullableDistance(body.orbit.semi_major_axis_km)],
-        ["Eccentricity", nullableNumber(body.orbit.eccentricity, 4)],
-        ["Inclination", nullableDegrees(body.orbit.inclination_deg)],
-        ["Periapsis", nullableDistance(body.orbit.periapsis_km)],
-        ["Apoapsis", nullableDistance(body.orbit.apoapsis_km)],
-        ["Ascending node", nullableDegrees(body.orbit.longitude_of_ascending_node_deg)],
-        ["Argument of periapsis", nullableDegrees(body.orbit.argument_of_periapsis_deg)],
-        ["True anomaly", nullableDegrees(body.orbit.true_anomaly_deg)],
-        ["Period", nullableDays(body.orbit.orbital_period_days)]
+        [t("field.orbitClass"), body.orbit.orbit_class],
+        [t("field.semiMajorAxis"), nullableDistance(body.orbit.semi_major_axis_km)],
+        [t("field.eccentricity"), nullableNumber(body.orbit.eccentricity, 4)],
+        [t("field.inclination"), nullableDegrees(body.orbit.inclination_deg)],
+        [t("field.periapsis"), nullableDistance(body.orbit.periapsis_km)],
+        [t("field.apoapsis"), nullableDistance(body.orbit.apoapsis_km)],
+        [t("field.ascendingNode"), nullableDegrees(body.orbit.longitude_of_ascending_node_deg)],
+        [t("field.argumentOfPeriapsis"), nullableDegrees(body.orbit.argument_of_periapsis_deg)],
+        [t("field.trueAnomaly"), nullableDegrees(body.orbit.true_anomaly_deg)],
+        [t("field.period"), nullableDays(body.orbit.orbital_period_days)]
       ]
     : [];
 
@@ -2806,57 +3655,57 @@ function updateBodyInfo() {
     ? [
         ["HIP", body.stellar.hip ? `HIP ${body.stellar.hip}` : null],
         ["HD", body.stellar.hd ? `HD ${body.stellar.hd}` : null],
-        ["Catalog distance", nullableLightYears(body.stellar.distance_ly)],
-        ["Parallax", body.stellar.parallax_mas ? `${formatNumber(body.stellar.parallax_mas)} mas` : null],
-        ["Apparent magnitude", nullableNumber(body.stellar.apparent_magnitude, 2)],
-        ["Absolute magnitude", nullableNumber(body.stellar.absolute_magnitude, 2)],
-        ["B-V color index", nullableNumber(body.stellar.bv_color_index, 3)],
-        ...(body.stellar.exoplanet_count != null ? [["Known planets", nullableNumber(body.stellar.exoplanet_count, 0)]] : []),
-        ...(body.stellar.stellar_teff_k ? [["Temperature", `${formatNumber(body.stellar.stellar_teff_k)} K`]] : []),
-        ...(body.stellar.stellar_mass_solar ? [["Mass", `${formatNumber(body.stellar.stellar_mass_solar)} Solar masses`]] : []),
-        ...(body.stellar.stellar_radius_solar ? [["Radius", `${formatNumber(body.stellar.stellar_radius_solar)} Solar radii`]] : []),
-        ...(body.stellar.spectral_type ? [["Spectral type", body.stellar.spectral_type]] : []),
-        ["Radius source", body.stellar.stellar_radius_source ?? null]
+        [t("field.catalogDistance"), nullableLightYears(body.stellar.distance_ly)],
+        [t("field.parallax"), body.stellar.parallax_mas ? `${formatNumber(body.stellar.parallax_mas)} mas` : null],
+        [t("field.apparentMagnitude"), nullableNumber(body.stellar.apparent_magnitude, 2)],
+        [t("field.absoluteMagnitude"), nullableNumber(body.stellar.absolute_magnitude, 2)],
+        [t("field.bvColorIndex"), nullableNumber(body.stellar.bv_color_index, 3)],
+        ...(body.stellar.exoplanet_count != null ? [[t("field.knownPlanets"), nullableNumber(body.stellar.exoplanet_count, 0)]] : []),
+        ...(body.stellar.stellar_teff_k ? [[t("field.temperature"), `${formatNumber(body.stellar.stellar_teff_k)} K`]] : []),
+        ...(body.stellar.stellar_mass_solar ? [[t("field.mass"), `${formatNumber(body.stellar.stellar_mass_solar)} ${t("value.solarMasses")}`]] : []),
+        ...(body.stellar.stellar_radius_solar ? [[t("field.radius"), `${formatNumber(body.stellar.stellar_radius_solar)} ${t("value.solarRadii")}`]] : []),
+        ...(body.stellar.spectral_type ? [[t("field.spectralType"), body.stellar.spectral_type]] : []),
+        [t("field.radiusSource"), body.stellar.stellar_radius_source ?? null]
       ]
     : [];
 
   const exoplanetRows = body.exoplanet_system
     ? [
-        ["Confirmed planets", nullableNumber(body.exoplanet_system.confirmed_planet_count ?? body.exoplanet_system.planets?.length, 0)],
-        ["Stars in system", nullableNumber(body.exoplanet_system.system_star_count, 0)],
-        ["Moons in archive", nullableNumber(body.exoplanet_system.system_moon_count, 0)]
+        [t("field.confirmedPlanets"), nullableNumber(body.exoplanet_system.confirmed_planet_count ?? body.exoplanet_system.planets?.length, 0)],
+        [t("field.starsInSystem"), nullableNumber(body.exoplanet_system.system_star_count, 0)],
+        [t("field.moonsInArchive"), nullableNumber(body.exoplanet_system.system_moon_count, 0)]
       ]
     : [];
 
   const deepSkyRows = body.deep_sky
     ? [
-        ["Common name", body.deep_sky.common_name ?? null],
-        ["Deep-sky type", body.deep_sky.deep_sky_type_label ?? "Unknown"],
-        ["Magnitude", nullableNumber(body.deep_sky.apparent_magnitude, 1)],
-        ["Constellation", body.deep_sky.constellation ?? "Unknown"],
-        ["Viewing season", body.deep_sky.viewing_season ?? "Unknown"],
-        ["Angular size", body.deep_sky.angular_size_arcmin ?? "Unknown"],
-        ["Physical diameter", body.deep_sky.physical_diameter_ly ? `${formatNumber(body.deep_sky.physical_diameter_ly)} ly` : "Unknown"],
-        ["Minor diameter", body.deep_sky.physical_minor_diameter_ly ? `${formatNumber(body.deep_sky.physical_minor_diameter_ly)} ly` : null],
-        ["Size note", body.deep_sky.physical_size_note ?? null],
-        ["Equipment", body.deep_sky.observing_equipment ?? null]
+        [t("field.commonName"), body.deep_sky.common_name ?? null],
+        [t("field.deepSkyType"), body.deep_sky.deep_sky_type_label ?? t("value.unknown")],
+        [t("field.magnitude"), nullableNumber(body.deep_sky.apparent_magnitude, 1)],
+        [t("field.constellation"), body.deep_sky.constellation ?? t("value.unknown")],
+        [t("field.viewingSeason"), body.deep_sky.viewing_season ?? t("value.unknown")],
+        [t("field.angularSize"), body.deep_sky.angular_size_arcmin ?? t("value.unknown")],
+        [t("field.physicalDiameter"), body.deep_sky.physical_diameter_ly ? `${formatNumber(body.deep_sky.physical_diameter_ly)} ly` : t("value.unknown")],
+        [t("field.minorDiameter"), body.deep_sky.physical_minor_diameter_ly ? `${formatNumber(body.deep_sky.physical_minor_diameter_ly)} ly` : null],
+        [t("field.sizeNote"), body.deep_sky.physical_size_note ?? null],
+        [t("field.equipment"), body.deep_sky.observing_equipment ?? null]
       ]
     : [];
 
   const smallBodyRows = body.small_body
     ? [
-        ["Orbit class", body.small_body.orbit_class ?? "Unknown"],
-        ["Near-Earth object", body.small_body.neo == null ? null : body.small_body.neo ? "Yes" : "No"],
-        ["Potentially hazardous", body.small_body.pha == null ? null : body.small_body.pha ? "Yes" : "No"],
-        ["Diameter", body.small_body.diameter_km ? formatDistance(body.small_body.diameter_km) : body.small_body.estimated_diameter_km ? `${formatDistance(body.small_body.estimated_diameter_km)} estimated` : null],
-        ["Absolute magnitude H", nullableNumber(body.small_body.h_absolute_magnitude, 2)],
-        ["Semi-major axis", body.small_body.semi_major_axis_au ? `${formatNumber(body.small_body.semi_major_axis_au)} AU` : null],
-        ["Perihelion", body.small_body.perihelion_au ? `${formatNumber(body.small_body.perihelion_au)} AU` : null],
-        ["Aphelion", body.small_body.aphelion_au ? `${formatNumber(body.small_body.aphelion_au)} AU` : null],
-        ["Eccentricity", nullableNumber(body.small_body.eccentricity, 4)],
-        ["Inclination", nullableDegrees(body.small_body.inclination_deg)],
-        ["Period", nullableDays(body.small_body.orbital_period_days)],
-        ["Earth MOID", body.small_body.earth_moid_au ? `${formatNumber(body.small_body.earth_moid_au)} AU` : null]
+        [t("field.orbitClass"), body.small_body.orbit_class ?? t("value.unknown")],
+        [t("field.nearEarthObject"), body.small_body.neo == null ? null : body.small_body.neo ? t("value.yes") : t("value.no")],
+        [t("field.potentiallyHazardous"), body.small_body.pha == null ? null : body.small_body.pha ? t("value.yes") : t("value.no")],
+        [t("field.diameter"), body.small_body.diameter_km ? formatDistance(body.small_body.diameter_km) : body.small_body.estimated_diameter_km ? `${formatDistance(body.small_body.estimated_diameter_km)} ${t("value.estimated")}` : null],
+        [t("field.absoluteMagnitudeH"), nullableNumber(body.small_body.h_absolute_magnitude, 2)],
+        [t("field.semiMajorAxis"), body.small_body.semi_major_axis_au ? `${formatNumber(body.small_body.semi_major_axis_au)} AU` : null],
+        [t("field.perihelion"), body.small_body.perihelion_au ? `${formatNumber(body.small_body.perihelion_au)} AU` : null],
+        [t("field.aphelion"), body.small_body.aphelion_au ? `${formatNumber(body.small_body.aphelion_au)} AU` : null],
+        [t("field.eccentricity"), nullableNumber(body.small_body.eccentricity, 4)],
+        [t("field.inclination"), nullableDegrees(body.small_body.inclination_deg)],
+        [t("field.period"), nullableDays(body.small_body.orbital_period_days)],
+        [t("field.earthMoid"), body.small_body.earth_moid_au ? `${formatNumber(body.small_body.earth_moid_au)} AU` : null]
       ]
     : [];
 
@@ -2864,17 +3713,19 @@ function updateBodyInfo() {
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
       <section class="object-data-pane">
         ${renderObjectDetailState(body)}
+        ${renderObjectSummaryCard(body, classification.label)}
         ${renderFactTiles(primaryStats)}
+        ${renderUniverseSciencePanel(body)}
         ${renderIdentifierSection(body)}
         ${renderMediaSection(body)}
-        ${renderDataSection("Overview", overviewRows)}
-        ${renderDataSection("Position", positionRows)}
-        ${renderDataSection("Motion", stateRows)}
-        ${renderDataSection("Orbit", orbitRows)}
-        ${renderDataSection("Stellar facts", stellarRows)}
-        ${renderDataSection("Confirmed exoplanets", exoplanetRows, renderExoplanetList(body.exoplanet_system?.planets ?? []))}
-        ${renderDataSection("Deep-sky facts", deepSkyRows)}
-        ${renderDataSection("Small-body facts", smallBodyRows)}
+        ${renderDataSection(t("section.overview"), overviewRows)}
+        ${renderDataSection(t("section.position"), positionRows)}
+        ${renderDataSection(t("section.motion"), stateRows)}
+        ${renderDataSection(t("section.orbit"), orbitRows)}
+        ${renderDataSection(t("section.stellarFacts"), stellarRows)}
+        ${renderDataSection(t("section.confirmedExoplanets"), exoplanetRows, renderExoplanetList(body.exoplanet_system?.planets ?? []))}
+        ${renderDataSection(t("section.deepSkyFacts"), deepSkyRows)}
+        ${renderDataSection(t("section.smallBodyFacts"), smallBodyRows)}
         ${renderObjectNotes(body)}
         ${renderSourceSection(body)}
         ${renderRelatedObjects(body)}
@@ -2886,8 +3737,8 @@ function updateBodyInfo() {
 function renderObjectEmptyState() {
   return `
     <section class="object-empty-state">
-      <h2>No object selected</h2>
-      <p>Search the catalog or select a point on the atlas to open its scientific object page.</p>
+      <h2>${escapeHtml(t("object.noSelectionTitle"))}</h2>
+      <p>${escapeHtml(t("object.noSelectionBody"))}</p>
     </section>
   `;
 }
@@ -2896,10 +3747,103 @@ function renderObjectDetailState(body: Body) {
   if (!body.catalog?.preview) return "";
   return `
     <section class="object-detail-state" aria-label="Object detail state">
-      <strong>Catalog preview</strong>
-      <span>Showing the indexed catalog record. Full orbital or physical detail appears when that source exposes it.</span>
+      <strong>${escapeHtml(t("object.catalogPreview"))}</strong>
+      <span>${escapeHtml(t("object.catalogPreviewBody"))}</span>
     </section>
   `;
+}
+
+function renderObjectSummaryCard(body: Body, typeLabel: string) {
+  const summary = objectSummaryText(body, typeLabel);
+  const contextItems = objectSummaryContext(body);
+  return `
+    <section class="object-summary-card" aria-label="${escapeHtml(t("object.whyThisMatters"))}">
+      <div>
+        <span>${escapeHtml(t("object.whyThisMatters"))}</span>
+        <p>${escapeHtml(summary)}</p>
+      </div>
+      ${
+        contextItems.length > 0
+          ? `<ul>${contextItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+          : ""
+      }
+    </section>
+  `;
+}
+
+function renderUniverseSciencePanel(body: Body) {
+  const distanceLy = body.distance_from_earth_km / 9_460_730_472_580.8;
+  if (distanceLy < 100_000) return "";
+  const shell = universeShellForRadius(distanceLy);
+  const classification = classifyBody(body);
+  const chips = [
+    [t("universe.context.distance"), formatLightYears(distanceLy)],
+    [t("universe.context.lookback"), formatLookbackTime(distanceLy)],
+    [t("universe.context.redshift"), formatRedshiftEstimate(distanceLy)],
+    [t("universe.context.shell"), t(shell.labelKey)]
+  ];
+  return `
+    <section class="object-science-panel">
+      <div class="object-science-panel__heading">
+        <span>${escapeHtml(t("object.scienceContext"))}</span>
+        <strong>${escapeHtml(t("object.cosmicTimeMachine"))}</strong>
+      </div>
+      <p>${escapeHtml(t("object.scienceContextBody", { name: body.name, type: classification.label.toLowerCase() }))}</p>
+      <dl>${chips.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>
+    </section>
+  `;
+}
+
+function objectSummaryText(body: Body, typeLabel: string) {
+  const curated = firstText([body.exoplanet_system?.why_interesting, body.deep_sky?.why_interesting]);
+  if (curated) return curated;
+
+  const name = body.name;
+  switch (body.object_type) {
+    case "planet":
+      return t("summary.planet", { name });
+    case "moon":
+      return t("summary.moon", { name });
+    case "star":
+      return body.stellar?.exoplanet_count ? t("summary.exoplanetHost", { name, count: body.stellar.exoplanet_count }) : t("summary.star", { name });
+    case "dwarf_planet":
+      return t("summary.dwarfPlanet", { name });
+    case "galaxy":
+      return t("summary.galaxy", { name });
+    case "quasar":
+      return t("summary.quasar", { name });
+    case "active_galaxy":
+      return t("summary.activeGalaxy", { name });
+    case "nebula":
+      return t("summary.nebula", { name });
+    case "star_cluster":
+      return t("summary.starCluster", { name });
+    case "asteroid":
+    case "comet":
+    case "small_body":
+      return t("summary.smallBody", { name });
+    default:
+      if (body.exoplanet_system) return t("summary.exoplanetSystem", { name });
+      return t("summary.generic", { name, type: typeLabel.toLowerCase() });
+  }
+}
+
+function objectSummaryContext(body: Body) {
+  const items = [
+    body.deep_sky?.constellation ? t("summary.contextConstellation", { value: body.deep_sky.constellation }) : null,
+    body.deep_sky?.viewing_season ? t("summary.contextSeason", { value: body.deep_sky.viewing_season }) : null,
+    body.exoplanet_system?.confirmed_planet_count != null
+      ? t("summary.contextPlanets", { count: body.exoplanet_system.confirmed_planet_count })
+      : null,
+    body.stellar?.distance_ly != null ? t("summary.contextDistance", { value: formatNumber(body.stellar.distance_ly) }) : null,
+    body.small_body?.neo ? t("summary.contextNeo") : null,
+    body.catalog_group ? t("summary.contextCatalog", { value: readableCatalogGroup(body.catalog_group) ?? body.catalog_group }) : null
+  ].filter(isPresent);
+  return items.slice(0, 3);
+}
+
+function firstText(values: readonly (string | null | undefined)[]) {
+  return values.find((value) => typeof value === "string" && value.trim().length > 0)?.trim() ?? null;
 }
 
 function renderIdentifierSection(body: Body) {
@@ -2908,7 +3852,7 @@ function renderIdentifierSection(body: Body) {
   if (aliases.length === 0 && identifiers.length === 0) return "";
   return `
     <section class="data-section object-identifiers">
-      <h4>Aliases and IDs</h4>
+      <h4>${escapeHtml(t("object.aliasesIds"))}</h4>
       ${aliases.length ? `<div class="identifier-chips">${aliases.map((alias) => `<span>${escapeHtml(alias)}</span>`).join("")}</div>` : ""}
       ${
         identifiers.length
@@ -2924,7 +3868,7 @@ function renderIdentifierSection(body: Body) {
 function renderMediaSection(body: Body) {
   return `
     <section class="data-section object-media-section">
-      <h4>Media</h4>
+      <h4>${escapeHtml(t("object.media"))}</h4>
       ${renderObjectMedia(body)}
     </section>
   `;
@@ -2935,7 +3879,7 @@ function renderObjectNotes(body: Body) {
   if (notes.length === 0) return "";
   return `
     <section class="data-section object-notes">
-      <h4>Scientific notes</h4>
+      <h4>${escapeHtml(t("object.scientificNotes"))}</h4>
       ${notes.map((note) => `<p class="object-note">${escapeHtml(note)}</p>`).join("")}
     </section>
   `;
@@ -2944,17 +3888,17 @@ function renderObjectNotes(body: Body) {
 function renderSourceSection(body: Body) {
   const links = externalLinksForBody(body);
   const sourceRows = [
-    ["Catalog source", readableOptionalModel(body.catalog?.source_type)],
-    ["Position model", readableOptionalModel(body.catalog?.position_model)],
-    ["Catalog group", readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)],
-    ["Atlas source", ephemeris?.data_source ?? null],
-    ["Epoch", ephemeris?.timestamp_utc ? formatFullDate(ephemeris.timestamp_utc) : null]
+    [t("field.catalogSource"), readableOptionalModel(body.catalog?.source_type)],
+    [t("field.positionModel"), readableOptionalModel(body.catalog?.position_model)],
+    [t("field.catalogGroup"), readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)],
+    [t("field.atlasSource"), ephemeris?.data_source ?? null],
+    [t("field.epoch"), ephemeris?.timestamp_utc ? formatFullDate(ephemeris.timestamp_utc) : null]
   ];
   const rows = renderRows(sourceRows);
   if (!rows && links.length === 0) return "";
   return `
     <section class="data-section object-sources">
-      <h4>Source links</h4>
+      <h4>${escapeHtml(t("object.sourceLinks"))}</h4>
       ${rows ? `<dl class="detail-grid">${rows}</dl>` : ""}
       ${
         links.length
@@ -2962,8 +3906,8 @@ function renderSourceSection(body: Body) {
               .map(
                 (link) => `
                   <a href="${escapeHtml(link.url ?? "")}" target="_blank" rel="noreferrer">
-                    <span>${escapeHtml(link.provider ?? "Source")}</span>
-                    <strong>${escapeHtml(link.label ?? "Open source record")}</strong>
+                    <span>${escapeHtml(link.provider ?? t("object.source"))}</span>
+                    <strong>${escapeHtml(link.label ?? t("object.openSourceRecord"))}</strong>
                   </a>
                 `
               )
@@ -2979,7 +3923,7 @@ function renderRelatedObjects(body: Body) {
   if (sections.length === 0) return "";
   return `
     <section class="data-section object-related">
-      <h4>Related objects</h4>
+      <h4>${escapeHtml(t("object.relatedObjects"))}</h4>
       <div class="related-section-list">
         ${sections
           .map(
@@ -3003,7 +3947,7 @@ function renderObjectMedia(body: Body) {
   if (!media) {
     const status = objectMediaStatusFor(body);
     return `
-      <section class="object-media object-media--empty" aria-label="Object media status">
+      <section class="object-media object-media--empty" aria-label="${escapeHtml(t("object.mediaStatus"))}">
         <div class="object-media__empty">
           <span class="object-media__badge">${escapeHtml(status.badge)}</span>
           <strong>${escapeHtml(status.title)}</strong>
@@ -3014,7 +3958,7 @@ function renderObjectMedia(body: Body) {
   }
 
   return `
-    <section class="object-media object-media--${escapeHtml(media.kind)}" aria-label="Object media">
+    <section class="object-media object-media--${escapeHtml(media.kind)}" aria-label="${escapeHtml(t("object.mediaLabel"))}">
       <div class="object-media__image">
         <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
         <span class="object-media__badge">${escapeHtml(media.badge)}</span>
@@ -3092,10 +4036,10 @@ function relatedObjectSections(body: Body): { title: string; bodies: Body[] }[] 
   };
 
   const parent = body.parent_key ? bodyByKey.get(body.parent_key) ?? null : null;
-  append("Parent body", parent ? [parent] : []);
-  append("Moons and children", childrenForBody(body).slice(0, 8));
-  append("Nearby in view", nearbyVisibleBodies(body).slice(0, 6));
-  append("Same catalog", sameCatalogNeighbors(body).slice(0, 6));
+  append(t("object.parentBody"), parent ? [parent] : []);
+  append(t("object.moonsChildren"), childrenForBody(body).slice(0, 8));
+  append(t("object.nearbyInView"), nearbyVisibleBodies(body).slice(0, 6));
+  append(t("object.sameCatalog"), sameCatalogNeighbors(body).slice(0, 6));
 
   return sections;
 }
@@ -3108,7 +4052,7 @@ function renderRelatedObjectButton(source: Body, related: Body) {
       <span class="body-orb"></span>
       <span>
         <strong>${escapeHtml(shortBodyName(related.name))}</strong>
-        <small>${escapeHtml(classification.label)} · ${escapeHtml(distanceLabel)} from ${escapeHtml(shortBodyName(source.name))}</small>
+        <small>${escapeHtml(classification.label)} · ${escapeHtml(distanceLabel)} ${escapeHtml(t("object.fromSource", { name: shortBodyName(source.name) }))}</small>
       </span>
     </button>
   `;
@@ -3153,11 +4097,11 @@ function renderExoplanetList(planets: BodyExoplanet[]) {
             planet.radius_earth ? `${formatNumber(planet.radius_earth)} Earth radii` : null,
             planet.discovery_year ? String(planet.discovery_year) : null
           ].filter(isPresent);
-          return `<li><strong>${escapeHtml(planet.name)}</strong><span>${escapeHtml(facts.join(" · ") || "Planet parameters incomplete")}</span></li>`;
+          return `<li><strong>${escapeHtml(planet.name)}</strong><span>${escapeHtml(facts.join(" · ") || t("object.planetParametersIncomplete"))}</span></li>`;
         })
         .join("")}
     </ol>
-    ${hiddenCount ? `<p class="object-note">${hiddenCount} more confirmed ${hiddenCount === 1 ? "planet" : "planets"} in this system.</p>` : ""}
+    ${hiddenCount ? `<p class="object-note">${escapeHtml(t("object.moreConfirmedPlanets", { count: hiddenCount, planetWord: t(hiddenCount === 1 ? "object.planetSingular" : "object.planetPlural") }))}</p>` : ""}
   `;
 }
 
@@ -3185,7 +4129,7 @@ function renderDataSection(title: string, rows: (string | number | null | undefi
 function renderRows(rows: (string | number | null | undefined)[][]) {
   return rows
     .filter(([, value]) => value !== null && value !== undefined && value !== "")
-    .map(([label, value]) => `<dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value ?? "Unknown"))}</dd>`)
+    .map(([label, value]) => `<dt>${escapeHtml(String(label))}</dt><dd>${escapeHtml(String(value ?? t("value.unknown")))}</dd>`)
     .join("");
 }
 
@@ -3193,8 +4137,8 @@ function normalizeExternalLinks(links: readonly ExternalLink[]) {
   const seen = new Set<string>();
   return links
     .map((link) => ({
-      provider: typeof link.provider === "string" && link.provider.trim() ? link.provider.trim() : "Source",
-      label: typeof link.label === "string" && link.label.trim() ? link.label.trim() : "Open source record",
+      provider: typeof link.provider === "string" && link.provider.trim() ? link.provider.trim() : t("object.source"),
+      label: typeof link.label === "string" && link.label.trim() ? link.label.trim() : t("object.openSourceRecord"),
       url: typeof link.url === "string" ? link.url.trim() : ""
     }))
     .filter((link) => {
@@ -3238,7 +4182,9 @@ async function updateComparePicker() {
     activeKey: compareTargetKey,
     currentTargetKey: selected?.key ?? null,
     excludeKeys: [selected.key],
-    emptyMessage: "No comparison matches.",
+    emptyMessage: t("compare.noMatches"),
+    loadingMessage: t("search.loading"),
+    fallbackMessage: t("search.fallback"),
     queryForSearch: (query) => (target && query.toLowerCase() === target.name.toLowerCase() ? "" : query),
     afterRender: updateSelectedPanelMetrics
   });
@@ -3248,13 +4194,13 @@ function updateComparePanel() {
   const selected = selectedBody();
   const target = compareTarget();
   if (!selected) {
-    compareHeading.textContent = "Compare with another object";
+    compareHeading.textContent = t("compare.heading");
     comparePanel.innerHTML = "";
     updateSelectedPanelMetrics();
     return;
   }
 
-  compareHeading.textContent = `Compare ${selected.name}`;
+  compareHeading.textContent = t("compare.compareObject", { name: selected.name });
   if (!target) {
     comparePanel.innerHTML = `
       <section class="compare-card compare-card--empty">
@@ -3263,8 +4209,8 @@ function updateComparePanel() {
           <article class="compare-object compare-object--empty">
             <span>B</span>
             <div>
-              <strong>Choose object B</strong>
-              <small>Search below to compare distance and true size.</small>
+              <strong>${escapeHtml(t("compare.chooseObjectB"))}</strong>
+              <small>${escapeHtml(t("compare.searchToCompare"))}</small>
             </div>
           </article>
         </div>
@@ -3280,7 +4226,7 @@ function updateComparePanel() {
   comparePanel.innerHTML = `
     <section class="compare-card">
       <div class="compare-distance compare-distance--hero">
-        <span>Current distance</span>
+        <span>${escapeHtml(t("compare.currentDistance"))}</span>
         <strong>${escapeHtml(formatDistance(distanceKm))}</strong>
         <small>${escapeHtml(formatNumber(distanceKm / auKm()))} AU</small>
       </div>
@@ -3295,7 +4241,7 @@ function updateComparePanel() {
     <section class="size-compare-card">
       <div class="panel-head compact">
         <div>
-          <p class="eyebrow">True diameter ratio</p>
+          <p class="eyebrow">${escapeHtml(t("compare.trueDiameterRatio"))}</p>
           <h3>${escapeHtml(sizeComparison.ratioLabel)}</h3>
           <small>${escapeHtml(sizeComparison.scaleLabel)}</small>
         </div>
@@ -3311,7 +4257,7 @@ function updateComparePanel() {
 
 function renderCompareObject(body: Body, label: string) {
   const classification = classifyBody(body);
-  const radiusLabel = body.radius_km > 0 ? `${formatDistance(body.radius_km)} radius` : "radius unknown";
+  const radiusLabel = body.radius_km > 0 ? `${formatDistance(body.radius_km)} ${t("picker.radius")}` : t("compare.radiusUnknown");
   return `
     <article class="compare-object" style="--body-color: ${escapeHtml(body.color)}">
       <span>${label}</span>
@@ -3334,8 +4280,8 @@ function renderSizeDisk(body: Body, visual: SizeVisual) {
       </div>
       <figcaption>
         <strong>${escapeHtml(body.name)}</strong>
-        <span>${escapeHtml(formatDistance(body.radius_km * 2))} diameter</span>
-        ${visual.isSubpixel ? `<span class="size-subpixel-note">&lt;1 px at this scale</span>` : ""}
+        <span>${escapeHtml(formatDistance(body.radius_km * 2))} ${escapeHtml(t("field.diameter"))}</span>
+        ${visual.isSubpixel ? `<span class="size-subpixel-note">${escapeHtml(t("compare.subpixel"))}</span>` : ""}
       </figcaption>
     </figure>
   `;
@@ -3348,7 +4294,7 @@ function updateTimeSummary() {
 
 function updateTimeStepUi() {
   const step = currentTimeStep();
-  timeStepLabel.textContent = step.label;
+  timeStepLabel.textContent = t(step.labelKey);
 }
 
 function currentTimeStep() {
@@ -3381,11 +4327,40 @@ function updateScaleUi() {
   const pixelScale = formatDistance(auKm() / camera.pxPerAu);
   const viewScale = formatDistance(scaleAu * auKm());
   zoomScaleSlider.value = String(zoomLevel);
-  zoomScaleSlider.title = `1 px = ${pixelScale}`;
-  zoomScaleSlider.setAttribute("aria-valuetext", `${pixelScale} per pixel`);
+  zoomScaleSlider.title = t("scale.pixelEquals", { value: pixelScale });
+  zoomScaleSlider.setAttribute("aria-valuetext", t("scale.perPixel", { value: pixelScale }));
   zoomScaleLabel.textContent = `${zoomLevel} / ${ZOOM_SLIDER_STEPS}`;
-  zoomPixelScale.textContent = `1 px = ${pixelScale}`;
-  zoomViewScale.textContent = `View = ${viewScale}`;
+  zoomPixelScale.textContent = t("scale.pixelEquals", { value: pixelScale });
+  zoomViewScale.textContent = t("scale.viewEquals", { value: viewScale });
+}
+
+function universeShellForRadius(radiusLy: number) {
+  return UNIVERSE_SHELLS.find((shell) => radiusLy <= shell.radiusLy) ?? UNIVERSE_SHELLS[UNIVERSE_SHELLS.length - 1];
+}
+
+function formatLightYears(value: number) {
+  if (value >= 1_000_000_000) return `${formatNumber(value / 1_000_000_000)} Gly`;
+  if (value >= 1_000_000) return `${formatNumber(value / 1_000_000)} Mly`;
+  if (value >= 1_000) return `${formatNumber(value / 1_000)} kly`;
+  return `${formatNumber(value)} ly`;
+}
+
+function formatLookbackTime(distanceLy: number) {
+  if (distanceLy >= 1_000_000_000) return t("universe.context.gyr", { value: formatNumber(distanceLy / 1_000_000_000) });
+  if (distanceLy >= 1_000_000) return t("universe.context.myr", { value: formatNumber(distanceLy / 1_000_000) });
+  if (distanceLy >= 1_000) return t("universe.context.kyr", { value: formatNumber(distanceLy / 1_000) });
+  return t("universe.context.years", { value: formatNumber(distanceLy) });
+}
+
+function redshiftEstimate(distanceLy: number) {
+  const beta = clamp(distanceLy / HUBBLE_DISTANCE_LY, 0, 0.97);
+  return Math.sqrt((1 + beta) / (1 - beta)) - 1;
+}
+
+function formatRedshiftEstimate(distanceLy: number) {
+  const redshift = redshiftEstimate(distanceLy);
+  if (redshift < 0.001) return t("universe.context.redshiftNearby");
+  return `z ≈ ${redshift < 0.1 ? redshift.toFixed(3) : redshift.toFixed(2)}`;
 }
 
 function currentViewWidthAu() {
@@ -3468,6 +4443,7 @@ function setCompareTarget(key: string) {
   if (!body || body.key === selectedKey) return;
   compareTargetKey = body.key;
   compareSearch.value = body.name;
+  compareSearchState.activeOptionKey = null;
   recentDestinations = recordRecentDestination(body.key, { distanceFromEarthKm: body.distance_from_earth_km });
   updateCompareUi();
   requestRender();
@@ -3488,12 +4464,14 @@ function selectBody(key: string, options: { center?: boolean; zoom?: "local"; an
     compareTargetKey = null;
     compareSearch.value = "";
     compareSearchState.latestBodies = [];
+    compareSearchState.activeOptionKey = null;
   }
   ensureCompareTarget();
   activeTab = "object";
   recentDestinations = recordRecentDestination(body.key, { distanceFromEarthKm: body.distance_from_earth_km });
   if (options.center) centerOnBody(body, options.zoom === "local", options.animate ?? false);
   bodySearch.value = body.name;
+  catalogSearchState.activeOptionKey = null;
   hidePopover();
   updateAllUi();
   requestRender({ data: Boolean(options.center && !options.animate) });
@@ -3504,6 +4482,7 @@ function clearSelectedObject(options: { openSearch?: boolean } = {}) {
   compareTargetKey = null;
   compareSearch.value = "";
   compareSearchState.latestBodies = [];
+  compareSearchState.activeOptionKey = null;
   if (options.openSearch) {
     activeGuidedSetId = null;
     bodySearch.value = "";
@@ -3644,13 +4623,20 @@ function applyZoomPreset(preset: ZoomPreset, update = true) {
   if (!ephemeris) return;
   if (preset === "galaxy") {
     fitMilkyWayModel(0.14);
+  } else if (preset === "localGroup") {
+    fitUniverseModel(LOCAL_GROUP_MODEL, 0.12);
+  } else if (preset === "cosmicWeb") {
+    fitUniverseModel(COSMIC_WEB_MODEL, 0.10);
   } else {
     const bodies = presetBodies(preset);
     if (bodies.length > 0) fitBodies(bodies, 0.16);
   }
   updateZoomPresetButtons();
   updateScaleUi();
-  if (update) requestRender({ data: true });
+  if (update) {
+    requestRender();
+    requestDataRefresh({ immediate: true });
+  }
 }
 
 function presetBodies(preset: ZoomPreset) {
@@ -3664,7 +4650,7 @@ function presetBodies(preset: ZoomPreset) {
   if (preset === "nearby") {
     return ephemeris.bodies.filter((body) => body.catalog_group === "nearby_exoplanet_systems" || body.key === "sun");
   }
-  if (preset === "galaxy") {
+  if (preset === "galaxy" || preset === "localGroup" || preset === "cosmicWeb") {
     return [];
   }
   if (preset === "messier") {
@@ -3689,6 +4675,12 @@ function fitBodies(bodies: Body[], paddingRatio: number) {
 function fitMilkyWayModel(paddingRatio: number) {
   cancelCameraAnimation();
   const bounds = MILKY_WAY_MODEL.bounds;
+  fitWorldBounds(bounds.minXAu, bounds.maxXAu, bounds.minYAu, bounds.maxYAu, paddingRatio);
+}
+
+function fitUniverseModel(model: UniverseModel, paddingRatio: number) {
+  cancelCameraAnimation();
+  const bounds = model.bounds;
   fitWorldBounds(bounds.minXAu, bounds.maxXAu, bounds.minYAu, bounds.maxYAu, paddingRatio);
 }
 
@@ -3725,6 +4717,7 @@ function setZoomFromSlider() {
   updateZoomPresetButtons();
   updateScaleUi();
   requestRender();
+  scheduleCatalogPointLoad({ immediate: true });
   scheduleCameraDataRefresh();
 }
 
@@ -3754,8 +4747,16 @@ function zoomAt(x: number, y: number, factor: number, clearPreset = false, dataM
     updateZoomPresetButtons();
   }
   updateScaleUi();
-  requestRender(dataMode === "immediate" ? { data: true } : {});
-  if (dataMode === "deferred") scheduleCameraDataRefresh();
+  if (dataMode === "immediate") {
+    requestRender();
+    requestDataRefresh({ immediate: true });
+  } else {
+    requestRender();
+    if (dataMode === "deferred") {
+      scheduleCatalogPointLoad({ immediate: true });
+      scheduleCameraDataRefresh();
+    }
+  }
 }
 
 async function handleMapClick(point: ScreenPoint) {
@@ -3792,9 +4793,8 @@ async function handleMapClick(point: ScreenPoint) {
 }
 
 async function nearestCatalogPointAt(point: ScreenPoint): Promise<Body | null> {
-  if (!hasActiveCatalogPointLayer() || !shouldUseCatalogPoints(currentViewWidthLy())) return null;
   const filterParams = catalogPointFilterParams();
-  if (!filterParams) return null;
+  if (!filterParams || !hasActiveCatalogPointLayer() || !shouldUseCatalogPoints(currentViewWidthLy(), filterParams)) return null;
   const world = screenToWorld(point.x, point.y);
   const radiusAu = clamp(8 / Math.max(camera.pxPerAu, MIN_ZOOM), 0.000001, 10_000_000);
   const params = new URLSearchParams();
@@ -4071,19 +5071,21 @@ function usableViewportRect(): Rect {
   const bar = document.querySelector<HTMLElement>(".atlas-bar");
   const selection = document.querySelector<HTMLElement>(".selection-strip");
   const visibleModeRail = document.querySelector<HTMLElement>(".mode-rail:not([hidden])");
+  const scaleRail = document.querySelector<HTMLElement>(".scale-rail");
   const workspaceRect = workspace?.getBoundingClientRect();
   const barRect = bar?.getBoundingClientRect();
   const selectionRect = selection?.getBoundingClientRect();
   const modeRailRect = visibleModeRail?.getBoundingClientRect();
+  const scaleRailRect = scaleRail?.getBoundingClientRect();
   const isWide = window.innerWidth >= 900;
   const left = 0;
-  const topBoundary = Math.max(barRect?.bottom ?? 0, isWide ? 0 : selectionRect?.bottom ?? 0);
+  const topBoundary = Math.max(barRect?.bottom ?? 0, !isWide ? modeRailRect?.bottom ?? 0 : 0, !isWide ? selectionRect?.bottom ?? 0 : 0);
   const top = Math.max(0, topBoundary + 8);
   const rightObstructions = [workspaceRect?.left, selectionRect && !selectedObjectPanel.hidden ? selectionRect.left : undefined].filter(
     (value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0
   );
   const right = isWide && rightObstructions.length > 0 ? Math.max(240, Math.min(...rightObstructions) - 12) : window.innerWidth;
-  const bottomBoundary = !isWide ? modeRailRect?.top ?? window.innerHeight : window.innerHeight;
+  const bottomBoundary = !isWide ? scaleRailRect?.top ?? window.innerHeight : window.innerHeight;
   const bottom = Math.max(top + 160, bottomBoundary - 10);
   return {
     left,
@@ -4253,32 +5255,65 @@ function formatDistance(km: number) {
 }
 
 function nullableDistance(km: number | null | undefined) {
-  return typeof km === "number" && Number.isFinite(km) ? formatDistance(km) : "Unknown";
+  return typeof km === "number" && Number.isFinite(km) ? formatDistance(km) : t("value.unknown");
 }
 
 function nullableNumber(value: number | null | undefined, digits: number) {
-  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "Unknown";
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : t("value.unknown");
 }
 
 function nullableDegrees(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${value.toFixed(2)} deg` : "Unknown";
+  return typeof value === "number" && Number.isFinite(value) ? t("value.degrees", { value: value.toFixed(2) }) : t("value.unknown");
 }
 
 function nullableDays(value: number | null | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value)) return "Unknown";
-  if (value >= 365) return `${(value / 365.25).toFixed(2)} years`;
-  return `${value.toFixed(2)} days`;
+  if (typeof value !== "number" || !Number.isFinite(value)) return t("value.unknown");
+  if (value >= 365) return t("value.years", { value: (value / 365.25).toFixed(2) });
+  return t("value.days", { value: value.toFixed(2) });
 }
 
 function nullableLightYears(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? `${formatNumber(value)} ly` : "Unknown";
+  return typeof value === "number" && Number.isFinite(value) ? `${formatNumber(value)} ly` : t("value.unknown");
 }
 
-function formatRaDec(body: Body) {
+function equatorialCoordinatesForBody(body: Body) {
   const raDeg = finiteOptionalNumber(body.catalog?.ra_deg);
   const decDeg = finiteOptionalNumber(body.catalog?.dec_deg);
   if (raDeg == null || decDeg == null) return null;
-  return `${raDeg.toFixed(5)} deg, ${decDeg.toFixed(5)} deg`;
+  return { raDeg, decDeg };
+}
+
+function formatRightAscensionForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatRightAscension(coordinates.raDeg)} (${formatDecimalDegrees(coordinates.raDeg)})`;
+}
+
+function formatDeclinationForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatDeclination(coordinates.decDeg)} (${formatDecimalDegrees(coordinates.decDeg)})`;
+}
+
+function formatRaDecDecimal(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  if (!coordinates) return null;
+  return `${formatDecimalDegrees(coordinates.raDeg)}, ${formatDecimalDegrees(coordinates.decDeg)}`;
+}
+
+function galacticCoordinatesForBody(body: Body) {
+  const coordinates = equatorialCoordinatesForBody(body);
+  return coordinates ? equatorialToGalactic(coordinates) : null;
+}
+
+function formatGalacticLongitude(body: Body) {
+  const coordinates = galacticCoordinatesForBody(body);
+  return coordinates ? formatDecimalDegrees(coordinates.longitudeDeg, 3) : null;
+}
+
+function formatGalacticLatitude(body: Body) {
+  const coordinates = galacticCoordinatesForBody(body);
+  return coordinates ? formatDecimalDegrees(coordinates.latitudeDeg, 3) : null;
 }
 
 function formatAuCoordinate(value: number) {
@@ -4377,7 +5412,7 @@ function formatFullDate(value: string) {
 }
 
 function readablePositionModel(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) || "Unknown";
+  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) || t("value.unknown");
 }
 
 function shortBodyName(name: string) {

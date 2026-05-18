@@ -9,6 +9,7 @@ defmodule StarsmapApi.Catalog.Importer do
   @parsec_au 206_264.80624709636
   @light_year_km 9_460_730_472_580.8
   @solar_radius_km 695_700.0
+  @earth_radius_km 6_371.0
   @obliquity_deg 23.4392911
   @report_sample_limit 20
 
@@ -105,6 +106,41 @@ defmodule StarsmapApi.Catalog.Importer do
     })
   end
 
+  def row_for_entry(:exoplanet, entry, source_meta) do
+    position = projected_position(entry)
+
+    base_row(entry, source_meta, position, %{
+      object_type: "planet",
+      catalog_group: "exoplanets",
+      source_type: "exoplanet_archive_planet",
+      position_model: "exoplanet_archive_host_coordinates",
+      parent_key: entry["parent_key"],
+      radius_km: earth_radius_to_km(entry["radius_earth"]),
+      aliases: list(entry["aliases"]),
+      external_ids: reject_nil_values(%{"nasa_exoplanet_archive_name" => entry["name"]}),
+      facts:
+        take(entry, [
+          "host_key",
+          "host_name",
+          "radius_earth",
+          "mass_earth",
+          "period_days",
+          "semi_major_axis_au",
+          "discovery_method",
+          "discovery_year",
+          "system_star_count",
+          "system_planet_count",
+          "system_moon_count",
+          "why_interesting"
+        ]),
+      search_values: [
+        entry["host_name"],
+        entry["discovery_method"],
+        entry["why_interesting"]
+      ]
+    })
+  end
+
   def row_for_entry(:bright_star, entry, source_meta) do
     position = projected_position(entry)
 
@@ -179,6 +215,60 @@ defmodule StarsmapApi.Catalog.Importer do
         entry["constellation"],
         entry["common_name"],
         entry["why_interesting"]
+      ]
+    })
+  end
+
+  def row_for_entry(:ngc_ic_deep_sky, entry, source_meta) do
+    position = projected_position_optional(entry)
+    physical_diameter_ly = number(entry["physical_diameter_ly"]) || angular_diameter_ly(entry)
+
+    base_row(entry, source_meta, position, %{
+      object_type: entry["object_type"] || "deep_sky_object",
+      catalog_group: "ngc_ic_deep_sky",
+      source_type: "openngc_ngc_ic_catalog",
+      position_model: "openngc_j2000_coordinates",
+      radius_km: deep_sky_radius_km(entry),
+      aliases: list(entry["aliases"]),
+      external_ids: %{
+        "messier" => prefixed_id("M", entry["messier"]),
+        "ngc" => prefixed_id("NGC", entry["ngc"]),
+        "ic" => prefixed_id("IC", entry["ic"])
+      },
+      facts:
+        (entry["facts"] || %{})
+        |> Map.merge(
+          take(entry, [
+            "catalog_designation",
+            "messier",
+            "ngc",
+            "ic",
+            "distance_quality",
+            "deep_sky_type",
+            "deep_sky_type_label",
+            "angular_size_arcmin",
+            "constellation",
+            "common_name",
+            "physical_diameter_ly",
+            "physical_minor_diameter_ly",
+            "physical_size_note"
+          ])
+        )
+        |> Map.put("physical_diameter_ly", physical_diameter_ly),
+      search_values: [
+        entry["catalog_designation"],
+        entry["messier"],
+        entry["ngc"],
+        entry["ic"],
+        entry["deep_sky_type"],
+        entry["deep_sky_type_label"],
+        entry["constellation"],
+        fact(entry, "hubble_type"),
+        fact(entry, "openngc_notes"),
+        fact(entry, "ned_notes"),
+        fact(entry, "why_interesting"),
+        fact(entry, "identifiers"),
+        fact(entry, "common_names")
       ]
     })
   end
@@ -267,6 +357,71 @@ defmodule StarsmapApi.Catalog.Importer do
         fact(entry, "redshift")
       ]
     })
+  end
+
+  def row_for_entry(:simbad_compact_object, entry, source_meta) do
+    position = projected_position(entry)
+
+    base_row(entry, source_meta, position, %{
+      object_type: entry["object_type"] || "unknown",
+      catalog_group: "simbad_compact_objects",
+      source_type: "simbad_tap",
+      position_model: entry["position_model"] || "simbad_compact_object_coordinates",
+      radius_km: number(entry["radius_km"], 0.0),
+      aliases: list(entry["aliases"]),
+      external_ids: entry["external_ids"] || %{},
+      facts:
+        (entry["facts"] || %{})
+        |> Map.put_new("why_interesting", entry["why_interesting"])
+        |> reject_nil_values()
+        |> reject_empty_values(),
+      search_values: [
+        entry["why_interesting"],
+        fact(entry, "simbad_object_type"),
+        fact(entry, "simbad_object_type_label"),
+        fact(entry, "distance_quality")
+      ]
+    })
+  end
+
+  def row_for_entry(:curated_extragalactic_survey, entry, source_meta) do
+    position = projected_position(entry)
+
+    base_row(entry, source_meta, position, %{
+      object_type: entry["object_type"] || "galaxy",
+      catalog_group: "curated_extragalactic_survey",
+      source_type: entry["source_type"] || "curated_extragalactic_survey",
+      position_model: entry["position_model"] || "survey_ra_dec_distance_coordinates",
+      radius_km: number(entry["radius_km"], 0.0),
+      aliases: list(entry["aliases"]),
+      external_ids: entry["external_ids"] || %{},
+      facts:
+        (entry["facts"] || %{})
+        |> Map.put_new("why_interesting", entry["why_interesting"])
+        |> reject_nil_values()
+        |> reject_empty_values(),
+      search_values: [
+        entry["why_interesting"],
+        fact(entry, "source_catalog"),
+        fact(entry, "survey_class"),
+        fact(entry, "redshift")
+      ]
+    })
+  end
+
+  defp rows_for_file({:exoplanet_system = type, path}) do
+    data = path |> File.read!() |> Jason.decode!()
+    source_meta = source_meta(type, data, path)
+    systems = entries(type, data)
+
+    system_rows = Enum.map(systems, &row_for_entry(:exoplanet_system, &1, source_meta))
+
+    planet_rows =
+      systems
+      |> Enum.flat_map(&exoplanet_planet_entries/1)
+      |> Enum.map(&row_for_entry(:exoplanet, &1, source_meta))
+
+    system_rows ++ planet_rows
   end
 
   defp rows_for_file({type, path}) do
@@ -374,9 +529,43 @@ defmodule StarsmapApi.Catalog.Importer do
   defp entries(:exoplanet_system, data), do: Map.fetch!(data, "systems")
   defp entries(:bright_star, data), do: Map.fetch!(data, "stars")
   defp entries(:deep_sky, data), do: Map.fetch!(data, "objects")
+  defp entries(:ngc_ic_deep_sky, data), do: Map.fetch!(data, "objects")
   defp entries(:small_body, data), do: Map.fetch!(data, "objects")
   defp entries(:gaia_star, data), do: Map.fetch!(data, "stars")
   defp entries(:simbad_extragalactic, data), do: Map.fetch!(data, "objects")
+  defp entries(:simbad_compact_object, data), do: Map.fetch!(data, "objects")
+  defp entries(:curated_extragalactic_survey, data), do: Map.fetch!(data, "objects")
+
+  defp exoplanet_planet_entries(system) do
+    host_key = system["key"]
+    host_name = system["name"]
+
+    system
+    |> Map.get("planets", [])
+    |> Enum.filter(&is_map/1)
+    |> Enum.map(fn planet ->
+      planet_name = planet["name"] |> to_string() |> String.trim()
+
+      planet
+      |> Map.merge(%{
+        "key" => planet["key"] || "exoplanet-#{slug_key(planet_name)}",
+        "name" => planet_name,
+        "parent_key" => host_key,
+        "host_key" => host_key,
+        "host_name" => host_name,
+        "aliases" => [planet_name, "#{host_name} planet"],
+        "ra_deg" => system["ra_deg"],
+        "dec_deg" => system["dec_deg"],
+        "distance_pc" => system["distance_pc"],
+        "system_star_count" => system["system_star_count"],
+        "system_planet_count" => system["system_planet_count"],
+        "system_moon_count" => system["system_moon_count"],
+        "color" => planet["color"] || "#89d6ff",
+        "why_interesting" => exoplanet_note(planet, host_name)
+      })
+    end)
+    |> Enum.reject(fn planet -> planet["name"] == "" end)
+  end
 
   defp source_meta(type, data, path) do
     %{
@@ -401,9 +590,12 @@ defmodule StarsmapApi.Catalog.Importer do
       {:exoplanet_system, Path.join(catalog_dir, "exoplanet_systems.json")},
       {:bright_star, Path.join(catalog_dir, "bright_stars.json")},
       {:deep_sky, Path.join(catalog_dir, "deep_sky_catalog.json")},
+      {:ngc_ic_deep_sky, Path.join(catalog_dir, "ngc_ic_deep_sky.json")},
       {:small_body, Path.join(catalog_dir, "small_bodies.json")},
       {:gaia_star, Path.join(catalog_dir, "gaia_local_stars.json")},
-      {:simbad_extragalactic, Path.join(catalog_dir, "simbad_extragalactic.json")}
+      {:simbad_extragalactic, Path.join(catalog_dir, "simbad_extragalactic.json")},
+      {:simbad_compact_object, Path.join(catalog_dir, "simbad_compact_objects.json")},
+      {:curated_extragalactic_survey, Path.join(catalog_dir, "curated_extragalactic_survey.json")}
     ]
     |> Enum.filter(fn {_type, path} -> File.exists?(path) end)
   end
@@ -494,6 +686,22 @@ defmodule StarsmapApi.Catalog.Importer do
     }
   end
 
+  defp projected_position_optional(entry) do
+    projected_position(entry)
+  rescue
+    ArgumentError ->
+      %{
+        distance_pc: nil,
+        distance_ly: nil,
+        x_au: nil,
+        y_au: nil,
+        z_au: nil,
+        x_km: nil,
+        y_km: nil,
+        z_km: nil
+      }
+  end
+
   defp cartesian_position(entry) do
     x_au = number(entry["x_au"])
     y_au = number(entry["y_au"])
@@ -525,6 +733,9 @@ defmodule StarsmapApi.Catalog.Importer do
 
   defp solar_radius_to_km(nil), do: 0.0
   defp solar_radius_to_km(value), do: number(value, 0.0) * @solar_radius_km
+
+  defp earth_radius_to_km(nil), do: 0.0
+  defp earth_radius_to_km(value), do: number(value, 0.0) * @earth_radius_km
 
   defp distance_ly_to_pc(nil), do: nil
   defp distance_ly_to_pc(value), do: value / 3.261563777
@@ -635,6 +846,28 @@ defmodule StarsmapApi.Catalog.Importer do
     case entry["external_ids"] do
       ids when is_map(ids) -> ids[key]
       _ -> nil
+    end
+  end
+
+  defp slug_key(value) do
+    value
+    |> to_string()
+    |> String.downcase()
+    |> String.replace("+", " plus ")
+    |> String.replace(~r/[^a-z0-9]+/, "-")
+    |> String.trim("-")
+  end
+
+  defp exoplanet_note(planet, host_name) do
+    cond do
+      number(planet["semi_major_axis_au"]) != nil and number(planet["semi_major_axis_au"]) < 0.05 ->
+        "A confirmed close-in exoplanet orbiting #{host_name}."
+
+      number(planet["radius_earth"]) != nil and number(planet["radius_earth"]) < 1.5 ->
+        "A confirmed roughly Earth-sized exoplanet orbiting #{host_name}."
+
+      true ->
+        "A confirmed exoplanet from the NASA Exoplanet Archive orbiting #{host_name}."
     end
   end
 

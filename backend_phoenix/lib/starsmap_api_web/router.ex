@@ -10,6 +10,8 @@ defmodule StarsmapApiWeb.Router do
   end
 
   scope "/", StarsmapApiWeb do
+    get "/catalog-tiles/v1/*path", CatalogTileProxyController, :show
+
     pipe_through :browser
 
     get "/", PageController, :index

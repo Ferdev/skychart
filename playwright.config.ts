@@ -32,7 +32,7 @@ export default defineConfig({
   projects: [
     {
       name: "smoke",
-      testMatch: /.*\.smoke\.spec\.ts/,
+      testMatch: [/.*\.smoke\.spec\.ts/, /.*\.guardrail\.spec\.ts/],
       use: {
         browserName: "chromium",
         launchOptions: chromiumLaunchOptions,
@@ -46,6 +46,16 @@ export default defineConfig({
         browserName: "chromium",
         launchOptions: chromiumLaunchOptions,
         viewport: { width: 1600, height: 1000 }
+      }
+    },
+    {
+      name: "mobile",
+      testMatch: /.*\.mobile\.spec\.ts/,
+      use: {
+        browserName: "chromium",
+        launchOptions: chromiumLaunchOptions,
+        viewport: { width: 390, height: 844 },
+        isMobile: true
       }
     }
   ]

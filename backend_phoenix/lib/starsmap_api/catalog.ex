@@ -732,7 +732,8 @@ defmodule StarsmapApi.Catalog do
       simbad_link(name, object),
       ned_link(name, object),
       jpl_small_body_link(identifiers),
-      gaia_link(identifiers, facts)
+      gaia_link(identifiers, facts),
+      nasa_exoplanet_link(identifiers, object)
     ]
     |> Enum.reject(&is_nil/1)
   end
@@ -793,6 +794,27 @@ defmodule StarsmapApi.Catalog do
   end
 
   defp gaia_link(_identifiers, _facts), do: nil
+
+  defp nasa_exoplanet_link(%{"nasa_exoplanet_archive_name" => planet_name}, _object)
+       when is_binary(planet_name) do
+    %{
+      provider: "NASA Exoplanet Archive",
+      label: "NASA Exoplanet Archive lookup",
+      url:
+        "https://exoplanetarchive.ipac.caltech.edu/overview/#{URI.encode_www_form(planet_name)}"
+    }
+  end
+
+  defp nasa_exoplanet_link(_identifiers, %{source_type: "exoplanet_archive_system", name: name})
+       when is_binary(name) do
+    %{
+      provider: "NASA Exoplanet Archive",
+      label: "NASA Exoplanet Archive lookup",
+      url: "https://exoplanetarchive.ipac.caltech.edu/overview/#{URI.encode_www_form(name)}"
+    }
+  end
+
+  defp nasa_exoplanet_link(_identifiers, _object), do: nil
 
   defp viewport_bounds(params) do
     with {:ok, min_x_au} <- required_float(params, "min_x_au"),

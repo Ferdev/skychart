@@ -1,6 +1,6 @@
 # Cosmic Atlas
 
-Cosmic Atlas is a scientific 2D celestial atlas. It renders Solar System bodies, confirmed exoplanet host systems, Hipparcos bright stars, Gaia local-neighborhood stars, JPL small bodies, SIMBAD extragalactic objects, nearby stars, and Messier deep-sky objects in one heliocentric ecliptic coordinate space so they can be searched, inspected, centered, measured, and compared.
+Cosmic Atlas is a scientific 2D celestial atlas. It renders Solar System bodies, confirmed exoplanet host systems, Hipparcos bright stars, Gaia local-neighborhood stars, JPL small bodies, SIMBAD extragalactic objects, curated survey-backed universe landmarks, nearby stars, Messier deep-sky objects, and the generated OpenNGC NGC/IC deep-sky catalog in one heliocentric ecliptic coordinate space so they can be searched, inspected, centered, measured, and compared.
 
 ## What Is Included
 
@@ -11,15 +11,17 @@ Cosmic Atlas is a scientific 2D celestial atlas. It renders Solar System bodies,
 - Static Gaia DR3 local-neighborhood star positions projected from right ascension, declination, and parallax-derived distance, with Gaia G magnitude, BP-RP color, proper-motion facts, and estimated stellar radius when enough catalog data is present.
 - JPL Small-Body Database asteroids and comets propagated from osculating elements into approximate heliocentric ecliptic positions for search, viewport loading, and comparison.
 - Static Messier deep-sky positions projected from catalog right ascension, declination, and distance estimates, with NGC/IC aliases where listed.
+- OpenNGC NGC/IC deep-sky catalog entries generated from the OpenNGC `database_files/NGC.csv` snapshot, with stable `ngc-*` / `ic-*` keys, aliases, object classes, constellations, magnitudes, angular sizes, and distance projections when OpenNGC supplies positive parallax, redshift, or radial velocity.
 - SIMBAD galaxies, quasars, and active galactic nuclei projected from RA/Dec and redshift-derived distance estimates, with SIMBAD and NED lookup links attached.
+- A compact curated extragalactic survey landmark catalog covering Local Volume galaxies, Virgo/Fornax/Abell cluster anchors, Shapley/Great Attractor supercluster context, and famous 3C/APM/Tonantzintla quasars/blazars without a bulk survey download.
 - Catalog metadata for each loaded object: object type, parent body, source kernel or catalog source, catalog group, and dynamic/static position model.
 - Object inspection for physical radius, Earth distance, heliocentric distance, state-vector speeds, osculating orbital elements, stellar data, and deep-sky observing metadata.
 - Curated NASA/JPL and NASA/Hubble media for selected high-value objects, with title, credit, license, and source link shown directly in object detail.
 - Distance measurement between selected objects or map points, including light-time and scale comparisons.
 - UTC time controls: apply a timestamp, jump to now, or step by days/weeks/months.
-- Map view controls for object labels, orbit guides, scale grid, Milky Way projection, edge references, zoom presets, and readable/hybrid/true-size rendering.
-- Guided object sets for Solar neighborhood, bright stars, nearby stars, small bodies, Messier highlights, galaxies, active galaxies, and nebulae.
-- A scale ladder that marks whether the current viewport is planetary, Solar System, nearby-star, Milky Way, or Local Group scale.
+- Map view controls for object labels, orbit guides, scale grid, Milky Way projection, Local Group structure, galaxy-cluster context, quasar fields, cosmic-web filaments, edge references, zoom presets, and readable/hybrid/true-size rendering.
+- Guided object sets for Solar neighborhood, bright stars, nearby stars, small bodies, Messier highlights, galaxies, active galaxies, nebulae, and universe-scale exploration.
+- A scale ladder that marks whether the current viewport is planetary, Solar System, nearby-star, Milky Way, Local Group, galaxy-cluster, or cosmic-web scale.
 
 The old piloting/game prototype has been split out to the `game/ship-prototype` branch.
 
@@ -131,7 +133,7 @@ kamal app exec -d production --primary --env MIX_ENV:prod --env CATALOG_IMPORT_S
 The Gaia importer accepts either standard `PG*` environment variables or `DATABASE_URL` for its `psql` connection.
 Production uses an `ecto://` `DATABASE_URL`; the importer converts that to a PostgreSQL URL for `psql`.
 
-Static point tiles are built separately from normal deploys. Production should use the manual `Build Production Catalog Tiles` GitHub workflow after the image is deployed; that workflow builds the `/catalog-tiles/v1` pyramid inside the production app container with low CPU priority and uploads it to the configured S3-compatible bucket/CDN. Normal deploys only inject `CATALOG_TILE_MANIFEST_URL` into the HTML so the browser can load the CDN manifest and immutable `.bin` tile files.
+Static point tiles are built separately from normal deploys. Use the manual `Build Catalog Tiles` GitHub workflow after the image is deployed; choose `target_environment=staging` or `production` as the source database/container and an immutable `catalog_version` such as `v2`. The workflow builds that `/catalog-tiles/<version>` pyramid inside the selected app container with low CPU priority and uploads it to the configured S3-compatible bucket/CDN. Normal deploys only inject the selected manifest URL into the HTML, so staging and production can share the same verified immutable tile artifact without sharing a writable Postgres database.
 
 ## Data Source
 
@@ -143,15 +145,21 @@ Bright stars are loaded from `data/catalogs/bright_stars.json`, generated by `sc
 
 Gaia local stars are loaded from `data/catalogs/gaia_local_stars.json`, generated by `scripts/build_gaia_local_catalog.py` from the ESA Gaia DR3 `gaiadr3.gaia_source` table. The default snapshot includes 33,170 nearby sources with parallax `>= 20 mas`, parallax-over-error `>= 10`, and Gaia G magnitude `<= 16`.
 
-The larger Gaia point layers are imported directly into Phoenix/Postgres with `scripts/import_gaia_bulk_catalog.py --preset 500pc-g14` and `scripts/import_gaia_bulk_catalog.py --preset 10kpc-g12`. The current bulk slices add 3,016,638 Gaia DR3 sources between 50 and 500 pc and 1,928,481 broader bright Gaia DR3 sources between 500 pc and 10 kpc, without creating multi-gigabyte JSON snapshots or increasing the app startup payload.
+The larger Gaia point layers are imported directly into Phoenix/Postgres with `scripts/import_gaia_bulk_catalog.py --preset 500pc-g14` and `scripts/import_gaia_bulk_catalog.py --preset 10kpc-g14`. The current bulk slices target about 1.6 million Gaia DR3 sources between 50 and 500 pc plus about 13.15 million broader bright Gaia DR3 sources between 500 pc and 10 kpc, without creating multi-gigabyte JSON snapshots or increasing the app startup payload.
 
 Small bodies are loaded from `data/catalogs/small_bodies.json`, generated by `scripts/build_small_body_catalog.py` from the NASA/JPL Small-Body Database Query API. The current snapshot imports 17,630 large diameter-known asteroids, bright near-Earth asteroids, and non-fragment comets. Positions are approximate two-body propagations from SBDB osculating elements to the snapshot generation timestamp, not full N-body ephemerides.
 
 Messier objects are loaded from a generated snapshot in `data/catalogs/deep_sky_catalog.json`. The generator script `scripts/build_deep_sky_catalog.py` pulls the AstroPixels Messier table for RA/Dec, distance estimates, apparent magnitude, angular size, constellation, season, and common names, and records NASA HEASARC Messier table notes as catalog context. When angular size and distance are available, the backend derives an estimated physical diameter for true-size rendering.
 
+NGC and IC objects are loaded from `data/catalogs/ngc_ic_deep_sky.json`, generated by `scripts/build_ngc_ic_catalog.py` from the OpenNGC `database_files/NGC.csv` table. The snapshot skips duplicate and nonexistent OpenNGC rows, keeps stable keys such as `ngc-224` and `ic-434`, and imports 13k+ NGC/IC objects into the `ngc_ic_deep_sky` catalog group. Objects without trustworthy distance fields remain searchable by catalog position and metadata without inventing distances.
+
 SIMBAD extragalactic objects are loaded from `data/catalogs/simbad_extragalactic.json`, generated by `scripts/build_simbad_extragalactic_catalog.py` from the SIMBAD TAP `basic` table. The current snapshot imports 5,000 high-reference-count galaxies, quasars, blazars, Seyfert galaxies, radio sources, and active galactic nuclei with positive redshifts. Distances are approximate flat Lambda-CDM redshift distances for atlas placement.
 
+Curated extragalactic survey landmarks are loaded from `data/catalogs/curated_extragalactic_survey.json`, generated by `scripts/build_curated_extragalactic_survey_catalog.py`. The compact static snapshot deliberately avoids bulk survey downloads while adding source-backed Local Volume galaxies, Virgo/Fornax/Abell cluster anchors, Shapley and Great Attractor context landmarks, and famous 3C/APM/Tonantzintla quasars/blazars with NED/SIMBAD and survey-catalog provenance.
+
 The Milky Way view layer is a procedural frontend context layer, not a catalog of individual stars. It defines the Galactic center, outer disk, solar circle, and major spiral-arm density guides in Galactic coordinates, then rotates diffuse haze, dust lanes, and reference geometry into the same heliocentric ecliptic frame used by the canvas. Real Gaia point primitives render over that context layer; the Milky Way renderer does not add fake selectable-looking stars.
+
+The Local Group and cosmic-web layers in `src/universeModel.ts` are also procedural context, not catalog objects. They add non-selectable, labeled scale scaffolding for the Milky Way/Andromeda neighborhood, Virgo/Fornax/Coma clusters, Local Supercluster/Laniakea-scale flow, Great Attractor context, quasar fields, and redshift-survey shells so the map remains interpretable after zooming beyond real point-catalog density. Real Messier, OpenNGC, SIMBAD galaxy/quasar, and Gaia tiles render above or alongside those guides where the catalog has data.
 
 Object media is resolved in `src/objectMedia.ts`. Curated NASA Image and Video Library assets cover the Sun, major planets, Pluto, the Moon, M31, M42, M45, and M57 with visible attribution. Objects with right ascension and declination but no curated image use a deterministic CDS/Aladin DSS2 survey cutout, so searched catalog objects can still show real sky imagery without live media search. Objects without either source show an explicit catalog-only state instead of an empty media gap.
 
@@ -212,6 +220,7 @@ The timestamp input is treated as UTC. Changing time recomputes every dynamic ce
 - Messier deep-sky objects use static catalog RA/Dec and distance estimates. Their distances and physical sizes are educational catalog values, not mission-grade astrometric solutions.
 - SIMBAD extragalactic distances are redshift-derived estimates. Local peculiar velocities and cosmology assumptions can dominate nearby-galaxy placement error.
 - The Milky Way layer is an oriented procedural context model. Its diffuse haze, dust lanes, core glow, and spiral-arm density guides are for spatial context, not a high-precision structural model. Catalog stars are rendered by the real Gaia point layer instead.
+- The Local Group, galaxy-cluster, quasar-field, and cosmic-web overlays are non-selectable context guides. They preserve true coordinate scale but summarize structures that cannot be represented as complete shipped catalogs; use them as navigation scaffolding around real catalog points, not as precision survey data.
 - NGC/IC support currently comes through aliases attached to Messier objects, not the full NGC/IC catalog.
 - Osculating orbital elements are computed from a single instantaneous state vector. They are useful for inspection and rough comparison, but they are not permanent catalog elements or mission-grade propagated orbits.
 - The map is a top-down ecliptic projection, so it does not show vertical displacement visually.

@@ -290,25 +290,36 @@ defmodule StarsmapApi.Catalog.ImporterTest do
       })
     )
 
-    assert {:ok, %{total: 3, counts: counts, report: report}} =
+    assert {:ok, %{total: 4, counts: counts, report: report}} =
              Importer.import_all(data_dir: data_dir)
 
-    assert counts == %{"bright_stars" => 1, "exoplanet_systems" => 1, "messier_deep_sky" => 1}
+    assert counts == %{
+             "bright_stars" => 1,
+             "exoplanet_systems" => 1,
+             "exoplanets" => 1,
+             "messier_deep_sky" => 1
+           }
+
     assert report[:valid?] == true
     assert report.source_types["bright_star_catalog"].rows == 1
     assert report.source_types["deep_sky_catalog"].rows == 1
     assert report.source_types["exoplanet_archive_system"].rows == 1
+    assert report.source_types["exoplanet_archive_planet"].rows == 1
 
-    assert Repo.aggregate(CatalogObject, :count) == 3
+    assert Repo.aggregate(CatalogObject, :count) == 4
 
     assert Catalog.summary().source_counts == %{
              "bright_star_catalog" => 1,
              "deep_sky_catalog" => 1,
+             "exoplanet_archive_planet" => 1,
              "exoplanet_archive_system" => 1
            }
 
-    assert {:ok, %{total: 3}} = Importer.import_all(data_dir: data_dir)
-    assert Repo.aggregate(CatalogObject, :count) == 3
+    assert %CatalogObject{object_type: "planet", parent_key: "exosys-test"} =
+             Repo.get_by(CatalogObject, key: "exoplanet-test-host-b")
+
+    assert {:ok, %{total: 4}} = Importer.import_all(data_dir: data_dir)
+    assert Repo.aggregate(CatalogObject, :count) == 4
   end
 
   defp tmp_catalog_dir do

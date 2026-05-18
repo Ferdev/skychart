@@ -76,7 +76,7 @@ python3 "$repo_root/scripts/import_gaia_bulk_catalog.py" \
 
 echo "[catalog-import] Ensuring Gaia 10 kpc bright bulk slice is present..."
 python3 "$repo_root/scripts/import_gaia_bulk_catalog.py" \
-  --preset 10kpc-g12 \
+  --preset 10kpc-g14 \
   --skip-if-existing-at-least "$gaia_10kpc_min_count"
 
 echo "[catalog-import] Refreshing catalog summary counts..."
