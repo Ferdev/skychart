@@ -79,7 +79,7 @@ defmodule StarsmapApiWeb.CatalogTileProxyController do
     with {:ok, manifest} <- Jason.decode(body),
          true <- is_map(manifest) do
       manifest
-      |> Map.put("tile_url_template", "/catalog-tiles/v1/s{span_log2}/x{x}/y{y}.bin")
+      |> rewrite_tile_url_templates()
       |> Jason.encode!()
     else
       _ -> body
@@ -87,4 +87,22 @@ defmodule StarsmapApiWeb.CatalogTileProxyController do
   end
 
   defp maybe_rewrite_manifest(body, _path), do: body
+
+  defp rewrite_tile_url_templates(manifest) do
+    manifest
+    |> Map.put("tile_url_template", "/catalog-tiles/v1/s{span_log2}/x{x}/y{y}.bin")
+    |> Map.update("layers", [], fn layers ->
+      Enum.map(layers, fn
+        %{"id" => layer_id} = layer when is_binary(layer_id) ->
+          Map.put(
+            layer,
+            "tile_url_template",
+            "/catalog-tiles/v1/layers/#{layer_id}/s{span_log2}/x{x}/y{y}.bin"
+          )
+
+        layer ->
+          layer
+      end)
+    end)
+  end
 end
