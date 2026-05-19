@@ -10,7 +10,7 @@ defmodule StarsmapApiWeb.CatalogTileProxyController do
          {:ok, status, headers, body} <- fetch_upstream(upstream_url) do
       conn
       |> put_proxy_headers(headers, path)
-      |> send_resp(status, maybe_rewrite_manifest(body, path))
+      |> send_proxied_response(status, body, path)
     else
       {:error, :not_configured} ->
         conn
@@ -56,6 +56,21 @@ defmodule StarsmapApiWeb.CatalogTileProxyController do
     end
   end
 
+  defp send_proxied_response(conn, status, body, path) when status in [403, 404] do
+    if tile_path?(path) do
+      conn
+      |> put_resp_content_type("application/octet-stream")
+      |> put_resp_header("x-starsmap-total", "0")
+      |> put_resp_header("x-starsmap-returned", "0")
+      |> send_resp(200, empty_smp2_tile())
+    else
+      send_resp(conn, status, maybe_rewrite_manifest(body, path))
+    end
+  end
+
+  defp send_proxied_response(conn, status, body, path),
+    do: send_resp(conn, status, maybe_rewrite_manifest(body, path))
+
   defp put_proxy_headers(conn, upstream_headers, path) do
     content_type = upstream_content_type(upstream_headers) || content_type_for_path(path)
 
@@ -74,6 +89,10 @@ defmodule StarsmapApiWeb.CatalogTileProxyController do
 
   defp content_type_for_path([@manifest_name]), do: "application/json"
   defp content_type_for_path(_path), do: "application/octet-stream"
+
+  defp tile_path?(path), do: List.last(path) |> to_string() |> String.ends_with?(".bin")
+
+  defp empty_smp2_tile, do: <<"SMP2", 0::little-unsigned-integer-size(32)>>
 
   defp maybe_rewrite_manifest(body, [@manifest_name]) do
     with {:ok, manifest} <- Jason.decode(body),
