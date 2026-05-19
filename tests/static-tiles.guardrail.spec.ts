@@ -215,4 +215,54 @@ test.describe("static catalog tile guardrails", () => {
     expect(urls.some((url) => url.includes("/layers/black_holes/"))).toBe(false);
     expect(urls.some((url) => url.includes("/layers/nebulae/"))).toBe(false);
   });
+
+  test("renders catalog point tiles progressively while a sibling tile is still pending", async ({ page }) => {
+    await installAtlasPerfInstrumentation(page);
+
+    const layers = [staticLayer("progressive_deep_sky", ["messier_deep_sky", "simbad_extragalactic", "simbad_compact_objects"], [])];
+    let tileRequests = 0;
+    let releaseLoadedTiles = () => {};
+    const loadedTilesCanFinish = new Promise<void>((resolve) => {
+      releaseLoadedTiles = resolve;
+    });
+
+    await routeStaticTileFixture(page, layers);
+    await page.route("**/catalog-tiles/v1/**/*.bin", async (route) => {
+      tileRequests += 1;
+      if (tileRequests === 1) return;
+      await loadedTilesCanFinish;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/octet-stream",
+        headers: { "x-starsmap-total": "0", "x-starsmap-returned": "0" },
+        body: EMPTY_SMP2_TILE
+      });
+    });
+
+    await openAtlas(page);
+    await page.locator('[data-zoom-preset="cosmicWeb"]').click();
+    await expect.poll(() => tileRequests, { timeout: 10_000, message: "multiple static tile requests" }).toBeGreaterThan(1);
+    await expect.poll(async () => (await readAtlasPerf(page)).rafCount, { timeout: 5_000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(100);
+
+    await page.evaluate(() => (window as Window & { __resetAtlasPerf?: () => void }).__resetAtlasPerf?.());
+    releaseLoadedTiles();
+
+    await expect
+      .poll(async () => (await readAtlasPerf(page)).rafCount, {
+        timeout: 5_000,
+        message: "a loaded tile should schedule a render even while another tile is still pending"
+      })
+      .toBeGreaterThan(0);
+  });
+
+  test("opening the search workspace focuses the catalog search field", async ({ page }) => {
+    await routeStaticTileFixture(page, []);
+    await openAtlas(page);
+
+    await page.locator('[data-tab="catalog"]').click();
+    await page.keyboard.type("m31");
+
+    await expect(page.locator("#body-search")).toHaveValue("m31");
+  });
 });
