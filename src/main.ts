@@ -475,8 +475,8 @@ const POINT_TILE_MAX_POINTS_WIDE = 12_000;
 const POINT_TILE_MAX_POINTS_UNIVERSE = 7_500;
 const POINT_TILE_CACHE_LIMIT = 192;
 const POINT_TILE_FETCH_CONCURRENCY = 2;
-const POINT_TILE_PREFETCH_LEVEL_RADIUS = 5;
-const POINT_TILE_PREFETCH_MAX_REQUESTS = 144;
+const POINT_TILE_PREFETCH_LEVEL_RADIUS = 1;
+const POINT_TILE_PREFETCH_MAX_REQUESTS = 0;
 const POINT_TILE_PREFETCH_DELAY_MS = 500;
 const POINT_TILE_RETRY_BASE_MS = 1_200;
 const POINT_TILE_RETRY_MAX_MS = 8_000;
@@ -487,6 +487,7 @@ const CATALOG_TILE_MANIFEST_URL = catalogTileManifestUrl();
 const ALLOW_DYNAMIC_POINT_FALLBACK = dynamicPointFallbackEnabled();
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
 const DEEP_SKY_POINT_GROUPS = ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey"];
+const DEEP_SKY_POINT_TYPES: DestinationBodyType[] = ["galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"];
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
 const POINT_SAMPLE_BUCKET_COUNT = 1_024;
 const BODY_HIT_GRID_CELL_PX = 56;
@@ -2967,12 +2968,35 @@ function catalogPointManifestGroupSet() {
 function catalogStaticTileLayersForFilter(filterParams: { groups: string[]; types: DestinationBodyType[] }): CatalogPointTileManifestLayer[] {
   if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return [];
   const requestedGroups = new Set(filterParams.groups);
-  return catalogPointTileManifest.layers.filter((layer) => layer.groups.some((group) => requestedGroups.has(group)) && layerCoversAnyType(layer, filterParams.types));
+  const matchingLayers = catalogPointTileManifest.layers.filter((layer) => layer.groups.some((group) => requestedGroups.has(group)) && layerCoversAnyType(layer, filterParams.types));
+  const requestedDeepSkyTypes = filterParams.types.filter((type) => DEEP_SKY_POINT_TYPES.includes(type));
+
+  if (filterParams.types.length === 1 && requestedDeepSkyTypes.length === 1) {
+    const specializedLayers = matchingLayers.filter((layer) => layer.types.length > 0 && layer.types.every((type) => type === requestedDeepSkyTypes[0]));
+    if (specializedLayers.length > 0) return specializedLayers;
+  }
+
+  return matchingLayers.filter((layer) => !isStaticLayerCoveredByPreferredAggregate(layer, matchingLayers, requestedDeepSkyTypes));
 }
 
 function layerCoversAnyType(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]) {
   if (layer.types.length === 0 || types.length === 0) return true;
   return layer.types.some((type) => types.includes(type));
+}
+
+function isStaticLayerCoveredByPreferredAggregate(
+  layer: CatalogPointTileManifestLayer,
+  matchingLayers: CatalogPointTileManifestLayer[],
+  requestedDeepSkyTypes: DestinationBodyType[]
+) {
+  if (layer.types.length === 0) return false;
+  return matchingLayers.some((aggregateLayer) => {
+    if (aggregateLayer === layer || aggregateLayer.types.length <= layer.types.length) return false;
+    if (!aggregateLayer.types.every((type) => DEEP_SKY_POINT_TYPES.includes(type))) return false;
+    if (requestedDeepSkyTypes.length > 0 && !requestedDeepSkyTypes.every((type) => aggregateLayer.types.includes(type))) return false;
+    if (!layer.types.every((type) => aggregateLayer.types.includes(type))) return false;
+    return layer.groups.some((group) => aggregateLayer.groups.includes(group));
+  });
 }
 
 

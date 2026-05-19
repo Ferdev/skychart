@@ -3,6 +3,44 @@ import { installAtlasPerfInstrumentation, openAtlas, readAtlasPerf, waitForCatal
 
 const EMPTY_SMP2_TILE = "SMP2\u0000\u0000\u0000\u0000";
 
+const TEST_TILE_LEVELS = [
+  { span_log2: 38, span_au: 274_877_906_944, max_points_per_tile: 4096, sample_buckets: 2 },
+  { span_log2: 40, span_au: 1_099_511_627_776, max_points_per_tile: 4096, sample_buckets: 2 },
+  { span_log2: 42, span_au: 4_398_046_511_104, max_points_per_tile: 4096, sample_buckets: 2 },
+  { span_log2: 44, span_au: 17_592_186_044_416, max_points_per_tile: 4096, sample_buckets: 2 },
+  { span_log2: 46, span_au: 70_368_744_177_664, max_points_per_tile: 4096, sample_buckets: 2 },
+  { span_log2: 48, span_au: 281_474_976_710_656, max_points_per_tile: 4096, sample_buckets: 2 }
+];
+
+function staticLayer(id: string, groups: string[], types: string[]) {
+  return {
+    id,
+    tile_url_template: `/catalog-tiles/v1/layers/${id}/s{span_log2}/x{x}/y{y}.bin`,
+    groups,
+    types,
+    levels: TEST_TILE_LEVELS
+  };
+}
+
+async function routeStaticTileFixture(page: import("@playwright/test").Page, layers: ReturnType<typeof staticLayer>[]) {
+  await page.route("**/api/ephemeris**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(EPHEMERIS_FIXTURE) });
+  });
+  await page.route("**/api/catalog", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ object_count: 2, group_counts: { solar_system: 2 }, available_groups: [] }) });
+  });
+  await page.route("**/api/catalog/viewport**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bounds: {}, limit: 0, total: 0, objects: [] }) });
+  });
+  await page.route("**/catalog-tiles/v1/manifest.json", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ version: "test-static-tiles", format: "SMP2", layers })
+    });
+  });
+}
+
 const EPHEMERIS_FIXTURE = {
   timestamp_utc: "2026-01-01T00:00:00Z",
   generated_at_utc: "2026-01-01T00:00:00Z",
@@ -121,5 +159,60 @@ test.describe("static catalog tile guardrails", () => {
     expect(perf.fetches.some((entry) => entry.url.includes("/catalog-tiles/v1/layers/deep_sky/") && entry.url.endsWith(".bin"))).toBe(true);
     expect(dynamicPointRequests, "dynamic /api/catalog/points.bin requests").toBe(0);
     expect(perf.fetches.filter((entry) => entry.url.includes("/api/catalog/points.bin"))).toEqual([]);
+  });
+
+  test("broad universe view does not request overlapping subtype layers or prefetch hundreds of tiles", async ({ page }) => {
+    await installAtlasPerfInstrumentation(page);
+
+    let dynamicPointRequests = 0;
+    const staticTileUrls = new Set<string>();
+    const layers = [
+      staticLayer("gaia_stars", ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"], ["star"]),
+      staticLayer("exoplanet_systems", ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"], []),
+      staticLayer("small_bodies", ["jpl_small_bodies"], ["asteroid", "comet", "small_body"]),
+      staticLayer("deep_sky", ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey"], [
+        "galaxy",
+        "quasar",
+        "active_galaxy",
+        "black_hole",
+        "pulsar",
+        "nebula",
+        "star_cluster"
+      ]),
+      staticLayer("galaxies", ["messier_deep_sky", "simbad_extragalactic", "curated_extragalactic_survey"], ["galaxy"]),
+      staticLayer("quasars", ["simbad_extragalactic", "curated_extragalactic_survey"], ["quasar"]),
+      staticLayer("active_galaxies", ["simbad_extragalactic", "curated_extragalactic_survey"], ["active_galaxy"]),
+      staticLayer("black_holes", ["simbad_compact_objects"], ["black_hole"]),
+      staticLayer("pulsars", ["simbad_compact_objects"], ["pulsar"]),
+      staticLayer("nebulae", ["messier_deep_sky"], ["nebula"]),
+      staticLayer("star_clusters", ["messier_deep_sky"], ["star_cluster"])
+    ];
+
+    await routeStaticTileFixture(page, layers);
+    await page.route("**/api/catalog/points.bin**", async (route) => {
+      dynamicPointRequests += 1;
+      await route.fulfill({ status: 599, body: "dynamic point fallback must not be used when a static tile manifest is valid" });
+    });
+    await page.route("**/catalog-tiles/v1/**/*.bin", async (route) => {
+      staticTileUrls.add(route.request().url());
+      await route.fulfill({
+        status: 200,
+        contentType: "application/octet-stream",
+        headers: { "x-starsmap-total": "0", "x-starsmap-returned": "0" },
+        body: EMPTY_SMP2_TILE
+      });
+    });
+
+    await openAtlas(page);
+    await page.locator('[data-zoom-preset="cosmicWeb"]').click();
+    await waitForCatalogRequestsToSettle(page, 1_200, 20_000);
+
+    const urls = Array.from(staticTileUrls);
+    expect(dynamicPointRequests, "dynamic /api/catalog/points.bin requests").toBe(0);
+    expect(urls.length, "unique static tile URLs for a broad universe view").toBeLessThanOrEqual(24);
+    expect(urls.some((url) => url.includes("/layers/deep_sky/"))).toBe(true);
+    expect(urls.some((url) => url.includes("/layers/quasars/"))).toBe(false);
+    expect(urls.some((url) => url.includes("/layers/black_holes/"))).toBe(false);
+    expect(urls.some((url) => url.includes("/layers/nebulae/"))).toBe(false);
   });
 });
