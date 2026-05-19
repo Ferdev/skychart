@@ -930,7 +930,7 @@ function bindEvents() {
   tabButtons.forEach((button) => {
     button.addEventListener("click", () => {
       const tab = (button.dataset.tab as AtlasTab) ?? "catalog";
-      setActiveTab(activeTab === tab ? null : tab);
+      setActiveTab(activeTab === tab && tab !== "catalog" ? null : tab);
     });
   });
 
@@ -2264,6 +2264,7 @@ function setActiveTab(tab: ActiveAtlasTab) {
   }
   activeTab = tab;
   updateTabs();
+  if (activeTab === "catalog") bodySearch.focus();
   requestRender();
 }
 
@@ -2551,12 +2552,23 @@ function scheduleCatalogPointLoad(options: DataRefreshOptions = {}) {
   }
 
   const signature = requests.map((request) => request.key).join("|");
+  const previousActiveKeys = activeCatalogPointTileKeys;
   activeCatalogPointTileKeys = new Set(requests.map((request) => request.key));
   catalogPointSignature = signature;
+  let activeTileSetChanged = previousActiveKeys.size !== activeCatalogPointTileKeys.size;
   for (const tile of catalogPointTiles.values()) {
     if (!activeCatalogPointTileKeys.has(tile.request.key)) {
+      activeTileSetChanged = true;
       tile.abortController?.abort();
       tile.abortController = undefined;
+    }
+  }
+  if (!activeTileSetChanged) {
+    for (const key of Array.from(activeCatalogPointTileKeys)) {
+      if (!previousActiveKeys.has(key)) {
+        activeTileSetChanged = true;
+        break;
+      }
     }
   }
 
@@ -2578,6 +2590,7 @@ function scheduleCatalogPointLoad(options: DataRefreshOptions = {}) {
   });
 
   updateStats();
+  if (activeTileSetChanged) requestRender();
   const schedulePrefetch = () => scheduleCatalogPointPrefetch(requests, signature);
   if (missingRequests.length === 0 || signature === catalogPointInFlightSignature) {
     schedulePrefetch();
@@ -2670,6 +2683,7 @@ async function loadCatalogPointTile(request: CatalogPointTileRequest, requestId:
       tile.failedAt = undefined;
       tile.retryCount = 0;
       tile.lastUsedAt = tile.loadedAt;
+      if (activeCatalogPointTileKeys.has(request.key)) requestRender();
       return;
     }
     if (!response.ok) throw new Error(`Catalog points failed with ${response.status}`);
@@ -2684,6 +2698,7 @@ async function loadCatalogPointTile(request: CatalogPointTileRequest, requestId:
     tile.retryCount = 0;
     tile.lastUsedAt = tile.loadedAt;
     perfPointTileLoads += 1;
+    if (activeCatalogPointTileKeys.has(request.key)) requestRender();
   } catch (error) {
     if (!abortController.signal.aborted) {
       tile.failedAt = performance.now();
