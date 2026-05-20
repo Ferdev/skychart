@@ -279,6 +279,7 @@ type CatalogPointTileRequest = {
   signature: string;
   params: URLSearchParams;
   staticUrl?: string;
+  staticLayerId?: string;
   bounds: CatalogPointPayload["bounds"];
   groups: string[];
   types: DestinationBodyType[];
@@ -2820,13 +2821,17 @@ function catalogPointRequests(): CatalogPointTileRequest[] {
   const requestContext = catalogPointRequestContext();
   if (!requestContext) return [];
 
+  const maxRequests = catalogPointMaxActiveTiles(requestContext.viewWidthLy);
   const staticLayers = requestContext.staticLayers.length > 0 ? requestContext.staticLayers : [requestContext.staticLayer];
-  return staticLayers.flatMap((staticLayer) => {
-    const layerContext = { ...requestContext, staticLayer };
-    const tileSpanAu = catalogPointTileSpanAu(layerContext.bounds, layerContext.viewWidthLy, staticLayer);
-    const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu, staticLayer);
-    return catalogPointRequestsForLevel(layerContext, tileSpanAu, staticLevel, catalogPointMaxActiveTiles(layerContext.viewWidthLy));
-  });
+  return staticLayers
+    .flatMap((staticLayer) => {
+      const layerContext = { ...requestContext, staticLayer };
+      const tileSpanAu = catalogPointTileSpanAu(layerContext.bounds, layerContext.viewWidthLy, staticLayer);
+      const staticLevel = catalogStaticTileLevelForSpan(tileSpanAu, staticLayer);
+      return catalogPointRequestsForLevel(layerContext, tileSpanAu, staticLevel, maxRequests);
+    })
+    .sort(compareCatalogPointTileRequests)
+    .slice(0, maxRequests);
 }
 
 function catalogPointPrefetchRequests(activeRequests: CatalogPointTileRequest[]): CatalogPointTileRequest[] {
@@ -2864,8 +2869,24 @@ function catalogPointPrefetchRequests(activeRequests: CatalogPointTileRequest[])
       const tile = catalogPointTiles.get(request.key);
       return !tile || (!tile.source && !tile.abortController && canRetryCatalogPointTile(tile, now));
     })
-    .sort((a, b) => tileDistanceToCamera(a) - tileDistanceToCamera(b))
+    .sort(compareCatalogPointTileRequests)
     .slice(0, POINT_TILE_PREFETCH_MAX_REQUESTS);
+}
+
+function compareCatalogPointTileRequests(a: CatalogPointTileRequest, b: CatalogPointTileRequest) {
+  const distanceDelta = tileDistanceToCamera(a) - tileDistanceToCamera(b);
+  if (Math.abs(distanceDelta) > 1) return distanceDelta;
+  const priorityDelta = catalogStaticLayerPriority(a.staticLayerId) - catalogStaticLayerPriority(b.staticLayerId);
+  return priorityDelta !== 0 ? priorityDelta : distanceDelta;
+}
+
+function catalogStaticLayerPriority(layerId: string | undefined) {
+  if (!layerId) return 0;
+  if (layerId === "gaia_stars") return 0;
+  if (layerId === "deep_sky") return 1;
+  if (layerId === "exoplanet_systems") return 3;
+  if (layerId === "small_bodies") return 4;
+  return 2;
 }
 
 function catalogPointRequestContextForTileSpan(
@@ -2897,7 +2918,8 @@ function catalogPointRequestContext() {
   if (!filterParams || !shouldUseCatalogPoints(viewWidthLy, filterParams)) return null;
   if (catalogPointTileManifestState === "loading") return null;
   if (catalogPointTileManifestState === "missing" && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
-  const staticLayers = catalogStaticTileLayersForFilter(filterParams);
+  const filter = activeBodyFilterDefinition();
+  const staticLayers = prioritizedCatalogStaticTileLayers(catalogStaticTileLayersForFilter(filterParams), viewWidthLy, filter.key === "all");
   const staticLayer = staticLayers[0] ?? null;
   if (catalogPointTileManifestState === "ready" && staticLayers.length === 0 && !ALLOW_DYNAMIC_POINT_FALLBACK) return null;
   return {
@@ -2950,6 +2972,7 @@ function catalogPointRequestsForLevel(
         signature: `points:${tileKey}`,
         params,
         staticUrl: staticLevel && requestContext.staticLayer ? catalogStaticTileUrl(requestContext.staticLayer, staticLevel, tileX, tileY) : undefined,
+        staticLayerId: requestContext.staticLayer?.id,
         bounds: tileBounds,
         groups: filterParams.groups,
         types: filterParams.types,
@@ -2992,6 +3015,13 @@ function catalogStaticTileLayersForFilter(filterParams: { groups: string[]; type
   }
 
   return matchingLayers.filter((layer) => !isStaticLayerCoveredByPreferredAggregate(layer, matchingLayers, requestedDeepSkyTypes));
+}
+
+function prioritizedCatalogStaticTileLayers(layers: CatalogPointTileManifestLayer[], viewWidthLy: number, isDefaultFilter: boolean) {
+  const visibleLayers = isDefaultFilter && viewWidthLy > 70_000
+    ? layers.filter((layer) => !["exoplanet_systems", "small_bodies"].includes(layer.id))
+    : layers;
+  return [...visibleLayers].sort((a, b) => catalogStaticLayerPriority(a.id) - catalogStaticLayerPriority(b.id));
 }
 
 function layerCoversAnyType(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]) {

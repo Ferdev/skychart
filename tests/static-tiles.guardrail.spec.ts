@@ -161,6 +161,49 @@ test.describe("static catalog tile guardrails", () => {
     expect(perf.fetches.filter((entry) => entry.url.includes("/api/catalog/points.bin"))).toEqual([]);
   });
 
+  test("wide galaxy view caps static tile requests globally and skips low-priority default layers", async ({ page }) => {
+    await installAtlasPerfInstrumentation(page);
+
+    const staticTileUrls = new Set<string>();
+    const layers = [
+      staticLayer("gaia_stars", ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"], ["star"]),
+      staticLayer("exoplanet_systems", ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"], []),
+      staticLayer("small_bodies", ["jpl_small_bodies"], ["asteroid", "comet", "small_body"]),
+      staticLayer("deep_sky", ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey"], [
+        "galaxy",
+        "quasar",
+        "active_galaxy",
+        "black_hole",
+        "pulsar",
+        "nebula",
+        "star_cluster"
+      ])
+    ];
+
+    await routeStaticTileFixture(page, layers);
+    await page.route("**/catalog-tiles/v1/**/*.bin", async (route) => {
+      staticTileUrls.add(route.request().url());
+      await route.fulfill({
+        status: 200,
+        contentType: "application/octet-stream",
+        headers: { "x-starsmap-total": "0", "x-starsmap-returned": "0" },
+        body: EMPTY_SMP2_TILE
+      });
+    });
+
+    await openAtlas(page);
+    await page.locator('[data-zoom-preset="galaxy"]').click();
+    await expect.poll(() => staticTileUrls.size, { timeout: 10_000, message: "wide static tile requests" }).toBeGreaterThan(0);
+    await page.waitForTimeout(350);
+
+    const urls = Array.from(staticTileUrls);
+    expect(urls.length, "wide-view active static tile URLs should use one global cap, not per-layer caps").toBeLessThanOrEqual(8);
+    expect(urls.some((url) => url.includes("/layers/gaia_stars/"))).toBe(true);
+    expect(urls.some((url) => url.includes("/layers/deep_sky/"))).toBe(true);
+    expect(urls.some((url) => url.includes("/layers/exoplanet_systems/"))).toBe(false);
+    expect(urls.some((url) => url.includes("/layers/small_bodies/"))).toBe(false);
+  });
+
   test("broad universe view does not request overlapping subtype layers or prefetch hundreds of tiles", async ({ page }) => {
     await installAtlasPerfInstrumentation(page);
 
