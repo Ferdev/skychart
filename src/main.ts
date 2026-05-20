@@ -423,6 +423,12 @@ type BodyHitEntry = {
   radius: number;
 };
 
+type CatalogPointHitEntry = {
+  x: number;
+  y: number;
+  radius: number;
+};
+
 type PickerSearchState = {
   requestId: number;
   latestBodies: Body[];
@@ -497,7 +503,7 @@ const MAP_POINT_SELECTION_RING_PX = 8.5;
 const DENSITY_HAZE_MIN_WIDTH_LY = 4_500_000;
 const DENSITY_SUMMARY_MIN_WIDTH_LY = 85_000_000;
 const DENSITY_HAZE_BIN_PX = 92;
-const DENSITY_HAZE_MAX_CELLS = 180;
+const DENSITY_HAZE_MAX_CELLS = 72;
 const WORKSPACE_LABEL_KEYS: Record<AtlasTab, string> = {
   catalog: "workspace.searchCatalog",
   object: "workspace.selectedObject"
@@ -784,8 +790,11 @@ let catalogPointTileManifestPromise: Promise<void> | null = null;
 let visibleBodiesFrameCache: Body[] | null = null;
 let bodyHitGrid = new Map<string, BodyHitEntry[]>();
 let bodyHitGridValid = false;
+let catalogPointHitGrid = new Map<string, CatalogPointHitEntry[]>();
+let catalogPointHitGridValid = false;
 let bodyPointLayerCache: PointLayerSource | null = null;
 const pointColorCache = new Map<string, [number, number, number]>();
+let usableViewportRectCache: Rect | null = null;
 let perfEnabled = new URLSearchParams(window.location.search).has("perf") || window.localStorage.getItem("starsmap:perf") === "1";
 let perfLastFrameAt = performance.now();
 let perfFrameMs = 0;
@@ -1133,8 +1142,9 @@ function bindEvents() {
 
     const edgeReference = edgeReferenceAt(point.x, point.y);
     const nearest = edgeReference ? null : nearestBodyAt(point.x, point.y);
+    const catalogPoint = edgeReference || nearest ? null : nearestCatalogTilePointAt(point.x, point.y);
     hoverKey = edgeReference?.body.key ?? nearest?.body.key ?? null;
-    canvas.style.cursor = edgeReference || nearest ? "pointer" : "grab";
+    canvas.style.cursor = edgeReference || nearest || catalogPoint ? "pointer" : "grab";
     if (previousHoverKey !== hoverKey) requestRender();
   });
 
@@ -1212,24 +1222,30 @@ function render() {
   renderRequested = false;
   visibleBodiesFrameCache = null;
   bodyHitGridValid = false;
+  catalogPointHitGridValid = false;
   resizeCanvas();
+  usableViewportRectCache = computeUsableViewportRect();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (ephemeris) {
-    drawWebglPointLayers();
-    if (displayLayers.milkyWay) drawMilkyWayLayer();
-    if (displayLayers.localGroup) drawLocalGroupLayer();
-    if (displayLayers.galaxyPoints) drawGalaxyContextLayer();
-    if (displayLayers.quasars) drawQuasarContextLayer();
-    if (displayLayers.cosmicWeb) drawCosmicWebLayer();
-    drawCatalogDensityLodLayer();
-    if (displayLayers.grid) drawGrid();
-    if (displayLayers.orbits) drawOrbitGuides();
-    drawComparisonGuide();
-    drawBodies();
-    if (displayLayers.labels) drawLabels();
-    if (displayLayers.references) drawEdgeReferences();
-  } else {
-    pointRenderer.clear();
+  try {
+    if (ephemeris) {
+      drawWebglPointLayers();
+      if (displayLayers.milkyWay) drawMilkyWayLayer();
+      if (displayLayers.localGroup) drawLocalGroupLayer();
+      if (displayLayers.galaxyPoints) drawGalaxyContextLayer();
+      if (displayLayers.quasars) drawQuasarContextLayer();
+      if (displayLayers.cosmicWeb) drawCosmicWebLayer();
+      drawCatalogDensityLodLayer();
+      if (displayLayers.grid) drawGrid();
+      if (displayLayers.orbits) drawOrbitGuides();
+      drawComparisonGuide();
+      drawBodies();
+      if (displayLayers.labels) drawLabels();
+      if (displayLayers.references) drawEdgeReferences();
+    } else {
+      pointRenderer.clear();
+    }
+  } finally {
+    usableViewportRectCache = null;
   }
   perfDrawMs = performance.now() - frameStartedAt;
   updatePerfHud();
@@ -1239,6 +1255,7 @@ function requestRender(options: RenderRequestOptions = {}) {
   renderRequested = true;
   visibleBodiesFrameCache = null;
   bodyHitGridValid = false;
+  catalogPointHitGridValid = false;
   if (options.data) requestDataRefresh();
   if (renderFrameId !== null) return;
   renderFrameId = requestAnimationFrame(render);
@@ -4877,6 +4894,58 @@ function nearestBodyAt(x: number, y: number) {
   return nearest;
 }
 
+function nearestCatalogTilePointAt(x: number, y: number) {
+  if (!hasActiveCatalogPointLayer()) return null;
+  if (!catalogPointHitGridValid) rebuildCatalogPointHitGrid();
+  let nearest: { x: number; y: number; distancePx: number } | null = null;
+  const cellX = Math.floor(x / BODY_HIT_GRID_CELL_PX);
+  const cellY = Math.floor(y / BODY_HIT_GRID_CELL_PX);
+  for (let gx = cellX - 1; gx <= cellX + 1; gx += 1) {
+    for (let gy = cellY - 1; gy <= cellY + 1; gy += 1) {
+      for (const entry of catalogPointHitGrid.get(`${gx}:${gy}`) ?? []) {
+        const distancePx = Math.hypot(entry.x - x, entry.y - y);
+        if (distancePx <= entry.radius && (!nearest || distancePx < nearest.distancePx)) {
+          nearest = { x: entry.x, y: entry.y, distancePx };
+        }
+      }
+    }
+  }
+  return nearest;
+}
+
+function rebuildCatalogPointHitGrid() {
+  catalogPointHitGrid = new Map();
+  const previousRectCache = usableViewportRectCache;
+  usableViewportRectCache = previousRectCache ?? computeUsableViewportRect();
+  const rect = expandedRect(usableViewportRect(), 12);
+  for (const tile of activeCatalogPointTiles()) {
+    const payload = tile.payload;
+    if (!payload || payload.returned === 0) continue;
+    const step = Math.max(1, Math.ceil(payload.returned / 2_500));
+    for (let index = 0; index < payload.returned; index += step) {
+      const offset = index * POINT_VERTEX_STRIDE_FLOATS;
+      const screen = worldToScreen(payload.vertices[offset] ?? 0, payload.vertices[offset + 1] ?? 0);
+      if (!pointInRect(screen, rect)) continue;
+      const radius = 5.5;
+      const minCellX = Math.floor((screen.x - radius) / BODY_HIT_GRID_CELL_PX);
+      const maxCellX = Math.floor((screen.x + radius) / BODY_HIT_GRID_CELL_PX);
+      const minCellY = Math.floor((screen.y - radius) / BODY_HIT_GRID_CELL_PX);
+      const maxCellY = Math.floor((screen.y + radius) / BODY_HIT_GRID_CELL_PX);
+      const entry = { x: screen.x, y: screen.y, radius };
+      for (let gx = minCellX; gx <= maxCellX; gx += 1) {
+        for (let gy = minCellY; gy <= maxCellY; gy += 1) {
+          const key = `${gx}:${gy}`;
+          const bucket = catalogPointHitGrid.get(key);
+          if (bucket) bucket.push(entry);
+          else catalogPointHitGrid.set(key, [entry]);
+        }
+      }
+    }
+  }
+  usableViewportRectCache = previousRectCache;
+  catalogPointHitGridValid = true;
+}
+
 function rebuildBodyHitGrid() {
   bodyHitGrid = new Map();
   for (const body of visibleBodies()) {
@@ -4964,8 +5033,14 @@ function prioritizedLabelBodies() {
 function edgeReferenceBodies() {
   const rect = usableViewportRect();
   const selected = selectedBody();
+  const viewWidthLy = currentViewWidthLy();
   return (ephemeris?.bodies ?? [])
-    .filter((body) => body.key !== selectedKey)
+    .filter((body) => {
+      if (body.key === selectedKey) return false;
+      if (!bodyMatchesActiveFilter(body) || !shouldRenderBodyAtScale(body)) return false;
+      if (viewWidthLy >= 6_000 && !isMajorBody(body) && !FEATURED_KEYS.includes(body.key)) return false;
+      return true;
+    })
     .map((body) => {
       const screen = worldToScreen(body.position.x_au, body.position.y_au);
       const selectedDistanceKm = selected ? bodyDistanceKm(selected, body) : body.distance_from_earth_km;
@@ -5106,6 +5181,11 @@ function screenToWorld(x: number, y: number) {
 }
 
 function usableViewportRect(): Rect {
+  if (usableViewportRectCache) return usableViewportRectCache;
+  return computeUsableViewportRect();
+}
+
+function computeUsableViewportRect(): Rect {
   const workspace = document.querySelector<HTMLElement>(".workspace-panel:not([hidden])");
   const bar = document.querySelector<HTMLElement>(".atlas-bar");
   const selection = document.querySelector<HTMLElement>(".selection-strip");
