@@ -1,0 +1,40 @@
+{
+  "name": "cosmic-atlas",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "A scientifically grounded 2D celestial atlas built from real ephemeris and catalog data.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ferdev/skychart.git"
+  },
+  "homepage": "https://skychart.org/",
+  "bugs": {
+    "url": "https://github.com/Ferdev/skychart/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:all": "bash scripts/dev.sh",
+    "build": "tsc && vite build",
+    "build:phoenix": "tsc && vite build --outDir backend_phoenix/priv/static --emptyOutDir false",
+    "preview": "vite preview --host 127.0.0.1",
+    "test:e2e": "playwright test --project=smoke",
+    "test:mobile": "playwright test --project=mobile",
+    "test:perf": "playwright test --project=perf",
+    "test:view-state": "node --experimental-strip-types tests/viewState.test.ts",
+    "test:helpers": "node --experimental-strip-types tests/atlasHelpers.test.ts",
+    "validate:tours": "node scripts/validate_tours.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "typescript": "^5.6.3",
+    "vite": "^8.0.10"
+  },
+  "dependencies": {
+    "@sentry/browser": "^9.47.1"
+  }
+}

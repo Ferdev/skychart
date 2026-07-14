@@ -1,0 +1,187 @@
+name: Upload Bulk Catalog Artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Prepare a multipart upload or complete it after local transfer.
+        required: true
+        type: choice
+        options:
+          - prepare
+          - complete
+      catalog_version:
+        description: Immutable catalog version, for example v7.
+        required: true
+        type: string
+      object_size:
+        description: Exact packed-container size in bytes.
+        required: true
+        type: string
+      object_name:
+        description: Packed-container filename, for example gaia_stars.smpk or desi_dr1.smpk.
+        required: true
+        default: gaia_stars.smpk
+        type: string
+      upload_id:
+        description: Multipart upload ID from the prepare artifact (complete phase only).
+        required: false
+        type: string
+      parts_base64:
+        description: Base64 AWS CompleteMultipartUpload JSON (complete phase only).
+        required: false
+        type: string
+      manifest_gzip_base64:
+        description: Base64 gzip-compressed release manifest (complete phase only).
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog-bulk-upload-${{ inputs.catalog_version }}
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.CATALOG_TILE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CATALOG_TILE_AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ vars.CATALOG_TILE_S3_REGION }}
+      AWS_EC2_METADATA_DISABLED: "true"
+      CATALOG_TILE_S3_BUCKET: ${{ vars.CATALOG_TILE_S3_BUCKET }}
+      CATALOG_TILE_S3_ENDPOINT_URL: ${{ vars.CATALOG_TILE_S3_ENDPOINT_URL }}
+      CATALOG_TILE_S3_ACL: ${{ vars.CATALOG_TILE_S3_ACL }}
+      CATALOG_VERSION: ${{ inputs.catalog_version }}
+      OBJECT_SIZE: ${{ inputs.object_size }}
+      OBJECT_NAME: ${{ inputs.object_name }}
+      UPLOAD_ID: ${{ inputs.upload_id }}
+      PARTS_BASE64: ${{ inputs.parts_base64 }}
+      MANIFEST_GZIP_BASE64: ${{ inputs.manifest_gzip_base64 }}
+    steps:
+      - name: Validate request
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CATALOG_VERSION" =~ ^v[0-9]+$ ]]
+          [[ "$OBJECT_SIZE" =~ ^[1-9][0-9]*$ ]]
+          [[ "$OBJECT_NAME" =~ ^[a-z0-9_]+\.smpk$ ]]
+          test -n "$AWS_ACCESS_KEY_ID"
+          test -n "$AWS_SECRET_ACCESS_KEY"
+          test -n "$CATALOG_TILE_S3_BUCKET"
+          test -n "$CATALOG_TILE_S3_ENDPOINT_URL"
+          if [ "${{ inputs.phase }}" = complete ]; then
+            test -n "$UPLOAD_ID"
+            test -n "$PARTS_BASE64"
+            test -n "$MANIFEST_GZIP_BASE64"
+          fi
+
+      - name: Install S3 client library
+        run: python -m pip install --disable-pip-version-check --quiet boto3
+
+      - name: Prepare scoped multipart upload
+        if: inputs.phase == 'prepare'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, math, os
+          import boto3
+
+          size = int(os.environ["OBJECT_SIZE"])
+          part_size = 128 * 1024 * 1024
+          key = f"catalog-tiles/{os.environ['CATALOG_VERSION']}/{os.environ['OBJECT_NAME']}"
+          client = boto3.client(
+              "s3",
+              endpoint_url=os.environ["CATALOG_TILE_S3_ENDPOINT_URL"],
+              region_name=os.environ["AWS_DEFAULT_REGION"],
+          )
+          create = {
+              "Bucket": os.environ["CATALOG_TILE_S3_BUCKET"],
+              "Key": key,
+              "ContentType": "application/octet-stream",
+              "CacheControl": "public, max-age=31536000, immutable",
+          }
+          if os.environ.get("CATALOG_TILE_S3_ACL"):
+              create["ACL"] = os.environ["CATALOG_TILE_S3_ACL"]
+          upload_id = client.create_multipart_upload(**create)["UploadId"]
+          part_count = math.ceil(size / part_size)
+          urls = [
+              client.generate_presigned_url(
+                  "upload_part",
+                  Params={
+                      "Bucket": os.environ["CATALOG_TILE_S3_BUCKET"],
+                      "Key": key,
+                      "UploadId": upload_id,
+                      "PartNumber": part_number,
+                  },
+                  ExpiresIn=86_400,
+                  HttpMethod="PUT",
+              )
+              for part_number in range(1, part_count + 1)
+          ]
+          with open("catalog-multipart-plan.json", "w", encoding="utf-8") as handle:
+              json.dump({
+                  "bucket": os.environ["CATALOG_TILE_S3_BUCKET"],
+                  "key": key,
+                  "size": size,
+                  "part_size": part_size,
+                  "upload_id": upload_id,
+                  "urls": urls,
+              }, handle, indent=2)
+          PY
+
+      - name: Publish multipart plan
+        if: inputs.phase == 'prepare'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: catalog-multipart-${{ inputs.catalog_version }}
+          path: catalog-multipart-plan.json
+          retention-days: 1
+
+      - name: Complete multipart upload and publish manifest
+        if: inputs.phase == 'complete'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64, gzip, json, os
+          import boto3
+
+          key = f"catalog-tiles/{os.environ['CATALOG_VERSION']}/{os.environ['OBJECT_NAME']}"
+          client = boto3.client(
+              "s3",
+              endpoint_url=os.environ["CATALOG_TILE_S3_ENDPOINT_URL"],
+              region_name=os.environ["AWS_DEFAULT_REGION"],
+          )
+          parts = json.loads(base64.b64decode(os.environ["PARTS_BASE64"]))
+          client.complete_multipart_upload(
+              Bucket=os.environ["CATALOG_TILE_S3_BUCKET"],
+              Key=key,
+              UploadId=os.environ["UPLOAD_ID"],
+              MultipartUpload=parts,
+          )
+          head = client.head_object(Bucket=os.environ["CATALOG_TILE_S3_BUCKET"], Key=key)
+          if int(head["ContentLength"]) != int(os.environ["OBJECT_SIZE"]):
+              raise SystemExit("Uploaded catalog container size does not match")
+          manifest = gzip.decompress(base64.b64decode(os.environ["MANIFEST_GZIP_BASE64"]))
+          put = {
+              "Bucket": os.environ["CATALOG_TILE_S3_BUCKET"],
+              "Key": f"catalog-tiles/{os.environ['CATALOG_VERSION']}/manifest.json",
+              "Body": manifest,
+              "ContentType": "application/json",
+              "CacheControl": "public, max-age=60",
+          }
+          if os.environ.get("CATALOG_TILE_S3_ACL"):
+              put["ACL"] = os.environ["CATALOG_TILE_S3_ACL"]
+          client.put_object(**put)
+          parsed = json.loads(manifest)
+          if parsed.get("version") != os.environ["CATALOG_VERSION"]:
+              raise SystemExit("Manifest version does not match upload version")
+          print(json.dumps({
+              "version": parsed["version"],
+              "layers": len(parsed.get("layers", [])),
+              "gaia_sources": parsed.get("source_counts", {}).get("gaia_dr3_bulk"),
+              "container_bytes": head["ContentLength"],
+          }))
+          PY

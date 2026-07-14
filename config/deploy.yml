@@ -1,0 +1,53 @@
+service: skychart
+retain_containers: 2
+image: ferdev/skychart
+
+minimum_version: 2.4.0
+
+deploy_timeout: 600
+drain_timeout: 20
+readiness_delay: 7
+
+servers:
+  web:
+    hosts:
+      - <%= ENV.fetch("DEPLOY_HOST") %>
+
+ssh:
+  user: <%= ENV.fetch("DEPLOY_USER") %>
+
+registry:
+  server: ghcr.io
+  username: ferdev
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  args:
+    VITE_SENTRY_DSN: <%= ENV["VITE_SENTRY_DSN"] %>
+
+env:
+  clear:
+    SKYCHART_APPLICATION_HOST: "1"
+  secret:
+    - SECRET_KEY_BASE
+    - DATABASE_URL
+    - POSTGRES_PASSWORD
+    - SENTRY_DSN
+    - ANALYTICS_HASH_SALT
+
+proxy:
+  app_port: 4000
+  ssl: true
+  forward_headers: true
+  healthcheck:
+    path: /api/health
+    interval: 3
+    timeout: 3
+
+logging:
+  driver: json-file
+  options:
+    max-size: 50m
+    max-file: "3"

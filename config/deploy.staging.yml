@@ -1,0 +1,22 @@
+service: skychart-staging
+image: ferdev/skychart-staging
+
+env:
+  clear:
+    PHX_HOST: staging.skychart.org
+    PORT: "4000"
+    POOL_SIZE: "2"
+    PYTHON_BACKEND_URL: http://127.0.0.1:8765
+    TRUSTED_PROXY_CIDRS: '<%= ENV.fetch("TRUSTED_PROXY_CIDRS", "172.16.0.0/12") %>'
+    CATALOG_TILE_MANIFEST_URL: '<%= ENV.fetch("CATALOG_TILE_MANIFEST_URL", "") %>'
+    ANALYTICS_ENABLED: "false"
+    SKY_EVENTS_REFRESH_ENABLED: "false"
+  secret:
+    - SECRET_KEY_BASE
+    - DATABASE_URL
+    - SENTRY_DSN
+    - ANALYTICS_HASH_SALT
+
+proxy:
+  hosts:
+    - staging.skychart.org

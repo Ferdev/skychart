@@ -1,0 +1,222 @@
+name: Build Catalog Tiles
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Which deployed app/container/database should build the catalog artifact.
+        required: true
+        default: production
+        type: choice
+        options:
+          - staging
+          - production
+      catalog_version:
+        description: Immutable catalog tile version/path segment, e.g. v2. Defaults to v1.
+        required: true
+        default: v1
+        type: string
+      public_base_url:
+        description: Optional full public CDN base URL ending in the catalog version. Defaults to CATALOG_TILE_PUBLIC_BASE_URL with the version swapped in.
+        required: false
+        type: string
+      s3_prefix:
+        description: Optional S3 object prefix. Defaults to catalog-tiles/<catalog_version>.
+        required: false
+        type: string
+      nice:
+        description: Unix nice value for the tile build/upload inside the target app container.
+        required: true
+        default: "15"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Host-writing jobs must not overlap with deploy cleanup.
+  group: skychart-deploy-host
+  cancel-in-progress: false
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    environment:
+      name: ${{ inputs.target_environment || 'production' }}
+      url: ${{ inputs.target_environment == 'staging' && 'https://staging.skychart.org' || 'https://skychart.org' }}
+
+    env:
+      KAMAL_REGISTRY_PASSWORD: ${{ secrets.KAMAL_REGISTRY_PASSWORD || github.token }}
+      SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      ANALYTICS_HASH_SALT: ${{ secrets.ANALYTICS_HASH_SALT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.CATALOG_TILE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.CATALOG_TILE_AWS_SECRET_ACCESS_KEY }}
+      CATALOG_TILE_S3_BUCKET: ${{ vars.CATALOG_TILE_S3_BUCKET }}
+      CATALOG_TILE_S3_ENDPOINT_URL: ${{ vars.CATALOG_TILE_S3_ENDPOINT_URL }}
+      CATALOG_TILE_S3_REGION: ${{ vars.CATALOG_TILE_S3_REGION }}
+      CATALOG_TILE_S3_ACL: ${{ vars.CATALOG_TILE_S3_ACL }}
+      DEFAULT_CATALOG_TILE_PUBLIC_BASE_URL: ${{ vars.CATALOG_TILE_PUBLIC_BASE_URL }}
+      CATALOG_TILE_VERSION: ${{ inputs.catalog_version || 'v1' }}
+      CATALOG_TILE_NICE: ${{ inputs.nice || '15' }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Configure tile target
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET_ENVIRONMENT="${{ inputs.target_environment || 'production' }}"
+          CATALOG_TILE_VERSION="${CATALOG_TILE_VERSION#/}"
+          CATALOG_TILE_VERSION="${CATALOG_TILE_VERSION%/}"
+          if [ -z "$CATALOG_TILE_VERSION" ]; then
+            echo "::error::catalog_version cannot be empty"
+            exit 1
+          fi
+
+          case "$TARGET_ENVIRONMENT" in
+            staging)
+              DATABASE_URL="$STAGING_DATABASE_URL"
+              ;;
+            production)
+              DATABASE_URL="ecto://skychart:${POSTGRES_PASSWORD}@skychart-production-postgres/skychart"
+              ;;
+            *)
+              echo "::error::Unsupported target_environment: $TARGET_ENVIRONMENT"
+              exit 1
+              ;;
+          esac
+
+          public_base_url="${{ inputs.public_base_url }}"
+          if [ -z "$public_base_url" ]; then
+            default_base="${DEFAULT_CATALOG_TILE_PUBLIC_BASE_URL%/}"
+            if [ -z "$default_base" ]; then
+              echo "::error::CATALOG_TILE_PUBLIC_BASE_URL repository variable is required when public_base_url input is empty"
+              exit 1
+            fi
+            public_root="${default_base%/*}"
+            public_base_url="$public_root/$CATALOG_TILE_VERSION"
+          fi
+          public_base_url="${public_base_url%/}"
+
+          s3_prefix="${{ inputs.s3_prefix }}"
+          if [ -z "$s3_prefix" ]; then
+            s3_prefix="catalog-tiles/$CATALOG_TILE_VERSION"
+          fi
+          s3_prefix="${s3_prefix#/}"
+          s3_prefix="${s3_prefix%/}"
+
+          {
+            echo "TARGET_ENVIRONMENT=$TARGET_ENVIRONMENT"
+            echo "DATABASE_URL=$DATABASE_URL"
+            echo "CATALOG_TILE_VERSION=$CATALOG_TILE_VERSION"
+            echo "CATALOG_TILE_PUBLIC_BASE_URL=$public_base_url"
+            echo "CATALOG_TILE_S3_PREFIX=$s3_prefix"
+          } >> "$GITHUB_ENV"
+
+          echo "[catalog-tiles] target=$TARGET_ENVIRONMENT version=$CATALOG_TILE_VERSION"
+          echo "[catalog-tiles] public_base_url=$public_base_url"
+          echo "[catalog-tiles] s3_prefix=$s3_prefix"
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@6e5d382445ae5590b7449d8b3bc8cb1c2c27f617 # v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install Kamal
+        run: gem install kamal -v "2.10.1"
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          {
+            printf 'Host %s\n' "$DEPLOY_HOST"
+            printf '  User %s\n' "$DEPLOY_USER"
+            printf '  IdentityFile ~/.ssh/deploy_key\n'
+            printf '  IdentitiesOnly yes\n'
+            printf '  StrictHostKeyChecking yes\n'
+            printf '  UserKnownHostsFile ~/.ssh/known_hosts\n'
+            printf '  LogLevel ERROR\n'
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Verify required tile config
+        shell: bash
+        run: |
+          missing=()
+          for v in KAMAL_REGISTRY_PASSWORD SECRET_KEY_BASE POSTGRES_PASSWORD DATABASE_URL SENTRY_DSN ANALYTICS_HASH_SALT AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY CATALOG_TILE_S3_BUCKET CATALOG_TILE_S3_ENDPOINT_URL CATALOG_TILE_S3_REGION CATALOG_TILE_PUBLIC_BASE_URL CATALOG_TILE_S3_PREFIX CATALOG_TILE_NICE TARGET_ENVIRONMENT DEPLOY_HOST DEPLOY_USER SSH_PRIVATE_KEY SSH_KNOWN_HOSTS; do
+            if [ -z "${!v}" ]; then missing+=("$v"); fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "::error::Missing or empty tile deploy config: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Write Kamal secrets
+        shell: bash
+        run: |
+          mkdir -p .kamal
+          umask 077
+          secrets_file=".kamal/secrets.$TARGET_ENVIRONMENT"
+          cat > "$secrets_file" <<'SECRETS_EOF'
+          KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD
+          SECRET_KEY_BASE=$SECRET_KEY_BASE
+          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+          DATABASE_URL=$DATABASE_URL
+          SENTRY_DSN=$SENTRY_DSN
+          ANALYTICS_HASH_SALT=$ANALYTICS_HASH_SALT
+          SECRETS_EOF
+          sed -i 's/^[[:space:]]*//' "$secrets_file"
+          cp "$secrets_file" .kamal/secrets-common
+
+      - name: Build and upload static catalog tiles
+        shell: bash
+        run: |
+          env_args=(
+            --env
+            AWS_ACCESS_KEY_ID:"$AWS_ACCESS_KEY_ID"
+            AWS_SECRET_ACCESS_KEY:"$AWS_SECRET_ACCESS_KEY"
+            CATALOG_TILE_S3_BUCKET:"$CATALOG_TILE_S3_BUCKET"
+            CATALOG_TILE_S3_ENDPOINT_URL:"$CATALOG_TILE_S3_ENDPOINT_URL"
+            CATALOG_TILE_S3_REGION:"$CATALOG_TILE_S3_REGION"
+            CATALOG_TILE_S3_PREFIX:"$CATALOG_TILE_S3_PREFIX"
+            CATALOG_TILE_PUBLIC_BASE_URL:"$CATALOG_TILE_PUBLIC_BASE_URL"
+            CATALOG_TILE_VERSION:"$CATALOG_TILE_VERSION"
+            CATALOG_TILE_NICE:"$CATALOG_TILE_NICE"
+          )
+          if [ -n "$CATALOG_TILE_S3_ACL" ]; then
+            env_args+=(CATALOG_TILE_S3_ACL:"$CATALOG_TILE_S3_ACL")
+          fi
+
+          kamal app exec -d "$TARGET_ENVIRONMENT" --primary --reuse "${env_args[@]}" -- ./scripts/build_and_upload_static_tiles.sh
+
+      - name: Configure and verify bucket Range CORS
+        shell: bash
+        run: |
+          env_args=(
+            --env
+            AWS_ACCESS_KEY_ID:"$AWS_ACCESS_KEY_ID"
+            AWS_SECRET_ACCESS_KEY:"$AWS_SECRET_ACCESS_KEY"
+            CATALOG_TILE_S3_BUCKET:"$CATALOG_TILE_S3_BUCKET"
+            CATALOG_TILE_S3_ENDPOINT_URL:"$CATALOG_TILE_S3_ENDPOINT_URL"
+            CATALOG_TILE_S3_REGION:"$CATALOG_TILE_S3_REGION"
+          )
+          kamal app exec -d "$TARGET_ENVIRONMENT" --primary --reuse "${env_args[@]}" -- ./scripts/configure_catalog_bucket_cors.sh
+
+      - name: Smoke test tile manifest
+        run: curl -fsSI "$CATALOG_TILE_PUBLIC_BASE_URL/manifest.json"
