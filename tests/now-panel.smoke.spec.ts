@@ -1,0 +1,2 @@
+import {expect,test} from "@playwright/test";
+test("Happening now uses canonical object permalink",async({page})=>{await page.route("**/api/now",r=>r.fulfill({contentType:"application/json",body:JSON.stringify({refreshed_at:"2026-07-15T12:00:00Z",stale:false,events:[{title:"Apophis close approach",summary:"Fixture approach.",starts_at:"2026-07-20T12:00:00Z",catalog_key:"99942-apophis",url:"/o/99942-apophis"}]})}));await page.goto("/");await expect(page.locator("#now-events a",{hasText:"Apophis close approach"})).toHaveAttribute("href","/o/99942-apophis");});

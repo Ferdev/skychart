@@ -1,0 +1,301 @@
+.compare-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  margin: 12px;
+}
+
+.compare-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.compare-workspace-body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 232px;
+  overflow: hidden;
+}
+
+.compare-workspace-body .compare-panel {
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 14px;
+  border-right: 1px solid rgba(242, 237, 223, 0.1);
+}
+
+.compare-target-card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.compare-picker {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+  margin: 10px 0 0;
+  overflow-y: auto;
+  border: 1px solid rgba(21, 23, 20, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.48);
+  padding: 8px;
+}
+
+.compare-picker .destination-picker__section {
+  gap: 5px;
+}
+
+.compare-picker .destination-picker__item {
+  padding: 7px;
+}
+
+.compare-picker .destination-picker__distance {
+  max-width: 74px;
+}
+
+.compare-card,
+.size-compare-card {
+  display: grid;
+  gap: 10px;
+}
+
+.compare-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.compare-object,
+.compare-distance {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(21, 23, 20, 0.08);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.compare-object--empty {
+  color: rgba(21, 23, 20, 0.52);
+  background: rgba(255, 250, 240, 0.5);
+}
+
+.compare-object--empty > span {
+  background: rgba(21, 23, 20, 0.12);
+}
+
+.compare-object > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  color: #15120c;
+  background: var(--accent-strong);
+  font-weight: 850;
+}
+
+.compare-object > div {
+  min-width: 0;
+}
+
+.compare-object strong,
+.compare-object small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-object small {
+  color: rgba(21, 23, 20, 0.58);
+  font-size: 0.76rem;
+}
+
+.compare-distance {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.compare-distance--hero {
+  padding: 14px;
+  background:
+    linear-gradient(135deg, rgba(239, 196, 104, 0.22), rgba(130, 203, 179, 0.12)),
+    #fffaf0;
+}
+
+.compare-distance span,
+.compare-distance small {
+  color: rgba(21, 23, 20, 0.58);
+}
+
+.compare-distance strong {
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.compare-distance--hero strong {
+  font-size: 1.75rem;
+}
+
+.size-stage {
+  min-height: 190px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 14px;
+  overflow: hidden;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: #fffaf0;
+}
+
+.size-disk-wrap {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 126px auto;
+  justify-items: center;
+  align-items: end;
+  gap: 8px;
+  margin: 0;
+}
+
+.size-disk-slot {
+  width: 100%;
+  height: 126px;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+}
+
+.size-visual {
+  width: var(--disk-size);
+  height: var(--disk-size);
+  display: block;
+  border-radius: 999px;
+}
+
+.size-visual--planet,
+.size-visual--moon,
+.size-visual--dwarf_planet,
+.size-visual--asteroid,
+.size-visual--comet,
+.size-visual--small_body,
+.size-visual--unknown {
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.72), transparent 0 18%, rgba(255, 255, 255, 0.12) 19%, transparent 36%),
+    var(--body-color, var(--accent));
+  box-shadow: inset -12px -14px 20px rgba(0, 0, 0, 0.24);
+}
+
+.size-visual--star {
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.88), transparent 0 18%, rgba(255, 255, 255, 0.2) 19%, transparent 38%),
+    radial-gradient(circle, #ffe9a6 0 42%, var(--body-color, var(--accent)) 63%, rgba(216, 162, 63, 0.24) 100%);
+  box-shadow:
+    0 0 calc(var(--disk-size) * 0.22) rgba(239, 196, 104, 0.42),
+    inset -10px -12px 20px rgba(99, 57, 14, 0.18);
+}
+
+.size-visual--galaxy,
+.size-visual--active_galaxy,
+.size-visual--quasar,
+.size-visual--black_hole {
+  height: max(14px, calc(var(--disk-size) * 0.62));
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.72) 0 9%, rgba(226, 205, 154, 0.76) 10% 25%, transparent 26%),
+    repeating-radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.16) 0 4px, rgba(91, 72, 45, 0.12) 5px 8px, transparent 9px 14px),
+    radial-gradient(ellipse at 50% 50%, rgba(223, 198, 143, 0.72) 0 34%, rgba(143, 122, 90, 0.36) 58%, rgba(143, 122, 90, 0.08) 72%, transparent 100%);
+  box-shadow:
+    0 0 calc(var(--disk-size) * 0.18) rgba(189, 169, 126, 0.34),
+    inset 0 0 calc(var(--disk-size) * 0.12) rgba(42, 32, 20, 0.18);
+  transform: rotate(-14deg);
+}
+
+.size-visual--quasar,
+.size-visual--active_galaxy {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.92) 0 7%, rgba(248, 218, 136, 0.78) 8% 13%, transparent 14%),
+    radial-gradient(ellipse at 50% 50%, rgba(215, 194, 255, 0.5) 0 28%, rgba(89, 76, 120, 0.22) 48%, transparent 72%),
+    radial-gradient(ellipse at 50% 50%, var(--body-color, #d7c2ff) 0 34%, transparent 74%);
+}
+
+.size-visual--nebula,
+.size-visual--star_cluster,
+.size-visual--asterism,
+.size-visual--milky_way_patch {
+  border-radius: 42% 58% 52% 48%;
+  background:
+    radial-gradient(circle at 32% 35%, rgba(255, 255, 255, 0.52), transparent 0 14%),
+    radial-gradient(circle at 68% 42%, rgba(130, 203, 179, 0.38), transparent 0 28%),
+    radial-gradient(circle at 47% 58%, var(--body-color, var(--teal)) 0 22%, rgba(130, 203, 179, 0.18) 52%, transparent 76%);
+  box-shadow: 0 0 calc(var(--disk-size) * 0.18) rgba(130, 203, 179, 0.28);
+  filter: blur(0.2px);
+}
+
+.size-arrow {
+  width: 2px;
+  height: 68px;
+  position: relative;
+  display: block;
+  margin-bottom: 1px;
+  background: rgba(21, 23, 20, 0.76);
+}
+
+.size-arrow::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(21, 23, 20, 0.76);
+  transform: translateX(-50%);
+}
+
+.size-arrow::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -15px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid rgba(21, 23, 20, 0.76);
+  transform: translateX(-50%);
+}
+
+.size-disk-wrap figcaption {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  text-align: center;
+}
+
+.size-disk-wrap strong,
+.size-disk-wrap span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.size-disk-wrap span {
+  color: rgba(21, 23, 20, 0.56);
+  font-size: 0.76rem;
+}
+
+.size-disk-wrap .size-subpixel-note {
+  color: rgba(21, 23, 20, 0.74);
+  font-weight: 760;
+}

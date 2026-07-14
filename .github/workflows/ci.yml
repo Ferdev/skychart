@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - trunk
+      - production
+  push:
+    branches:
+      - trunk
+      - production
+
+permissions:
+  contents: read
+
+env:
+  MIX_ENV: test
+  PGHOST: 127.0.0.1
+  PGUSER: postgres
+  PGPASSWORD: postgres
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Validate Python backend and catalog scripts
+        run: |
+          python3 -m pip install --disable-pip-version-check -r requirements-dev.txt
+          python3 -m pytest -q tests
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run validate:tours && npm run build && npm run test:view-state && npm run test:helpers && npm run test:catalog-point-decoder && npm run test:catalog-point-manifest
+
+      - name: Build frontend for Phoenix
+        run: npm run build:phoenix
+
+      - name: Set up Erlang/Elixir
+        uses: erlef/setup-beam@0f75c29430f34bb5af4cce5e3b7f6a8860fca236 # v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.18"
+
+      - name: Cache Mix dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            backend_phoenix/deps
+            backend_phoenix/_build
+          key: ${{ runner.os }}-mix-${{ hashFiles('backend_phoenix/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - name: Install Phoenix dependencies
+        working-directory: backend_phoenix
+        run: mix deps.get
+
+      - name: Compile Phoenix
+        working-directory: backend_phoenix
+        run: mix compile --warnings-as-errors
+
+      - name: Run Phoenix tests
+        working-directory: backend_phoenix
+        run: mix test
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare browser-test database
+        env:
+          MIX_ENV: dev
+          PGDATABASE: starsmap_api_dev
+        working-directory: backend_phoenix
+        run: mix ecto.create --quiet && mix ecto.migrate && mix starsmap.import_catalogs
+
+      - name: Start browser-test services
+        env:
+          MIX_ENV: dev
+          PGDATABASE: starsmap_api_dev
+          PORT: "4020"
+          PYTHON_BACKEND_URL: http://127.0.0.1:8765
+          RATE_LIMIT_CAPACITY_OVERRIDE: "10000"
+        run: |
+          mkdir -p "$RUNNER_TEMP/skychart-logs"
+          nohup python3 backend/server.py >"$RUNNER_TEMP/skychart-logs/python.log" 2>&1 &
+          echo $! >"$RUNNER_TEMP/skychart-python.pid"
+          nohup sh -c 'cd backend_phoenix && exec mix phx.server' >"$RUNNER_TEMP/skychart-logs/phoenix.log" 2>&1 &
+          echo $! >"$RUNNER_TEMP/skychart-phoenix.pid"
+
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent --show-error http://127.0.0.1:8765/api/health >/dev/null \
+              && curl --fail --silent --show-error http://127.0.0.1:4020/api/health >/dev/null \
+              && curl --fail --silent --show-error --max-time 120 http://127.0.0.1:4020/api/ephemeris >/dev/null; then
+              exit 0
+            fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/skychart-python.pid")" 2>/dev/null \
+              || ! kill -0 "$(cat "$RUNNER_TEMP/skychart-phoenix.pid")" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          tail -n 200 "$RUNNER_TEMP/skychart-logs/python.log" || true
+          tail -n 200 "$RUNNER_TEMP/skychart-logs/phoenix.log" || true
+          exit 1
+
+      - name: Run browser smoke, tour, guardrail, and mobile tests
+        env:
+          ATLAS_BASE_URL: http://127.0.0.1:4020
+        run: npm run test:e2e && npm run test:mobile
+
+      - name: Upload browser-test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-test-diagnostics
+          path: |
+            ${{ runner.temp }}/skychart-logs
+            test-results
+          if-no-files-found: ignore
