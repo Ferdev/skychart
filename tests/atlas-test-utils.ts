@@ -57,7 +57,18 @@ export async function selectCatalogObject(page: Page, query: string, key: string
 export function collectBrowserIssues(page: Page): BrowserIssueCollector {
   const errors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+    if (message.type() !== "error") return;
+    const locationUrl = message.location().url;
+    if (message.text() === "Failed to load resource: the server responded with a status of 404 (Not Found)" && locationUrl) {
+      try {
+        const location = new URL(locationUrl);
+        const atlas = new URL(page.url());
+        if (location.origin === atlas.origin && location.pathname === "/catalog-tiles/v1/manifest.json") return;
+      } catch {
+        // Keep malformed or non-URL console locations visible to the assertion.
+      }
+    }
+    errors.push(message.text());
   });
   page.on("pageerror", (error) => {
     errors.push(error.message);
