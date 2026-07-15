@@ -164,10 +164,16 @@ class StaticTileDefaultsTest(unittest.TestCase):
         self.assertEqual(layers["planets"].types, ["planet"])
         self.assertEqual(layers["asteroids"].types, ["asteroid"])
         self.assertEqual(layers["comets"].types, ["comet"])
+        self.assertEqual(layers["dwarf_planets"].types, ["dwarf_planet"])
         self.assertNotIn("exoplanet_systems", layers)
         self.assertNotIn("small_bodies", layers)
         for layer_id in ("deep_sky", "galaxies", "nebulae", "star_clusters"):
             self.assertIn("ngc_ic_deep_sky", layers[layer_id].groups)
+        self.assertIn("bass_dr2_black_holes", layers["deep_sky"].groups)
+        self.assertEqual(
+            set(layers["black_holes"].groups),
+            {"simbad_compact_objects", "bass_dr2_black_holes"},
+        )
 
     def test_manifest_version_comes_from_explicit_tile_version(self) -> None:
         builder = load_tile_builder()

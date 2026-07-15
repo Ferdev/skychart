@@ -4321,22 +4321,40 @@ body[data-atlas-mode="embed"] .embed-activation:not([hidden]) {
 }
 
 .scale-options .map-filter-buttons button {
+  display: inline-flex;
   min-height: 30px;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   border-color: rgba(242, 237, 223, 0.14);
   color: rgba(243, 238, 223, 0.72);
   background: rgba(242, 237, 223, 0.045);
 }
 
-.scale-options .map-filter-buttons button small {
-  color: rgba(243, 238, 223, 0.46);
-  font-size: 0.63rem;
-  font-variant-numeric: tabular-nums;
+.scale-options .map-filter-buttons .map-filter-label {
+  min-width: 0;
 }
 
-.scale-options .map-filter-buttons button.active small {
-  color: rgba(241, 197, 104, 0.76);
+.scale-options .map-filter-buttons .map-filter-count {
+  display: inline-flex;
+  min-width: 2.25em;
+  padding: 2px 6px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(243, 238, 223, 0.13);
+  border-radius: 999px;
+  color: rgba(243, 238, 223, 0.82);
+  background: rgba(243, 238, 223, 0.075);
+  font-size: 0.72rem;
+  font-weight: 680;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scale-options .map-filter-buttons button.active .map-filter-count {
+  border-color: rgba(241, 197, 104, 0.24);
+  color: rgba(255, 220, 143, 0.94);
+  background: rgba(241, 197, 104, 0.1);
 }
 
 .map-hud.workspace-open ~ .atlas-footer {

@@ -19,7 +19,7 @@ defmodule StarsmapApi.Catalog.Importer do
   def import!(root_path \\ repo_root(), opts \\ []) do
     rows = rows(root_path)
     report = import_report(rows)
-    {count, _} = Catalog.upsert_objects(rows)
+    {count, _} = Catalog.replace_snapshot_objects(rows)
     source_table_counts = source_table_counts(rows)
 
     result = %{
@@ -38,7 +38,7 @@ defmodule StarsmapApi.Catalog.Importer do
     data_dir = Keyword.fetch!(opts, :data_dir)
     rows = data_dir |> catalog_files() |> Enum.flat_map(&rows_for_file/1)
     report = import_report(rows)
-    {count, _} = Catalog.upsert_objects(rows)
+    {count, _} = Catalog.replace_snapshot_objects(rows)
     source_table_counts = source_table_counts(rows)
 
     result = %{
@@ -430,6 +430,32 @@ defmodule StarsmapApi.Catalog.Importer do
     })
   end
 
+  def row_for_entry(:bass_dr2_black_hole, entry, source_meta) do
+    position = projected_position(entry)
+
+    base_row(entry, source_meta, position, %{
+      object_type: "black_hole",
+      catalog_group: "bass_dr2_black_holes",
+      source_type: "bass_dr2_black_hole_mass",
+      position_model: entry["position_model"] || "bass_dr2_catalog_distance_coordinates",
+      radius_km: number(entry["radius_km"], 0.0),
+      aliases: list(entry["aliases"]),
+      external_ids: entry["external_ids"] || %{},
+      facts:
+        (entry["facts"] || %{})
+        |> Map.put_new("why_interesting", entry["why_interesting"])
+        |> reject_nil_values()
+        |> reject_empty_values(),
+      search_values: [
+        entry["why_interesting"],
+        fact(entry, "black_hole_mass_log10_solar"),
+        fact(entry, "black_hole_mass_method"),
+        fact(entry, "redshift"),
+        fact(entry, "bass_id")
+      ]
+    })
+  end
+
   def row_for_entry(:curated_extragalactic_survey, entry, source_meta) do
     position = projected_position(entry)
 
@@ -605,6 +631,7 @@ defmodule StarsmapApi.Catalog.Importer do
   defp entries(:gaia_star, data), do: Map.fetch!(data, "stars")
   defp entries(:simbad_extragalactic, data), do: Map.fetch!(data, "objects")
   defp entries(:simbad_compact_object, data), do: Map.fetch!(data, "objects")
+  defp entries(:bass_dr2_black_hole, data), do: Map.fetch!(data, "objects")
   defp entries(:curated_extragalactic_survey, data), do: Map.fetch!(data, "objects")
 
   defp exoplanet_planet_entries(system) do
@@ -666,6 +693,7 @@ defmodule StarsmapApi.Catalog.Importer do
       {:gaia_star, Path.join(catalog_dir, "gaia_local_stars.json")},
       {:simbad_extragalactic, Path.join(catalog_dir, "simbad_extragalactic.json")},
       {:simbad_compact_object, Path.join(catalog_dir, "simbad_compact_objects.json")},
+      {:bass_dr2_black_hole, Path.join(catalog_dir, "bass_dr2_black_holes.json")},
       {:curated_extragalactic_survey, Path.join(catalog_dir, "curated_extragalactic_survey.json")}
     ]
     |> Enum.filter(fn {_type, path} -> File.exists?(path) end)
@@ -697,6 +725,9 @@ defmodule StarsmapApi.Catalog.Importer do
 
   defp source_table_for_row(%{source_type: "curated_extragalactic_survey"}),
     do: "catalog_simbad_objects"
+
+  defp source_table_for_row(%{source_type: "bass_dr2_black_hole_mass"}),
+    do: "catalog_bass_dr2_objects"
 
   defp source_table_for_row(_row), do: nil
 

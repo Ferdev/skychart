@@ -18,6 +18,18 @@ SB_SAT_URL = "https://ssd-api.jpl.nasa.gov/sb_sat.api"
 SBDB_DOC_URL = "https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html"
 SBDB_FILTER_DOC_URL = "https://ssd-api.jpl.nasa.gov/doc/sbdb_filter.html"
 SB_SAT_DOC_URL = "https://ssd-api.jpl.nasa.gov/doc/sb_sat.html"
+IAU_DWARF_PLANET_DEFINITION_URL = "https://www.iau.org/static/resolutions/Resolution_GA26-5-6.pdf"
+IAU_RECOGNIZED_DWARF_PLANETS_URL = "https://www.iau.org/static/archives/releases/pdf/iau0807.pdf"
+
+# Pluto is intentionally absent: it is supplied by the dynamic core ephemeris.
+# These permanent designations are the four IAU-recognized dwarf planets that
+# belong in the static JPL small-body catalog.
+STATIC_RECOGNIZED_DWARF_PLANETS = {
+    "1": "Ceres",
+    "136108": "Haumea",
+    "136472": "Makemake",
+    "136199": "Eris",
+}
 
 AU_KM = 149_597_870.700
 DEFAULT_ASTEROID_ALBEDO = 0.14
@@ -53,6 +65,20 @@ FIELDS = [
 ]
 
 SOURCE_ADAPTERS = [
+    {
+        "name": "iau_recognized_dwarf_planets",
+        "api": "sbdb_query",
+        "family": "asteroid",
+        "params": {
+            "sb-kind": "a",
+            "sb-cdata": json.dumps(
+                {"OR": [f"pdes|EQ|{designation}" for designation in STATIC_RECOGNIZED_DWARF_PLANETS]},
+                separators=(",", ":"),
+            ),
+            "sort": "pdes",
+            "limit": str(len(STATIC_RECOGNIZED_DWARF_PLANETS)),
+        },
+    },
     {
         "name": "largest_diameter_asteroids",
         "api": "sbdb_query",
@@ -356,6 +382,12 @@ def estimated_diameter_km(row: dict[str, Any], object_type: str) -> float | None
     if diameter is not None and diameter > 0:
         return diameter
 
+    # The generic asteroid H/albedo fallback is far too coarse for named dwarf
+    # planets and can overstate their radii by several times. Keep size unknown
+    # unless JPL supplies a measured diameter.
+    if object_type == "dwarf_planet":
+        return None
+
     absolute_magnitude = finite_float(row.get("H"))
     if absolute_magnitude is None:
         return None
@@ -382,6 +414,9 @@ def object_color(row: dict[str, Any], object_type: str) -> str:
 
 
 def object_type_for(row: dict[str, Any]) -> str:
+    if primary_designation(row) in STATIC_RECOGNIZED_DWARF_PLANETS:
+        return "dwarf_planet"
+
     source_family = str(row.get("_source_family") or "").lower()
     if source_family in {"asteroid", "comet", "satellite"}:
         return source_family
@@ -392,6 +427,10 @@ def object_type_for(row: dict[str, Any]) -> str:
     if kind.startswith("s"):
         return "satellite"
     return "asteroid"
+
+
+def primary_designation(row: dict[str, Any]) -> str:
+    return str(row.get("pdes") or "").strip()
 
 
 def aliases_for(row: dict[str, Any], display_name: str) -> list[str]:
@@ -495,11 +534,29 @@ def build_object(row: dict[str, Any], target_jd: float) -> dict[str, Any] | None
             "primary_body_designation": parent_designation,
             "satellite_record": row.get("_satellite_record"),
         },
+        **classification_metadata(row, object_type),
         "why_interesting": interesting_note(row, object_type),
     }
 
 
+def classification_metadata(row: dict[str, Any], object_type: str) -> dict[str, Any]:
+    designation = primary_designation(row)
+    if object_type != "dwarf_planet" or designation not in STATIC_RECOGNIZED_DWARF_PLANETS:
+        return {}
+    return {
+        "classification": {
+            "object_type": "dwarf_planet",
+            "status": "recognized",
+            "authority": "International Astronomical Union",
+            "definition_url": IAU_DWARF_PLANET_DEFINITION_URL,
+            "recognition_url": IAU_RECOGNIZED_DWARF_PLANETS_URL,
+        }
+    }
+
+
 def interesting_note(row: dict[str, Any], object_type: str) -> str:
+    if object_type == "dwarf_planet":
+        return "IAU-recognized dwarf planet with orbital elements from the NASA/JPL Small-Body Database."
     if object_type == "comet":
         return "Cometary body from the NASA/JPL Small-Body Database."
     if object_type == "satellite":
@@ -509,6 +566,19 @@ def interesting_note(row: dict[str, Any], object_type: str) -> str:
     if row.get("neo") == "Y":
         return "Near-Earth asteroid from the NASA/JPL Small-Body Database."
     return "Asteroid with orbital elements from the NASA/JPL Small-Body Database."
+
+
+def validate_static_recognized_dwarfs(objects: list[dict[str, Any]]) -> None:
+    dwarfs = [item for item in objects if item.get("object_type") == "dwarf_planet"]
+    expected_designations = set(STATIC_RECOGNIZED_DWARF_PLANETS)
+    actual_designations = [str(item.get("external_ids", {}).get("primary_designation") or "") for item in dwarfs]
+    if len(actual_designations) != len(set(actual_designations)):
+        raise ValueError("static dwarf-planet catalog contains duplicate recognized designations")
+    if len(dwarfs) != len(expected_designations) or set(actual_designations) != expected_designations:
+        raise ValueError(
+            "static dwarf-planet catalog must contain exactly the four recognized designations "
+            f"{sorted(expected_designations)}; found {actual_designations}"
+        )
 
 
 def reject_none(value: Any) -> Any:
@@ -523,13 +593,22 @@ def main() -> None:
     generated_at = datetime.now(timezone.utc)
     target_jd = julian_day(generated_at)
     rows, slice_meta = fetch_rows()
+    retrieved_at_utc = generated_at.isoformat().replace("+00:00", "Z")
+    for source_slice in slice_meta:
+        source_slice["retrieved_at_utc"] = retrieved_at_utc
     objects = [build_object(row, target_jd) for row in rows]
     objects = [reject_none(item) for item in objects if item is not None]
+    validate_static_recognized_dwarfs(objects)
     objects.sort(key=lambda item: (item["object_type"], item.get("absolute_magnitude") is None, item.get("absolute_magnitude") or 99.0, item["name"]))
 
     payload = {
-        "schema_version": 1,
-        "generated_at_utc": generated_at.isoformat().replace("+00:00", "Z"),
+        "schema_version": 2,
+        "generated_at_utc": retrieved_at_utc,
+        "snapshot_lineage": {
+            "assembly_mode": "full_snapshot",
+            "assembled_at_utc": retrieved_at_utc,
+            "position_targets": "Per-object Julian dates are recorded in facts.position_generated_for_jd_utc.",
+        },
         "source": {
             "name": "NASA/JPL Small-Body Database Query API",
             "api_url": SBDB_QUERY_URL,

@@ -46,6 +46,13 @@ The atlas distinguishes the evidence behind a distance:
 - Solar System positions come from ephemeris state or orbital models rather
   than a static catalog distance.
 
+BASS DR2 black-hole records use the catalog's published distance and mass
+estimate. Their map position is a catalog-coordinate projection; the point is
+not intended to represent an event-horizon radius or a directly imaged black
+hole. Dwarf-planet classification follows the five bodies formally recognized
+by the International Astronomical Union, while their orbital and physical
+parameters remain attributed to JPL sources.
+
 DESI and Quaia projections use a checked-in flat Lambda-CDM convention with
 `H0 = 67.66 km/s/Mpc`, `Omega_m = 0.30966`, and `Omega_lambda = 0.69034`.
 Comoving distance is a display coordinate, not a claim of exact lookback time
@@ -66,7 +73,10 @@ literature compilation as a uniform volume-limited survey.
 
 - [Gaia Data Release 3](https://www.cosmos.esa.int/web/gaia/dr3)
 - [NASA/JPL Small-Body Database](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html)
+- [IAU Resolution B5 and dwarf-planet classifications](https://www.iau.org/static/resolutions/Resolution_GA26-5-6.pdf)
 - [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/)
+- [BASS Data Release 2](https://www.bass-survey.com/dr2.html)
+- [BASS DR2 black-hole mass catalog at VizieR](https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2)
 - [DESI Data Release 1](https://data.desi.lbl.gov/doc/releases/dr1/)
 - [Quaia G<20.0](https://doi.org/10.5281/zenodo.10403370)
 - [OpenNGC](https://github.com/mattiaverga/OpenNGC)

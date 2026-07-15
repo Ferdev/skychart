@@ -53,7 +53,7 @@ const en: Record<string, string> = {
   "scale.objectDisplay": "Object size",
   "scale.objectSizeMode": "Object size mode",
   "scale.objectTypes": "Object types",
-  "scale.objectTypesHelp": "Choose an object type to filter the map and move to a useful scale. Counts show indexed objects.",
+  "scale.objectTypesHelp": "Choose a type to filter the map and move to a useful scale. Counts show catalog records plus loaded Solar System bodies; overlapping catalogs may describe the same system.",
   "scale.readable": "Readable",
   "scale.hybrid": "Hybrid",
   "scale.true": "True",
@@ -198,6 +198,7 @@ const en: Record<string, string> = {
   "filters.pulsars": "Pulsars",
   "filters.nebulae": "Nebulae",
   "filters.clusters": "Clusters",
+  "filters.availableObjects": "available objects: {count}",
   "guided.solarNeighborhood": "Solar neighborhood",
   "guided.brightStars": "Bright stars",
   "guided.nearbyStars": "Nearby stars",
@@ -495,6 +496,7 @@ const PARTIAL_TRANSLATIONS: Record<Exclude<LocaleCode, "en">, { label: string; s
       "filters.pulsars": "Púlsares",
       "filters.nebulae": "Nebulosas",
       "filters.clusters": "Cúmulos",
+      "filters.availableObjects": "objetos disponibles: {count}",
       "explore.label": "Dominios para explorar",
       "explore.title": "Explorar",
       "explore.count": "{count} objetos",
@@ -715,16 +717,51 @@ const PARTIAL_TRANSLATIONS: Record<Exclude<LocaleCode, "en">, { label: string; s
   ko: { label: "한국어", strings: { "workspace.search": "검색", "scale.title": "축척", "scale.zoomOut": "축소", "scale.zoomIn": "확대", "scale.zoomLevel": "확대 수준", "time.title": "시간", "time.now": "현재", "time.apply": "적용", "workspace.close": "닫기", "object.center": "가운데로", "object.zoom": "확대", "compare.heading": "다른 천체와 비교", "search.find": "천체 찾기", "search.query": "카탈로그 검색", "search.placeholder": "천체 이름 또는 카탈로그 명칭", "search.focus": "초점", "search.scope": "범위", "search.matches": "결과", "language.label": "언어" } }
 };
 
+const FILTER_COUNT_TRANSLATIONS: Record<Exclude<LocaleCode, "en">, Record<string, string>> = {
+  es: {
+    "filters.availableObjects": "objetos disponibles: {count}",
+    "scale.objectTypesHelp": "Elige un tipo para filtrar el mapa. Los recuentos suman registros de catálogo y cuerpos cargados del Sistema Solar; varios catálogos pueden describir el mismo sistema."
+  },
+  fr: {
+    "filters.availableObjects": "objets disponibles : {count}",
+    "scale.objectTypesHelp": "Choisissez un type pour filtrer la carte. Les nombres regroupent les entrées de catalogue et les corps chargés du Système solaire ; plusieurs catalogues peuvent décrire le même système."
+  },
+  de: {
+    "filters.availableObjects": "verfügbare Objekte: {count}",
+    "scale.objectTypesHelp": "Wähle einen Typ, um die Karte zu filtern. Die Zahlen umfassen Katalogeinträge und geladene Körper des Sonnensystems; mehrere Kataloge können dasselbe System beschreiben."
+  },
+  "pt-BR": {
+    "filters.availableObjects": "objetos disponíveis: {count}",
+    "scale.objectTypesHelp": "Escolha um tipo para filtrar o mapa. As contagens incluem registros de catálogo e corpos carregados do Sistema Solar; catálogos diferentes podem descrever o mesmo sistema."
+  },
+  it: {
+    "filters.availableObjects": "oggetti disponibili: {count}",
+    "scale.objectTypesHelp": "Scegli un tipo per filtrare la mappa. I conteggi includono record di catalogo e corpi caricati del Sistema solare; cataloghi diversi possono descrivere lo stesso sistema."
+  },
+  "zh-Hans": {
+    "filters.availableObjects": "可用天体：{count}",
+    "scale.objectTypesHelp": "选择类型以筛选地图。数量包括星表记录和已加载的太阳系天体；不同星表可能描述同一个系统。"
+  },
+  ja: {
+    "filters.availableObjects": "利用可能な天体: {count}",
+    "scale.objectTypesHelp": "種類を選んで地図を絞り込みます。件数にはカタログ記録と読み込み済みの太陽系天体が含まれ、複数のカタログが同じ系を記述する場合があります。"
+  },
+  ko: {
+    "filters.availableObjects": "사용 가능한 천체: {count}",
+    "scale.objectTypesHelp": "유형을 선택해 지도를 필터링합니다. 수량에는 카탈로그 레코드와 불러온 태양계 천체가 포함되며 여러 카탈로그가 같은 계를 설명할 수 있습니다."
+  }
+};
+
 export const LOCALES: Record<LocaleCode, LocaleDefinition> = {
   en: { label: "English", strings: en },
-  es: { label: PARTIAL_TRANSLATIONS.es.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.es.strings, ...LAUNCH_TRANSLATIONS.es } },
-  fr: { label: PARTIAL_TRANSLATIONS.fr.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.fr.strings, ...LAUNCH_TRANSLATIONS.fr } },
-  de: { label: PARTIAL_TRANSLATIONS.de.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.de.strings, ...LAUNCH_TRANSLATIONS.de } },
-  "pt-BR": { label: PARTIAL_TRANSLATIONS["pt-BR"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["pt-BR"].strings, ...LAUNCH_TRANSLATIONS["pt-BR"] } },
-  it: { label: PARTIAL_TRANSLATIONS.it.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.it.strings, ...LAUNCH_TRANSLATIONS.it } },
-  "zh-Hans": { label: PARTIAL_TRANSLATIONS["zh-Hans"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["zh-Hans"].strings, ...LAUNCH_TRANSLATIONS["zh-Hans"] } },
-  ja: { label: PARTIAL_TRANSLATIONS.ja.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ja.strings, ...LAUNCH_TRANSLATIONS.ja } },
-  ko: { label: PARTIAL_TRANSLATIONS.ko.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ko.strings, ...LAUNCH_TRANSLATIONS.ko } }
+  es: { label: PARTIAL_TRANSLATIONS.es.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.es.strings, ...FILTER_COUNT_TRANSLATIONS.es, ...LAUNCH_TRANSLATIONS.es } },
+  fr: { label: PARTIAL_TRANSLATIONS.fr.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.fr.strings, ...FILTER_COUNT_TRANSLATIONS.fr, ...LAUNCH_TRANSLATIONS.fr } },
+  de: { label: PARTIAL_TRANSLATIONS.de.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.de.strings, ...FILTER_COUNT_TRANSLATIONS.de, ...LAUNCH_TRANSLATIONS.de } },
+  "pt-BR": { label: PARTIAL_TRANSLATIONS["pt-BR"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["pt-BR"].strings, ...FILTER_COUNT_TRANSLATIONS["pt-BR"], ...LAUNCH_TRANSLATIONS["pt-BR"] } },
+  it: { label: PARTIAL_TRANSLATIONS.it.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.it.strings, ...FILTER_COUNT_TRANSLATIONS.it, ...LAUNCH_TRANSLATIONS.it } },
+  "zh-Hans": { label: PARTIAL_TRANSLATIONS["zh-Hans"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["zh-Hans"].strings, ...FILTER_COUNT_TRANSLATIONS["zh-Hans"], ...LAUNCH_TRANSLATIONS["zh-Hans"] } },
+  ja: { label: PARTIAL_TRANSLATIONS.ja.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ja.strings, ...FILTER_COUNT_TRANSLATIONS.ja, ...LAUNCH_TRANSLATIONS.ja } },
+  ko: { label: PARTIAL_TRANSLATIONS.ko.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ko.strings, ...FILTER_COUNT_TRANSLATIONS.ko, ...LAUNCH_TRANSLATIONS.ko } }
 };
 
 let currentLocale = detectLocale();

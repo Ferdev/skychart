@@ -51,8 +51,10 @@ defmodule StarsmapApiWeb.PageControllerTest do
           "DESI DR1",
           "NASA Exoplanet Archive",
           "SIMBAD / CDS",
+          "BASS DR2 / VizieR",
           "OpenNGC",
           "JPL SSD / Horizons",
+          "International Astronomical Union",
           "NAIF"
         ],
         do: assert(html =~ credit)

@@ -19,7 +19,7 @@ import { eclipticCartesianToSpherical, equatorialToGalactic, formatDecimalDegree
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL, lightYearsToAu, type GalacticModelFeature, type GalacticModelPoint } from "./galacticModel";
 import { educationalComparisons } from "./navigationMetrics";
 import { objectMediaFor, objectMediaStatusFor } from "./objectMedia";
-import { initI18n, t } from "./i18n";
+import { initI18n, locale, t } from "./i18n";
 import { WebglPointRenderer, type PointLayerSource, type PointRenderStats } from "./webglPointRenderer";
 import { composeAtlasPng } from "./exportCompositor";
 import { measuredRedshift, scienceSemanticsFor, uncertaintySummary } from "./scienceSemantics";
@@ -572,7 +572,7 @@ type CatalogPointDecoded = {
 };
 let perfWebglEmaMs = 0;
 const POINT_LAYER_GROUPS = ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"];
-const DEEP_SKY_POINT_GROUPS = ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey", "desi_dr1_galaxies", "desi_dr1_quasars", "quaia_g20_quasars"];
+const DEEP_SKY_POINT_GROUPS = ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "bass_dr2_black_holes", "curated_extragalactic_survey", "desi_dr1_galaxies", "desi_dr1_quasars", "quaia_g20_quasars"];
 const DEEP_SKY_POINT_TYPES: DestinationBodyType[] = ["galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"];
 const UNIVERSE_DENSE_LAYER_IDS = new Set(["desi_dr1", "quaia_g20"]);
 const EXTRAGALACTIC_POINT_TYPES = new Set<DestinationBodyType>(["galaxy", "quasar", "active_galaxy"]);
@@ -618,11 +618,11 @@ const BODY_FILTERS: BodyFilterDefinition[] = [
   { key: "bright_star", labelKey: "filters.bright", types: ["star"], groups: ["bright_stars"] },
   { key: "gaia_star", labelKey: "filters.gaia", types: ["star"], groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"] },
   { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"] },
-  { key: "dwarf_planet", labelKey: "filters.dwarf", types: ["dwarf_planet"], groups: ["core"] },
+  { key: "dwarf_planet", labelKey: "filters.dwarf", types: ["dwarf_planet"], groups: ["core", "jpl_small_bodies"] },
   { key: "small_body", labelKey: "filters.smallBodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
   { key: "asteroid", labelKey: "filters.asteroids", types: ["asteroid"] },
   { key: "comet", labelKey: "filters.comets", types: ["comet"] },
-  { key: "deep_sky", labelKey: "filters.deepSky", types: ["galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"], groups: ["messier_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey", "desi_dr1_galaxies", "desi_dr1_quasars", "quaia_g20_quasars"] },
+  { key: "deep_sky", labelKey: "filters.deepSky", types: ["galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"], groups: ["messier_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "bass_dr2_black_holes", "curated_extragalactic_survey", "desi_dr1_galaxies", "desi_dr1_quasars", "quaia_g20_quasars"] },
   { key: "galaxy", labelKey: "filters.galaxies", types: ["galaxy"] },
   { key: "quasar", labelKey: "filters.quasars", types: ["quasar"] },
   { key: "active_galaxy", labelKey: "filters.agn", types: ["active_galaxy"] },
@@ -662,6 +662,8 @@ const MAP_FILTER_ZOOM_PRESETS: Partial<Record<BodyFilter, ZoomPreset>> = {
   nebula: "galaxy",
   star_cluster: "galaxy"
 };
+const SOLAR_SYSTEM_COUNT_GROUPS = new Set(["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"]);
+const SOLAR_SYSTEM_COUNT_FILTERS = new Set<BodyFilter>(["planet", "moon", "dwarf_planet"]);
 const GUIDED_SETS: { id: string; labelKey: string; keys: string[] }[] = [
   { id: "solar-neighborhood", labelKey: "guided.solarNeighborhood", keys: ["sun", "earth", "moon", "mars", "jupiter", "saturn"] },
   { id: "bright-stars", labelKey: "guided.brightStars", keys: ["hip-32349", "hip-30438", "hip-69673", "hip-71683", "hip-91262", "hip-24436", "hip-24608"] },
@@ -2919,11 +2921,11 @@ function renderMapObjectTypeButtons(active: BodyFilter) {
     .map((filter) => {
       const count = filter.key === "all" ? null : mapObjectTypeCount(filter);
       const label = filter.key === "all" ? t("filters.allTypes") : t(filter.labelKey);
-      const countLabel = count === null ? "" : formatCount(count);
-      const title = count === null ? label : `${label}: ${formatInteger(count)}`;
+      const countLabel = count === null ? "" : formatAvailableObjectCount(count);
+      const accessibleLabel = count === null ? label : `${label}, ${t("filters.availableObjects", { count: countLabel })}`;
       return `
-        <button type="button" data-body-filter="${filter.key}" class="${filter.key === active ? "active" : ""}" aria-pressed="${filter.key === active ? "true" : "false"}" title="${escapeHtml(title)}">
-          <span>${escapeHtml(label)}</span>${count === null ? "" : `<small>${escapeHtml(countLabel)}</small>`}
+        <button type="button" data-body-filter="${filter.key}"${count === null ? "" : ` data-available-count="${count}"`} class="${filter.key === active ? "active" : ""}" aria-pressed="${filter.key === active ? "true" : "false"}" aria-label="${escapeHtml(accessibleLabel)}">
+          <span class="map-filter-label">${escapeHtml(label)}</span>${count === null ? "" : `<span class="map-filter-count" aria-hidden="true">${escapeHtml(countLabel)}</span>`}
         </button>
       `;
     })
@@ -2932,18 +2934,23 @@ function renderMapObjectTypeButtons(active: BodyFilter) {
 
 function mapObjectTypeCount(filter: BodyFilterDefinition) {
   const indexedCount = (filter.types ?? []).reduce((total, type) => total + (catalogSummary?.type_counts?.[type] ?? 0), 0);
-  if (indexedCount > 0) return indexedCount;
-  return (ephemeris?.bodies ?? []).filter((body) => bodyMatchesFilter(body, filter)).length;
+  if (!SOLAR_SYSTEM_COUNT_FILTERS.has(filter.key)) {
+    if (indexedCount > 0) return indexedCount;
+    return (ephemeris?.bodies ?? []).filter((body) => bodyMatchesFilter(body, filter)).length;
+  }
+  const ephemerisOnlyCount = (ephemeris?.bodies ?? []).filter(
+    (body) => bodyMatchesFilter(body, filter) && SOLAR_SYSTEM_COUNT_GROUPS.has(body.catalog_group ?? "")
+  ).length;
+  return indexedCount + ephemerisOnlyCount;
+}
+
+function formatAvailableObjectCount(count: number) {
+  return Intl.NumberFormat(locale(), { maximumFractionDigits: 0 }).format(count);
 }
 
 function focusMapFilter(filterKey: BodyFilter) {
   const filter = BODY_FILTERS.find((item) => item.key === filterKey);
   if (!filter || filter.key === "all" || !ephemeris) return;
-  const loadedMatches = ephemeris.bodies.filter((body) => bodyMatchesFilter(body, filter));
-  if (filterKey === "dwarf_planet" && loadedMatches.length === 1) {
-    centerOnBody(loadedMatches[0]!, true);
-    return;
-  }
   const preset = MAP_FILTER_ZOOM_PRESETS[filterKey];
   if (preset) applyZoomPreset(preset, false);
 }
@@ -3747,7 +3754,7 @@ function catalogStaticLayerPriority(layerId: string | undefined) {
   if (layerId === "gaia_stars") return 0;
   if (layerId === "deep_sky") return 1;
   if (layerId === "exoplanet_systems" || layerId === "exoplanet_stars" || layerId === "planets") return 3;
-  if (layerId === "small_bodies" || layerId === "asteroids" || layerId === "comets") return 4;
+  if (layerId === "small_bodies" || layerId === "asteroids" || layerId === "comets" || layerId === "dwarf_planets") return 4;
   return 2;
 }
 
@@ -3897,7 +3904,7 @@ function catalogStaticTileLayersForFilter(filterParams: { groups: string[]; type
 
 function prioritizedCatalogStaticTileLayers(layers: CatalogPointTileManifestLayer[], viewWidthLy: number, isDefaultFilter: boolean) {
   const visibleLayers = isDefaultFilter && viewWidthLy > 70_000
-    ? layers.filter((layer) => !["exoplanet_systems", "small_bodies", "exoplanet_stars", "planets", "asteroids", "comets"].includes(layer.id))
+    ? layers.filter((layer) => !["exoplanet_systems", "small_bodies", "exoplanet_stars", "planets", "asteroids", "comets", "dwarf_planets"].includes(layer.id))
     : layers;
   return [...visibleLayers].sort((a, b) => catalogStaticLayerPriority(a.id) - catalogStaticLayerPriority(b.id));
 }

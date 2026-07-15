@@ -187,6 +187,37 @@ defmodule StarsmapApi.Catalog.ImporterTest do
     assert attrs.search_text =~ "3c 273"
   end
 
+  test "maps BASS DR2 mass-bearing entries as black holes with source evidence" do
+    attrs =
+      Importer.attrs_for_entry!(
+        {:bass_dr2_black_hole,
+         %{
+           "key" => "bass-dr2-black-hole-1",
+           "name" => "2MASX J00004876-0709117",
+           "aliases" => ["SWIFT J0000.5-0709"],
+           "ra_deg" => 0.2032,
+           "dec_deg" => -7.1533,
+           "distance_ly" => 337_000_000.0,
+           "external_ids" => %{"bass_dr2_id" => "1"},
+           "facts" => %{
+             "bass_id" => "1",
+             "black_hole_mass_log10_solar" => 7.91,
+             "black_hole_mass_method" => "broad H-beta"
+           },
+           "why_interesting" =>
+             "BASS DR2 active galaxy with a published black-hole mass estimate."
+         }}
+      )
+
+    assert attrs.object_type == "black_hole"
+    assert attrs.catalog_group == "bass_dr2_black_holes"
+    assert attrs.source_type == "bass_dr2_black_hole_mass"
+    assert attrs.position_model == "bass_dr2_catalog_distance_coordinates"
+    assert attrs.facts["black_hole_mass_log10_solar"] == 7.91
+    assert attrs.search_text =~ "broad h-beta"
+    assert attrs.search_text =~ "swift j0000.5-0709"
+  end
+
   test "neutralizes invalid OpenNGC galaxy parallax before projection" do
     attrs =
       Importer.attrs_for_entry!(
@@ -346,10 +377,40 @@ defmodule StarsmapApi.Catalog.ImporterTest do
       })
     )
 
-    assert {:ok, %{total: 4, counts: counts, report: report}} =
+    File.write!(
+      Path.join(data_dir, "bass_dr2_black_holes.json"),
+      Jason.encode!(%{
+        "objects" => [
+          %{
+            "key" => "bass-dr2-black-hole-test",
+            "name" => "BASS Test",
+            "ra_deg" => 12.0,
+            "dec_deg" => -4.0,
+            "distance_ly" => 100_000_000.0,
+            "facts" => %{"black_hole_mass_log10_solar" => 8.0}
+          }
+        ]
+      })
+    )
+
+    Catalog.upsert_source_objects([
+      %{
+        key: "bass-dr2-black-hole-stale",
+        name: "Stale BASS row",
+        object_type: "black_hole",
+        catalog_group: "bass_dr2_black_holes",
+        source_type: "bass_dr2_black_hole_mass",
+        position_model: "bass_dr2_catalog_distance_coordinates",
+        x_au: 1.0,
+        y_au: 1.0
+      }
+    ])
+
+    assert {:ok, %{total: 5, counts: counts, report: report}} =
              Importer.import_all(data_dir: data_dir, report_path: report_path)
 
     assert counts == %{
+             "bass_dr2_black_holes" => 1,
              "bright_stars" => 1,
              "exoplanet_systems" => 1,
              "exoplanets" => 1,
@@ -357,6 +418,7 @@ defmodule StarsmapApi.Catalog.ImporterTest do
            }
 
     assert report[:valid?] == true
+    assert report.source_types["bass_dr2_black_hole_mass"].rows == 1
     assert report.source_types["bright_star_catalog"].rows == 1
     assert report.source_types["deep_sky_catalog"].rows == 1
     assert report.source_types["exoplanet_archive_system"].rows == 1
@@ -365,16 +427,19 @@ defmodule StarsmapApi.Catalog.ImporterTest do
     assert count_source_table("catalog_stellar_stars") == 1
     assert count_source_table("catalog_deep_sky_objects") == 1
     assert count_source_table("catalog_exoplanet_objects") == 2
+    assert count_source_table("catalog_bass_dr2_objects") == 1
+    assert {:error, :not_found} = Catalog.get_by_key("bass-dr2-black-hole-stale")
 
     assert File.exists?(report_path)
     persisted_report = report_path |> File.read!() |> Jason.decode!()
-    assert persisted_report["report"]["total"] == 4
+    assert persisted_report["report"]["total"] == 5
     assert persisted_report["report"]["report"]["valid?"] == true
     assert persisted_report["report"]["report"]["source_types"]["deep_sky_catalog"]["rows"] == 1
 
-    assert Repo.aggregate(CatalogSourceObject, :count, :id) == 4
+    assert Repo.aggregate(CatalogSourceObject, :count, :id) == 5
 
     assert Catalog.summary().source_counts == %{
+             "bass_dr2_black_hole_mass" => 1,
              "bright_star_catalog" => 1,
              "deep_sky_catalog" => 1,
              "exoplanet_archive_planet" => 1,
@@ -384,8 +449,8 @@ defmodule StarsmapApi.Catalog.ImporterTest do
     assert {:ok, %{object_type: "planet", parent_key: "exosys-test"}} =
              Catalog.get_by_key("exoplanet-test-host-b")
 
-    assert {:ok, %{total: 4}} = Importer.import_all(data_dir: data_dir)
-    assert Repo.aggregate(CatalogSourceObject, :count, :id) == 4
+    assert {:ok, %{total: 5}} = Importer.import_all(data_dir: data_dir)
+    assert Repo.aggregate(CatalogSourceObject, :count, :id) == 5
   end
 
   defp tmp_catalog_dir do

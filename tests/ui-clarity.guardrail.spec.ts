@@ -86,6 +86,37 @@ test.describe("compact and understandable atlas controls", () => {
     await expect(page.locator('#map-filter-buttons [data-body-filter="bright_star"]')).toHaveCount(0);
     await expect(page.locator('#map-filter-buttons [data-body-filter="deep_sky"]')).toHaveCount(0);
 
+    const catalogSummary = await page.request.get("/api/catalog").then((response) => response.json()) as {
+      type_counts?: Record<string, number>;
+    };
+    const starCount = catalogSummary.type_counts?.star ?? 0;
+    const planetCount = catalogSummary.type_counts?.planet ?? 0;
+    expect(catalogSummary.type_counts?.black_hole).toBe(806);
+    expect(catalogSummary.type_counts?.dwarf_planet).toBe(4);
+    const appLocale = await page.locator("html").getAttribute("lang") ?? "en";
+    const exactStarCount = new Intl.NumberFormat(appLocale, { maximumFractionDigits: 0 }).format(starCount);
+    const starFilter = page.locator('#map-filter-buttons [data-body-filter="star"]');
+    await expect(starFilter.locator(".map-filter-count")).toHaveText(exactStarCount);
+    await expect(starFilter).toHaveAccessibleName(`Stars, available objects: ${exactStarCount}`);
+    await expect(starFilter).toHaveAttribute("data-available-count", String(starCount));
+    await expect(starFilter.locator(".map-filter-count")).toHaveAttribute("aria-hidden", "true");
+    const countStyle = await starFilter.locator(".map-filter-count").evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { fontSize: Number.parseFloat(style.fontSize), display: style.display };
+    });
+    expect(countStyle.fontSize).toBeGreaterThanOrEqual(11.5);
+    expect(["flex", "inline-flex"]).toContain(countStyle.display);
+
+    const availablePlanetCount = Number(await page.locator('#map-filter-buttons [data-body-filter="planet"]').getAttribute("data-available-count"));
+    expect(availablePlanetCount, "planet count adds loaded Solar System planets to indexed exoplanets").toBeGreaterThan(planetCount);
+    await expect(page.locator('#map-filter-buttons [data-body-filter="moon"] .map-filter-count')).not.toHaveText("0");
+    const availableDwarfCount = Number(await page.locator('#map-filter-buttons [data-body-filter="dwarf_planet"]').getAttribute("data-available-count"));
+    expect(availableDwarfCount, "dwarf count adds dynamic Pluto to four static recognized dwarfs").toBe(5);
+    await expect(page.locator('#map-filter-buttons [data-body-filter="dwarf_planet"]')).toHaveAccessibleName(
+      `Dwarf planets, available objects: ${new Intl.NumberFormat(appLocale, { maximumFractionDigits: 0 }).format(availableDwarfCount)}`
+    );
+    await expect(page.locator('#map-filter-buttons [data-body-filter="black_hole"]')).toHaveAttribute("data-available-count", "806");
+
     await page.locator('#map-filter-buttons [data-body-filter="galaxy"]').click();
     await expect(page.locator('#map-filter-buttons [data-body-filter="galaxy"]')).toHaveClass(/active/);
     await expect(page.locator('#body-filter-buttons [data-body-filter="galaxy"]')).toHaveClass(/active/);

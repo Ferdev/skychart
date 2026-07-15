@@ -28,6 +28,7 @@ defmodule StarsmapApi.Catalog do
   @point_cache_version 1
   @point_cache_max_limit 50_000
   @point_cache_max_binary_bytes 2_000_000
+  @snapshot_replace_timeout 300_000
   @point_sample_bucket_count 1_024
   @point_layer_groups ~w(gaia_local_stars gaia_500pc_stars gaia_10kpc_bright_stars)
   @point_layer_rgb {224, 196, 128}
@@ -72,6 +73,22 @@ defmodule StarsmapApi.Catalog do
     counts = upsert_source_objects(objects)
     PointTileCache.clear()
     {Enum.sum(Map.values(counts)), nil}
+  end
+
+  def replace_snapshot_objects(objects) when is_list(objects) do
+    transaction = fn ->
+      reconcile_snapshot_groups(objects)
+      upsert_source_objects(objects)
+    end
+
+    case Repo.transaction(transaction, timeout: @snapshot_replace_timeout) do
+      {:ok, counts} ->
+        PointTileCache.clear()
+        {Enum.sum(Map.values(counts)), nil}
+
+      {:error, reason} ->
+        raise "catalog snapshot replacement failed: #{inspect(reason)}"
+    end
   end
 
   def upsert_source_objects(objects) when is_list(objects) do
@@ -160,6 +177,24 @@ defmodule StarsmapApi.Catalog do
   # whole-catalog inserts must be chunked by row width.
   defp source_insert_chunk_size([row | _rest]), do: max(div(65_000, max(map_size(row), 1)), 1)
   defp source_insert_chunk_size([]), do: 1
+
+  defp reconcile_snapshot_groups(objects) do
+    objects
+    |> Enum.group_by(fn object ->
+      {source_table_for(object), Map.fetch!(object, :catalog_group)}
+    end)
+    |> Enum.reject(fn {{table, _group}, rows} -> is_nil(table) or rows == [] end)
+    |> Enum.each(fn {{table, group}, rows} ->
+      keys = Enum.map(rows, &Map.fetch!(&1, :key))
+
+      # `table` comes only from the closed source_table_for/1 mapping above;
+      # group and keys remain query parameters.
+      Repo.query!(
+        "DELETE FROM #{table} WHERE catalog_group = $1 AND NOT (key = ANY($2::text[]))",
+        [group, keys]
+      )
+    end)
+  end
 
   def summary do
     case cached_summary() do
@@ -278,6 +313,9 @@ defmodule StarsmapApi.Catalog do
   defp source_table_for(%{source_type: "curated_extragalactic_survey"}),
     do: "catalog_simbad_objects"
 
+  defp source_table_for(%{source_type: "bass_dr2_black_hole_mass"}),
+    do: "catalog_bass_dr2_objects"
+
   defp source_table_for(%{catalog_group: group})
        when group in ["messier_deep_sky", "ngc_ic_deep_sky"],
        do: "catalog_deep_sky_objects"
@@ -285,6 +323,9 @@ defmodule StarsmapApi.Catalog do
   defp source_table_for(%{catalog_group: group})
        when group in ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"],
        do: "catalog_exoplanet_objects"
+
+  defp source_table_for(%{catalog_group: "bass_dr2_black_holes"}),
+    do: "catalog_bass_dr2_objects"
 
   defp source_table_for(%{catalog_group: group})
        when group in [
@@ -302,6 +343,7 @@ defmodule StarsmapApi.Catalog do
       external_ids["hip"] ||
       external_ids["hd"] ||
       external_ids["simbad_oid"] ||
+      external_ids["bass_dr2_id"] ||
       facts["source_id"] ||
       facts["full_name"]
   end

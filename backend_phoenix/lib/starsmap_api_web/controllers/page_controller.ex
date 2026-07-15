@@ -50,8 +50,10 @@ defmodule StarsmapApiWeb.PageController do
     <section><h3>DESI DR1</h3><p>This research uses data from the <a href="https://data.desi.lbl.gov/doc/acknowledgments/">Dark Energy Spectroscopic Instrument</a>, supported by the U.S. Department of Energy and participating institutions.</p></section>
     <section><h3>NASA Exoplanet Archive</h3><p>Exoplanet data come from the <a href="https://exoplanetarchive.ipac.caltech.edu/">NASA Exoplanet Archive</a>, operated by Caltech under contract with NASA.</p></section>
     <section><h3>SIMBAD / CDS</h3><p>Selected object records use <a href="https://simbad.cds.unistra.fr/">SIMBAD</a>, operated at CDS, Strasbourg, France.</p></section>
+    <section><h3>BASS DR2 / VizieR</h3><p>Mass-bearing active-galaxy records use <a href="https://www.bass-survey.com/dr2.html">BASS Data Release 2</a> through the <a href="https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2">CDS/VizieR catalog service</a>.</p></section>
     <section><h3>OpenNGC</h3><p>NGC and IC records use the community-maintained <a href="https://github.com/mattiaverga/OpenNGC">OpenNGC</a> database under its published license.</p></section>
     <section><h3>JPL SSD / Horizons</h3><p>Solar-system object and ephemeris data use NASA Jet Propulsion Laboratory <a href="https://ssd.jpl.nasa.gov/">Solar System Dynamics</a> resources and <a href="https://ssd.jpl.nasa.gov/horizons/">Horizons</a>.</p></section>
+    <section><h3>International Astronomical Union</h3><p>Dwarf-planet labels follow formal <a href="https://www.iau.org/static/resolutions/Resolution_GA26-5-6.pdf">IAU classifications</a>; orbital and physical data remain credited to their originating JPL sources.</p></section>
     <section><h3>NAIF</h3><p>Reference frames and kernels use resources from NASA's <a href="https://naif.jpl.nasa.gov/naif/">Navigation and Ancillary Information Facility</a> (NAIF/SPICE).</p></section></div>
     <h2>Use with care</h2><p>Displayed density reflects catalog selection, measurement quality, and rendering level of detail. Missing uncertainty, epoch, completeness, or distance semantics means not supplied, never zero.</p></main></body></html>
     """)

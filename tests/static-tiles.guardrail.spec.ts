@@ -531,7 +531,7 @@ test.describe("static catalog tile guardrails", () => {
       staticLayer("gaia_stars", ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"], ["star"]),
       staticLayer("exoplanet_systems", ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"], []),
       staticLayer("small_bodies", ["jpl_small_bodies"], ["asteroid", "comet", "small_body"]),
-      staticLayer("deep_sky", ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey"], [
+      staticLayer("deep_sky", ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "bass_dr2_black_holes", "curated_extragalactic_survey"], [
         "galaxy",
         "quasar",
         "active_galaxy",
@@ -572,7 +572,9 @@ test.describe("static catalog tile guardrails", () => {
     const tileUrls = new Set<string>();
     await routeStaticTileFixture(page, [
       staticLayer("exoplanet_systems", ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"], []),
-      staticLayer("small_bodies", ["jpl_small_bodies"], ["asteroid", "comet", "small_body"])
+      staticLayer("small_bodies", ["jpl_small_bodies"], ["asteroid", "comet", "small_body"]),
+      staticLayer("dwarf_planets", ["jpl_small_bodies"], ["dwarf_planet"]),
+      staticLayer("black_holes", ["simbad_compact_objects", "bass_dr2_black_holes"], ["black_hole"])
     ]);
     await page.route("**/catalog-tiles/v1/**/*.bin", async (route) => {
       tileUrls.add(route.request().url());
@@ -590,6 +592,15 @@ test.describe("static catalog tile guardrails", () => {
     await page.waitForTimeout(500);
 
     expect(Array.from(tileUrls).filter((url) => url.includes("/layers/small_bodies/"))).toEqual([]);
+
+    tileUrls.clear();
+    await page.locator('#map-filter-buttons [data-body-filter="dwarf_planet"]').click();
+    await expect.poll(() => Array.from(tileUrls).some((url) => url.includes("/layers/dwarf_planets/")), { timeout: 10_000 }).toBe(true);
+    expect(Array.from(tileUrls).some((url) => url.includes("/layers/small_bodies/"))).toBe(false);
+
+    tileUrls.clear();
+    await page.locator('#map-filter-buttons [data-body-filter="black_hole"]').click();
+    await expect.poll(() => Array.from(tileUrls).some((url) => url.includes("/layers/black_holes/")), { timeout: 10_000 }).toBe(true);
   });
 
   test("broad universe view does not request overlapping subtype layers or prefetch hundreds of tiles", async ({ page }) => {
@@ -601,7 +612,7 @@ test.describe("static catalog tile guardrails", () => {
       staticLayer("gaia_stars", ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"], ["star"]),
       staticLayer("exoplanet_systems", ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"], []),
       staticLayer("small_bodies", ["jpl_small_bodies"], ["asteroid", "comet", "small_body"]),
-      staticLayer("deep_sky", ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey"], [
+      staticLayer("deep_sky", ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "bass_dr2_black_holes", "curated_extragalactic_survey"], [
         "galaxy",
         "quasar",
         "active_galaxy",
@@ -613,7 +624,7 @@ test.describe("static catalog tile guardrails", () => {
       staticLayer("galaxies", ["messier_deep_sky", "simbad_extragalactic", "curated_extragalactic_survey"], ["galaxy"]),
       staticLayer("quasars", ["simbad_extragalactic", "curated_extragalactic_survey"], ["quasar"]),
       staticLayer("active_galaxies", ["simbad_extragalactic", "curated_extragalactic_survey"], ["active_galaxy"]),
-      staticLayer("black_holes", ["simbad_compact_objects"], ["black_hole"]),
+      staticLayer("black_holes", ["simbad_compact_objects", "bass_dr2_black_holes"], ["black_hole"]),
       staticLayer("pulsars", ["simbad_compact_objects"], ["pulsar"]),
       staticLayer("nebulae", ["messier_deep_sky"], ["nebula"]),
       staticLayer("star_clusters", ["messier_deep_sky"], ["star_cluster"])
