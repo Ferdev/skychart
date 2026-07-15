@@ -608,28 +608,60 @@ const BODY_FILTERS: BodyFilterDefinition[] = [
     types: ["star", "planet", "moon", "dwarf_planet"],
     groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"]
   },
-  { key: "planet", labelKey: "filters.planets", types: ["planet"], groups: ["core"] },
+  { key: "planet", labelKey: "filters.planets", types: ["planet"] },
   { key: "moon", labelKey: "filters.moons", types: ["moon"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
   {
     key: "star",
     labelKey: "filters.stars",
-    types: ["star"],
-    groups: ["core", "bright_stars", "nearby_exoplanet_systems", "exoplanet_systems", "gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"]
+    types: ["star"]
   },
   { key: "bright_star", labelKey: "filters.bright", types: ["star"], groups: ["bright_stars"] },
   { key: "gaia_star", labelKey: "filters.gaia", types: ["star"], groups: ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"] },
   { key: "exoplanet_system", labelKey: "filters.exoplanets", groups: ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"] },
   { key: "dwarf_planet", labelKey: "filters.dwarf", types: ["dwarf_planet"], groups: ["core"] },
   { key: "small_body", labelKey: "filters.smallBodies", types: ["asteroid", "comet", "small_body"], groups: ["jpl_small_bodies"] },
+  { key: "asteroid", labelKey: "filters.asteroids", types: ["asteroid"] },
+  { key: "comet", labelKey: "filters.comets", types: ["comet"] },
   { key: "deep_sky", labelKey: "filters.deepSky", types: ["galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"], groups: ["messier_deep_sky", "simbad_extragalactic", "simbad_compact_objects", "curated_extragalactic_survey", "desi_dr1_galaxies", "desi_dr1_quasars", "quaia_g20_quasars"] },
-  { key: "galaxy", labelKey: "filters.galaxies", types: ["galaxy"], groups: ["messier_deep_sky", "simbad_extragalactic", "curated_extragalactic_survey", "desi_dr1_galaxies"] },
-  { key: "quasar", labelKey: "filters.quasars", types: ["quasar"], groups: ["simbad_extragalactic", "curated_extragalactic_survey", "desi_dr1_quasars", "quaia_g20_quasars"] },
-  { key: "active_galaxy", labelKey: "filters.agn", types: ["active_galaxy"], groups: ["simbad_extragalactic", "curated_extragalactic_survey"] },
-  { key: "black_hole", labelKey: "filters.blackHoles", types: ["black_hole"], groups: ["simbad_compact_objects"] },
-  { key: "pulsar", labelKey: "filters.pulsars", types: ["pulsar"], groups: ["simbad_compact_objects"] },
-  { key: "nebula", labelKey: "filters.nebulae", types: ["nebula"], groups: ["messier_deep_sky"] },
-  { key: "star_cluster", labelKey: "filters.clusters", types: ["star_cluster"], groups: ["messier_deep_sky"] }
+  { key: "galaxy", labelKey: "filters.galaxies", types: ["galaxy"] },
+  { key: "quasar", labelKey: "filters.quasars", types: ["quasar"] },
+  { key: "active_galaxy", labelKey: "filters.agn", types: ["active_galaxy"] },
+  { key: "black_hole", labelKey: "filters.blackHoles", types: ["black_hole"] },
+  { key: "pulsar", labelKey: "filters.pulsars", types: ["pulsar"] },
+  { key: "nebula", labelKey: "filters.nebulae", types: ["nebula"] },
+  { key: "star_cluster", labelKey: "filters.clusters", types: ["star_cluster"] }
 ];
+const MAP_OBJECT_TYPE_FILTER_KEYS: readonly BodyFilter[] = [
+  "all",
+  "star",
+  "planet",
+  "moon",
+  "dwarf_planet",
+  "asteroid",
+  "comet",
+  "galaxy",
+  "quasar",
+  "active_galaxy",
+  "black_hole",
+  "pulsar",
+  "nebula",
+  "star_cluster"
+];
+const MAP_FILTER_ZOOM_PRESETS: Partial<Record<BodyFilter, ZoomPreset>> = {
+  star: "galaxy",
+  planet: "galaxy",
+  moon: "solar",
+  dwarf_planet: "solar",
+  asteroid: "solar",
+  comet: "solar",
+  galaxy: "cosmicWeb",
+  quasar: "cosmicWeb",
+  active_galaxy: "cosmicWeb",
+  black_hole: "cosmicWeb",
+  pulsar: "galaxy",
+  nebula: "galaxy",
+  star_cluster: "galaxy"
+};
 const GUIDED_SETS: { id: string; labelKey: string; keys: string[] }[] = [
   { id: "solar-neighborhood", labelKey: "guided.solarNeighborhood", keys: ["sun", "earth", "moon", "mars", "jupiter", "saturn"] },
   { id: "bright-stars", labelKey: "guided.brightStars", keys: ["hip-32349", "hip-30438", "hip-69673", "hip-71683", "hip-91262", "hip-24436", "hip-24608"] },
@@ -1129,6 +1161,7 @@ function bindEvents() {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
     if (!button) return;
     activeFilter = (button.dataset.bodyFilter as BodyFilter) ?? "all";
+    const shouldFocusMap = event.currentTarget === mapFilterButtons;
     trackAnalytics("filter", { filter: activeFilter });
     activeGuidedSetId = null;
     bodySearch.value = "";
@@ -1140,6 +1173,7 @@ function bindEvents() {
     updateGuidedSets();
     updateStats();
     void updateBodyPicker();
+    if (shouldFocusMap) focusMapFilter(activeFilter);
     requestRender({ data: true });
     pushCurrentViewState();
   };
@@ -2735,6 +2769,7 @@ async function refreshCatalogSummary() {
     catalogSummary = (await response.json()) as CatalogSummary;
     updateStats();
     updateExploreDomains();
+    updateBodyFilters();
   } catch (error) {
     console.warn("Phoenix catalog summary unavailable.", error);
   }
@@ -2822,9 +2857,8 @@ function setActiveTab(tab: ActiveAtlasTab) {
 }
 
 function updateBodyFilters() {
-  const filters = renderFilterButtons(activeFilter);
-  bodyFilterButtons.innerHTML = filters;
-  mapFilterButtons.innerHTML = filters;
+  bodyFilterButtons.innerHTML = renderFilterButtons(activeFilter);
+  mapFilterButtons.innerHTML = renderMapObjectTypeButtons(activeFilter);
 }
 
 function updateExploreDomains() {
@@ -2877,6 +2911,41 @@ function renderFilterButtons(active: BodyFilter) {
       </button>
     `
   ).join("");
+}
+
+function renderMapObjectTypeButtons(active: BodyFilter) {
+  return MAP_OBJECT_TYPE_FILTER_KEYS.map((key) => BODY_FILTERS.find((filter) => filter.key === key))
+    .filter(isPresent)
+    .map((filter) => {
+      const count = filter.key === "all" ? null : mapObjectTypeCount(filter);
+      const label = filter.key === "all" ? t("filters.allTypes") : t(filter.labelKey);
+      const countLabel = count === null ? "" : formatCount(count);
+      const title = count === null ? label : `${label}: ${formatInteger(count)}`;
+      return `
+        <button type="button" data-body-filter="${filter.key}" class="${filter.key === active ? "active" : ""}" aria-pressed="${filter.key === active ? "true" : "false"}" title="${escapeHtml(title)}">
+          <span>${escapeHtml(label)}</span>${count === null ? "" : `<small>${escapeHtml(countLabel)}</small>`}
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function mapObjectTypeCount(filter: BodyFilterDefinition) {
+  const indexedCount = (filter.types ?? []).reduce((total, type) => total + (catalogSummary?.type_counts?.[type] ?? 0), 0);
+  if (indexedCount > 0) return indexedCount;
+  return (ephemeris?.bodies ?? []).filter((body) => bodyMatchesFilter(body, filter)).length;
+}
+
+function focusMapFilter(filterKey: BodyFilter) {
+  const filter = BODY_FILTERS.find((item) => item.key === filterKey);
+  if (!filter || filter.key === "all" || !ephemeris) return;
+  const loadedMatches = ephemeris.bodies.filter((body) => bodyMatchesFilter(body, filter));
+  if (filterKey === "dwarf_planet" && loadedMatches.length === 1) {
+    centerOnBody(loadedMatches[0]!, true);
+    return;
+  }
+  const preset = MAP_FILTER_ZOOM_PRESETS[filterKey];
+  if (preset) applyZoomPreset(preset, false);
 }
 
 function activeBodyFilterDefinition() {
@@ -3677,8 +3746,8 @@ function catalogStaticLayerPriority(layerId: string | undefined) {
   if (layerId === "quaia_g20" && currentViewWidthLy() >= 1_000_000) return 0;
   if (layerId === "gaia_stars") return 0;
   if (layerId === "deep_sky") return 1;
-  if (layerId === "exoplanet_systems") return 3;
-  if (layerId === "small_bodies") return 4;
+  if (layerId === "exoplanet_systems" || layerId === "exoplanet_stars" || layerId === "planets") return 3;
+  if (layerId === "small_bodies" || layerId === "asteroids" || layerId === "comets") return 4;
   return 2;
 }
 
@@ -3817,38 +3886,37 @@ function catalogStaticTileLayersForFilter(filterParams: { groups: string[]; type
   if (catalogPointTileManifestState !== "ready" || !catalogPointTileManifest) return [];
   const requestedGroups = new Set(filterParams.groups);
   const matchingLayers = catalogPointTileManifest.layers.filter((layer) => layer.groups.some((group) => requestedGroups.has(group)) && layerCoversAnyType(layer, filterParams.types));
-  const requestedDeepSkyTypes = filterParams.types.filter((type) => DEEP_SKY_POINT_TYPES.includes(type));
-
-  if (filterParams.types.length === 1 && requestedDeepSkyTypes.length === 1) {
-    const specializedLayers = matchingLayers.filter((layer) => layer.types.length > 0 && layer.types.every((type) => type === requestedDeepSkyTypes[0]));
-    if (specializedLayers.length > 0) return specializedLayers;
+  if (filterParams.types.length === 1) {
+    const requestedType = filterParams.types[0];
+    const specializedLayers = matchingLayers.filter((layer) => layer.types.length > 0 && layer.types.every((type) => type === requestedType));
+    return specializedLayers;
   }
 
-  return matchingLayers.filter((layer) => !isStaticLayerCoveredByPreferredAggregate(layer, matchingLayers, requestedDeepSkyTypes));
+  return matchingLayers.filter((layer) => !isStaticLayerCoveredByPreferredAggregate(layer, matchingLayers, filterParams.types));
 }
 
 function prioritizedCatalogStaticTileLayers(layers: CatalogPointTileManifestLayer[], viewWidthLy: number, isDefaultFilter: boolean) {
   const visibleLayers = isDefaultFilter && viewWidthLy > 70_000
-    ? layers.filter((layer) => !["exoplanet_systems", "small_bodies"].includes(layer.id))
+    ? layers.filter((layer) => !["exoplanet_systems", "small_bodies", "exoplanet_stars", "planets", "asteroids", "comets"].includes(layer.id))
     : layers;
   return [...visibleLayers].sort((a, b) => catalogStaticLayerPriority(a.id) - catalogStaticLayerPriority(b.id));
 }
 
 function layerCoversAnyType(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]) {
-  if (layer.types.length === 0 || types.length === 0) return true;
+  if (types.length === 0) return true;
+  if (layer.types.length === 0) return false;
   return layer.types.some((type) => types.includes(type));
 }
 
 function isStaticLayerCoveredByPreferredAggregate(
   layer: CatalogPointTileManifestLayer,
   matchingLayers: CatalogPointTileManifestLayer[],
-  requestedDeepSkyTypes: DestinationBodyType[]
+  requestedTypes: DestinationBodyType[]
 ) {
   if (layer.types.length === 0) return false;
   return matchingLayers.some((aggregateLayer) => {
     if (aggregateLayer === layer || aggregateLayer.types.length <= layer.types.length) return false;
-    if (!aggregateLayer.types.every((type) => DEEP_SKY_POINT_TYPES.includes(type))) return false;
-    if (requestedDeepSkyTypes.length > 0 && !requestedDeepSkyTypes.every((type) => aggregateLayer.types.includes(type))) return false;
+    if (requestedTypes.length > 0 && !requestedTypes.every((type) => aggregateLayer.types.includes(type))) return false;
     if (!layer.types.every((type) => aggregateLayer.types.includes(type))) return false;
     return layer.groups.some((group) => aggregateLayer.groups.includes(group));
   });

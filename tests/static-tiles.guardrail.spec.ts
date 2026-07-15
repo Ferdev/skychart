@@ -567,6 +567,31 @@ test.describe("static catalog tile guardrails", () => {
     expect(urls.some((url) => url.includes("/layers/small_bodies/"))).toBe(false);
   });
 
+  test("exact type filters never fall back to mixed legacy layers", async ({ page }) => {
+    await installAtlasPerfInstrumentation(page);
+    const tileUrls = new Set<string>();
+    await routeStaticTileFixture(page, [
+      staticLayer("exoplanet_systems", ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"], []),
+      staticLayer("small_bodies", ["jpl_small_bodies"], ["asteroid", "comet", "small_body"])
+    ]);
+    await page.route("**/catalog-tiles/v1/**/*.bin", async (route) => {
+      tileUrls.add(route.request().url());
+      await route.fulfill({ status: 200, contentType: "application/octet-stream", body: EMPTY_SMP2_TILE });
+    });
+
+    await openAtlas(page);
+    await waitForCatalogRequestsToSettle(page, 300, 10_000);
+    tileUrls.clear();
+    await page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"]) .scale-collapse__toggle').click();
+    await page.locator('#map-filter-buttons [data-body-filter="asteroid"]').click();
+    await page.waitForTimeout(500);
+    tileUrls.clear();
+    await page.locator("#zoom-in").click();
+    await page.waitForTimeout(500);
+
+    expect(Array.from(tileUrls).filter((url) => url.includes("/layers/small_bodies/"))).toEqual([]);
+  });
+
   test("broad universe view does not request overlapping subtype layers or prefetch hundreds of tiles", async ({ page }) => {
     await installAtlasPerfInstrumentation(page);
 

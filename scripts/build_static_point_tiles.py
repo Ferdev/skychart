@@ -36,6 +36,7 @@ from smp3 import (
 
 POINT_BINARY_MAGIC = b"SMP2"
 POINT_SAMPLE_BUCKET_COUNT = 1024
+SPARSE_LAYER_FULL_SAMPLE_MAX_POINTS = 5_000
 POINT_RGB = (224, 196, 128)
 DEFAULT_GROUPS = (
     "gaia_local_stars",
@@ -47,16 +48,18 @@ DEFAULT_LAYERS = (
     # into both a Gaia layer and a broad "stars" layer exhausts the app
     # container filesystem before the upload step.
     "gaia_stars:gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
-    "exoplanet_systems:nearby_exoplanet_systems|exoplanet_systems|exoplanets:",
-    "small_bodies:jpl_small_bodies:asteroid|comet|small_body",
-    "deep_sky:messier_deep_sky|simbad_extragalactic|simbad_compact_objects|curated_extragalactic_survey:galaxy|quasar|active_galaxy|black_hole|pulsar|nebula|star_cluster",
-    "galaxies:messier_deep_sky|simbad_extragalactic|curated_extragalactic_survey:galaxy",
+    "exoplanet_stars:nearby_exoplanet_systems|exoplanet_systems:star",
+    "planets:exoplanets:planet",
+    "asteroids:jpl_small_bodies:asteroid",
+    "comets:jpl_small_bodies:comet",
+    "deep_sky:messier_deep_sky|ngc_ic_deep_sky|simbad_extragalactic|simbad_compact_objects|curated_extragalactic_survey:galaxy|quasar|active_galaxy|black_hole|pulsar|nebula|star_cluster",
+    "galaxies:messier_deep_sky|ngc_ic_deep_sky|simbad_extragalactic|curated_extragalactic_survey:galaxy",
     "quasars:simbad_extragalactic|curated_extragalactic_survey:quasar",
     "active_galaxies:simbad_extragalactic|curated_extragalactic_survey:active_galaxy",
     "black_holes:simbad_compact_objects:black_hole",
     "pulsars:simbad_compact_objects:pulsar",
-    "nebulae:messier_deep_sky:nebula",
-    "star_clusters:messier_deep_sky:star_cluster",
+    "nebulae:messier_deep_sky|ngc_ic_deep_sky:nebula",
+    "star_clusters:messier_deep_sky|ngc_ic_deep_sky:star_cluster",
 )
 DEFAULT_LEVELS = (
     # span_log2:sample_buckets:max_points_per_tile
@@ -480,12 +483,22 @@ def count_raw_tile_populations(
 def density_preserving_levels(levels: list[TileLevel], raw_counts: dict[TileKey, int]) -> list[TileLevel]:
     effective: list[TileLevel] = []
     for level in levels:
-        maximum = max((count for key, count in raw_counts.items() if key.span_log2 == level.span_log2), default=0)
+        level_counts = [count for key, count in raw_counts.items() if key.span_log2 == level.span_log2]
+        maximum = max(level_counts, default=0)
+        total = sum(level_counts)
         safe_buckets = POINT_SAMPLE_BUCKET_COUNT if maximum < level.max_points_per_tile else max(
             1,
             int(POINT_SAMPLE_BUCKET_COUNT * level.max_points_per_tile * DENSITY_SAMPLE_HEADROOM / maximum),
         )
-        sample_buckets = min(level.sample_buckets, safe_buckets)
+        # A sparse type layer should never randomly lose its entire population
+        # merely because the broad universe level uses a low default sample.
+        # Keep every point only for globally small layers whose busiest tile
+        # also fits the cap; distributed large layers retain the LOD taper.
+        sample_buckets = (
+            POINT_SAMPLE_BUCKET_COUNT
+            if total <= SPARSE_LAYER_FULL_SAMPLE_MAX_POINTS and maximum < level.max_points_per_tile
+            else min(level.sample_buckets, safe_buckets)
+        )
         effective.append(TileLevel(level.span_log2, sample_buckets, level.max_points_per_tile))
         print(
             f"[catalog-tiles] level s{level.span_log2}: raw max {maximum:,}, "

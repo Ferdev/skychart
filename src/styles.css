@@ -4308,7 +4308,7 @@ body[data-atlas-mode="embed"] .embed-activation:not([hidden]) {
 .science-layer-disclosure dl > div { display: flex; justify-content: space-between; gap: 12px; }
 .science-layer-disclosure dt, .science-layer-disclosure dd { margin: 0; font-size: .72rem; }
 .science-layer-disclosure p { margin: 6px 0; font-size: .72rem; line-height: 1.35; }
-.atlas-footer { position: fixed; z-index: 20; left: 12px; bottom: 8px; display: flex; gap: 12px; align-items: center; font-size: .68rem; }
+.atlas-footer { position: fixed; z-index: 20; right: 126px; bottom: 8px; display: flex; gap: 12px; align-items: center; font-size: .68rem; }
 .atlas-footer > a { color: rgba(220, 231, 224, .78); text-transform: uppercase; text-decoration: none; }
 .atlas-footer .about-link { position: static; }
 
@@ -4322,9 +4322,27 @@ body[data-atlas-mode="embed"] .embed-activation:not([hidden]) {
 
 .scale-options .map-filter-buttons button {
   min-height: 30px;
+  justify-content: space-between;
+  gap: 8px;
   border-color: rgba(242, 237, 223, 0.14);
   color: rgba(243, 238, 223, 0.72);
   background: rgba(242, 237, 223, 0.045);
+}
+
+.scale-options .map-filter-buttons button small {
+  color: rgba(243, 238, 223, 0.46);
+  font-size: 0.63rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.scale-options .map-filter-buttons button.active small {
+  color: rgba(241, 197, 104, 0.76);
+}
+
+.map-hud.workspace-open ~ .atlas-footer {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .scale-options .map-filter-buttons button:hover,
@@ -4334,8 +4352,17 @@ body[data-atlas-mode="embed"] .embed-activation:not([hidden]) {
   background: rgba(239, 196, 104, 0.12);
 }
 
+@media (min-width: 900px) and (max-width: 999px) {
+  .atlas-footer {
+    right: 12px;
+    bottom: 70px;
+  }
+}
+
 @media (max-width: 899px) {
   .atlas-footer {
+    right: auto;
+    left: 12px;
     bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px);
   }
 }

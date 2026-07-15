@@ -63,10 +63,55 @@ test.describe("compact and understandable atlas controls", () => {
     await section.locator(".scale-collapse__toggle").click();
     await expect(page.locator("#scale-object-types")).toBeVisible();
 
+    const filterKeys = await page.locator("#map-filter-buttons [data-body-filter]").evaluateAll((buttons) =>
+      buttons.map((button) => (button as HTMLElement).dataset.bodyFilter)
+    );
+    expect(filterKeys).toEqual([
+      "all",
+      "star",
+      "planet",
+      "moon",
+      "dwarf_planet",
+      "asteroid",
+      "comet",
+      "galaxy",
+      "quasar",
+      "active_galaxy",
+      "black_hole",
+      "pulsar",
+      "nebula",
+      "star_cluster"
+    ]);
+    await expect(page.locator('#map-filter-buttons [data-body-filter="gaia_star"]')).toHaveCount(0);
+    await expect(page.locator('#map-filter-buttons [data-body-filter="bright_star"]')).toHaveCount(0);
+    await expect(page.locator('#map-filter-buttons [data-body-filter="deep_sky"]')).toHaveCount(0);
+
     await page.locator('#map-filter-buttons [data-body-filter="galaxy"]').click();
     await expect(page.locator('#map-filter-buttons [data-body-filter="galaxy"]')).toHaveClass(/active/);
     await expect(page.locator('#body-filter-buttons [data-body-filter="galaxy"]')).toHaveClass(/active/);
+    await expect(page.locator('[data-zoom-preset="cosmicWeb"]')).toHaveClass(/active/);
     await expect.poll(() => new URL(page.url()).searchParams.get("F")).toMatch(/^galaxy\./);
+    issues.assertClean();
+  });
+
+  test("keeps footer links outside the scale panel at tablet and desktop widths", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    await page.setViewportSize({ width: 1024, height: 680 });
+    const section = page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"])');
+    await section.locator(".scale-collapse__toggle").click();
+
+    const collisions = await page.evaluate(() => {
+      const footer = document.querySelector<HTMLElement>(".atlas-footer")?.getBoundingClientRect();
+      const protectedSurfaces = [".scale-rail", "#share-menu-button"]
+        .map((selector) => ({ selector, rect: document.querySelector<HTMLElement>(selector)?.getBoundingClientRect() }))
+        .filter((entry): entry is { selector: string; rect: DOMRect } => Boolean(entry.rect));
+      if (!footer) return ["missing footer"];
+      return protectedSurfaces
+        .filter(({ rect }) => footer.left < rect.right && footer.right > rect.left && footer.top < rect.bottom && footer.bottom > rect.top)
+        .map(({ selector }) => selector);
+    });
+
+    expect(collisions, "footer must not intersect scale or share controls").toEqual([]);
     issues.assertClean();
   });
 });

@@ -12,9 +12,8 @@ on:
           - staging
           - production
       catalog_version:
-        description: Immutable catalog tile version/path segment, e.g. v2. Defaults to v1.
+        description: New immutable catalog tile version/path segment, e.g. v11. Existing versions are rejected.
         required: true
-        default: v1
         type: string
       public_base_url:
         description: Optional full public CDN base URL ending in the catalog version. Defaults to CATALOG_TILE_PUBLIC_BASE_URL with the version swapped in.
@@ -60,7 +59,7 @@ jobs:
       CATALOG_TILE_S3_REGION: ${{ vars.CATALOG_TILE_S3_REGION }}
       CATALOG_TILE_S3_ACL: ${{ vars.CATALOG_TILE_S3_ACL }}
       DEFAULT_CATALOG_TILE_PUBLIC_BASE_URL: ${{ vars.CATALOG_TILE_PUBLIC_BASE_URL }}
-      CATALOG_TILE_VERSION: ${{ inputs.catalog_version || 'v1' }}
+      CATALOG_TILE_VERSION: ${{ inputs.catalog_version }}
       CATALOG_TILE_NICE: ${{ inputs.nice || '15' }}
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}

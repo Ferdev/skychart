@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import subprocess
 import tempfile
 import sys
 import unittest
@@ -52,6 +54,26 @@ class StaticTileDefaultsTest(unittest.TestCase):
         )
 
         self.assertEqual(effective[0].sample_buckets, builder.POINT_SAMPLE_BUCKET_COUNT)
+
+    def test_sparse_object_type_layers_are_not_sampled_out_at_universe_scale(self) -> None:
+        builder = load_tile_builder()
+        level = builder.TileLevel(50, 12, 6_000)
+
+        effective = builder.density_preserving_levels(
+            [level],
+            {builder.TileKey(50, 0, 0): 16},
+        )
+
+        self.assertEqual(effective[0].sample_buckets, builder.POINT_SAMPLE_BUCKET_COUNT)
+
+    def test_globally_large_layers_keep_configured_lod_when_each_tile_is_sparse(self) -> None:
+        builder = load_tile_builder()
+        level = builder.TileLevel(50, 12, 6_000)
+        counts = {builder.TileKey(50, index, 0): 100 for index in range(100)}
+
+        effective = builder.density_preserving_levels([level], counts)
+
+        self.assertEqual(effective[0].sample_buckets, 12)
 
     def test_default_levels_reach_full_sample_density_at_close_zoom(self) -> None:
         builder = load_tile_builder()
@@ -134,6 +156,19 @@ class StaticTileDefaultsTest(unittest.TestCase):
         self.assertEqual([layer.id for layer in heavy_layers], ["gaia_stars"])
         self.assertEqual(set(heavy_layers[0].groups), gaia_groups)
 
+    def test_default_layers_cover_real_filter_types_and_full_ngc_catalog(self) -> None:
+        builder = load_tile_builder()
+        layers = {layer.id: layer for layer in builder.parse_layers(",".join(builder.DEFAULT_LAYERS))}
+
+        self.assertEqual(layers["exoplanet_stars"].types, ["star"])
+        self.assertEqual(layers["planets"].types, ["planet"])
+        self.assertEqual(layers["asteroids"].types, ["asteroid"])
+        self.assertEqual(layers["comets"].types, ["comet"])
+        self.assertNotIn("exoplanet_systems", layers)
+        self.assertNotIn("small_bodies", layers)
+        for layer_id in ("deep_sky", "galaxies", "nebulae", "star_clusters"):
+            self.assertIn("ngc_ic_deep_sky", layers[layer_id].groups)
+
     def test_manifest_version_comes_from_explicit_tile_version(self) -> None:
         builder = load_tile_builder()
 
@@ -155,16 +190,92 @@ class StaticTileDefaultsTest(unittest.TestCase):
         self.assertIn("CATALOG_TILE_VERSION", workflow)
         self.assertIn("CATALOG_TILE_S3_PREFIX", workflow)
         self.assertIn("kamal app exec -d \"$TARGET_ENVIRONMENT\"", workflow)
+        self.assertNotIn("catalog_version || 'v1'", workflow)
+        self.assertNotRegex(workflow, r"catalog_version:[\s\S]{0,240}default:\s*v1")
 
     def test_tile_scripts_use_catalog_tile_version_for_output_and_public_paths(self) -> None:
         build_if_needed = (ROOT / "scripts" / "build_static_tiles_if_needed.sh").read_text(encoding="utf-8")
         import_if_needed = (ROOT / "scripts" / "import_catalogs_if_needed.sh").read_text(encoding="utf-8")
         upload = (ROOT / "scripts" / "build_and_upload_static_tiles.sh").read_text(encoding="utf-8")
 
-        for script in [build_if_needed, import_if_needed, upload]:
+        for script in [build_if_needed, import_if_needed]:
             self.assertIn('catalog_tile_version="${CATALOG_TILE_VERSION:-v1}"', script)
             self.assertIn("catalog-tiles/$catalog_tile_version", script)
             self.assertIn('--version "$catalog_tile_version"', script)
+        self.assertIn('catalog_tile_version="$CATALOG_TILE_VERSION"', upload)
+        self.assertIn("Refusing to overwrite immutable release", upload)
+        self.assertIn("catalog-tiles/$catalog_tile_version", upload)
+        self.assertIn('--version "$catalog_tile_version"', upload)
+
+    def test_catalog_tile_upload_fails_closed_and_conditionally_publishes_manifest(self) -> None:
+        script = ROOT / "scripts" / "build_and_upload_static_tiles.sh"
+
+        def run_upload(probe: str, claim: str = "success") -> tuple[subprocess.CompletedProcess[str], str]:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                log = root / "aws.log"
+                aws = root / "aws"
+                aws.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "printf '%s\\n' \"$*\" >> \"$MOCK_AWS_LOG\"\n"
+                    "if [[ \"$*\" == *\"list-objects-v2\"* ]]; then\n"
+                    "  case \"$MOCK_PROBE\" in\n"
+                    "    error) exit 42 ;;\n"
+                    "    occupied) printf '%s\\n' 'catalog-tiles/v-test/partial.bin'; exit 0 ;;\n"
+                    "    empty) printf '%s\\n' 'None'; exit 0 ;;\n"
+                    "  esac\n"
+                    "fi\n"
+                    "if [[ \"$*\" == *\"/.publishing\"* && \"$MOCK_CLAIM\" == 'error' ]]; then exit 43; fi\n"
+                    "exit 0\n",
+                    encoding="utf-8",
+                )
+                aws.chmod(0o755)
+                nice = root / "nice"
+                nice.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "while [[ \"$1\" == '-n' || \"$1\" =~ ^[0-9]+$ ]]; do shift; done\n"
+                    "if [[ \"$1\" == 'python3' ]]; then exit 0; fi\n"
+                    "\"$@\"\n",
+                    encoding="utf-8",
+                )
+                nice.chmod(0o755)
+                env = {
+                    **os.environ,
+                    "PATH": f"{root}:{os.environ['PATH']}",
+                    "AWS_ACCESS_KEY_ID": "test",
+                    "AWS_SECRET_ACCESS_KEY": "test",
+                    "CATALOG_TILE_PUBLIC_BASE_URL": "https://tiles.example/catalog-tiles/v-test",
+                    "CATALOG_TILE_S3_BUCKET": "test-bucket",
+                    "CATALOG_TILE_S3_ENDPOINT_URL": "https://storage.example",
+                    "CATALOG_TILE_S3_REGION": "test-region",
+                    "CATALOG_TILE_VERSION": "v-test",
+                    "CATALOG_TILE_OUTPUT_DIR": str(root / "tiles"),
+                    "MOCK_AWS_LOG": str(log),
+                    "MOCK_PROBE": probe,
+                    "MOCK_CLAIM": claim,
+                }
+                result = subprocess.run(["bash", str(script)], cwd=ROOT, env=env, text=True, capture_output=True, check=False)
+                return result, log.read_text(encoding="utf-8") if log.exists() else ""
+
+        failed_probe, failed_log = run_upload("error")
+        self.assertNotEqual(failed_probe.returncode, 0)
+        self.assertNotIn("s3 sync", failed_log)
+
+        occupied, occupied_log = run_upload("occupied")
+        self.assertNotEqual(occupied.returncode, 0)
+        self.assertNotIn("s3 sync", occupied_log)
+
+        lost_claim, lost_claim_log = run_upload("empty", "error")
+        self.assertNotEqual(lost_claim.returncode, 0)
+        self.assertIn("/.publishing", lost_claim_log)
+        self.assertNotIn("s3 sync", lost_claim_log)
+
+        empty, empty_log = run_upload("empty")
+        self.assertEqual(empty.returncode, 0, msg=empty.stderr)
+        self.assertIn("s3 sync", empty_log)
+        self.assertIn("/.publishing", empty_log)
+        self.assertIn("s3api put-object", empty_log)
+        self.assertIn("--if-none-match *", empty_log)
 
     def test_runtime_image_and_workflow_include_smp3_build_dependencies(self) -> None:
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
