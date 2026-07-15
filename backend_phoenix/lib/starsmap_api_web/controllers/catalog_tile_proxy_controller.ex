@@ -43,16 +43,20 @@ defmodule StarsmapApiWeb.CatalogTileProxyController do
 
   defp fetch_upstream(url) do
     headers = [{"accept", "application/json,application/octet-stream;q=0.9,*/*;q=0.8"}]
+    http_client = Application.get_env(:starsmap_api, :catalog_tile_http_client, :hackney)
 
-    case :hackney.request(:get, url, headers, <<>>, follow_redirect: true, recv_timeout: 30_000) do
-      {:ok, status, response_headers, client_ref} ->
-        case :hackney.body(client_ref) do
-          {:ok, body} -> {:ok, status, response_headers, body}
-          {:error, reason} -> {:error, reason}
-        end
+    case http_client.request(:get, url, headers, <<>>,
+           follow_redirect: true,
+           recv_timeout: 30_000
+         ) do
+      {:ok, status, response_headers, body} when is_binary(body) ->
+        {:ok, status, response_headers, body}
 
       {:error, reason} ->
         {:error, reason}
+
+      unexpected ->
+        {:error, {:unexpected_upstream_response, unexpected}}
     end
   end
 
