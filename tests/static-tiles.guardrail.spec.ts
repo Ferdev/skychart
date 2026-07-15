@@ -3,13 +3,14 @@ import { installAtlasPerfInstrumentation, openAtlas, readAtlasPerf, waitForCatal
 
 const EMPTY_SMP2_TILE = "SMP2\u0000\u0000\u0000\u0000";
 
-function smp3ContainerFixture(options: { spanLog2?: number; tileX?: number; tileY?: number; qx?: number; qy?: number } = {}) {
+function smp3ContainerFixture(options: { spanLog2?: number; tileX?: number; tileY?: number; qx?: number; qy?: number; sourceId?: bigint } = {}) {
   const spanLog2 = options.spanLog2 ?? 24;
   const tileX = options.tileX ?? 0;
   const tileY = options.tileY ?? 0;
-  const tile = Buffer.alloc(40);
+  const tile = Buffer.alloc(40 + (options.sourceId == null ? 0 : 8));
   tile.write("SMP3", 0, "ascii");
   tile.writeUInt16LE(1, 4);
+  tile.writeUInt16LE(options.sourceId == null ? 0 : 1, 6);
   tile.writeDoubleLE((options.tileX ?? 0) * 2 ** spanLog2, 8);
   tile.writeDoubleLE((options.tileY ?? 0) * 2 ** spanLog2, 16);
   tile.writeFloatLE(2 ** spanLog2, 24);
@@ -18,6 +19,7 @@ function smp3ContainerFixture(options: { spanLog2?: number; tileX?: number; tile
   tile.writeUInt16LE(options.qy ?? 32768, 34);
   tile.writeUInt8(20, 36);
   tile.writeUInt8(16, 37);
+  if (options.sourceId != null) tile.writeBigUInt64LE(options.sourceId, 40);
 
   const container = Buffer.alloc(16 + 24 + tile.length);
   container.write("SMPK1", 0, "ascii");
@@ -106,6 +108,114 @@ const EPHEMERIS_FIXTURE = {
 };
 
 test.describe("static catalog tile guardrails", () => {
+  test("opens dense tile-point details immediately while the stable object hydrates", async ({ page }) => {
+    const sourceId = 5_931_842_930_184_739_845n;
+    const container = smp3ContainerFixture({ spanLog2: 8, tileX: 0, tileY: 0, qx: 128, qy: 128, sourceId });
+    let releaseSourceId = () => {};
+    let releaseDetail = () => {};
+    const sourceIdCanFinish = new Promise<void>((resolve) => { releaseSourceId = resolve; });
+    const detailCanFinish = new Promise<void>((resolve) => { releaseDetail = resolve; });
+
+    await page.route("**/api/ephemeris**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(EPHEMERIS_FIXTURE) }));
+    await page.route("**/api/catalog", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ object_count: 2, group_counts: {}, available_groups: [] }) }));
+    await page.route("**/api/catalog/viewport**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ bounds: {}, limit: 0, total: 0, objects: [] }) }));
+    await page.route("**/api/catalog/nearest**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ object: null }) }));
+    await page.route("**/catalog-tiles/v1/manifest.json", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        version: "instant-selection-fixture",
+        format: "SMP3",
+        color_lut: Array.from({ length: 256 }, () => [224, 196, 128]),
+        layers: [{
+          id: "gaia_stars",
+          container: "/catalog-tiles/instant/gaia_stars.smpk",
+          groups: ["gaia_dr3_bulk"],
+          types: ["star"],
+          levels: [{ span_log2: 8, span_au: 2 ** 8, max_points_per_tile: 65_000, sample_buckets: 1024 }]
+        }]
+      })
+    }));
+    await page.route("**/catalog-tiles/instant/gaia_stars.smpk", async (route) => {
+      const match = /^bytes=(\d+)-(\d+)$/.exec(route.request().headers().range ?? "");
+      const start = match ? Number(match[1]) : 0;
+      const end = match ? Math.min(Number(match[2]), container.length - 1) : container.length - 1;
+      if (start === 80) await sourceIdCanFinish;
+      await route.fulfill({
+        status: 206,
+        contentType: "application/octet-stream",
+        headers: { "content-range": `bytes ${start}-${end}/${container.length}`, "accept-ranges": "bytes" },
+        body: container.subarray(start, end + 1)
+      });
+    });
+    await page.route(`**/api/objects/gaia/${sourceId}`, async (route) => {
+      await detailCanFinish;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          key: `gaia_dr3_${sourceId}`,
+          name: `Gaia DR3 ${sourceId}`,
+          object_type: "star",
+          catalog_group: "gaia_dr3_bulk",
+          source_type: "gaia_dr3",
+          position_model: "catalog_astrometry",
+          color: "#e0c480",
+          astrometry: { distance_ly: 12.5, apparent_magnitude: 0 },
+          position: { x_au: 0.5, y_au: 0.5, z_au: 0 }
+        })
+      });
+    });
+
+    await openAtlas(page, "/?perf=1");
+    await expect.poll(async () => page.locator("#perf-hud").textContent(), { timeout: 10_000 }).toMatch(/Pipeline\s*1 available .* 1 decoded/);
+    const fixtureScreenPoint = () => page.evaluate(() => {
+      const pointAu = 128 / 65_535 * 256;
+      const { camera, usable } = window.__ATLAS_DIAGNOSTICS__!.selectionGeometry();
+      return {
+        x: usable.left + usable.width / 2 + (pointAu - camera.xAu) * camera.pxPerAu,
+        y: usable.top + usable.height / 2 - (pointAu - camera.yAu) * camera.pxPerAu
+      };
+    });
+    const hit = await fixtureScreenPoint();
+
+    await page.mouse.click(hit.x, hit.y);
+    await expect(page.locator("#selected-summary-name")).toHaveText("Gaia DR3 star");
+    await expect(page.locator(".object-detail-state--loading")).toContainText("Loading object detail");
+    await expect(page.locator("#close-panel")).toHaveText("×");
+    await expect(page.locator("#close-panel")).toHaveAccessibleName("Deselect current object");
+    expect(new URL(page.url()).searchParams.get("o"), "transient tile key must not enter history").toBeNull();
+
+    const repeatedHit = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry().selected);
+    expect(repeatedHit).not.toBeNull();
+    const retryHit = await fixtureScreenPoint();
+    await page.mouse.click(retryHit.x, retryHit.y);
+    await page.locator('#display-toggles [data-layer="labels"]').evaluate((input: HTMLInputElement) => {
+      input.checked = false;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await expect.poll(() => new URL(page.url()).searchParams.get("L")).toContain("labels.0");
+    expect(new URL(page.url()).searchParams.get("o"), "repeat selection and state writes must keep transient keys out of history").toBeNull();
+
+    const emptyHit = await page.evaluate(() => {
+      const { usable } = window.__ATLAS_DIAGNOSTICS__!.selectionGeometry();
+      return { x: usable.left + usable.width * 0.75, y: usable.top + usable.height * 0.25 };
+    });
+    await page.mouse.click(emptyHit.x, emptyHit.y);
+    await expect(page.locator("#workspace-panel")).toBeHidden();
+    await expect(page.locator(".object-detail-state--loading")).toHaveCount(0);
+
+    const finalHit = await fixtureScreenPoint();
+    await page.mouse.click(finalHit.x, finalHit.y);
+    await expect(page.locator("#selected-summary-name")).toHaveText("Gaia DR3 star");
+
+    releaseSourceId();
+    releaseDetail();
+    await expect(page.locator("#selected-summary-name")).toHaveText(`Gaia DR3 ${sourceId}`);
+    await expect(page.locator(".object-detail-state--loading")).toHaveCount(0);
+    expect(new URL(page.url()).searchParams.get("o")).toBe(`gaia_dr3_${sourceId}`);
+  });
+
   test("catalog point tiles remain eligible at Solar scale", async ({ page }) => {
     const container = smp3ContainerFixture({ spanLog2: 20, tileX: 0, tileY: 0, qx: 0, qy: 0 });
     await page.route("**/api/ephemeris**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(EPHEMERIS_FIXTURE) }));

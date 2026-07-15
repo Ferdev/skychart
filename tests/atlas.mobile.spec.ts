@@ -68,6 +68,23 @@ test.describe("Cosmic Atlas mobile layout", () => {
     issues.assertClean();
   });
 
+  test("keeps footer links clear of the bottom scale sheet", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    const mobileScaleToggle = page.locator("#mobile-scale-toggle");
+    const collapsed = await page.evaluate(() => {
+      const footer = document.querySelector<HTMLElement>(".atlas-footer")?.getBoundingClientRect();
+      const scale = document.querySelector<HTMLElement>(".scale-rail")?.getBoundingClientRect();
+      return footer && scale ? footer.bottom <= scale.top - 8 : false;
+    });
+    expect(collapsed, "footer must sit above the compact scale sheet").toBe(true);
+
+    await mobileScaleToggle.click();
+    await expect(page.locator("#controls")).toHaveClass(/scale-expanded/);
+    await expect(page.locator(".atlas-footer")).toHaveCSS("pointer-events", "none");
+    await expect(page.locator(".atlas-footer")).toHaveCSS("opacity", "0");
+    issues.assertClean();
+  });
+
   test("keeps the compact share trigger clear of navigation and reveals export actions on demand", async ({ page }) => {
     const issues = collectBrowserIssues(page);
 

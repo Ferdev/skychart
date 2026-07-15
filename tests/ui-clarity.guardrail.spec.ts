@@ -56,4 +56,17 @@ test.describe("compact and understandable atlas controls", () => {
     await expect(page.locator("#control-info-tooltip")).toBeHidden();
     issues.assertClean();
   });
+
+  test("filters map objects by type from the scale panel", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    const section = page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"])');
+    await section.locator(".scale-collapse__toggle").click();
+    await expect(page.locator("#scale-object-types")).toBeVisible();
+
+    await page.locator('#map-filter-buttons [data-body-filter="galaxy"]').click();
+    await expect(page.locator('#map-filter-buttons [data-body-filter="galaxy"]')).toHaveClass(/active/);
+    await expect(page.locator('#body-filter-buttons [data-body-filter="galaxy"]')).toHaveClass(/active/);
+    await expect.poll(() => new URL(page.url()).searchParams.get("F")).toMatch(/^galaxy\./);
+    issues.assertClean();
+  });
 });

@@ -144,6 +144,18 @@
             </section>
             <section class="scale-collapse" data-scale-disclosure>
               <div class="scale-collapse__header">
+                <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-object-types">
+                  <span data-i18n="scale.objectTypes">Object types</span>
+                  <span class="scale-collapse__indicator" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div id="scale-object-types" class="scale-collapse__content" hidden>
+                <p class="control-help" data-i18n="scale.objectTypesHelp">Choose which kinds of objects appear on the map and in search.</p>
+                <div class="body-picker-filters map-filter-buttons" id="map-filter-buttons" aria-label="Map object filters" data-i18n-attrs="aria-label:scale.objectTypes"></div>
+              </div>
+            </section>
+            <section class="scale-collapse" data-scale-disclosure>
+              <div class="scale-collapse__header">
                 <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-map-overlays">
                   <span data-i18n="scale.overlays">Map overlays</span>
                   <span class="scale-collapse__indicator" aria-hidden="true"></span>

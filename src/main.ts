@@ -427,6 +427,21 @@ type RenderRequestOptions = {
   data?: boolean;
 };
 
+type SelectBodyOptions = {
+  center?: boolean;
+  zoom?: "local";
+  animate?: boolean;
+  transient?: boolean;
+};
+
+type CatalogNearestQuery = {
+  xAu: number;
+  yAu: number;
+  radiusAu: number;
+  groups: string[];
+  types: DestinationBodyType[];
+};
+
 type DataRefreshOptions = {
   immediate?: boolean;
 };
@@ -755,6 +770,7 @@ const tabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[dat
 const tabPanels = Array.from(document.querySelectorAll<HTMLElement>("[data-tab-panel]"));
 const catalogCount = requiredElement<HTMLElement>("#catalog-count");
 const bodyFilterButtons = requiredElement<HTMLElement>("#body-filter-buttons");
+const mapFilterButtons = requiredElement<HTMLElement>("#map-filter-buttons");
 const bodyPicker = requiredElement<HTMLElement>("#body-picker");
 const exploreDomains = requiredElement<HTMLElement>("#explore-domains");
 const guidedTours = requiredElement<HTMLElement>("#guided-tours");
@@ -884,6 +900,8 @@ let catalogPointTileManifest: CatalogPointTileManifest | null = null;
 let catalogPointTileManifestState: CatalogPointTileManifestState = "loading";
 let objectDetailHydrationRequestId = 0;
 const objectDetailHydrationStates = new Map<string, ObjectDetailHydrationState>();
+let transientSelectedKey: string | null = null;
+let mapDetailSelectionController: AbortController | null = null;
 let catalogPointTileManifestPromise: Promise<void> | null = null;
 let visibleBodiesFrameCache: Body[] | null = null;
 let bodyHitGrid = new Map<string, BodyHitEntry[]>();
@@ -1107,7 +1125,7 @@ function bindEvents() {
     mobileScaleToggle.setAttribute("aria-label", isExpanded ? t("scale.collapse") : t("scale.expand"));
   });
 
-  bodyFilterButtons.addEventListener("click", (event) => {
+  const handleBodyFilterClick = (event: Event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
     if (!button) return;
     activeFilter = (button.dataset.bodyFilter as BodyFilter) ?? "all";
@@ -1123,7 +1141,10 @@ function bindEvents() {
     updateStats();
     void updateBodyPicker();
     requestRender({ data: true });
-  });
+    pushCurrentViewState();
+  };
+  bodyFilterButtons.addEventListener("click", handleBodyFilterClick);
+  mapFilterButtons.addEventListener("click", handleBodyFilterClick);
 
   exploreDomains.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-explore-domain]");
@@ -1579,10 +1600,11 @@ function applyDecodedViewStateFields(state: ViewState) {
 }
 
 function currentViewState(): ViewState {
+  const stableSelectedKey = selectedKey && selectedKey !== transientSelectedKey ? selectedKey : "";
   return {
     center: { x: camera.xAu, y: camera.yAu }, zoom: camera.pxPerAu, time: viewTime,
-    objectKey: selectedKey || undefined,
-    compare: selectedKey && compareTargetKey ? [selectedKey, compareTargetKey] : undefined,
+    objectKey: stableSelectedKey || undefined,
+    compare: stableSelectedKey && compareTargetKey ? [stableSelectedKey, compareTargetKey] : undefined,
     catalogRelease: catalogPointTileManifest?.version ?? requestedCatalogRelease,
     layers: { ...displayLayers }, filters: { primary: activeFilter, compare: activeCompareFilter }
   };
@@ -2759,6 +2781,7 @@ function updateQuickFocus() {
 
 function updateTabs() {
   const hasSelectedBody = Boolean(selectedBody());
+  const isSelectedObjectWorkspace = activeTab === "object" && hasSelectedBody;
   if (!hasSelectedBody && activeTab === "object") activeTab = null;
   modeRail.hidden = hasSelectedBody;
   workspacePanel.hidden = activeTab === null;
@@ -2771,8 +2794,11 @@ function updateTabs() {
   workspaceSearchLink.hidden = activeTab !== "object" || !hasSelectedBody;
   workspaceLabel.hidden = activeTab === "object" && hasSelectedBody;
   workspaceLabel.textContent = activeTab ? t(WORKSPACE_LABEL_KEYS[activeTab]) : t("workspace.title");
-  closePanel.textContent = activeTab === "object" && hasSelectedBody ? t("workspace.deselect") : t("workspace.close");
-  closePanel.setAttribute("aria-label", activeTab === "object" && hasSelectedBody ? t("workspace.deselectCurrent") : t("workspace.close"));
+  closePanel.textContent = isSelectedObjectWorkspace ? "×" : t("workspace.close");
+  closePanel.classList.toggle("workspace-close-icon", isSelectedObjectWorkspace);
+  closePanel.setAttribute("aria-label", isSelectedObjectWorkspace ? t("workspace.deselectCurrent") : t("workspace.close"));
+  if (isSelectedObjectWorkspace) closePanel.setAttribute("title", t("workspace.deselectCurrent"));
+  else closePanel.removeAttribute("title");
   for (const button of tabButtons) {
     button.classList.toggle("active", button.dataset.tab === activeTab);
     button.setAttribute("aria-pressed", String(button.dataset.tab === activeTab));
@@ -2796,7 +2822,9 @@ function setActiveTab(tab: ActiveAtlasTab) {
 }
 
 function updateBodyFilters() {
-  bodyFilterButtons.innerHTML = renderFilterButtons(activeFilter);
+  const filters = renderFilterButtons(activeFilter);
+  bodyFilterButtons.innerHTML = filters;
+  mapFilterButtons.innerHTML = filters;
 }
 
 function updateExploreDomains() {
@@ -2844,7 +2872,7 @@ function updateCompareFilters() {
 function renderFilterButtons(active: BodyFilter) {
   return BODY_FILTERS.map(
     (filter) => `
-      <button type="button" data-body-filter="${filter.key}" class="${filter.key === active ? "active" : ""}">
+      <button type="button" data-body-filter="${filter.key}" class="${filter.key === active ? "active" : ""}" aria-pressed="${filter.key === active ? "true" : "false"}">
         ${escapeHtml(t(filter.labelKey))}
       </button>
     `
@@ -5626,7 +5654,7 @@ function setCompareTarget(key: string) {
   pushCurrentViewState();
 }
 
-async function selectBodyByKey(key: string, options: { center?: boolean; zoom?: "local"; animate?: boolean } = {}) {
+async function selectBodyByKey(key: string, options: SelectBodyOptions = {}) {
   const body = bodyByKey.get(key) ?? [...catalogSearchState.latestBodies, ...compareSearchState.latestBodies].find((candidate) => candidate.key === key) ?? null;
   if (body) {
     if (!bodyByKey.has(body.key)) mergeBodies([body]);
@@ -5638,13 +5666,20 @@ async function selectBodyByKey(key: string, options: { center?: boolean; zoom?: 
   if (hydrated.length > 0) selectBody(hydrated[0].key, options);
 }
 
-function selectBody(key: string, options: { center?: boolean; zoom?: "local"; animate?: boolean } = {}) {
+function selectBody(key: string, options: SelectBodyOptions = {}) {
   const body = bodyByKey.get(key);
   if (!body) return;
+  const previousSelectedKey = selectedKey;
   const selectionChanged = selectedKey !== body.key;
+  const isTransient = options.transient === true || body.key === transientSelectedKey;
+  if (selectionChanged && previousSelectedKey) cleanupTransientCatalogPreview(previousSelectedKey);
   selectedKey = body.key;
-  if (selectionChanged) {
+  transientSelectedKey = isTransient ? body.key : null;
+  if (!isTransient) cancelMapDetailSelection();
+  if (selectionChanged && !isTransient) {
     trackAnalytics("object", { object_type: classifyBody(body).type, source: body.catalog_group ?? "ephemeris" });
+  }
+  if (selectionChanged) {
     compareTargetKey = null;
     compareSearch.value = "";
     compareSearchState.latestBodies = [];
@@ -5652,18 +5687,21 @@ function selectBody(key: string, options: { center?: boolean; zoom?: "local"; an
   }
   ensureCompareTarget();
   activeTab = "object";
-  recentDestinations = recordRecentDestination(body.key, { distanceFromEarthKm: body.distance_from_earth_km });
+  if (!isTransient) recentDestinations = recordRecentDestination(body.key, { distanceFromEarthKm: body.distance_from_earth_km });
   bodySearch.value = body.name;
   catalogSearchState.activeOptionKey = null;
   updateAllUi();
   if (options.center) centerOnBody(body, options.zoom === "local", options.animate ?? false);
   requestRender({ data: Boolean(options.center && !options.animate) });
-  if (selectionChanged) pushCurrentViewState();
-  if (body.catalog?.preview && objectDetailHydrationStates.get(body.key)?.status !== "loading") void hydrateSelectedBody(body.key);
+  if (selectionChanged && !isTransient) pushCurrentViewState();
+  if (!isTransient && body.catalog?.preview && objectDetailHydrationStates.get(body.key)?.status !== "loading") void hydrateSelectedBody(body.key);
 }
 
-function clearSelectedObject(options: { openSearch?: boolean } = {}) {
+function clearSelectedObject(options: { openSearch?: boolean; preserveMapDetailRequest?: boolean } = {}) {
+  if (!options.preserveMapDetailRequest) cancelMapDetailSelection();
+  cleanupTransientCatalogPreview(selectedKey);
   selectedKey = "";
+  transientSelectedKey = null;
   compareTargetKey = null;
   compareSearch.value = "";
   compareSearchState.latestBodies = [];
@@ -5998,6 +6036,7 @@ function zoomAt(x: number, y: number, factor: number, clearPreset = false, dataM
 }
 
 async function handleMapClick(point: ScreenPoint) {
+  cancelMapDetailSelection();
   const edgeReference = edgeReferenceAt(point.x, point.y);
   if (edgeReference) {
     selectBody(edgeReference.body.key, { center: true, zoom: "local", animate: true });
@@ -6006,7 +6045,48 @@ async function handleMapClick(point: ScreenPoint) {
 
   const nearest = nearestBodyAt(point.x, point.y);
   if (!nearest) {
-    const catalogPoint = await nearestCatalogPointAt(point);
+    const detailController = new AbortController();
+    mapDetailSelectionController = detailController;
+    const nearestQuery = catalogNearestQueryAt(point);
+    const tileHit = nearestCatalogTilePointAt(point.x, point.y);
+    const tilePreview = tileHit ? catalogTilePointPreview(tileHit) : null;
+    if (tileHit && tilePreview) {
+      const requestId = ++objectDetailHydrationRequestId;
+      objectDetailHydrationStates.set(tilePreview.key, { status: "loading", requestId });
+      mergeBodies([tilePreview]);
+      selectBody(tilePreview.key, { center: true, animate: true, transient: true });
+
+      const catalogPoint = (await hydrateCatalogTilePoint(tileHit, detailController.signal)) ?? await nearestCatalogPointFromApi(nearestQuery, detailController.signal);
+      if (detailController.signal.aborted) {
+        cleanupOwnedTransientCatalogPreview(tilePreview.key, requestId);
+        return;
+      }
+      const hydrationState = objectDetailHydrationStates.get(tilePreview.key);
+      if (selectedKey !== tilePreview.key || hydrationState?.requestId !== requestId) {
+        if (hydrationState?.requestId === requestId) {
+          objectDetailHydrationStates.delete(tilePreview.key);
+          removeMergedBody(tilePreview.key);
+        }
+        if (mapDetailSelectionController === detailController) mapDetailSelectionController = null;
+        return;
+      }
+      objectDetailHydrationStates.delete(tilePreview.key);
+      if (!catalogPoint) {
+        objectDetailHydrationStates.set(tilePreview.key, { status: "error", requestId, message: t("object.detailErrorBody") });
+        updateBodyInfo();
+        if (mapDetailSelectionController === detailController) mapDetailSelectionController = null;
+        return;
+      }
+
+      mergeBodies([catalogPoint]);
+      if (mapDetailSelectionController === detailController) mapDetailSelectionController = null;
+      selectBody(catalogPoint.key);
+      return;
+    }
+
+    const catalogPoint = await nearestCatalogPointAt(point, detailController.signal, nearestQuery);
+    if (detailController.signal.aborted) return;
+    if (mapDetailSelectionController === detailController) mapDetailSelectionController = null;
     if (catalogPoint) {
       mergeBodies([catalogPoint]);
       selectBody(catalogPoint.key, { center: true, animate: true });
@@ -6017,42 +6097,130 @@ async function handleMapClick(point: ScreenPoint) {
   selectBody(nearest.body.key, { center: true, animate: true });
 }
 
-async function nearestCatalogPointAt(point: ScreenPoint): Promise<Body | null> {
+function catalogTilePointPreview(hit: CatalogPointHitEntry): Body | null {
+  const payload = hit.tile.payload;
+  const layerId = hit.tile.request.staticLayerId;
+  if (!payload || payload.format !== "SMP3" || (payload.flags & 1) === 0 || hit.pointIndex >= payload.declared || !layerId) return null;
+  if (layerId !== "gaia_stars" && layerId !== "desi_dr1" && layerId !== "quaia_g20") return null;
+
+  const strideFloats = catalogPointVertexStrideFloats(payload);
+  const strideBytes = catalogPointVertexStrideBytes(payload);
+  const floatOffset = hit.pointIndex * strideFloats;
+  const byteOffset = hit.pointIndex * strideBytes;
+  const bytes = new Uint8Array(payload.vertices.buffer, payload.vertices.byteOffset, payload.vertices.byteLength);
+  const typeCode = bytes[byteOffset + 11] ?? 0;
+  const objectType = layerId === "gaia_stars" ? "star" : layerId === "quaia_g20" || typeCode === 3 ? "quasar" : "galaxy";
+  const catalogGroup = layerId === "gaia_stars" ? "gaia_dr3_bulk" : layerId === "quaia_g20" ? "quaia_g20_quasars" : objectType === "quasar" ? "desi_dr1_quasars" : "desi_dr1_galaxies";
+  const sourceType = layerId === "gaia_stars" ? "gaia_dr3_bulk_tile" : layerId === "quaia_g20" ? "quaia_g20_tile" : "desi_dr1_tile";
+  const positionModel = layerId === "gaia_stars" ? "catalog_astrometry" : layerId === "quaia_g20" ? "catalog_inferred_redshift_comoving" : "catalog_redshift_comoving";
+  const name = layerId === "gaia_stars" ? "Gaia DR3 star" : layerId === "quaia_g20" ? "Quaia G<20 quasar" : `DESI DR1 ${objectType}`;
+  const magnitudeByte = bytes[byteOffset + 12] ?? 255;
+  const red = bytes[byteOffset + 8] ?? 224;
+  const green = bytes[byteOffset + 9] ?? 196;
+  const blue = bytes[byteOffset + 10] ?? 128;
+  const body = catalogObjectToBody({
+    key: `catalog-tile-preview:${hit.tile.request.key}:${hit.pointIndex}`,
+    name,
+    object_type: objectType,
+    catalog_group: catalogGroup,
+    source_type: sourceType,
+    position_model: positionModel,
+    color: `#${[red, green, blue].map((component) => component.toString(16).padStart(2, "0")).join("")}`,
+    astrometry: { apparent_magnitude: magnitudeByte === 255 ? null : magnitudeByte / 10 - 2 },
+    position: {
+      x_au: payload.origin.x + (payload.vertices[floatOffset] ?? 0),
+      y_au: payload.origin.y + (payload.vertices[floatOffset + 1] ?? 0),
+      z_au: 0
+    }
+  });
+  if (body.catalog) body.catalog.preview = true;
+  return body;
+}
+
+function removeMergedBody(key: string) {
+  if (ephemeris) ephemeris = { ...ephemeris, bodies: ephemeris.bodies.filter((body) => body.key !== key) };
+  bodyByKey.delete(key);
+  visibleBodiesFrameCache = null;
+  bodyPointLayerCache = null;
+  bodyHitGridValid = false;
+  requestRender();
+}
+
+function cleanupTransientCatalogPreview(key: string | null) {
+  if (!key || key !== transientSelectedKey) return;
+  objectDetailHydrationStates.delete(key);
+  removeMergedBody(key);
+  transientSelectedKey = null;
+}
+
+function cleanupOwnedTransientCatalogPreview(key: string, requestId: number) {
+  if (objectDetailHydrationStates.get(key)?.requestId !== requestId) return;
+  if (selectedKey === key) {
+    clearSelectedObject({ preserveMapDetailRequest: true });
+    return;
+  }
+  objectDetailHydrationStates.delete(key);
+  if (key === transientSelectedKey) transientSelectedKey = null;
+  removeMergedBody(key);
+}
+
+function cancelMapDetailSelection() {
+  mapDetailSelectionController?.abort();
+  mapDetailSelectionController = null;
+}
+
+function catalogNearestQueryAt(point: ScreenPoint): CatalogNearestQuery {
+  const world = screenToWorld(point.x, point.y);
+  const filterParams = catalogPointFilterParams();
+  return {
+    xAu: world.xAu,
+    yAu: world.yAu,
+    radiusAu: clamp(8 / Math.max(camera.pxPerAu, MIN_ZOOM), 0.000001, 10_000_000),
+    groups: [...(filterParams?.groups ?? [])],
+    types: [...(filterParams?.types ?? [])]
+  };
+}
+
+async function nearestCatalogPointAt(point: ScreenPoint, signal?: AbortSignal, nearestQuery = catalogNearestQueryAt(point)): Promise<Body | null> {
   const filterParams = catalogPointFilterParams();
   if (!filterParams || !hasActiveCatalogPointLayer() || !shouldUseCatalogPoints(currentViewWidthLy(), filterParams)) return null;
   const tileHit = nearestCatalogTilePointAt(point.x, point.y);
   if (tileHit) {
-    const exactTilePoint = await hydrateCatalogTilePoint(tileHit);
+    const exactTilePoint = await hydrateCatalogTilePoint(tileHit, signal);
     if (exactTilePoint) return exactTilePoint;
   }
-  const world = screenToWorld(point.x, point.y);
-  const radiusAu = clamp(8 / Math.max(camera.pxPerAu, MIN_ZOOM), 0.000001, 10_000_000);
+  return nearestCatalogPointFromApi(nearestQuery, signal);
+}
+
+async function nearestCatalogPointFromApi(query: CatalogNearestQuery, signal?: AbortSignal): Promise<Body | null> {
+  if (query.groups.length === 0) return null;
   const params = new URLSearchParams();
-  params.set("x_au", String(world.xAu));
-  params.set("y_au", String(world.yAu));
-  params.set("radius_au", String(radiusAu));
-  params.set("groups", filterParams.groups.join(","));
-  if (filterParams.types.length > 0) params.set("types", filterParams.types.join(","));
+  params.set("x_au", String(query.xAu));
+  params.set("y_au", String(query.yAu));
+  params.set("radius_au", String(query.radiusAu));
+  params.set("groups", query.groups.join(","));
+  if (query.types.length > 0) params.set("types", query.types.join(","));
 
   try {
-    const response = await fetch(`/api/catalog/nearest?${params.toString()}`);
+    const response = await fetch(`/api/catalog/nearest?${params.toString()}`, { signal });
     if (!response.ok) throw new Error(`Catalog nearest failed with ${response.status}`);
     const payload = (await response.json()) as CatalogNearestPayload;
     return payload.object ? catalogObjectToBody(payload.object) : null;
   } catch (error) {
+    if (signal?.aborted) return null;
     console.warn("Unable to select catalog point.", error);
     return null;
   }
 }
 
-async function hydrateCatalogTilePoint(hit: CatalogPointHitEntry): Promise<Body | null> {
-  if (hit.tile.request.staticLayerId === "gaia_stars") return hydrateGaiaCatalogTilePoint(hit);
-  if (hit.tile.request.staticLayerId === "desi_dr1") return hydrateDesiCatalogTilePoint(hit);
-  if (hit.tile.request.staticLayerId === "quaia_g20") return hydrateQuaiaCatalogTilePoint(hit);
+async function hydrateCatalogTilePoint(hit: CatalogPointHitEntry, signal?: AbortSignal): Promise<Body | null> {
+  if (hit.tile.request.staticLayerId === "gaia_stars") return hydrateGaiaCatalogTilePoint(hit, signal);
+  if (hit.tile.request.staticLayerId === "desi_dr1") return hydrateDesiCatalogTilePoint(hit, signal);
+  if (hit.tile.request.staticLayerId === "quaia_g20") return hydrateQuaiaCatalogTilePoint(hit, signal);
   return null;
 }
 
-async function hydrateGaiaCatalogTilePoint(hit: CatalogPointHitEntry): Promise<Body | null> {
+async function hydrateGaiaCatalogTilePoint(hit: CatalogPointHitEntry, signal?: AbortSignal): Promise<Body | null> {
   const { payload, request } = hit.tile;
   if (
     request.staticLayerId !== "gaia_stars" ||
@@ -6066,8 +6234,9 @@ async function hydrateGaiaCatalogTilePoint(hit: CatalogPointHitEntry): Promise<B
 
   let sourceId: string | null;
   try {
-    sourceId = await sourceIdForCatalogTilePoint(hit);
+    sourceId = await sourceIdForCatalogTilePoint(hit, signal);
   } catch (error) {
+    if (signal?.aborted) return null;
     console.warn("Unable to read the Gaia source ID from its tile.", error);
     return null;
   }
@@ -6075,16 +6244,17 @@ async function hydrateGaiaCatalogTilePoint(hit: CatalogPointHitEntry): Promise<B
 
   const preview = gaiaCatalogTilePointPreview(hit, sourceId);
   try {
-    const detailResponse = await fetch(`/api/objects/gaia/${sourceId}`);
+    const detailResponse = await fetch(`/api/objects/gaia/${sourceId}`, { signal });
     if (!detailResponse.ok) return preview;
     return catalogObjectToBody((await detailResponse.json()) as CatalogObjectPayload);
   } catch (error) {
+    if (signal?.aborted) return null;
     console.warn("Unable to hydrate Gaia tile point details; using its local tile record.", error);
     return preview;
   }
 }
 
-async function sourceIdForCatalogTilePoint(hit: CatalogPointHitEntry) {
+async function sourceIdForCatalogTilePoint(hit: CatalogPointHitEntry, signal?: AbortSignal) {
   const { payload, request } = hit.tile;
   if (!payload || !request.staticUrl || !request.staticRange) return null;
   const sourceRange = smp3SourceIdRange(
@@ -6096,7 +6266,8 @@ async function sourceIdForCatalogTilePoint(hit: CatalogPointHitEntry) {
   );
   if (!sourceRange) return null;
   const response = await fetch(request.staticUrl, {
-    headers: { Range: `bytes=${sourceRange.offset}-${sourceRange.offset + sourceRange.length - 1}` }
+    headers: { Range: `bytes=${sourceRange.offset}-${sourceRange.offset + sourceRange.length - 1}` },
+    signal
   });
   if (!response.ok) throw new Error(`Catalog source ID Range failed with ${response.status}`);
   let buffer = await response.arrayBuffer();
@@ -6104,7 +6275,7 @@ async function sourceIdForCatalogTilePoint(hit: CatalogPointHitEntry) {
   return decodeSmp3SourceId(buffer);
 }
 
-async function hydrateDesiCatalogTilePoint(hit: CatalogPointHitEntry): Promise<Body | null> {
+async function hydrateDesiCatalogTilePoint(hit: CatalogPointHitEntry, signal?: AbortSignal): Promise<Body | null> {
   const payload = hit.tile.payload;
   const request = hit.tile.request;
   if (
@@ -6118,8 +6289,9 @@ async function hydrateDesiCatalogTilePoint(hit: CatalogPointHitEntry): Promise<B
 
   let targetId: string | null;
   try {
-    targetId = await sourceIdForCatalogTilePoint(hit);
+    targetId = await sourceIdForCatalogTilePoint(hit, signal);
   } catch (error) {
+    if (signal?.aborted) return null;
     console.warn("Unable to read the DESI TARGETID from its tile.", error);
     return null;
   }
@@ -6162,7 +6334,7 @@ async function hydrateDesiCatalogTilePoint(hit: CatalogPointHitEntry): Promise<B
   return body;
 }
 
-async function hydrateQuaiaCatalogTilePoint(hit: CatalogPointHitEntry): Promise<Body | null> {
+async function hydrateQuaiaCatalogTilePoint(hit: CatalogPointHitEntry, signal?: AbortSignal): Promise<Body | null> {
   const payload = hit.tile.payload;
   const request = hit.tile.request;
   if (
@@ -6177,8 +6349,9 @@ async function hydrateQuaiaCatalogTilePoint(hit: CatalogPointHitEntry): Promise<
 
   let sourceId: string | null;
   try {
-    sourceId = await sourceIdForCatalogTilePoint(hit);
+    sourceId = await sourceIdForCatalogTilePoint(hit, signal);
   } catch (error) {
+    if (signal?.aborted) return null;
     console.warn("Unable to read the Quaia Gaia source ID from its tile.", error);
     return null;
   }
@@ -6274,6 +6447,7 @@ function nearestBodyAt(x: number, y: number) {
   for (let gx = cellX - 1; gx <= cellX + 1; gx += 1) {
     for (let gy = cellY - 1; gy <= cellY + 1; gy += 1) {
       for (const entry of bodyHitGrid.get(`${gx}:${gy}`) ?? []) {
+        if (entry.body.key === transientSelectedKey) continue;
         if (seen.has(entry.body.key)) continue;
         seen.add(entry.body.key);
         const distancePx = Math.hypot(entry.x - x, entry.y - y);
