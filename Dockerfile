@@ -81,13 +81,14 @@ COPY --chown=app:app scripts/build_static_point_tiles.py scripts/build_static_po
 COPY --chown=app:app scripts/smp3.py scripts/smp3.py
 COPY --chown=app:app scripts/build_static_tiles_if_needed.sh scripts/build_static_tiles_if_needed.sh
 COPY --chown=app:app scripts/build_and_upload_static_tiles.sh scripts/build_and_upload_static_tiles.sh
+COPY --chown=app:app scripts/compose_bulk_catalog_release.py scripts/compose_bulk_catalog_release.py
 COPY --chown=app:app scripts/configure_catalog_bucket_cors.sh scripts/configure_catalog_bucket_cors.sh
 
 RUN python3 -m venv /app/.venv && \
   /app/.venv/bin/pip install --no-cache-dir --upgrade pip && \
   /app/.venv/bin/pip install --no-cache-dir -r requirements.txt && \
   chown -R app:app /app && \
-  chmod +x /app/scripts/docker-entrypoint.sh /app/scripts/import_catalogs_if_needed.sh /app/scripts/build_static_point_tiles.py /app/scripts/build_static_tiles_if_needed.sh /app/scripts/build_and_upload_static_tiles.sh /app/scripts/configure_catalog_bucket_cors.sh && \
+  chmod +x /app/scripts/docker-entrypoint.sh /app/scripts/import_catalogs_if_needed.sh /app/scripts/build_static_point_tiles.py /app/scripts/build_static_tiles_if_needed.sh /app/scripts/build_and_upload_static_tiles.sh /app/scripts/compose_bulk_catalog_release.py /app/scripts/configure_catalog_bucket_cors.sh && \
   ln -s /app/erts-*/bin/epmd /usr/local/bin/epmd
 
 USER app

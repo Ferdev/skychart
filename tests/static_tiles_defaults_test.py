@@ -300,6 +300,10 @@ class StaticTileDefaultsTest(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "catalog-tiles.yml").read_text(encoding="utf-8")
 
         self.assertIn("scripts/smp3.py scripts/smp3.py", dockerfile)
+        self.assertIn(
+            "scripts/compose_bulk_catalog_release.py scripts/compose_bulk_catalog_release.py",
+            dockerfile,
+        )
         self.assertIn("scripts/configure_catalog_bucket_cors.sh scripts/configure_catalog_bucket_cors.sh", dockerfile)
         self.assertIn('CATALOG_TILE_VERSION:"$CATALOG_TILE_VERSION"', workflow)
 
