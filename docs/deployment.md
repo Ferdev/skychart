@@ -39,6 +39,9 @@ verification and do not discover or accept a key during deployment.
 - `CATALOG_TILE_PUBLIC_BASE_URL`
 - `CATALOG_TILE_MANIFEST_URL`
 - `STAGING_CATALOG_TILE_MANIFEST_URL`
+- `CATALOG_TILE_CARRY_FORWARD_MANIFEST_URL`, an audited release containing the
+  immutable Gaia, DESI, and Quaia bulk layers. When omitted, the tile workflow
+  uses `CATALOG_TILE_MANIFEST_URL`.
 - `CATALOG_TILE_S3_BUCKET`
 - `CATALOG_TILE_S3_ENDPOINT_URL`
 - `CATALOG_TILE_S3_REGION`
@@ -99,7 +102,10 @@ normal deployment path.
 
 1. Deploy and verify the application image.
 2. Run the manual `Build Catalog Tiles` workflow against the intended source
-   environment and choose a new immutable version.
+   environment and choose a new immutable version. The workflow replaces the
+   searchable-database Gaia subset with the audited bulk Gaia layer and carries
+   DESI and Quaia forward; publication fails if those layers are missing or
+   below their validated minimum counts.
 3. Verify the published `manifest.json`, byte-range support, CORS headers,
    source counts, and representative tiles.
 4. Update the staging manifest variable and verify rendering.

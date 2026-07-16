@@ -10,6 +10,7 @@ required_vars=(
   CATALOG_TILE_PUBLIC_BASE_URL
   CATALOG_TILE_S3_BUCKET
   CATALOG_TILE_S3_ENDPOINT_URL
+  CATALOG_TILE_CARRY_FORWARD_MANIFEST_URL
 )
 
 missing_vars=()
@@ -122,6 +123,16 @@ nice -n "$nice_level" \
   --tile-url-base "$catalog_tile_public_base_url" \
   --version "$catalog_tile_version" \
   --skip-if-current
+
+composed_manifest="$(mktemp)"
+trap 'rm -f "$claim_file" "$composed_manifest"' EXIT
+nice -n "$nice_level" \
+  python3 "$repo_root/scripts/compose_bulk_catalog_release.py" \
+  --base-manifest "$catalog_tile_output/manifest.json" \
+  --carry-forward-manifest "$CATALOG_TILE_CARRY_FORWARD_MANIFEST_URL" \
+  --version "$catalog_tile_version" \
+  --output "$composed_manifest"
+mv "$composed_manifest" "$catalog_tile_output/manifest.json"
 
 nice -n "$nice_level" "$aws_cmd" \
   --endpoint-url "$CATALOG_TILE_S3_ENDPOINT_URL" \

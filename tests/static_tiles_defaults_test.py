@@ -240,7 +240,18 @@ class StaticTileDefaultsTest(unittest.TestCase):
                 nice.write_text(
                     "#!/usr/bin/env bash\n"
                     "while [[ \"$1\" == '-n' || \"$1\" =~ ^[0-9]+$ ]]; do shift; done\n"
-                    "if [[ \"$1\" == 'python3' ]]; then exit 0; fi\n"
+                    "if [[ \"$1\" == 'python3' ]]; then\n"
+                    "  if [[ \"$2\" == *'compose_bulk_catalog_release.py' ]]; then\n"
+                    "    while [[ $# -gt 0 ]]; do\n"
+                    "      if [[ \"$1\" == '--output' ]]; then mkdir -p \"$(dirname \"$2\")\"; printf '{}\\n' > \"$2\"; break; fi\n"
+                    "      shift\n"
+                    "    done\n"
+                    "  else\n"
+                    "    mkdir -p \"$CATALOG_TILE_OUTPUT_DIR\"\n"
+                    "    printf '{}\\n' > \"$CATALOG_TILE_OUTPUT_DIR/manifest.json\"\n"
+                    "  fi\n"
+                    "  exit 0\n"
+                    "fi\n"
                     "\"$@\"\n",
                     encoding="utf-8",
                 )
@@ -251,6 +262,7 @@ class StaticTileDefaultsTest(unittest.TestCase):
                     "AWS_ACCESS_KEY_ID": "test",
                     "AWS_SECRET_ACCESS_KEY": "test",
                     "CATALOG_TILE_PUBLIC_BASE_URL": "https://tiles.example/catalog-tiles/v-test",
+                    "CATALOG_TILE_CARRY_FORWARD_MANIFEST_URL": "https://tiles.example/catalog-tiles/v-bulk/manifest.json",
                     "CATALOG_TILE_S3_BUCKET": "test-bucket",
                     "CATALOG_TILE_S3_ENDPOINT_URL": "https://storage.example",
                     "CATALOG_TILE_S3_REGION": "test-region",
