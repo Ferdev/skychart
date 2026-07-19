@@ -698,6 +698,37 @@ test.describe("static catalog tile guardrails", () => {
     expect(urls.size).toBeLessThanOrEqual(396);
   });
 
+  test("portrait cosmological views avoid survey levels dense enough to expose square tile artifacts", async ({ page }) => {
+    await page.setViewportSize({ width: 1_356, height: 2_048 });
+    const urls = new Set<string>();
+    const desi = {
+      id: "desi_dr1",
+      tile_url_template: "/catalog-tiles/v1/layers/desi_dr1/s{span_log2}/x{x}/y{y}.bin",
+      groups: ["desi_dr1_galaxies", "desi_dr1_quasars"],
+      types: ["galaxy", "quasar"],
+      levels: [
+        { span_log2: 44, span_au: 2 ** 44, max_points_per_tile: 40_000, point_count: 10_308_425 },
+        { span_log2: 46, span_au: 2 ** 46, max_points_per_tile: 30_000, point_count: 651_791 },
+        { span_log2: 48, span_au: 2 ** 48, max_points_per_tile: 800_000, point_count: 1_498_783 },
+        { span_log2: 50, span_au: 2 ** 50, max_points_per_tile: 800_000, point_count: 1_498_783 }
+      ]
+    };
+    await routeStaticTileFixture(page, [desi]);
+    await page.route("**/catalog-tiles/v1/**/*.bin", async (route) => {
+      urls.add(route.request().url());
+      await route.fulfill({ status: 200, contentType: "application/octet-stream", body: EMPTY_SMP2_TILE });
+    });
+
+    await openAtlas(page);
+    urls.clear();
+    await page.locator("#zoom-scale-slider").fill("148");
+    await expect.poll(() => urls.size, { timeout: 10_000 }).toBeGreaterThan(0);
+    await waitForCatalogRequestsToSettle(page, 500, 20_000);
+
+    expect(Array.from(urls).some((url) => url.includes("/desi_dr1/s48/"))).toBe(true);
+    expect(Array.from(urls).filter((url) => url.includes("/desi_dr1/s44/"))).toEqual([]);
+  });
+
   test("renders catalog point tiles progressively while a sibling tile is still pending", async ({ page }) => {
     await installAtlasPerfInstrumentation(page);
 

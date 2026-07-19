@@ -20,6 +20,12 @@ const MAX_ACTIVE = 28;
 const MAX_ACTIVE_WIDE = 8;
 const MAX_ACTIVE_UNIVERSE = 6;
 const MAX_ACTIVE_UNIVERSE_DENSE = 192;
+// A cosmological LOD represents the whole source, not just one viewport. Keep
+// its retained sample below the renderer's practical density ceiling so a
+// partial survey footprint cannot turn individual spatial bins into opaque
+// rectangles. The same global sample remains scientifically comparable across
+// every tile in the selected level.
+const MAX_UNIVERSE_LEVEL_POINTS = 2_000_000;
 const MAX_POINTS = 24_000;
 const MAX_POINTS_WIDE = 12_000;
 const MAX_POINTS_UNIVERSE = 7_500;
@@ -109,7 +115,7 @@ export class CatalogPointPlanner {
       const layerContext = { ...requestContext, staticLayer };
       const tileSpanAu = this.tileSpanAu(layerContext.bounds, viewport.viewWidthLy, staticLayer);
       const defaultLevel = this.levelForSpan(tileSpanAu, staticLayer);
-      const staticLevel = densestCompleteUniverseLevel(
+      const staticLevel = densestRenderableUniverseLevel(
         layerContext.bounds,
         viewport.viewWidthLy,
         staticLayer,
@@ -460,17 +466,21 @@ function isCoveredByPreferredAggregate(
   });
 }
 
-function densestCompleteUniverseLevel(
+function densestRenderableUniverseLevel(
   bounds: CatalogPointWorldBounds,
   viewWidthLy: number,
   layer: CatalogPointTileManifestLayer | null,
   fallback: CatalogPointTileManifestLevel | null,
 ): CatalogPointTileManifestLevel | null {
   if (!layer || !isDenseUniverseLayer(layer) || viewWidthLy <= 450_000_000) return fallback;
-  const candidates = layer.levels.filter(
+  const fanoutCandidates = layer.levels.filter(
     (level) => tileCountForBounds(bounds, level.span_au) <= MAX_ACTIVE_UNIVERSE_DENSE,
   );
-  if (candidates.length === 0) return fallback;
+  if (fanoutCandidates.length === 0) return fallback;
+  const densityCandidates = fanoutCandidates.filter(
+    (level) => level.point_count === undefined || level.point_count <= MAX_UNIVERSE_LEVEL_POINTS,
+  );
+  const candidates = densityCandidates.length > 0 ? densityCandidates : fanoutCandidates;
   return candidates.reduce((best, level) => {
     const pointDelta = (level.point_count ?? 0) - (best.point_count ?? 0);
     return pointDelta > 0 || (pointDelta === 0 && level.span_au < best.span_au) ? level : best;
