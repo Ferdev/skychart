@@ -125,7 +125,9 @@ export class CatalogPointSelector {
     try {
       const response = await this.fetcher(`/api/objects/gaia/${sourceId}`, { signal });
       if (!response.ok) return preview;
-      return this.options.mapper.map(await response.json() as CatalogObjectPayload);
+      const body = this.options.mapper.map(await response.json() as CatalogObjectPayload);
+      if (body.catalog) body.catalog.preview = false;
+      return body;
     } catch (error) {
       if (signal?.aborted) return null;
       console.warn("Unable to hydrate Gaia tile point details; using its local tile record.", error);
