@@ -156,15 +156,27 @@ class StaticTileDefaultsTest(unittest.TestCase):
         self.assertEqual([layer.id for layer in heavy_layers], ["gaia_stars"])
         self.assertEqual(set(heavy_layers[0].groups), gaia_groups)
 
-    def test_default_layers_cover_real_filter_types_and_full_ngc_catalog(self) -> None:
+    def test_default_layers_keep_precise_small_bodies_out_of_bulk_tiles(self) -> None:
+        builder = load_tile_builder()
+        layers = builder.parse_layers(",".join(builder.DEFAULT_LAYERS))
+
+        self.assertFalse(
+            any("jpl_small_bodies" in layer.groups for layer in layers),
+            "JPL objects need precise selectable viewport records, not 16-bit survey tiles",
+        )
+        self.assertTrue({"asteroid", "comet", "dwarf_planet"}.isdisjoint(
+            {object_type for layer in layers for object_type in layer.types}
+        ))
+
+    def test_default_layers_cover_bulk_filter_types_and_full_ngc_catalog(self) -> None:
         builder = load_tile_builder()
         layers = {layer.id: layer for layer in builder.parse_layers(",".join(builder.DEFAULT_LAYERS))}
 
         self.assertEqual(layers["exoplanet_stars"].types, ["star"])
         self.assertEqual(layers["planets"].types, ["planet"])
-        self.assertEqual(layers["asteroids"].types, ["asteroid"])
-        self.assertEqual(layers["comets"].types, ["comet"])
-        self.assertEqual(layers["dwarf_planets"].types, ["dwarf_planet"])
+        self.assertNotIn("asteroids", layers)
+        self.assertNotIn("comets", layers)
+        self.assertNotIn("dwarf_planets", layers)
         self.assertNotIn("exoplanet_systems", layers)
         self.assertNotIn("small_bodies", layers)
         for layer_id in ("deep_sky", "galaxies", "nebulae", "star_clusters"):

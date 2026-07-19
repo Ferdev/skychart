@@ -567,15 +567,20 @@ test.describe("static catalog tile guardrails", () => {
     expect(urls.some((url) => url.includes("/layers/small_bodies/"))).toBe(false);
   });
 
-  test("exact type filters never fall back to mixed legacy layers", async ({ page }) => {
+  test("Solar-System filters use precise viewport objects instead of legacy point tiles", async ({ page }) => {
     await installAtlasPerfInstrumentation(page);
     const tileUrls = new Set<string>();
+    const viewportUrls = new Set<string>();
     await routeStaticTileFixture(page, [
       staticLayer("exoplanet_systems", ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"], []),
       staticLayer("small_bodies", ["jpl_small_bodies"], ["asteroid", "comet", "small_body"]),
       staticLayer("dwarf_planets", ["jpl_small_bodies"], ["dwarf_planet"]),
       staticLayer("black_holes", ["simbad_compact_objects", "bass_dr2_black_holes"], ["black_hole"])
     ]);
+    await page.route("**/api/catalog/viewport?**", async (route) => {
+      viewportUrls.add(route.request().url());
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ objects: [] }) });
+    });
     await page.route("**/catalog-tiles/v1/**/*.bin", async (route) => {
       tileUrls.add(route.request().url());
       await route.fulfill({ status: 200, contentType: "application/octet-stream", body: EMPTY_SMP2_TILE });
@@ -586,7 +591,10 @@ test.describe("static catalog tile guardrails", () => {
     tileUrls.clear();
     await page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"]) .scale-collapse__toggle').click();
     await page.locator('#map-filter-buttons [data-body-filter="asteroid"]').click();
-    await page.waitForTimeout(500);
+    await expect.poll(
+      () => Array.from(viewportUrls).some((url) => url.includes("groups=jpl_small_bodies") && url.includes("types=asteroid")),
+      { timeout: 10_000 },
+    ).toBe(true);
     tileUrls.clear();
     await page.locator("#zoom-in").click();
     await page.waitForTimeout(500);
@@ -595,7 +603,12 @@ test.describe("static catalog tile guardrails", () => {
 
     tileUrls.clear();
     await page.locator('#map-filter-buttons [data-body-filter="dwarf_planet"]').click();
-    await expect.poll(() => Array.from(tileUrls).some((url) => url.includes("/layers/dwarf_planets/")), { timeout: 10_000 }).toBe(true);
+    await expect.poll(
+      () => Array.from(viewportUrls).some((url) => url.includes("jpl_small_bodies") && url.includes("types=dwarf_planet")),
+      { timeout: 10_000 },
+    ).toBe(true);
+    await page.waitForTimeout(300);
+    expect(Array.from(tileUrls).some((url) => url.includes("/layers/dwarf_planets/"))).toBe(false);
     expect(Array.from(tileUrls).some((url) => url.includes("/layers/small_bodies/"))).toBe(false);
 
     tileUrls.clear();

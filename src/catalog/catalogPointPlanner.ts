@@ -46,6 +46,12 @@ const DEEP_SKY_POINT_GROUPS = [
 ];
 const DENSE_UNIVERSE_LAYER_IDS = new Set(["desi_dr1", "quaia_g20"]);
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
+// JPL small bodies are bounded semantic objects with stable identities and
+// precise coordinates. Serving them through the dense SMP3 path discards both
+// properties: the survey-oriented tile spans quantize Solar-System positions
+// and non-bulk tiles do not carry hydratable source IDs. Keep them on the
+// viewport-object path even when an older manifest still advertises JPL tiles.
+const OBJECT_ONLY_CATALOG_GROUPS = new Set(["jpl_small_bodies"]);
 
 export type CatalogPointWorldBounds = {
   minXAu: number;
@@ -96,10 +102,13 @@ export class CatalogPointPlanner {
 
   countableLayers(): CatalogPointTileManifestLayer[] {
     const layers = this.manifest.value?.layers ?? [];
-    return layers.filter((layer) => !isCoveredByPreferredAggregate(layer, layers, []));
+    return layers.filter(
+      (layer) => !isObjectOnlyLayer(layer) && !isCoveredByPreferredAggregate(layer, layers, []),
+    );
   }
 
   ownsCatalogGroup(group: string): boolean {
+    if (OBJECT_ONLY_CATALOG_GROUPS.has(group)) return false;
     return POINT_LAYER_GROUP_SET.has(group) || this.manifestGroups().includes(group);
   }
 
@@ -318,7 +327,10 @@ export class CatalogPointPlanner {
   private filterParams(filter: BodyFilterDefinition): CatalogPointFilter | null {
     const sourceGroups = filter.key === "all" || !filter.groups ? this.manifestGroups() : filter.groups;
     const manifestGroups = new Set(this.manifestGroups());
-    const groups = sourceGroups.filter((group) => POINT_LAYER_GROUP_SET.has(group) || manifestGroups.has(group));
+    const groups = sourceGroups.filter(
+      (group) => !OBJECT_ONLY_CATALOG_GROUPS.has(group)
+        && (POINT_LAYER_GROUP_SET.has(group) || manifestGroups.has(group)),
+    );
     if (groups.length === 0) return null;
     return { groups: uniqueStrings(groups), types: filter.types ?? [] };
   }
@@ -332,7 +344,9 @@ export class CatalogPointPlanner {
     if (this.manifest.state !== "ready" || !this.manifest.value) return [];
     const requestedGroups = new Set(filter.groups);
     const matchingLayers = this.manifest.value.layers.filter(
-      (layer) => layer.groups.some((group) => requestedGroups.has(group)) && layerCoversAnyType(layer, filter.types),
+      (layer) => !isObjectOnlyLayer(layer)
+        && layer.groups.some((group) => requestedGroups.has(group))
+        && layerCoversAnyType(layer, filter.types),
     );
     if (filter.types.length === 1) {
       const requestedType = filter.types[0];
@@ -450,6 +464,10 @@ function shouldUseCatalogPoints(viewWidthLy: number, filter: CatalogPointFilter)
 function layerCoversAnyType(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]): boolean {
   if (types.length === 0) return true;
   return layer.types.length > 0 && layer.types.some((type) => types.includes(type));
+}
+
+function isObjectOnlyLayer(layer: CatalogPointTileManifestLayer): boolean {
+  return layer.groups.some((group) => OBJECT_ONLY_CATALOG_GROUPS.has(group));
 }
 
 function isCoveredByPreferredAggregate(

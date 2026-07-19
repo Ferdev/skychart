@@ -50,9 +50,10 @@ DEFAULT_LAYERS = (
     "gaia_stars:gaia_local_stars|gaia_500pc_stars|gaia_10kpc_bright_stars:star",
     "exoplanet_stars:nearby_exoplanet_systems|exoplanet_systems:star",
     "planets:exoplanets:planet",
-    "asteroids:jpl_small_bodies:asteroid",
-    "comets:jpl_small_bodies:comet",
-    "dwarf_planets:jpl_small_bodies:dwarf_planet",
+    # JPL small bodies stay on the semantic viewport-object path. The static
+    # pyramid starts at 2^24 AU and its 16-bit positions resolve only ~256 AU,
+    # which collapses Solar-System objects onto false grid points and drops the
+    # stable identity required for selection.
     "deep_sky:messier_deep_sky|ngc_ic_deep_sky|simbad_extragalactic|simbad_compact_objects|bass_dr2_black_holes|curated_extragalactic_survey:galaxy|quasar|active_galaxy|black_hole|pulsar|nebula|star_cluster",
     "galaxies:messier_deep_sky|ngc_ic_deep_sky|simbad_extragalactic|curated_extragalactic_survey:galaxy",
     "quasars:simbad_extragalactic|curated_extragalactic_survey:quasar",

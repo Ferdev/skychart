@@ -39,6 +39,11 @@ Offline catalog tools
   -> immutable point-layer build and audit
 ```
 
+JPL Solar-System objects deliberately stay outside the immutable point-layer
+path. They are small enough for the bounded viewport-object API, which keeps
+their precise coordinates and stable selectable identities. SMP3 remains the
+bulk visualization path for survey-scale catalogs.
+
 ## Module rules
 
 1. The composition root wires modules together and starts the application. It
