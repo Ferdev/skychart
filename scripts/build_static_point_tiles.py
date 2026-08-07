@@ -62,7 +62,11 @@ DEFAULT_LAYERS = (
     "pulsars:simbad_compact_objects:pulsar",
     "nebulae:messier_deep_sky|ngc_ic_deep_sky:nebula",
     "star_clusters:messier_deep_sky|ngc_ic_deep_sky:star_cluster",
-    "xray:erosita_dr2_xray|erosita_dr2_extended|sdss_spiders_dr20:xray_source|xray_extended|quasar|galaxy|star",
+    # X-ray survey points sit at cosmological distances or on the 1 Gly
+    # unknown-distance shell; fine spans would give almost every point its own
+    # tile (millions of tiles, gigabytes of builder memory), so this layer
+    # starts at span 2^42 like the other universe-scale layers.
+    "xray@42:erosita_dr2_xray|erosita_dr2_extended|sdss_spiders_dr20:xray_source|xray_extended|quasar|galaxy|star",
 )
 DEFAULT_LEVELS = (
     # span_log2:sample_buckets:max_points_per_tile
@@ -129,6 +133,10 @@ class TileLayer:
     id: str
     groups: list[str]
     types: list[str]
+    # Layers whose points sit at cosmological distances (almost every point in
+    # its own fine-span tile) restrict themselves to coarse spans so the build
+    # memory and tile count stay bounded.
+    min_span_log2: int = 0
 
 
 @dataclass(frozen=True)
@@ -267,10 +275,11 @@ def main() -> int:
     total_rows = 0
     for layer in layers:
         layer_dir = staging_dir / "layers" / layer.id
+        levels_for_layer = layer_levels(layer, levels)
         counts: dict[tuple[int, int, int], int] = {}
         source_counts = {group: 0 for group in layer.groups}
-        level_point_counts = {level.span_log2: 0 for level in levels}
-        level_tile_counts = {level.span_log2: set() for level in levels}
+        level_point_counts = {level.span_log2: 0 for level in levels_for_layer}
+        level_tile_counts = {level.span_log2: set() for level in levels_for_layer}
         writer = TileFileCache(layer_dir, max(32, args.max_open_files))
 
         rows_seen = 0
@@ -280,7 +289,7 @@ def main() -> int:
                 source_counts[catalog_group] = source_counts.get(catalog_group, 0) + 1
                 record = struct.pack("<ffBBBB", x_au, y_au, *POINT_RGB_BY_TYPE.get(object_type, POINT_RGB), POINT_TYPE_CODES.get(object_type, 0))
 
-                for level in levels:
+                for level in levels_for_layer:
                     if sample_bucket >= level.sample_buckets:
                         continue
                     tile_x = floor_div(x_au, level.span_au)
@@ -336,8 +345,9 @@ def build_smp3(
     layer_manifests: list[dict[str, object]] = []
 
     for layer in layers:
-        raw_tile_counts = count_raw_tile_populations(database_url, layer.groups, layer.types, levels)
-        effective_levels = density_preserving_levels(levels, raw_tile_counts)
+        levels_for_layer = layer_levels(layer, levels)
+        raw_tile_counts = count_raw_tile_populations(database_url, layer.groups, layer.types, levels_for_layer)
+        effective_levels = density_preserving_levels(levels_for_layer, raw_tile_counts)
         records: dict[TileKey, bytearray] = {}
         source_ids: dict[TileKey, bytearray] = {}
         counts: dict[TileKey, int] = {}
@@ -653,6 +663,13 @@ def parse_levels(value: str) -> list[TileLevel]:
     return sorted(levels, key=lambda level: level.span_log2)
 
 
+def layer_levels(layer: TileLayer, levels: list[TileLevel]) -> list[TileLevel]:
+    filtered = [level for level in levels if level.span_log2 >= layer.min_span_log2]
+    if not filtered:
+        raise SystemExit(f"Layer {layer.id!r} excludes every configured level with min span {layer.min_span_log2}.")
+    return filtered
+
+
 def parse_layers(value: str) -> list[TileLayer]:
     layers: list[TileLayer] = []
     for raw_entry in value.split(","):
@@ -662,12 +679,20 @@ def parse_layers(value: str) -> list[TileLayer]:
         parts = entry.split(":")
         if len(parts) != 3:
             raise SystemExit(f"Invalid layer entry {entry!r}; expected id:group|group:type|type.")
-        layer_id, raw_groups, raw_types = parts
+        raw_id, raw_groups, raw_types = parts
+        min_span_log2 = 0
+        if "@" in raw_id:
+            raw_id, raw_min_span = raw_id.split("@", 1)
+            try:
+                min_span_log2 = int(raw_min_span)
+            except ValueError:
+                raise SystemExit(f"Invalid layer entry {entry!r}; the @ suffix must be a span_log2 integer.")
+        layer_id = raw_id
         groups = [group.strip() for group in raw_groups.split("|") if group.strip()]
         types = [item.strip() for item in raw_types.split("|") if item.strip()]
         if not layer_id or not groups:
             raise SystemExit(f"Invalid layer entry {entry!r}; layer id and groups are required.")
-        layers.append(TileLayer(layer_id, groups, types))
+        layers.append(TileLayer(layer_id, groups, types, min_span_log2))
     if not layers:
         raise SystemExit("At least one tile layer is required.")
     return layers

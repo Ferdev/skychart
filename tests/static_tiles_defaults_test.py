@@ -196,6 +196,12 @@ class StaticTileDefaultsTest(unittest.TestCase):
         self.assertEqual(builder.POINT_TYPE_CODES["xray_extended"], 9)
         self.assertIn("xray_source", builder.POINT_RGB_BY_TYPE)
         self.assertIn("xray_extended", builder.POINT_RGB_BY_TYPE)
+        # Cosmological X-ray points skip fine spans so the build stays bounded.
+        self.assertEqual(layers["xray"].min_span_log2, 42)
+        xray_levels = builder.layer_levels(layers["xray"], builder.parse_levels(",".join(builder.DEFAULT_LEVELS)))
+        self.assertEqual(min(level.span_log2 for level in xray_levels), 42)
+        deep_sky_levels = builder.layer_levels(layers["deep_sky"], builder.parse_levels(",".join(builder.DEFAULT_LEVELS)))
+        self.assertEqual(min(level.span_log2 for level in deep_sky_levels), 24)
 
     def test_manifest_version_comes_from_explicit_tile_version(self) -> None:
         builder = load_tile_builder()
