@@ -58,6 +58,17 @@ DESI and Quaia projections use a checked-in flat Lambda-CDM convention with
 Comoving distance is a display coordinate, not a claim of exact lookback time
 or independently measured geometric distance.
 
+The eROSITA-DE DR2 and SDSS-V DR20 SPIDERS layers reuse the same cosmology.
+SPIDERS rows use the BOSS spectroscopic redshift only when
+`sdss_zwarning = 0`. eROSITA DR2 rows use the SIMBAD-compiled redshift shipped
+with the DR2 Legacy Survey DR10 counterpart catalog; the upstream
+documentation warns those values are not always reliable, and each row carries
+that caveat in its facts. Sources of either catalog without a usable redshift
+keep their measured sky position but are drawn on a fixed 1 billion light-year
+reference shell (`catalog_sky_position_reference_shell`); the shell radius is
+a display convention, recorded as `distance_unknown`, and is never presented
+as a measurement.
+
 ## Selection effects and uncertainty
 
 Catalog density follows survey coverage and quality cuts. Blank or dense
@@ -81,6 +92,8 @@ literature compilation as a uniform volume-limited survey.
 - [Quaia G<20.0](https://doi.org/10.5281/zenodo.10403370)
 - [OpenNGC](https://github.com/mattiaverga/OpenNGC)
 - [HEASARC Nearby Galaxies Catalog](https://heasarc.gsfc.nasa.gov/W3Browse/galaxy-catalog/neargalcat.html)
+- [eROSITA-DE Data Release 2](https://erosita.mpe.mpg.de/dr2/)
+- [SDSS DR20 SPIDERS DL1 value-added catalog](https://data.sdss.org/sas/dr20/vac/mos/DL1_SDSS_eROSITA/v1_1_0/)
 
 Each object record retains its own source metadata and external identifiers so
 users can inspect the originating archive.

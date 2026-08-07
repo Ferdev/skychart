@@ -104,6 +104,8 @@ export type DestinationBodyType =
   | "pulsar"
   | "nebula"
   | "star_cluster"
+  | "xray_source"
+  | "xray_extended"
   | "asterism"
   | "milky_way_patch"
   | "asteroid"
@@ -265,6 +267,8 @@ const TYPE_LABEL_KEYS: Record<DestinationBodyType, string> = {
   pulsar: "type.pulsar",
   nebula: "type.nebula",
   star_cluster: "type.starCluster",
+  xray_source: "type.xraySource",
+  xray_extended: "type.xrayExtended",
   asterism: "type.asterism",
   milky_way_patch: "type.milkyWayPatch",
   asteroid: "type.asteroid",
@@ -285,6 +289,8 @@ const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
   pulsar: "pulsar",
   nebula: "nebula",
   star_cluster: "cluster",
+  xray_source: "quasar",
+  xray_extended: "galaxy",
   asterism: "cluster",
   milky_way_patch: "cluster",
   asteroid: "asteroid",
@@ -305,6 +311,8 @@ const TYPE_SORT_GROUPS: Record<DestinationBodyType, number> = {
   pulsar: 5,
   nebula: 5,
   star_cluster: 6,
+  xray_source: 5,
+  xray_extended: 5,
   asterism: 7,
   milky_way_patch: 8,
   asteroid: 9,

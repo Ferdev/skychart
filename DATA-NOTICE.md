@@ -18,6 +18,18 @@ who redistribute it should review the current BASS/VizieR terms and cite:
 - the VizieR catalog access service, DOI `10.26093/cds/vizier`;
 - BASS DR2 catalog `J/ApJS/261/2`, table 9.
 
+The eROSITA-DE DR2 and SDSS-V DR20 SPIDERS rows are imported directly into
+PostgreSQL by `scripts/import_erosita_dr2_catalog.py` and
+`scripts/import_sdss_spiders_dr20_catalog.py`; no derived snapshot of those
+catalogs is committed to this repository. Users who redistribute derived
+products should review the upstream terms and cite:
+
+- Ramos-Ceja et al. (2026), *The SRG/eROSITA All-Sky Survey DR2*,
+  arXiv `2607.27772`, and acknowledge the eROSITA-DE DR2 catalogue release
+  (`https://erosita.mpe.mpg.de/dr2/`);
+- the SDSS DR20 paper (arXiv `2607.26149`) and the SPIDERS DL1 value-added
+  catalog (`DL1_SDSS_eROSITA` v1.1.0; Aydar, Merloni, Dwelly et al.).
+
 Other generated snapshots identify their originating archives and source URLs
 inside each JSON file. The `/about` page and
 [`docs/scientific-methodology.md`](docs/scientific-methodology.md) provide the

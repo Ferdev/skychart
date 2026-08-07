@@ -121,7 +121,7 @@ class StaticTileDefaultsTest(unittest.TestCase):
         # galaxies and quasars look like invented filaments and nebulae.
         builder = load_tile_builder()
         renderer_src = (ROOT / "src" / "webglPointRenderer.ts").read_text(encoding="utf-8")
-        self.assertEqual(len(builder.POINT_TYPE_CODES), 7)
+        self.assertEqual(len(builder.POINT_TYPE_CODES), 9)
         for procedural_token in ("v_style", "v_rand", "styleCode", "diffraction", "wobble"):
             self.assertNotIn(procedural_token, renderer_src)
         self.assertIn("gl_FragColor = v_color;", renderer_src)
@@ -186,6 +186,16 @@ class StaticTileDefaultsTest(unittest.TestCase):
             set(layers["black_holes"].groups),
             {"simbad_compact_objects", "bass_dr2_black_holes"},
         )
+        self.assertEqual(
+            set(layers["xray"].groups),
+            {"erosita_dr2_xray", "erosita_dr2_extended", "sdss_spiders_dr20"},
+        )
+        self.assertIn("xray_source", layers["xray"].types)
+        self.assertIn("xray_extended", layers["xray"].types)
+        self.assertEqual(builder.POINT_TYPE_CODES["xray_source"], 8)
+        self.assertEqual(builder.POINT_TYPE_CODES["xray_extended"], 9)
+        self.assertIn("xray_source", builder.POINT_RGB_BY_TYPE)
+        self.assertIn("xray_extended", builder.POINT_RGB_BY_TYPE)
 
     def test_manifest_version_comes_from_explicit_tile_version(self) -> None:
         builder = load_tile_builder()

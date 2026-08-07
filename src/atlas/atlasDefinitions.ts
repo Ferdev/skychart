@@ -34,16 +34,17 @@ export const BODY_FILTERS: BodyFilterDefinition[] = [
   { key: "pulsar", labelKey: "filters.pulsars", types: ["pulsar"] },
   { key: "nebula", labelKey: "filters.nebulae", types: ["nebula"] },
   { key: "star_cluster", labelKey: "filters.clusters", types: ["star_cluster"] },
+  { key: "xray", labelKey: "filters.xray", types: ["xray_source", "xray_extended", "quasar", "galaxy", "star"], groups: ["erosita_dr2_xray", "erosita_dr2_extended", "sdss_spiders_dr20"] },
 ];
 
 export const MAP_OBJECT_TYPE_FILTER_KEYS: readonly BodyFilter[] = [
-  "all", "star", "planet", "moon", "dwarf_planet", "asteroid", "comet", "galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster",
+  "all", "star", "planet", "moon", "dwarf_planet", "asteroid", "comet", "galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster", "xray",
 ];
 
 export const MAP_FILTER_ZOOM_PRESETS: Partial<Record<BodyFilter, ZoomPreset>> = {
   star: "galaxy", planet: "galaxy", moon: "solar", dwarf_planet: "solar", asteroid: "solar", comet: "solar",
   galaxy: "cosmicWeb", quasar: "cosmicWeb", active_galaxy: "cosmicWeb", black_hole: "cosmicWeb",
-  pulsar: "galaxy", nebula: "galaxy", star_cluster: "galaxy",
+  pulsar: "galaxy", nebula: "galaxy", star_cluster: "galaxy", xray: "cosmicWeb",
 };
 
 export const SOLAR_SYSTEM_COUNT_GROUPS = new Set(["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"]);
