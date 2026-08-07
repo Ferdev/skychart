@@ -82,6 +82,19 @@ python3 "$repo_root/scripts/import_gaia_bulk_catalog.py" \
   --preset 10kpc-g14 \
   --skip-if-existing-at-least "$gaia_10kpc_min_count"
 
+erosita_dr2_min_count="${EROSITA_DR2_MIN_COUNT:-1900000}"
+spiders_dr20_min_count="${SPIDERS_DR20_MIN_COUNT:-250000}"
+
+# These two imports read FITS files and need the pinned packages from
+# scripts/erosita_dr2_requirements.txt (fitsio, numpy) in the host python3.
+echo "[catalog-import] Ensuring eROSITA-DE DR2 X-ray catalogs are present..."
+python3 "$repo_root/scripts/import_erosita_dr2_catalog.py" \
+  --skip-if-existing-at-least "$erosita_dr2_min_count"
+
+echo "[catalog-import] Ensuring SDSS-V DR20 SPIDERS DL1 catalog is present..."
+python3 "$repo_root/scripts/import_sdss_spiders_dr20_catalog.py" \
+  --skip-if-existing-at-least "$spiders_dr20_min_count"
+
 echo "[catalog-import] Refreshing catalog summary counts..."
 if [ -x "$release_bin" ]; then
   "$release_bin" eval "StarsmapApi.Release.refresh_catalog_summary_counts()"

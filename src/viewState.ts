@@ -3,7 +3,7 @@ export const VIEW_STATE_VERSION = 1;
 export const DISPLAY_LAYERS = ["labels", "orbits", "grid", "milkyWay", "milkyWayArms", "milkyWayDust", "milkyWayGuides", "references"] as const;
 export type DisplayLayer = typeof DISPLAY_LAYERS[number];
 
-export const BODY_FILTERS = ["all", "solar_system", "planet", "moon", "star", "bright_star", "gaia_star", "exoplanet_system", "dwarf_planet", "small_body", "asteroid", "comet", "deep_sky", "galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster"] as const;
+export const BODY_FILTERS = ["all", "solar_system", "planet", "moon", "star", "bright_star", "gaia_star", "exoplanet_system", "dwarf_planet", "small_body", "asteroid", "comet", "deep_sky", "galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster", "xray"] as const;
 export type BodyFilter = typeof BODY_FILTERS[number];
 export type ViewFilters = { primary: BodyFilter; compare: BodyFilter };
 

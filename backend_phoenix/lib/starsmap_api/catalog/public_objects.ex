@@ -275,15 +275,53 @@ defmodule StarsmapApi.Catalog.PublicObjects do
       ned_link(name, object),
       jpl_small_body_link(identifiers),
       gaia_link(identifiers, facts),
-      nasa_exoplanet_link(identifiers, object)
+      nasa_exoplanet_link(identifiers, object),
+      xray_catalog_link(object)
     ]
     |> Enum.reject(&is_nil/1)
   end
 
+  defp xray_catalog_link(%{catalog_group: group, source: source})
+       when group in ["erosita_dr2_xray", "erosita_dr2_extended"] do
+    %{
+      provider: "eROSITA-DE DR2",
+      label: "eRASS:3 catalog page",
+      url: source_url(source, "catalog_page_url", "https://erosita.mpe.mpg.de/dr2/")
+    }
+  end
+
+  defp xray_catalog_link(%{catalog_group: "sdss_spiders_dr20", source: source}) do
+    %{
+      provider: "SDSS-V DR20",
+      label: "SPIDERS DL1 value-added catalog",
+      url:
+        source_url(
+          source,
+          "vac_page_url",
+          "https://www.sdss.org/dr20/data_access/value-added-catalogs/"
+        )
+    }
+  end
+
+  defp xray_catalog_link(_object), do: nil
+
+  defp source_url(source, key, fallback) when is_map(source) do
+    case Map.get(source, key) do
+      value when is_binary(value) -> if(String.trim(value) == "", do: fallback, else: value)
+      _ -> fallback
+    end
+  end
+
+  defp source_url(_source, _key, fallback), do: fallback
+
   defp simbad_link(name, object) do
     cond do
+      # SPIDERS DL1 rows carry survey-internal names that SIMBAD cannot resolve.
+      object.catalog_group == "sdss_spiders_dr20" ->
+        nil
+
       object.source_type == "simbad_tap" or
-          object.object_type in ["galaxy", "quasar", "active_galaxy", "black_hole"] ->
+          object.object_type in ["galaxy", "quasar", "active_galaxy", "black_hole", "xray_source", "xray_extended"] ->
         %{
           provider: "SIMBAD",
           label: "SIMBAD object lookup",
@@ -303,7 +341,8 @@ defmodule StarsmapApi.Catalog.PublicObjects do
   end
 
   defp ned_link(name, object) do
-    if object.object_type in ["galaxy", "quasar", "active_galaxy", "black_hole"] do
+    if object.catalog_group != "sdss_spiders_dr20" and
+         object.object_type in ["galaxy", "quasar", "active_galaxy", "black_hole"] do
       %{
         provider: "NED",
         label: "NASA/IPAC Extragalactic Database lookup",

@@ -80,7 +80,8 @@ test.describe("compact and understandable atlas controls", () => {
       "black_hole",
       "pulsar",
       "nebula",
-      "star_cluster"
+      "star_cluster",
+      "xray"
     ]);
     await expect(page.locator('#map-filter-buttons [data-body-filter="gaia_star"]')).toHaveCount(0);
     await expect(page.locator('#map-filter-buttons [data-body-filter="bright_star"]')).toHaveCount(0);

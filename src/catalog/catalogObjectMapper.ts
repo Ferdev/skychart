@@ -44,6 +44,8 @@ export class CatalogObjectMapper {
       "active_galaxy",
       "black_hole",
       "pulsar",
+      "xray_source",
+      "xray_extended",
     ].includes(objectType);
     const isSmallBodyLike = ["asteroid", "comet", "small_body"].includes(objectType);
     const externalLinks = context.normalizeExternalLinks
@@ -171,6 +173,7 @@ function normalizeDestinationType(type: string | null | undefined): DestinationB
   const allowed = new Set<DestinationBodyType>([
     "star", "planet", "moon", "dwarf_planet", "galaxy", "quasar",
     "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster",
+    "xray_source", "xray_extended",
     "asterism", "milky_way_patch", "asteroid", "comet", "small_body", "unknown",
   ]);
   return allowed.has(type as DestinationBodyType) ? type as DestinationBodyType : "unknown";

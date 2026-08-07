@@ -43,6 +43,9 @@ const DEEP_SKY_POINT_GROUPS = [
   "desi_dr1_galaxies",
   "desi_dr1_quasars",
   "quaia_g20_quasars",
+  "erosita_dr2_xray",
+  "erosita_dr2_extended",
+  "sdss_spiders_dr20",
 ];
 const DENSE_UNIVERSE_LAYER_IDS = new Set(["desi_dr1", "quaia_g20"]);
 const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
@@ -599,6 +602,7 @@ function layerPriority(layerId: string | undefined, viewWidthLy: number): number
   if (layerId === "quaia_g20" && viewWidthLy >= 1_000_000) return 0;
   if (layerId === "gaia_stars") return 0;
   if (layerId === "deep_sky") return 1;
+  if (layerId === "xray") return 1;
   if (["exoplanet_systems", "exoplanet_stars", "planets"].includes(layerId)) return 3;
   if (["small_bodies", "asteroids", "comets", "dwarf_planets"].includes(layerId)) return 4;
   return 2;

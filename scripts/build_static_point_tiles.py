@@ -62,6 +62,7 @@ DEFAULT_LAYERS = (
     "pulsars:simbad_compact_objects:pulsar",
     "nebulae:messier_deep_sky|ngc_ic_deep_sky:nebula",
     "star_clusters:messier_deep_sky|ngc_ic_deep_sky:star_cluster",
+    "xray:erosita_dr2_xray|erosita_dr2_extended|sdss_spiders_dr20:xray_source|xray_extended|quasar|galaxy|star",
 )
 DEFAULT_LEVELS = (
     # span_log2:sample_buckets:max_points_per_tile
@@ -101,6 +102,8 @@ POINT_RGB_BY_TYPE = {
     "pulsar": (138, 218, 255),
     "nebula": (184, 152, 255),
     "star_cluster": (207, 228, 255),
+    "xray_source": (148, 231, 255),
+    "xray_extended": (255, 190, 160),
 }
 # Sprite style codes written into the record's reserved 4th color byte. The
 # WebGL renderer keys per-type sprite shapes off these; keep them in sync with
@@ -114,6 +117,8 @@ POINT_TYPE_CODES = {
     "pulsar": 5,
     "nebula": 6,
     "star_cluster": 7,
+    "xray_source": 8,
+    "xray_extended": 9,
 }
 DENSITY_SAMPLE_HEADROOM = 0.72
 DEEP_SKY_COLOR_INDICES = {name: 240 + index for index, name in enumerate(POINT_RGB_BY_TYPE)}

@@ -19,6 +19,8 @@ const DESTINATION_BODY_TYPES = new Set<DestinationBodyType>([
   "pulsar",
   "nebula",
   "star_cluster",
+  "xray_source",
+  "xray_extended",
   "asterism",
   "milky_way_patch",
   "asteroid",

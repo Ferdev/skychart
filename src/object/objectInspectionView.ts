@@ -518,7 +518,8 @@ updateScienceLayerDisclosure() {
       gaia_stars: "Gaia positive-parallax quality tiers; parallax and magnitude cuts vary by tier. Not a complete stellar census.",
       desi_dr1: "DESI DR1 successful spectroscopy and target/class cuts inside the DESI footprint.",
       quaia_g20: "Quaia G<20 quasar candidates with inferred redshifts; near-all-sky selection is not spectroscopic completeness.",
-      deep_sky: "Named and literature-compiled catalogs with heterogeneous selection and coverage."
+      deep_sky: "Named and literature-compiled catalogs with heterogeneous selection and coverage.",
+      xray: "eROSITA-DE DR2 (eRASS:3) and SDSS-V DR20 SPIDERS DL1. Distances come from spectroscopic or SIMBAD-compiled redshifts where available; sources without a usable redshift are drawn on an explicit 1 billion ly reference shell (display convention, not a measurement)."
     };
     return `<section><strong>${escapeHtml(layer.id.replace(/_/g, " "))}</strong><dl><div><dt>${escapeHtml(t("launch.sourceObjects"))}</dt><dd>${escapeHtml(formatCount(available))}</dd></div><div><dt>${escapeHtml(t("launch.displayedAvailable"))}</dt><dd>${escapeHtml(formatCount(displayed))} / ${escapeHtml(formatCount(raw))}</dd></div><div><dt>${escapeHtml(t("launch.sampleRate"))}</dt><dd>${escapeHtml(this.formatPercent(rate))}</dd></div><div><dt>${escapeHtml(t("launch.release"))}</dt><dd>${escapeHtml(this.context.manifest.value!.version)}</dd></div></dl><p>${escapeHtml(context[layer.id] ?? t("launch.methodologyCaveat"))}</p></section>`;
   });
@@ -602,7 +603,10 @@ private externalLinksForBody(body: Body) {
   const lookupName = body.deep_sky?.common_name || body.name;
   const generatedLinks: ExternalLink[] = [];
 
-  if (["star", "star_cluster", "nebula", "galaxy", "quasar", "active_galaxy", "black_hole"].includes(classification.type)) {
+  // SPIDERS DL1 rows carry survey-internal names that SIMBAD/NED cannot resolve.
+  const resolvableName = body.catalog_group !== "sdss_spiders_dr20";
+
+  if (resolvableName && ["star", "star_cluster", "nebula", "galaxy", "quasar", "active_galaxy", "black_hole", "xray_source", "xray_extended"].includes(classification.type)) {
     generatedLinks.push({
       provider: "SIMBAD",
       label: "SIMBAD object lookup",
@@ -610,7 +614,7 @@ private externalLinksForBody(body: Body) {
     });
   }
 
-  if (["galaxy", "quasar", "active_galaxy", "black_hole"].includes(classification.type)) {
+  if (resolvableName && ["galaxy", "quasar", "active_galaxy", "black_hole"].includes(classification.type)) {
     generatedLinks.push({
       provider: "NED",
       label: "NASA/IPAC Extragalactic Database lookup",
