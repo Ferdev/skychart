@@ -3,6 +3,8 @@ defmodule StarsmapApi.Catalog.Search do
 
   import Ecto.Query
 
+  require Logger
+
   alias StarsmapApi.Catalog.CatalogSourceObject
   alias StarsmapApi.Catalog.PublicObjects
   alias StarsmapApi.Repo
@@ -10,6 +12,7 @@ defmodule StarsmapApi.Catalog.Search do
   @default_limit 80
   @max_limit 500
   @search_timeout 5_000
+  @fallback_search_timeout 15_000
 
   def search(params) do
     limit = bounded_integer(params["limit"], @default_limit, 1, @max_limit)
@@ -41,12 +44,29 @@ defmodule StarsmapApi.Catalog.Search do
       |> maybe_filter_types(types)
       |> maybe_filter_query(query_text)
 
+    # Ranked ordering computes two ILIKE fragments per candidate row. Queries
+    # that match nearly a whole survey-scale table (for example "3erass")
+    # cannot finish that work inside the interactive timeout, so a timeout
+    # falls back to the cheaper magnitude/name ordering instead of a 500.
     objects =
-      base_query
-      |> order_for_search(query_text)
-      |> limit(^(limit + 1))
-      |> offset(^offset)
-      |> Repo.all(timeout: @search_timeout)
+      try do
+        base_query
+        |> order_for_search(query_text)
+        |> limit(^(limit + 1))
+        |> offset(^offset)
+        |> Repo.all(timeout: search_timeout())
+      rescue
+        e in [DBConnection.ConnectionError, DBConnection.OwnershipError] ->
+          Logger.warning(
+            "ranked catalog search timed out, retrying with magnitude ordering: #{Exception.message(e)}"
+          )
+
+          base_query
+          |> order_for_search("")
+          |> limit(^(limit + 1))
+          |> offset(^offset)
+          |> Repo.all(timeout: @fallback_search_timeout)
+      end
 
     has_more = length(objects) > limit
     visible_objects = Enum.take(objects, limit)
@@ -65,6 +85,9 @@ defmodule StarsmapApi.Catalog.Search do
 
   defp short_interactive_query?(""), do: false
   defp short_interactive_query?(query_text), do: String.length(query_text) < 3
+
+  defp search_timeout,
+    do: Application.get_env(:starsmap_api, :catalog_search_timeout_ms, @search_timeout)
 
   defp maybe_filter_groups(query, []), do: query
 
