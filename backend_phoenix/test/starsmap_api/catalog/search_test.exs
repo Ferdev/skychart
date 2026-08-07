@@ -33,6 +33,21 @@ defmodule StarsmapApi.Catalog.SearchTest do
     refute payload.has_more
   end
 
+  test "a ranked-search timeout falls back to magnitude ordering instead of failing" do
+    insert_object!("jupiter", "Jupiter")
+    previous = Application.get_env(:starsmap_api, :catalog_search_timeout_ms)
+    Application.put_env(:starsmap_api, :catalog_search_timeout_ms, 1)
+
+    try do
+      payload = Search.search(%{"q" => "jupiter", "limit" => "10"})
+      assert Enum.map(payload.objects, & &1.key) == ["jupiter"]
+    after
+      if previous,
+        do: Application.put_env(:starsmap_api, :catalog_search_timeout_ms, previous),
+        else: Application.delete_env(:starsmap_api, :catalog_search_timeout_ms)
+    end
+  end
+
   defp insert_object!(key, name) do
     SnapshotStore.upsert_source_objects([
       %{
