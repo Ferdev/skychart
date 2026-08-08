@@ -16,6 +16,7 @@
 .atlas-footer { position: fixed; z-index: 20; right: 126px; bottom: 8px; display: flex; gap: 12px; align-items: center; font-size: .68rem; }
 .atlas-footer > a { color: rgba(220, 231, 224, .78); text-transform: uppercase; text-decoration: none; }
 .atlas-footer .about-link { position: static; }
+.atlas-footer .repo-link { display: inline-flex; align-items: center; }
 
 .scale-options .map-filter-buttons {
   max-height: 148px;
