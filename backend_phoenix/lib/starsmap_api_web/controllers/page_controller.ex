@@ -51,11 +51,14 @@ defmodule StarsmapApiWeb.PageController do
     <section><h3>NASA Exoplanet Archive</h3><p>Exoplanet data come from the <a href="https://exoplanetarchive.ipac.caltech.edu/">NASA Exoplanet Archive</a>, operated by Caltech under contract with NASA.</p></section>
     <section><h3>SIMBAD / CDS</h3><p>Selected object records use <a href="https://simbad.cds.unistra.fr/">SIMBAD</a>, operated at CDS, Strasbourg, France.</p></section>
     <section><h3>BASS DR2 / VizieR</h3><p>Mass-bearing active-galaxy records use <a href="https://www.bass-survey.com/dr2.html">BASS Data Release 2</a> through the <a href="https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2">CDS/VizieR catalog service</a>.</p></section>
+    <section><h3>eROSITA-DE DR2</h3><p>X-ray point and extended sources use the <a href="https://erosita.mpe.mpg.de/dr2/">eROSITA-DE Data Release 2</a> (eRASS:3) catalogs from the German eROSITA consortium; acknowledge the release and cite Ramos-Ceja et al. 2026 when using these data.</p></section>
+    <section><h3>SDSS-V DR20 / SPIDERS</h3><p>Optical spectroscopy of eROSITA X-ray targets uses the <a href="https://www.sdss.org/dr20/">Sloan Digital Sky Survey DR20</a> SPIDERS DL1 value-added catalog from the Black Hole Mapper program.</p></section>
     <section><h3>OpenNGC</h3><p>NGC and IC records use the community-maintained <a href="https://github.com/mattiaverga/OpenNGC">OpenNGC</a> database under its published license.</p></section>
     <section><h3>JPL SSD / Horizons</h3><p>Solar-system object and ephemeris data use NASA Jet Propulsion Laboratory <a href="https://ssd.jpl.nasa.gov/">Solar System Dynamics</a> resources and <a href="https://ssd.jpl.nasa.gov/horizons/">Horizons</a>.</p></section>
     <section><h3>International Astronomical Union</h3><p>Dwarf-planet labels follow formal <a href="https://www.iau.org/static/resolutions/Resolution_GA26-5-6.pdf">IAU classifications</a>; orbital and physical data remain credited to their originating JPL sources.</p></section>
     <section><h3>NAIF</h3><p>Reference frames and kernels use resources from NASA's <a href="https://naif.jpl.nasa.gov/naif/">Navigation and Ancillary Information Facility</a> (NAIF/SPICE).</p></section></div>
-    <h2>Use with care</h2><p>Displayed density reflects catalog selection, measurement quality, and rendering level of detail. Missing uncertainty, epoch, completeness, or distance semantics means not supplied, never zero.</p></main></body></html>
+    <h2>Use with care</h2><p>Displayed density reflects catalog selection, measurement quality, and rendering level of detail. Missing uncertainty, epoch, completeness, or distance semantics means not supplied, never zero.</p>
+    <h2>Source code</h2><p>Cosmic Atlas is open source under the MIT license: <a href="https://github.com/Ferdev/skychart">github.com/Ferdev/skychart</a>. Third-party catalog records keep their upstream licenses and citation terms; see <a href="https://github.com/Ferdev/skychart/blob/trunk/DATA-NOTICE.md">DATA-NOTICE.md</a> in the repository.</p></main></body></html>
     """)
   end
 
