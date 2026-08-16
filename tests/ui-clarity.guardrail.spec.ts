@@ -129,6 +129,10 @@ test.describe("compact and understandable atlas controls", () => {
   test("keeps footer links outside the scale panel at tablet and desktop widths", async ({ page }) => {
     const issues = collectBrowserIssues(page);
     await page.setViewportSize({ width: 1024, height: 680 });
+    const authorLink = page.getByRole("link", { name: "By Ferdev" });
+    await expect(authorLink).toBeVisible();
+    await expect(authorLink).toHaveAttribute("href", "https://ferdev.com/");
+    await expect(authorLink).toHaveAttribute("target", "_blank");
     const section = page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"])');
     await section.locator(".scale-collapse__toggle").click();
 

@@ -19,6 +19,7 @@ def test_launch_surfaces_use_translation_keys():
         'data-i18n="launch.downloadImage">Download image<',
         'data-i18n="launch.exploreMap">Explore this map<',
         'data-i18n="launch.aboutCredits">About · data credits<',
+        'data-i18n="launch.byFerdev">By Ferdev<',
     ]
     for text in wired_html:
         assert text in html, f"launch fallback is missing its data-i18n contract: {text}"

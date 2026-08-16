@@ -5,10 +5,12 @@ import type {
   CatalogObjectPayload,
   ExternalLink,
 } from "../atlas/contracts";
+import { smallBodyPositionAt } from "./smallBodyPropagation";
 
 export type CatalogMappingContext = {
   auKm: number;
   earth?: Body;
+  timestamp?: string;
   normalizeExternalLinks?: (links: readonly ExternalLink[]) => ExternalLink[];
 };
 
@@ -18,13 +20,17 @@ export class CatalogObjectMapper {
 
   map(object: CatalogObjectPayload): Body {
     const context = this.context();
+    const facts = object.facts ?? {};
     const position = object.position ?? {};
-    const xAu = finiteNumber(position.x_au, 0);
-    const yAu = finiteNumber(position.y_au, 0);
-    const zAu = finiteNumber(position.z_au, 0);
-    const xKm = finiteNumber(position.x_km, xAu * context.auKm);
-    const yKm = finiteNumber(position.y_km, yAu * context.auKm);
-    const zKm = finiteNumber(position.z_km, zAu * context.auKm);
+    const propagated = object.catalog_group === "jpl_small_bodies" && object.parent_key === "sun" && context.timestamp
+      ? smallBodyPositionAt(facts, context.timestamp)
+      : null;
+    const xAu = propagated?.xAu ?? finiteNumber(position.x_au, 0);
+    const yAu = propagated?.yAu ?? finiteNumber(position.y_au, 0);
+    const zAu = propagated?.zAu ?? finiteNumber(position.z_au, 0);
+    const xKm = propagated ? xAu * context.auKm : finiteNumber(position.x_km, xAu * context.auKm);
+    const yKm = propagated ? yAu * context.auKm : finiteNumber(position.y_km, yAu * context.auKm);
+    const zKm = propagated ? zAu * context.auKm : finiteNumber(position.z_km, zAu * context.auKm);
     const earthPosition = context.earth?.position;
     const distanceFromEarthKm = earthPosition
       ? Math.hypot(
@@ -33,7 +39,6 @@ export class CatalogObjectMapper {
           zAu - earthPosition.z_au,
         ) * context.auKm
       : Math.hypot(xKm, yKm, zKm);
-    const facts = object.facts ?? {};
     const astrometry = object.astrometry ?? {};
     const objectType = normalizeDestinationType(object.object_type);
     const isDeepSkyLike = [
@@ -64,6 +69,7 @@ export class CatalogObjectMapper {
       catalog: {
         source_type: object.source_type,
         position_model: object.position_model,
+        dynamic_position: propagated !== null,
         preview: true,
         parent_key: object.parent_key,
         catalog_group: object.catalog_group ?? undefined,
