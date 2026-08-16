@@ -76,7 +76,7 @@
   background: rgba(239, 196, 104, 0.12);
 }
 
-@media (min-width: 900px) and (max-width: 999px) {
+@media (min-width: 900px) and (max-width: 1099px) {
   .atlas-footer {
     right: 12px;
     bottom: 70px;
