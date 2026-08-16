@@ -14,6 +14,7 @@ import { CatalogPointDecoder } from "./catalog/catalogPointDecoder";
 import { CatalogPointManifestRepository } from "./catalog/catalogPointManifest";
 import { CatalogPointPlanner, type CatalogPointViewport } from "./catalog/catalogPointPlanner";
 import { CatalogObjectMapper } from "./catalog/catalogObjectMapper";
+import { propagateSmallBody } from "./catalog/smallBodyPropagation";
 import { CatalogPointStream } from "./catalog/catalogPointStream";
 import { CatalogPointSelector } from "./catalog/catalogPointSelector";
 import { ObjectInspectionView, normalizeExternalLinks } from "./object/objectInspectionView";
@@ -80,6 +81,7 @@ const catalogPointDecoder = new CatalogPointDecoder();
 const catalogObjectMapper = new CatalogObjectMapper(() => ({
   auKm: auKm(),
   earth: bodyByKey.get("earth"),
+  timestamp: ephemeris?.timestamp_utc,
   normalizeExternalLinks,
 }));
 const destinationCatalog = new DestinationCatalogModel({
@@ -594,7 +596,11 @@ async function loadAtlas(timestampIso?: string) {
 
     setLoading("parse", 64, t("loading.indexing"));
     const payload = (await response.json()) as Ephemeris;
-    const bodies = mergeBodyList(payload.bodies, preservedBodies);
+    const payloadEarth = payload.bodies.find((body) => body.key === "earth");
+    const propagatedPreservedBodies = preservedBodies.map((body) => (
+      propagateSmallBody(body, payload.timestamp_utc, payload.au_km, payloadEarth)
+    ));
+    const bodies = mergeBodyList(payload.bodies, propagatedPreservedBodies);
     ephemeris = { ...payload, bodies };
     catalogSummary = catalogSummaryFromEphemeris(payload);
     void refreshCatalogSummary();

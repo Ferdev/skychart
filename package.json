@@ -29,6 +29,7 @@
     "test:helpers": "node --experimental-strip-types tests/atlasHelpers.test.ts",
     "test:catalog-point-decoder": "node --experimental-strip-types tests/catalogPointDecoder.test.ts",
     "test:catalog-point-manifest": "node --experimental-strip-types tests/catalogPointManifest.test.ts",
+    "test:small-body-propagation": "node --experimental-strip-types tests/smallBodyPropagation.test.ts",
     "validate:tours": "node scripts/validate_tours.mjs"
   },
   "devDependencies": {
