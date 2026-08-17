@@ -1,5 +1,6 @@
-import type { BodyFilterDefinition, ExploreDomainDefinition, UniverseShell, ZoomPreset } from "./contracts";
+import type { Body, BodyFilterDefinition, Ephemeris, ExploreDomainDefinition, UniverseShell, ZoomPreset } from "./contracts";
 import { classifyBody } from "../destinationPicker";
+import { isPresent } from "../geometry";
 import { isSolarSystemBody } from "../rendering/atlasVisibilityModel";
 import type { BodyFilter } from "../viewState";
 
@@ -87,3 +88,27 @@ export const UNIVERSE_SHELLS: UniverseShell[] = [
   { id: "quasar-epoch", labelKey: "universe.shell.quasarEpoch", radiusLy: 13_000_000_000, noteKey: "universe.shell.quasarEpochNote" },
   { id: "observable", labelKey: "universe.shell.observable", radiusLy: OBSERVABLE_UNIVERSE_RADIUS_LY, noteKey: "universe.shell.observableNote" },
 ];
+
+export function universeShellForRadius(radiusLy: number): UniverseShell {
+  return UNIVERSE_SHELLS.find((shell) => radiusLy <= shell.radiusLy) ?? UNIVERSE_SHELLS[UNIVERSE_SHELLS.length - 1];
+}
+
+export function zoomPresetBodies(preset: ZoomPreset, ephemeris: Ephemeris | null, bodyByKey: ReadonlyMap<string, Body>): Body[] {
+  if (!ephemeris) return [];
+  if (preset === "inner") {
+    return ["sun", "mercury", "venus", "earth", "moon", "mars"].map((key) => bodyByKey.get(key)).filter(isPresent);
+  }
+  if (preset === "solar") {
+    return ephemeris.bodies.filter((body) => isSolarSystemBody(body));
+  }
+  if (preset === "nearby") {
+    return ephemeris.bodies.filter((body) => body.catalog_group === "nearby_exoplanet_systems" || body.key === "sun");
+  }
+  if (preset === "galaxy" || preset === "localGroup" || preset === "cosmicWeb") {
+    return [];
+  }
+  if (preset === "messier") {
+    return ephemeris.bodies.filter((body) => body.catalog_group === "messier_deep_sky");
+  }
+  return ephemeris.bodies;
+}

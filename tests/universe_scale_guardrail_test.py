@@ -42,7 +42,7 @@ class UniverseScaleGuardrailTest(unittest.TestCase):
 
     def test_universe_preset_targets_real_catalog_scale(self) -> None:
         self.assertIn('<small>4B ly</small>', INDEX)
-        preset_body = MAIN[MAIN.index("function applyZoomPreset") : MAIN.index("function presetBodies")]
+        preset_body = MAIN[MAIN.index("function applyZoomPreset") : MAIN.index("function updateZoomPresetButtons")]
         self.assertIn('fitPhysicalScale(4_000_000_000, 0.10)', preset_body)
         self.assertNotIn("COSMIC_WEB_MODEL", preset_body)
 

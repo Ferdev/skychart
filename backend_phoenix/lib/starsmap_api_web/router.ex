@@ -48,6 +48,7 @@ defmodule StarsmapApiWeb.Router do
     get "/catalog/points", CatalogController, :points
     get "/catalog/viewport", CatalogController, :viewport
     get "/ephemeris", PythonProxyController, :ephemeris
+    get "/small-body-ephemeris", PythonProxyController, :small_body_ephemeris
     get "/orbits", PythonProxyController, :orbits
     get "/trails", PythonProxyController, :trails
     get "/observe", PythonProxyController, :observe

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { propagateSmallBody, smallBodyPositionAt } from "../src/catalog/smallBodyPropagation.ts";
+import { propagateSmallBody, resolveSmallBodyPosition, smallBodyPositionAt } from "../src/catalog/smallBodyPropagation.ts";
 import type { Body } from "../src/atlas/contracts.ts";
 
 const AU_KM = 149_597_870.7;
@@ -36,7 +36,7 @@ const apophis = {
   parent_key: "sun",
   radius_km: 0.17,
   color: "#f06f61",
-  catalog: { facts },
+  catalog: { facts, external_ids: { primary_designation: "99942" } },
   position: {
     x_au: snapshotPosition.xAu,
     y_au: snapshotPosition.yAu,
@@ -71,6 +71,41 @@ assert.notEqual(propagated, apophis);
 assert.equal(propagated.catalog?.dynamic_position, true);
 assert.ok(Math.abs(propagated.position.x_au - encounterPosition.xAu) < 1e-12);
 assert.ok((propagated.distance_from_earth_km ?? Infinity) < 1_200_000);
+assert.equal(propagated.catalog?.position_model, "jpl_sbdb_two_body_osculating_elements");
+
+const horizonsPosition = {
+  x_au: -0.914447,
+  y_au: -0.411965,
+  z_au: 0.000001,
+  x_km: -136_799_000,
+  y_km: -61_629_000,
+  z_km: 150,
+  heliocentric_distance_km: 150_035_000,
+};
+let requestedUrl = "";
+const resolved = await resolveSmallBodyPosition(
+  apophis,
+  "2029-04-13T21:46:00.000Z",
+  AU_KM,
+  earth,
+  async (url) => {
+    requestedUrl = url;
+    return {
+      ok: true,
+      async json() {
+        return {
+          position: horizonsPosition,
+          distance_from_earth_km: 38_013.2,
+          position_model: "jpl_horizons_vectors",
+        };
+      },
+    };
+  },
+);
+assert.match(requestedUrl, /designation=99942/);
+assert.equal(resolved.position, horizonsPosition);
+assert.equal(resolved.distance_from_earth_km, 38_013.2);
+assert.equal(resolved.catalog?.position_model, "jpl_horizons_vectors");
 
 assert.equal(smallBodyPositionAt({}, "2029-04-13T21:46:00.000Z"), null);
 assert.equal(smallBodyPositionAt(facts, "not-a-date"), null);

@@ -8,13 +8,13 @@ import { installAnalytics, trackEvent } from "./analytics";
 import { initializeErrorReporting } from "./errorReporting";
 import { decodeViewState, type BodyFilter, type DisplayLayer, type ViewState } from "./viewState";
 import { TourPlayer } from "./tourPlayer";
-import { formatNumber } from "./atlasFormatting";
+import { formatLightYears, formatNumber } from "./atlasFormatting";
 import { isPresent, type Rect, type ScreenPoint } from "./geometry";
 import { CatalogPointDecoder } from "./catalog/catalogPointDecoder";
 import { CatalogPointManifestRepository } from "./catalog/catalogPointManifest";
 import { CatalogPointPlanner, type CatalogPointViewport } from "./catalog/catalogPointPlanner";
 import { CatalogObjectMapper } from "./catalog/catalogObjectMapper";
-import { propagateSmallBody } from "./catalog/smallBodyPropagation";
+import { resolveSmallBodyPosition } from "./catalog/smallBodyPropagation";
 import { CatalogPointStream } from "./catalog/catalogPointStream";
 import { CatalogPointSelector } from "./catalog/catalogPointSelector";
 import { ObjectInspectionView, normalizeExternalLinks } from "./object/objectInspectionView";
@@ -25,7 +25,7 @@ import { ObjectComparisonView } from "./object/objectComparisonView";
 import { AtlasOverlayRenderer } from "./rendering/atlasOverlayRenderer";
 import { AtlasVisibilityModel, isSolarSystemBody } from "./rendering/atlasVisibilityModel";
 import { atlasDom } from "./atlas/atlasDom";
-import { FEATURED_KEYS, STARTUP_EPHEMERIS_GROUPS, TIME_STEPS, UNIVERSE_SHELLS } from "./atlas/atlasDefinitions";
+import { FEATURED_KEYS, STARTUP_EPHEMERIS_GROUPS, TIME_STEPS, universeShellForRadius, zoomPresetBodies } from "./atlas/atlasDefinitions";
 import { CURATED_OBJECT_SUMMARIES } from "./object/curatedObjectSummaries";
 import { ScientificValueFormatter, formatFullDate, toDatetimeLocalValue } from "./object/scientificValueFormatter";
 import { ViewportCatalogLoader } from "./catalog/viewportCatalogLoader";
@@ -597,9 +597,9 @@ async function loadAtlas(timestampIso?: string) {
     setLoading("parse", 64, t("loading.indexing"));
     const payload = (await response.json()) as Ephemeris;
     const payloadEarth = payload.bodies.find((body) => body.key === "earth");
-    const propagatedPreservedBodies = preservedBodies.map((body) => (
-      propagateSmallBody(body, payload.timestamp_utc, payload.au_km, payloadEarth)
-    ));
+    const propagatedPreservedBodies = await Promise.all(preservedBodies.map((body) => (
+      resolveSmallBodyPosition(body, payload.timestamp_utc, payload.au_km, payloadEarth)
+    )));
     const bodies = mergeBodyList(payload.bodies, propagatedPreservedBodies);
     ephemeris = { ...payload, bodies };
     catalogSummary = catalogSummaryFromEphemeris(payload);
@@ -904,17 +904,6 @@ function updateScaleUi() {
   controlView.updateScale({ viewWidthAu: scaleAu, viewWidthLy: scaleAu / AU_PER_LIGHT_YEAR, pxPerAu: camera.pxPerAu, auKm: auKm(), zoomLevel, sliderSteps: ZOOM_SLIDER_STEPS, formatDistance, displayLayers });
 }
 
-function universeShellForRadius(radiusLy: number) {
-  return UNIVERSE_SHELLS.find((shell) => radiusLy <= shell.radiusLy) ?? UNIVERSE_SHELLS[UNIVERSE_SHELLS.length - 1];
-}
-
-function formatLightYears(value: number) {
-  if (value >= 1_000_000_000) return `${formatNumber(value / 1_000_000_000)} Gly`;
-  if (value >= 1_000_000) return `${formatNumber(value / 1_000_000)} Mly`;
-  if (value >= 1_000) return `${formatNumber(value / 1_000)} kly`;
-  return `${formatNumber(value)} ly`;
-}
-
 function currentViewWidthAu() { return Math.max(0.000001, usableViewportRect().width / camera.pxPerAu); }
 
 function currentViewWidthLy() { return currentViewWidthAu() / AU_PER_LIGHT_YEAR; }
@@ -963,7 +952,7 @@ function applyZoomPreset(preset: ZoomPreset, update = true) {
   } else if (preset === "cosmicWeb") {
     fitPhysicalScale(4_000_000_000, 0.10);
   } else {
-    const bodies = presetBodies(preset);
+    const bodies = zoomPresetBodies(preset, ephemeris, bodyByKey);
     if (bodies.length > 0) fitBodies(bodies, 0.16);
   }
   updateZoomPresetButtons();
@@ -973,26 +962,6 @@ function applyZoomPreset(preset: ZoomPreset, update = true) {
     requestDataRefresh({ immediate: true });
     pushCurrentViewState();
   }
-}
-
-function presetBodies(preset: ZoomPreset) {
-  if (!ephemeris) return [];
-  if (preset === "inner") {
-    return ["sun", "mercury", "venus", "earth", "moon", "mars"].map((key) => bodyByKey.get(key)).filter(isPresent);
-  }
-  if (preset === "solar") {
-    return ephemeris.bodies.filter((body) => isSolarSystemBody(body));
-  }
-  if (preset === "nearby") {
-    return ephemeris.bodies.filter((body) => body.catalog_group === "nearby_exoplanet_systems" || body.key === "sun");
-  }
-  if (preset === "galaxy" || preset === "localGroup" || preset === "cosmicWeb") {
-    return [];
-  }
-  if (preset === "messier") {
-    return ephemeris.bodies.filter((body) => body.catalog_group === "messier_deep_sky");
-  }
-  return ephemeris.bodies;
 }
 
 function updateZoomPresetButtons() { controlView.updateZoomPresets(activeZoomPreset); }

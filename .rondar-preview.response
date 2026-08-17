@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script type="module" src="/@vite/client"></script>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Cosmic Atlas is a scientific 2D map of Solar System, nearby-star, and Messier catalog objects using real ephemeris and catalog data."
+    />
+    <meta name="theme-color" content="#080a09" />
+    <meta property="og:title" content="Cosmic Atlas" />
+    <meta
+      property="og:description"
+      content="A scientifically grounded 2D celestial atlas for inspecting, measuring, and comparing loaded objects."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://skychart.org/" />
+    <meta property="og:image" content="https://skychart.org/og-image.svg" />
+    <link rel="canonical" href="https://skychart.org/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script defer src="https://visits.ferdev.com/script.js" data-website-id="d24fb846-2aba-4d76-89ac-6a0c98a4519b"></script>
+    <title>Cosmic Atlas</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#controls" data-i18n="app.skipControls">Skip to controls</a>
+    <main id="app">
+      <canvas id="point-map" aria-hidden="true"></canvas>
+      <canvas id="map" aria-label="2D heliocentric ecliptic celestial atlas" data-i18n-attrs="aria-label:app.mapLabel"></canvas>
+      <div id="catalog-point-hover" class="catalog-point-hover" aria-hidden="true"></div>
+
+      <section class="loading-screen" id="loading-screen" role="status" aria-live="polite" aria-label="Loading Cosmic Atlas" data-i18n-attrs="aria-label:loading.label">
+        <div class="loading-panel">
+          <div class="loading-orbit" aria-hidden="true"><span></span></div>
+          <div class="loading-copy">
+            <p class="eyebrow" data-i18n="loading.pipeline">Data pipeline</p>
+            <h2 data-i18n="loading.title">Loading Cosmic Atlas</h2>
+            <p id="loading-detail" data-i18n="loading.starting">Starting the local ephemeris API.</p>
+          </div>
+          <div class="loading-progress" aria-hidden="true">
+            <span id="loading-progress-fill"></span>
+          </div>
+          <div class="loading-meta">
+            <strong id="loading-progress-label">0%</strong>
+            <span id="loading-step-label" data-i18n="loading.initializing">Initializing</span>
+            <span id="loading-elapsed">0.0s</span>
+          </div>
+          <ol class="loading-steps" id="loading-steps">
+            <li data-loading-step="api" data-i18n="loading.api">Connect to local API</li>
+            <li data-loading-step="download" data-i18n="loading.download">Load ephemeris payload</li>
+            <li data-loading-step="parse" data-i18n="loading.parse">Index catalog objects</li>
+            <li data-loading-step="render" data-i18n="loading.render">Prepare scientific map</li>
+          </ol>
+          <p class="loading-source" data-i18n="loading.source">JPL DE440s/Skyfield data, Horizons vectors, nearby-star catalog, and Messier catalog snapshot.</p>
+        </div>
+      </section>
+
+      <header class="atlas-bar" aria-label="Atlas status" data-i18n-attrs="aria-label:header.status">
+        <div>
+          <p class="eyebrow" data-i18n="header.eyebrow">Scientific celestial atlas</p>
+          <h1>Cosmic Atlas</h1>
+        </div>
+        <label class="locale-control">
+          <span data-i18n="language.label">Language</span>
+          <select id="locale-select" aria-label="Language" data-i18n-attrs="aria-label:language.label"></select>
+        </label>
+        <dl id="atlas-stats"></dl>
+        <span id="load-state" class="sr-only" aria-live="polite">loading</span>
+      </header>
+
+      <section class="map-hud" id="controls" aria-label="Atlas controls" data-i18n-attrs="aria-label:controls.label">
+        <section class="scale-command scale-rail" aria-label="Zoom and scale" data-i18n-attrs="aria-label:scale.label">
+          <button
+            id="mobile-scale-toggle"
+            class="mobile-sheet-handle"
+            type="button"
+            aria-label="Expand scale controls"
+            data-i18n-attrs="aria-label:scale.expand"
+            aria-expanded="false"
+          >
+            <span aria-hidden="true"></span>
+          </button>
+          <div class="command-heading">
+            <span data-i18n="scale.title">Scale</span>
+            <div class="icon-cluster">
+              <button id="zoom-out" class="icon-button" type="button" title="Zoom out" aria-label="Zoom out" data-i18n-attrs="title:scale.zoomOut;aria-label:scale.zoomOut">-</button>
+              <button id="zoom-in" class="icon-button" type="button" title="Zoom in" aria-label="Zoom in" data-i18n-attrs="title:scale.zoomIn;aria-label:scale.zoomIn">+</button>
+            </div>
+          </div>
+          <p class="map-frame-status" data-i18n="scale.physicalFrame">Heliocentric ecliptic plane</p>
+          <div class="zoom-scale-control">
+            <div class="slider-head">
+              <span class="control-label-with-info">
+                <span data-i18n="scale.zoomLevel">Zoom level</span>
+                <button
+                  class="info-tip"
+                  type="button"
+                  aria-label="Explain zoom level" data-i18n-attrs="aria-label:launch.explainZoom" data-info-i18n="launch.zoomHelp"
+                  aria-describedby="control-info-tooltip"
+                  data-info="Controls map scale. Higher values zoom in; the exact physical span represented by the view is shown below."
+                >i</button>
+              </span>
+              <output id="zoom-scale-label" for="zoom-scale-slider">0 / 1000</output>
+            </div>
+            <input id="zoom-scale-slider" type="range" min="0" max="1000" step="1" value="0" aria-label="Zoom level" data-i18n-attrs="aria-label:scale.zoomLevel" />
+            <div class="zoom-scale-meta">
+              <span id="zoom-pixel-scale">1 px = ...</span>
+              <span id="zoom-view-scale">View = ...</span>
+            </div>
+          </div>
+          <div class="zoom-presets" id="zoom-presets" aria-label="Scale landmarks" data-i18n-attrs="aria-label:scale.landmarks">
+            <button type="button" data-zoom-preset="cosmicWeb"><span data-i18n="scale.cosmicWeb">Universe</span><small>4B ly</small></button>
+            <button type="button" data-zoom-preset="all"><span data-i18n="scale.all">All</span><small data-i18n="scale.deepSky">deep sky</small></button>
+            <button type="button" data-zoom-preset="localGroup"><span data-i18n="scale.localGroup">Local Group</span><small>5M ly</small></button>
+            <button type="button" data-zoom-preset="messier"><span data-i18n="scale.messier">Messier</span><small data-i18n="scale.mCatalog">M catalog</small></button>
+            <button type="button" data-zoom-preset="galaxy"><span data-i18n="scale.galaxy">Galaxy</span><small>100k ly</small></button>
+            <button type="button" data-zoom-preset="nearby"><span data-i18n="scale.nearby">Nearby</span><small>25 ly</small></button>
+            <button type="button" data-zoom-preset="solar"><span data-i18n="scale.solar">Solar</span><small>80 AU</small></button>
+            <button type="button" data-zoom-preset="inner"><span data-i18n="scale.inner">Inner</span><small>AU</small></button>
+          </div>
+          <div class="scale-options">
+            <section class="scale-collapse" data-scale-disclosure>
+              <div class="scale-collapse__header">
+                <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-object-display">
+                  <span data-i18n="scale.objectDisplay">Object size</span>
+                  <span class="scale-collapse__indicator" aria-hidden="true"></span>
+                </button>
+                <button
+                  class="info-tip"
+                  type="button"
+                  aria-label="Explain object size modes" data-i18n-attrs="aria-label:launch.explainObjectSize" data-info-i18n="launch.objectSizeHelp"
+                  aria-describedby="control-info-tooltip"
+                  data-info="Controls how object sizes are drawn. Readable enlarges tiny objects, Hybrid preserves scale cues while keeping them visible, and True uses physical radii—so many objects become extremely small."
+                >i</button>
+              </div>
+              <div id="scale-object-display" class="scale-collapse__content" hidden>
+                <p class="control-help" data-i18n="launch.objectSizePrompt">Choose how physical size is represented on the map.</p>
+                <div class="map-tool-row size-mode-row">
+                  <div class="segmented size-modes" id="size-mode-buttons" aria-label="Object size mode">
+                    <button type="button" data-size-mode="readable" data-i18n="scale.readable">Readable</button>
+                    <button type="button" data-size-mode="hybrid" data-i18n="scale.hybrid">Hybrid</button>
+                    <button type="button" data-size-mode="true" data-i18n="scale.true">True</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section class="scale-collapse" data-scale-disclosure>
+              <div class="scale-collapse__header">
+                <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-object-types">
+                  <span data-i18n="scale.objectTypes">Object types</span>
+                  <span class="scale-collapse__indicator" aria-hidden="true"></span>
+                </button>
+                <button class="info-tip" type="button" aria-label="Explain object type filters" aria-describedby="control-info-tooltip" data-i18n-attrs="aria-label:launch.explainObjectTypes" data-info-i18n="scale.objectTypesHelp">i</button>
+              </div>
+              <div id="scale-object-types" class="scale-collapse__content" hidden>
+                <p class="control-help" data-i18n="scale.objectTypesHelp">Choose which kinds of objects appear on the map and in search.</p>
+                <div class="body-picker-filters map-filter-buttons" id="map-filter-buttons" aria-label="Map object filters" data-i18n-attrs="aria-label:scale.objectTypes"></div>
+              </div>
+            </section>
+            <section class="scale-collapse" data-scale-disclosure>
+              <div class="scale-collapse__header">
+                <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-map-overlays">
+                  <span data-i18n="scale.overlays">Map overlays</span>
+                  <span class="scale-collapse__indicator" aria-hidden="true"></span>
+                </button>
+                <button class="info-tip" type="button" aria-label="Explain map overlays" aria-describedby="control-info-tooltip" data-i18n-attrs="aria-label:launch.explainOverlays" data-info-i18n="launch.overlaysHelp">i</button>
+              </div>
+              <div id="scale-map-overlays" class="scale-collapse__content" hidden>
+                <div class="display-toggles" id="display-toggles" aria-label="Display toggles" data-i18n-attrs="aria-label:scale.displayToggles">
+                  <label><input type="checkbox" data-layer="labels" checked /> <span data-i18n="scale.labels">Labels</span></label>
+                  <label><input type="checkbox" data-layer="orbits" checked /> <span data-i18n="scale.orbits">Orbits</span></label>
+                  <label><input type="checkbox" data-layer="grid" checked /> <span data-i18n="scale.grid">Grid</span></label>
+                  <label><input type="checkbox" data-layer="milkyWay" checked /> <span data-i18n="scale.milkyWay">Milky Way</span></label>
+                  <label><input type="checkbox" data-layer="milkyWayArms" checked /> <span data-i18n="scale.milkyWayArms">MW arms</span></label>
+                  <label><input type="checkbox" data-layer="milkyWayDust" checked /> <span data-i18n="scale.milkyWayDust">MW dust</span></label>
+                  <label><input type="checkbox" data-layer="milkyWayGuides" checked /> <span data-i18n="scale.milkyWayGuides">MW guides</span></label>
+                  <label><input type="checkbox" data-layer="references" checked /> <span data-i18n="scale.edgeHints">Edge hints</span></label>
+                </div>
+              </div>
+            </section>
+            <section class="scale-collapse" data-scale-disclosure>
+              <div class="scale-collapse__header">
+                <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-context-diagnostics">
+                  <span data-i18n="diagnostics.title">Context and diagnostics</span>
+                  <span class="scale-collapse__indicator" aria-hidden="true"></span>
+                </button>
+                <button class="info-tip" type="button" aria-label="Explain context and diagnostics" aria-describedby="control-info-tooltip" data-i18n-attrs="aria-label:launch.explainDiagnostics" data-info-i18n="launch.diagnosticsHelp">i</button>
+              </div>
+              <div id="scale-context-diagnostics" class="scale-collapse__content" hidden>
+                <div class="context-mode-panel">
+                  <p id="context-mode-status"></p>
+                  <dl>
+                    <div><dt data-i18n="diagnostics.gaiaCatalog">Gaia/catalog points</dt><dd data-i18n="diagnostics.gaiaCatalogBody">Real selectable objects and static point tiles.</dd></div>
+                    <div><dt data-i18n="diagnostics.milkyWayContext">Milky Way context</dt><dd data-i18n="diagnostics.milkyWayContextBody">Projected schematic arms, dust, disk, and center labels.</dd></div>
+                    <div><dt data-i18n="diagnostics.extragalacticContext">Extragalactic catalog</dt><dd data-i18n="diagnostics.extragalacticContextBody">Real DESI DR1 galaxy and quasar point tiles.</dd></div>
+                  </dl>
+                  <label class="diagnostics-toggle"><input id="diagnostics-toggle" type="checkbox" /> <span data-i18n="diagnostics.show">Show frame diagnostics</span></label>
+                </div>
+              </div>
+            </section>
+            <section class="scale-collapse science-layer-disclosure" data-scale-disclosure>
+              <div class="scale-collapse__header">
+                <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-science-layers">
+                  <span data-i18n="launch.whatSeeing">What am I seeing?</span>
+                  <span class="scale-collapse__indicator" aria-hidden="true"></span>
+                </button>
+                <button class="info-tip" type="button" aria-label="Explain layer metadata" aria-describedby="control-info-tooltip" data-i18n-attrs="aria-label:launch.explainLayers" data-info-i18n="launch.layersHelp">i</button>
+              </div>
+              <div id="scale-science-layers" class="scale-collapse__content" hidden>
+                <div id="science-layer-disclosure" aria-live="polite"><p data-i18n="launch.layersLoading">Catalog layer metadata loads with the atlas.</p></div>
+                <a href="/methodology" data-analytics-event="methodology" data-i18n="launch.readMethodology">Read methodology</a>
+              </div>
+            </section>
+            <section class="scale-collapse" data-scale-disclosure>
+              <div class="scale-collapse__header">
+                <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-time-controls">
+                  <span data-i18n="time.title">Time</span>
+                  <span class="scale-collapse__indicator" aria-hidden="true"></span>
+                </button>
+                <button class="info-tip" type="button" aria-label="Explain time controls" aria-describedby="control-info-tooltip" data-i18n-attrs="aria-label:launch.explainTime" data-info-i18n="launch.timeHelp">i</button>
+              </div>
+              <div id="scale-time-controls" class="scale-collapse__content" hidden>
+                <section class="scale-time" aria-label="Time controls" data-i18n-attrs="aria-label:time.controls">
+                  <div class="section-heading">
+                    <span data-i18n="time.position">Time position</span>
+                    <button id="time-now" class="text-action" type="button" data-i18n="time.now">Now</button>
+                  </div>
+                  <strong id="time-summary" data-i18n="time.currentUtc">Current UTC</strong>
+                  <div class="time-input-row">
+                    <input id="time-input" type="datetime-local" step="1" aria-label="UTC timestamp" />
+                    <button id="apply-time" class="primary-action" type="button" data-i18n="time.apply">Apply</button>
+                  </div>
+                  <div class="time-slider">
+                    <div class="slider-head">
+                      <span data-i18n="time.stepSize">Step size</span>
+                      <strong id="time-step-label" data-i18n="time.oneMonth">1 month</strong>
+                    </div>
+                    <input id="time-step-slider" type="range" min="0" max="8" step="1" value="2" aria-label="Time step size" />
+                  </div>
+                  <div class="time-step-row" aria-label="Step timestamp by selected amount">
+                    <button id="time-step-back" type="button" data-i18n="time.back">Back</button>
+                    <button id="time-step-forward" type="button" data-i18n="time.forward">Forward</button>
+                  </div>
+                </section>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <nav class="mode-rail" aria-label="Atlas workspaces" data-i18n-attrs="aria-label:workspace.nav">
+          <button type="button" data-tab="catalog" data-i18n="workspace.search">Search</button>
+        </nav>
+
+        <aside class="workspace-panel" id="workspace-panel" aria-label="Atlas workspace" data-i18n-attrs="aria-label:workspace.label" hidden>
+          <div class="workspace-titlebar">
+            <div class="workspace-path" aria-label="Workspace path" data-i18n-attrs="aria-label:workspace.path">
+              <button id="workspace-search-link" class="workspace-search-link" type="button" hidden data-i18n="workspace.search">Search</button>
+              <span id="workspace-label" data-i18n="workspace.title">Workspace</span>
+            </div>
+            <button id="close-panel" class="text-action" type="button" aria-label="Close workspace" data-i18n="workspace.close" data-i18n-attrs="aria-label:workspace.close">Close</button>
+          </div>
+          <div class="tab-panels">
+          <section class="tab-panel object-workspace" id="selected-object-panel" data-tab-panel="object" aria-label="Current object" hidden>
+            <div class="selected-object-header">
+              <div class="selected-summary">
+                <span class="body-orb" id="selected-summary-orb"></span>
+                <div>
+                  <h2 id="selected-summary-name"></h2>
+                  <span id="selected-summary-meta"></span>
+                </div>
+              </div>
+              <div class="object-actions" aria-label="Selected object actions" data-i18n-attrs="aria-label:object.actions">
+                <button id="center-selected" class="text-action" type="button" data-i18n="object.center">Center</button>
+                <button id="zoom-selected" class="text-action" type="button" data-i18n="object.zoom">Zoom</button>
+              </div>
+            </div>
+            <div id="body-info" class="selected-object-details"></div>
+            <section class="selection-compare" aria-label="Compare selected object" data-i18n-attrs="aria-label:compare.label">
+              <div class="selection-compare-head">
+                <div>
+                  <p class="eyebrow" data-i18n="compare.eyebrow">Compare</p>
+                  <h2 id="compare-heading" data-i18n="compare.heading">Compare with another object</h2>
+                </div>
+                <div><button id="share-compare" class="text-action" type="button" aria-label="Copy link to this comparison">Copy comparison link</button><button id="clear-compare" class="text-action" type="button" data-i18n="compare.clear">Clear</button></div>
+              </div>
+              <div id="compare-panel" class="compare-panel"></div>
+              <div class="compare-target-card compare-search-workspace">
+                <section class="workspace-card search-primary" aria-label="Comparison lookup" data-i18n-attrs="aria-label:compare.lookup">
+                  <label class="field-label" for="compare-search" data-i18n="search.query">Catalog query</label>
+                  <div class="search-control catalog-search compare-search">
+                    <input id="compare-search" type="search" autocomplete="off" placeholder="Object name or catalog designation" data-i18n-attrs="placeholder:search.placeholder" />
+                    <button id="compare-focus" class="primary-action" type="button" data-i18n="search.use">Use</button>
+                  </div>
+                </section>
+                <section class="workspace-section scope-section" aria-label="Comparison scope" data-i18n-attrs="aria-label:compare.scope">
+                  <div class="section-heading">
+                    <span data-i18n="search.scope">Scope</span>
+                  </div>
+                  <div class="body-picker-filters" id="compare-filter-buttons" aria-label="Comparison filters" data-i18n-attrs="aria-label:compare.filters"></div>
+                </section>
+                <div class="workspace-section results-section" aria-label="Comparison results" data-i18n-attrs="aria-label:compare.results">
+                  <div class="section-heading">
+                    <span data-i18n="search.matches">Matches</span>
+                  </div>
+                  <div class="body-picker compare-picker" id="compare-picker" role="group" aria-label="Comparison objects" data-i18n-attrs="aria-label:compare.objects"></div>
+                </div>
+              </div>
+            </section>
+          </section>
+
+          <section class="tab-panel search-workspace" id="tab-catalog" data-tab-panel="catalog" aria-label="Catalog search" data-i18n-attrs="aria-label:search.catalog">
+            <div class="workspace-lead">
+              <div>
+                <p class="eyebrow" data-i18n="workspace.search">Search</p>
+                <h2 data-i18n="search.find">Find a celestial object</h2>
+              </div>
+              <span id="catalog-count"></span>
+            </div>
+            <section class="workspace-card search-primary" aria-label="Catalog lookup" data-i18n-attrs="aria-label:search.lookup">
+              <label class="field-label" for="body-search" data-i18n="search.query">Catalog query</label>
+              <div class="search-control catalog-search">
+                <input id="body-search" type="search" autocomplete="off" placeholder="Object name or catalog designation" data-i18n-attrs="placeholder:search.placeholder" />
+                <button id="focus-body" class="primary-action" type="button" data-i18n="search.focus">Focus</button>
+              </div>
+              <div class="quick-focus" id="quick-focus-buttons" aria-label="Featured objects" data-i18n-attrs="aria-label:search.featured" hidden></div>
+            </section>
+            <section class="workspace-section now-panel" aria-labelledby="now-heading"><div class="section-heading"><span id="now-heading" data-i18n="launch.happeningNow">Happening now</span><a href="/feed.xml" data-i18n="launch.atomFeed">Atom feed</a></div><p id="now-status" role="status" data-i18n="launch.eventsLoading">Loading current events…</p><ol id="now-events" class="now-events"></ol></section>
+            <section class="workspace-section explore-section" aria-label="Explore domains" data-i18n-attrs="aria-label:explore.label">
+              <div class="section-heading">
+                <span data-i18n="explore.title">Explore</span>
+              </div>
+              <div class="explore-domain-grid" id="explore-domains" aria-label="Explore domains" data-i18n-attrs="aria-label:explore.label"></div>
+            </section>
+            <section class="workspace-section scope-section" aria-label="Catalog scope" data-i18n-attrs="aria-label:search.scope">
+              <div class="section-heading">
+                <span data-i18n="search.scope">Scope</span>
+              </div>
+              <div class="body-picker-filters" id="body-filter-buttons" aria-label="Object filters" data-i18n-attrs="aria-label:search.filters"></div>
+            </section>
+            <section class="workspace-section results-section" aria-label="Catalog results" data-i18n-attrs="aria-label:search.results">
+              <div class="section-heading">
+                <span data-i18n="search.matches">Matches</span>
+              </div>
+              <div class="body-picker" id="body-picker" role="group" aria-label="Loaded celestial objects" data-i18n-attrs="aria-label:search.loadedObjects"></div>
+            </section>
+            <section class="workspace-section" aria-label="Guided object sets" data-i18n-attrs="aria-label:guided.label" hidden>
+              <div class="section-heading">
+                <span data-i18n="guided.title">Guided sets</span>
+              </div>
+              <div class="tour-grid" id="guided-tours" aria-label="Guided object sets" data-i18n-attrs="aria-label:guided.label"></div>
+            </section>
+          </section>
+          </div>
+        </aside>
+      </section>
+
+      <div class="share-control">
+        <button id="share-menu-button" class="share-trigger" type="button" popovertarget="share-popover" aria-haspopup="dialog" aria-expanded="false">
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="17" height="17"><path d="M8.6 11.1 15.2 7.3M8.6 12.9l6.6 3.8M18 9.2a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm12 6a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span data-i18n="launch.share">Share</span>
+        </button>
+        <section id="share-popover" class="share-popover" popover="auto" role="dialog" aria-labelledby="share-popover-title">
+          <header class="share-popover__header">
+            <div>
+              <p class="eyebrow" data-i18n="launch.shareExport">Share and export</p>
+              <h2 id="share-popover-title" data-i18n="launch.shareView">Share this view</h2>
+              <p data-i18n="launch.shareDescription">Links preserve the current map position, time, layers, and selection.</p>
+            </div>
+            <button id="close-share-popover" class="icon-button" type="button" aria-label="Close share menu" data-i18n-attrs="aria-label:launch.closeShare">×</button>
+          </header>
+          <div class="share-action-grid">
+            <button id="copy-link" type="button" aria-label="Copy link to this atlas view" data-i18n="launch.copyLink" data-i18n-attrs="aria-label:launch.copyLinkLabel">Copy link</button>
+            <button id="native-share" type="button" aria-label="Share this atlas view" data-i18n="launch.shareEllipsis" data-i18n-attrs="aria-label:launch.shareLabel">Share…</button>
+            <button id="copy-embed" type="button" data-i18n="launch.copyEmbed">Copy embed</button>
+          </div>
+          <span id="share-feedback" class="share-feedback" role="status" aria-live="polite"></span>
+          <span id="embed-feedback" class="share-feedback" role="status" aria-live="polite"></span>
+          <div class="share-export">
+            <label for="export-resolution" data-i18n="launch.downloadImage">Download image</label>
+            <div>
+              <select id="export-resolution" aria-label="Export resolution" data-i18n-attrs="aria-label:launch.exportResolution">
+                <option value="current" data-i18n="launch.currentResolution">Current resolution</option>
+                <option value="4k" data-i18n="launch.4kWide">4K wide</option>
+                <option value="8k" data-i18n="launch.8kPoster">8K poster</option>
+              </select>
+              <button id="export-image" class="primary-action" type="button" data-i18n="launch.exportPng">Export PNG</button>
+            </div>
+            <span id="export-status" role="status" aria-live="polite"></span>
+          </div>
+        </section>
+      </div>
+      <div id="control-info-tooltip" class="control-info-tooltip" popover="manual" role="tooltip"></div>
+      <button id="embed-activation" class="embed-activation" type="button" hidden aria-pressed="false">
+        <strong data-i18n="launch.exploreMap">Explore this map</strong><span data-i18n="launch.activateMap">Activate to pan and zoom</span>
+      </button>
+      <aside id="embed-attribution" class="embed-attribution" hidden aria-label="Cosmic Atlas attribution">
+        <a id="embed-canonical-link" href="/" target="_blank" rel="noopener noreferrer">
+          <strong>Cosmic Atlas</strong><span id="embed-view-name">Open full atlas</span>
+        </a>
+      </aside>
+      <div class="perf-hud" id="perf-hud" hidden></div>
+      <div class="error-panel" id="error-panel" hidden></div>
+      <footer class="atlas-footer"><a href="/methodology" data-analytics-event="methodology" data-i18n="launch.methodology">Methodology</a><a class="about-link" href="/about" data-i18n="launch.aboutCredits">About · data credits</a><a class="repo-link" href="https://github.com/Ferdev/skychart" target="_blank" rel="noreferrer" aria-label="Cosmic Atlas source code on GitHub" title="Source code on GitHub"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg></a></footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
