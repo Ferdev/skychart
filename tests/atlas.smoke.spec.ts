@@ -448,6 +448,16 @@ test.describe("Cosmic Atlas browser smoke", () => {
     issues.assertClean();
   });
 
+  test("shared view-state links restore a selected small body", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+
+    await openAtlas(page, "/?v=1&c=0%2C0&z=24&t=now&o=jpl-sbdb-20000001&L=");
+
+    await expect(page.locator("#selected-object-panel")).toBeVisible();
+    await expect(page.locator("#selected-summary-name")).toContainText("Ceres");
+    issues.assertClean();
+  });
+
   test("catalog point tiles can ask the backend for nearest-object hydration", async ({ page }) => {
     const issues = collectBrowserIssues(page);
     let staticTileRequests = 0;

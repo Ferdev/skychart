@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timezone
+from urllib.error import URLError
+from unittest import mock
 
 from backend.scientific_calculation import (
     parse_horizons_state_vector,
+    small_body_ephemeris_payload,
+    small_body_ephemeris_unavailable,
     small_body_horizons_command,
 )
 
@@ -29,6 +34,28 @@ $$EOE
     def test_numbered_asteroid_command_has_disambiguating_semicolon(self) -> None:
         self.assertEqual(small_body_horizons_command("99942"), "99942;")
         self.assertEqual(small_body_horizons_command("2024 PT5"), "DES=2024 PT5;")
+
+    def test_horizons_outage_raises_oserror_so_transport_can_degrade(self) -> None:
+        with mock.patch(
+            "backend.scientific_calculation.urlopen",
+            side_effect=URLError("offline"),
+        ):
+            with self.assertRaises(OSError):
+                small_body_ephemeris_payload("99942", datetime(2029, 4, 13, 21, 46, tzinfo=timezone.utc))
+
+    def test_unavailable_payload_keeps_explicit_missing_position(self) -> None:
+        payload = small_body_ephemeris_unavailable(
+            "99942",
+            datetime(2029, 4, 13, 21, 46, tzinfo=timezone.utc),
+            URLError("offline"),
+        )
+
+        self.assertIsNone(payload["position"])
+        self.assertIsNone(payload["distance_from_earth_km"])
+        self.assertEqual(payload["position_model"], "horizons_unavailable")
+        self.assertEqual(payload["designation"], "99942")
+        self.assertEqual(payload["timestamp_utc"], "2029-04-13T21:46:00Z")
+        self.assertIn("offline", payload["error"])
 
 
 if __name__ == "__main__":
