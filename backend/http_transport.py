@@ -35,6 +35,8 @@ from backend.scientific_calculation import (
     orbits_payload,
     small_body_ephemeris_payload,
     small_body_ephemeris_unavailable,
+    small_body_orbit_payload,
+    small_body_orbit_unavailable,
     trails_payload,
 )
 
@@ -116,6 +118,36 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self.log_internal_error("small-body ephemeris calculation")
                 self.respond({"error": "small-body ephemeris calculation failed", "request_id": self.request_id()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if parsed.path == "/api/small-body-orbit":
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                around = parse_timestamp(query.get("around", [None])[0])
+                designation = query.get("designation", [""])[0].strip()
+                if not re.fullmatch(r"[A-Za-z0-9 ./()+-]{1,80}", designation):
+                    raise QueryInputError("designation is invalid")
+                try:
+                    period_days = float(query.get("period_days", [""])[0])
+                except ValueError as exc:
+                    raise QueryInputError("period_days is invalid") from exc
+                if not 1 <= period_days <= 100_000:
+                    raise QueryInputError("period_days is out of range")
+                key = cache_key_payload(
+                    "small_body_orbit",
+                    around_utc=isoformat_utc(around),
+                    designation=designation,
+                    period_days=round(period_days, 3),
+                )
+                self.respond(cached_payload("api", key, lambda: small_body_orbit_payload(designation, around, period_days)))
+            except (QueryInputError, ValueError) as exc:
+                self.respond({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            except (OSError, RuntimeError) as exc:
+                # Same Horizons degradation contract as /api/small-body-ephemeris.
+                self.respond(small_body_orbit_unavailable(designation, around, period_days, exc))
+            except Exception:
+                self.log_internal_error("small-body orbit calculation")
+                self.respond({"error": "small-body orbit calculation failed", "request_id": self.request_id()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
         if parsed.path == "/api/catalog/search":

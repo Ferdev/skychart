@@ -377,6 +377,122 @@ def small_body_ephemeris_unavailable(designation: str, timestamp: datetime, caus
     }
 
 
+def parse_horizons_state_vector_series(result: str, object_name: str) -> list[tuple[float, list[float], list[float]]]:
+    """Read every record of a generated vector table as (JD, position, velocity)."""
+    try:
+        vector_table = result.split("$$SOE", 1)[1].split("$$EOE", 1)[0]
+    except IndexError as exc:
+        raise RuntimeError(f"Horizons API did not return vector coordinates for {object_name}") from exc
+
+    number = r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)[Ee][+-]?\d+)"
+    record = re.compile(
+        rf"(?P<jd>\d{{7,}}\.\d+)\s*=\s*A\.D\.[^\n]*\n"
+        rf"\s*X\s*=\s*{number}\s+Y\s*=\s*{number}\s+Z\s*=\s*{number}\s*\n"
+        rf"\s*VX\s*=\s*{number}\s+VY\s*=\s*{number}\s+VZ\s*=\s*{number}"
+    )
+    rows = [
+        (
+            float(match.group("jd")),
+            [float(match.group(index)) for index in (2, 3, 4)],
+            [float(match.group(index)) for index in (5, 6, 7)],
+        )
+        for match in record.finditer(vector_table)
+    ]
+    if not rows:
+        raise RuntimeError(f"Horizons API did not return vector coordinates for {object_name}")
+    return rows
+
+
+def small_body_orbit_payload(
+    designation: str,
+    around: datetime,
+    period_days: float,
+    samples: int = 181,
+) -> dict[str, Any]:
+    """Samples one full Horizons orbit so the drawn path matches the rendered position.
+
+    Two-body osculating elements diverge from the real trajectory near close
+    approaches, so the orbit line must come from the same Horizons vectors as
+    the object marker.
+    """
+    horizons_id = small_body_horizons_command(designation)
+    center = horizons_center_for_item({"key": f"small-body:{designation}", "parent_key": "sun"})
+    start = around - timedelta(days=period_days / 2)
+    stop = around + timedelta(days=period_days / 2)
+    step_days = period_days / (samples - 1)
+    if step_days >= 1.5:
+        step_size = f"'{round(step_days)} d'"
+    elif step_days * 24 >= 1.5:
+        step_size = f"'{round(step_days * 24)} h'"
+    else:
+        step_size = f"'{max(1, round(step_days * 24 * 60))} m'"
+
+    disk_cache_key = cache_key_payload(
+        "horizons_orbit",
+        horizons_id=horizons_id,
+        center=center,
+        around_day=isoformat_utc(around)[:10],
+        period_days=round(period_days, 3),
+        coordinate_frame="true_ecliptic_of_date_ut_v1",
+    )
+    cached = read_cache("horizons", disk_cache_key)
+    if cached is None:
+        query = urlencode(
+            {
+                "format": "json",
+                "COMMAND": f"'{horizons_id}'",
+                "EPHEM_TYPE": "VECTORS",
+                "CENTER": f"'{center}'",
+                "REF_PLANE": "FRAME",
+                "REF_SYSTEM": "ICRF",
+                "TIME_TYPE": "UT",
+                "OUT_UNITS": "KM-S",
+                "VEC_TABLE": "2",
+                "START_TIME": f"'{horizons_timestamp(start)}'",
+                "STOP_TIME": f"'{horizons_timestamp(stop)}'",
+                "STEP_SIZE": step_size,
+            }
+        )
+        url = f"https://ssd.jpl.nasa.gov/api/horizons.api?{query}"
+        with urlopen(url, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if payload.get("error"):
+            raise RuntimeError(f"Horizons API error for {designation}: {payload['error']}")
+
+        rows = parse_horizons_state_vector_series(str(payload.get("result", "")), designation)
+        timescale, _ephemeris = skyfield_context()
+        points = []
+        for julian_day, icrf_position, _velocity in rows:
+            timestamp = datetime.fromtimestamp((julian_day - 2_440_587.5) * 86_400, tz=timezone.utc)
+            rotation = ecliptic_frame.rotation_at(timescale.from_datetime(timestamp))
+            x_km, y_km, z_km = (float(value) for value in rotation.dot(icrf_position))
+            points.append({"x_au": x_km / AU_KM, "y_au": y_km / AU_KM, "z_au": z_km / AU_KM})
+        cached = {"points": points}
+        write_cache("horizons", disk_cache_key, cached)
+
+    return {
+        "designation": designation,
+        "around_utc": isoformat_utc(around),
+        "period_days": period_days,
+        "points": cached["points"],
+        "position_model": "jpl_horizons_vectors",
+        "source": "NASA/JPL Horizons",
+    }
+
+
+def small_body_orbit_unavailable(designation: str, around: datetime, period_days: float, cause: Exception) -> dict[str, Any]:
+    """Explicit missing-path payload for Horizons outages; see ephemeris variant."""
+    return {
+        "designation": designation,
+        "around_utc": isoformat_utc(around),
+        "period_days": period_days,
+        "points": None,
+        "position_model": "horizons_unavailable",
+        "error": str(cause),
+        "source": "NASA/JPL Horizons",
+    }
+
+
 def add_relative_position(origin: dict[str, float], relative: dict[str, float]) -> dict[str, float]:
     x_km = origin["x_km"] + relative["x_km"]
     y_km = origin["y_km"] + relative["y_km"]

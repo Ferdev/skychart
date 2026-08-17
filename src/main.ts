@@ -14,7 +14,8 @@ import { CatalogPointDecoder } from "./catalog/catalogPointDecoder";
 import { CatalogPointManifestRepository } from "./catalog/catalogPointManifest";
 import { CatalogPointPlanner, type CatalogPointViewport } from "./catalog/catalogPointPlanner";
 import { CatalogObjectMapper } from "./catalog/catalogObjectMapper";
-import { resolveSmallBodyPosition, smallBodyOrbitPath } from "./catalog/smallBodyPropagation";
+import { resolveSmallBodyPosition } from "./catalog/smallBodyPropagation";
+import { smallBodyOrbitPathForBody } from "./catalog/smallBodyOrbit";
 import { CatalogPointStream } from "./catalog/catalogPointStream";
 import { CatalogPointSelector } from "./catalog/catalogPointSelector";
 import { ObjectInspectionView, normalizeExternalLinks } from "./object/objectInspectionView";
@@ -358,7 +359,7 @@ const atlasOverlay = new AtlasOverlayRenderer({
   currentViewWidthAu,
   auKm,
   formatDistance,
-  smallBodyOrbitPathAu: (body) => body.catalog?.facts ? smallBodyOrbitPath(body.catalog.facts) : null,
+  smallBodyOrbitPathAu: (body) => smallBodyOrbitPathForBody(body, ephemeris?.timestamp_utc ?? new Date().toISOString(), () => requestRender()),
 });
 const milkyWayRenderer = new MilkyWayRenderer({
   context: ctx,
