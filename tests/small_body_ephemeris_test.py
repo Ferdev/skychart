@@ -6,6 +6,8 @@ from urllib.error import URLError
 from unittest import mock
 
 from backend.scientific_calculation import (
+    AU_KM,
+    orbit_points_from_rows,
     parse_horizons_state_vector,
     parse_horizons_state_vector_series,
     small_body_ephemeris_payload,
@@ -105,6 +107,29 @@ $$EOE
         self.assertEqual(payload["position_model"], "horizons_unavailable")
         self.assertEqual(payload["designation"], "99942")
         self.assertIn("offline", payload["error"])
+
+    def test_orbit_points_replace_coarse_rows_with_the_fine_window(self) -> None:
+        class IdentityRotation:
+            def dot(self, vector):
+                return vector
+
+        coarse = [
+            (2462000.0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+            (2462001.0, [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+            (2462002.0, [2.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+            (2462003.0, [3.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+        ]
+        fine = [
+            (2462001.5, [10.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+            (2462002.5, [20.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+        ]
+
+        points = orbit_points_from_rows(coarse, fine, IdentityRotation())
+        xs = [point["x_au"] * AU_KM for point in points]
+
+        self.assertEqual(len(points), 5)
+        for actual, expected in zip(xs, [0.0, 1.0, 10.0, 20.0, 3.0]):
+            self.assertAlmostEqual(actual, expected)
 
 
 if __name__ == "__main__":
