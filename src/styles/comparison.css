@@ -242,38 +242,13 @@
   filter: blur(0.2px);
 }
 
-.size-arrow {
-  width: 2px;
-  height: 68px;
-  position: relative;
-  display: block;
-  margin-bottom: 1px;
-  background: rgba(21, 23, 20, 0.76);
-}
-
-.size-arrow::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -3px;
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(21, 23, 20, 0.76);
-  transform: translateX(-50%);
-}
-
-.size-arrow::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -15px;
-  width: 0;
-  height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-top: 10px solid rgba(21, 23, 20, 0.76);
-  transform: translateX(-50%);
+.size-visual--subpixel {
+  width: 8px;
+  height: 8px;
+  background: var(--body-color, var(--accent));
+  box-shadow:
+    0 0 0 2.5px rgba(21, 23, 20, 0.1),
+    0 0 9px rgba(21, 23, 20, 0.22);
 }
 
 .size-disk-wrap figcaption {
