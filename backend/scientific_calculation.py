@@ -413,19 +413,15 @@ def small_body_orbit_payload(
 
     Two-body osculating elements diverge from the real trajectory near close
     approaches, so the orbit line must come from the same Horizons vectors as
-    the object marker.
+    the object marker. Every row is rotated into the atlas frame at `around`
+    (the frame the marker uses), and the coarse period sweep is refined with an
+    hourly window around `around` so flyby bends are not cut by the polyline.
     """
     horizons_id = small_body_horizons_command(designation)
     center = horizons_center_for_item({"key": f"small-body:{designation}", "parent_key": "sun"})
     start = around - timedelta(days=period_days / 2)
     stop = around + timedelta(days=period_days / 2)
-    step_days = period_days / (samples - 1)
-    if step_days >= 1.5:
-        step_size = f"'{round(step_days)} d'"
-    elif step_days * 24 >= 1.5:
-        step_size = f"'{round(step_days * 24)} h'"
-    else:
-        step_size = f"'{max(1, round(step_days * 24 * 60))} m'"
+    fine_half_days = min(2.0, period_days / 8)
 
     disk_cache_key = cache_key_payload(
         "horizons_orbit",
@@ -434,40 +430,22 @@ def small_body_orbit_payload(
         around_day=isoformat_utc(around)[:10],
         period_days=round(period_days, 3),
         coordinate_frame="true_ecliptic_of_date_ut_v1",
+        series_version=2,
     )
     cached = read_cache("horizons", disk_cache_key)
     if cached is None:
-        query = urlencode(
-            {
-                "format": "json",
-                "COMMAND": f"'{horizons_id}'",
-                "EPHEM_TYPE": "VECTORS",
-                "CENTER": f"'{center}'",
-                "REF_PLANE": "FRAME",
-                "REF_SYSTEM": "ICRF",
-                "TIME_TYPE": "UT",
-                "OUT_UNITS": "KM-S",
-                "VEC_TABLE": "2",
-                "START_TIME": f"'{horizons_timestamp(start)}'",
-                "STOP_TIME": f"'{horizons_timestamp(stop)}'",
-                "STEP_SIZE": step_size,
-            }
+        coarse = horizons_orbit_rows(horizons_id, center, designation, start, stop, orbit_step_size(period_days / (samples - 1)))
+        fine = horizons_orbit_rows(
+            horizons_id,
+            center,
+            designation,
+            around - timedelta(days=fine_half_days),
+            around + timedelta(days=fine_half_days),
+            "'1 h'",
         )
-        url = f"https://ssd.jpl.nasa.gov/api/horizons.api?{query}"
-        with urlopen(url, timeout=30) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        if payload.get("error"):
-            raise RuntimeError(f"Horizons API error for {designation}: {payload['error']}")
-
-        rows = parse_horizons_state_vector_series(str(payload.get("result", "")), designation)
         timescale, _ephemeris = skyfield_context()
-        points = []
-        for julian_day, icrf_position, _velocity in rows:
-            timestamp = datetime.fromtimestamp((julian_day - 2_440_587.5) * 86_400, tz=timezone.utc)
-            rotation = ecliptic_frame.rotation_at(timescale.from_datetime(timestamp))
-            x_km, y_km, z_km = (float(value) for value in rotation.dot(icrf_position))
-            points.append({"x_au": x_km / AU_KM, "y_au": y_km / AU_KM, "z_au": z_km / AU_KM})
-        cached = {"points": points}
+        rotation = ecliptic_frame.rotation_at(timescale.from_datetime(around))
+        cached = {"points": orbit_points_from_rows(coarse, fine, rotation)}
         write_cache("horizons", disk_cache_key, cached)
 
     return {
@@ -478,6 +456,63 @@ def small_body_orbit_payload(
         "position_model": "jpl_horizons_vectors",
         "source": "NASA/JPL Horizons",
     }
+
+
+def orbit_step_size(step_days: float) -> str:
+    if step_days >= 1.5:
+        return f"'{round(step_days)} d'"
+    if step_days * 24 >= 1.5:
+        return f"'{round(step_days * 24)} h'"
+    return f"'{max(1, round(step_days * 24 * 60))} m'"
+
+
+def horizons_orbit_rows(
+    horizons_id: str,
+    center: str,
+    designation: str,
+    start: datetime,
+    stop: datetime,
+    step_size: str,
+) -> list[tuple[float, list[float], list[float]]]:
+    query = urlencode(
+        {
+            "format": "json",
+            "COMMAND": f"'{horizons_id}'",
+            "EPHEM_TYPE": "VECTORS",
+            "CENTER": f"'{center}'",
+            "REF_PLANE": "FRAME",
+            "REF_SYSTEM": "ICRF",
+            "TIME_TYPE": "UT",
+            "OUT_UNITS": "KM-S",
+            "VEC_TABLE": "2",
+            "START_TIME": f"'{horizons_timestamp(start)}'",
+            "STOP_TIME": f"'{horizons_timestamp(stop)}'",
+            "STEP_SIZE": step_size,
+        }
+    )
+    url = f"https://ssd.jpl.nasa.gov/api/horizons.api?{query}"
+    with urlopen(url, timeout=30) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if payload.get("error"):
+        raise RuntimeError(f"Horizons API error for {designation}: {payload['error']}")
+    return parse_horizons_state_vector_series(str(payload.get("result", "")), designation)
+
+
+def orbit_points_from_rows(
+    coarse: list[tuple[float, list[float], list[float]]],
+    fine: list[tuple[float, list[float], list[float]]],
+    rotation: Any,
+) -> list[dict[str, float]]:
+    """Merges the fine window into the coarse sweep and rotates into the atlas frame."""
+    fine_start = fine[0][0]
+    fine_end = fine[-1][0]
+    merged = [row for row in coarse if row[0] < fine_start or row[0] > fine_end] + fine
+    merged.sort(key=lambda row: row[0])
+    points = []
+    for _julian_day, icrf_position, _velocity in merged:
+        x_km, y_km, z_km = (float(value) for value in rotation.dot(icrf_position))
+        points.append({"x_au": x_km / AU_KM, "y_au": y_km / AU_KM, "z_au": z_km / AU_KM})
+    return points
 
 
 def small_body_orbit_unavailable(designation: str, around: datetime, period_days: float, cause: Exception) -> dict[str, Any]:
