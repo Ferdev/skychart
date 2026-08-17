@@ -107,7 +107,7 @@ export class ObjectComparisonView {
 
   private renderSizeDisk(body: Body, visual: SizeVisual) {
     const diskMarkup = visual.isSubpixel
-      ? `<span class="size-arrow" aria-hidden="true"></span>`
+      ? `<span class="size-visual size-visual--subpixel" aria-hidden="true"></span>`
       : `<span class="size-visual size-visual--${escapeHtml(visual.visualType)}" aria-hidden="true"></span>`;
     return `
       <figure class="size-disk-wrap ${visual.isSubpixel ? "is-subpixel" : ""}" data-object-type="${escapeHtml(visual.visualType)}" style="--disk-size: ${visual.diameterPx.toFixed(2)}px; --body-color: ${escapeHtml(body.color)}">

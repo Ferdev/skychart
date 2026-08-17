@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { propagateSmallBody, resolveSmallBodyPosition, smallBodyPositionAt } from "../src/catalog/smallBodyPropagation.ts";
+import { propagateSmallBody, resolveSmallBodyPosition, smallBodyOrbitPath, smallBodyPositionAt } from "../src/catalog/smallBodyPropagation.ts";
 import type { Body } from "../src/atlas/contracts.ts";
 
 const AU_KM = 149_597_870.7;
@@ -109,5 +109,23 @@ assert.equal(resolved.catalog?.position_model, "jpl_horizons_vectors");
 
 assert.equal(smallBodyPositionAt({}, "2029-04-13T21:46:00.000Z"), null);
 assert.equal(smallBodyPositionAt(facts, "not-a-date"), null);
+
+const orbitPath = smallBodyOrbitPath(facts);
+assert.ok(orbitPath);
+assert.equal(orbitPath.length, 181);
+const pathClosureError = Math.hypot(
+  orbitPath[0].xAu - orbitPath[orbitPath.length - 1].xAu,
+  orbitPath[0].yAu - orbitPath[orbitPath.length - 1].yAu,
+  orbitPath[0].zAu - orbitPath[orbitPath.length - 1].zAu,
+);
+assert.ok(pathClosureError < 1e-12, `orbit path not closed: ${pathClosureError}`);
+const perihelionAu = facts.semi_major_axis_au * (1 - facts.eccentricity);
+const aphelionAu = facts.semi_major_axis_au * (1 + facts.eccentricity);
+for (const point of orbitPath) {
+  const distanceAu = Math.hypot(point.xAu, point.yAu, point.zAu);
+  assert.ok(distanceAu >= perihelionAu - 1e-9, `below perihelion: ${distanceAu}`);
+  assert.ok(distanceAu <= aphelionAu + 1e-9, `above aphelion: ${distanceAu}`);
+}
+assert.equal(smallBodyOrbitPath({}), null);
 
 console.log("small-body propagation tests passed");

@@ -32,7 +32,45 @@ export function smallBodyPositionAt(
 ): SmallBodyPosition | null {
   const targetMilliseconds = Date.parse(timestamp);
   if (!Number.isFinite(targetMilliseconds)) return null;
+  const elements = smallBodyOrbitalElements(facts);
+  if (!elements) return null;
 
+  const targetJulianDay = targetMilliseconds / MILLISECONDS_PER_DAY + JULIAN_DAY_UNIX_EPOCH;
+  const meanAnomaly = normalizeRadians(degreesToRadians(
+    elements.meanAnomalyDegrees + elements.meanMotionDegreesPerDay * (targetJulianDay - elements.epochJulianDay),
+  ));
+  return orbitalPlanePosition(elements, solveKepler(meanAnomaly, elements.eccentricity));
+}
+
+/**
+ * Samples the full two-body orbit in heliocentric ecliptic coordinates so the
+ * atlas can draw the path of a selected small body.
+ */
+export function smallBodyOrbitPath(
+  facts: Record<string, unknown>,
+  samples = 180,
+): SmallBodyPosition[] | null {
+  const elements = smallBodyOrbitalElements(facts);
+  if (!elements) return null;
+  const points: SmallBodyPosition[] = [];
+  for (let index = 0; index <= samples; index += 1) {
+    points.push(orbitalPlanePosition(elements, (index / samples) * Math.PI * 2));
+  }
+  return points;
+}
+
+type SmallBodyOrbitalElements = {
+  eccentricity: number;
+  semiMajorAxisAu: number;
+  epochJulianDay: number;
+  meanAnomalyDegrees: number;
+  meanMotionDegreesPerDay: number;
+  inclinationDegrees: number;
+  ascendingNodeDegrees: number;
+  argumentOfPerihelionDegrees: number;
+};
+
+function smallBodyOrbitalElements(facts: Record<string, unknown>): SmallBodyOrbitalElements | null {
   const eccentricity = finiteFact(facts.eccentricity);
   const semiMajorAxisAu = finiteFact(facts.semi_major_axis_au);
   const epochJulianDay = finiteFact(facts.epoch_jd_tdb);
@@ -50,19 +88,27 @@ export function smallBodyPositionAt(
     || eccentricity < 0 || eccentricity >= 1 || semiMajorAxisAu <= 0
   ) return null;
 
-  const targetJulianDay = targetMilliseconds / MILLISECONDS_PER_DAY + JULIAN_DAY_UNIX_EPOCH;
-  const meanAnomaly = normalizeRadians(degreesToRadians(
-    meanAnomalyDegrees + meanMotionDegreesPerDay * (targetJulianDay - epochJulianDay),
-  ));
-  const eccentricAnomaly = solveKepler(meanAnomaly, eccentricity);
-  const orbitalX = semiMajorAxisAu * (Math.cos(eccentricAnomaly) - eccentricity);
-  const orbitalY = semiMajorAxisAu
-    * Math.sqrt(Math.max(0, 1 - eccentricity * eccentricity))
+  return {
+    eccentricity,
+    semiMajorAxisAu,
+    epochJulianDay,
+    meanAnomalyDegrees,
+    meanMotionDegreesPerDay,
+    inclinationDegrees,
+    ascendingNodeDegrees,
+    argumentOfPerihelionDegrees,
+  };
+}
+
+function orbitalPlanePosition(elements: SmallBodyOrbitalElements, eccentricAnomaly: number): SmallBodyPosition {
+  const orbitalX = elements.semiMajorAxisAu * (Math.cos(eccentricAnomaly) - elements.eccentricity);
+  const orbitalY = elements.semiMajorAxisAu
+    * Math.sqrt(Math.max(0, 1 - elements.eccentricity * elements.eccentricity))
     * Math.sin(eccentricAnomaly);
 
-  const ascendingNode = degreesToRadians(ascendingNodeDegrees);
-  const perihelion = degreesToRadians(argumentOfPerihelionDegrees);
-  const inclination = degreesToRadians(inclinationDegrees);
+  const ascendingNode = degreesToRadians(elements.ascendingNodeDegrees);
+  const perihelion = degreesToRadians(elements.argumentOfPerihelionDegrees);
+  const inclination = degreesToRadians(elements.inclinationDegrees);
   const cosNode = Math.cos(ascendingNode);
   const sinNode = Math.sin(ascendingNode);
   const cosPerihelion = Math.cos(perihelion);

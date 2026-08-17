@@ -1,4 +1,5 @@
 import type { Body, Camera, Ephemeris } from "../atlas/contracts";
+import type { SmallBodyPosition } from "../catalog/smallBodyPropagation";
 import { clamp, degToRad, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectsOverlap, rectUnion, type EdgeSide, type Rect, type ScreenPoint } from "../geometry";
 
 type EdgeBody = { body: Body; screen: ScreenPoint };
@@ -30,6 +31,7 @@ type AtlasOverlayRendererOptions = {
   currentViewWidthAu: () => number;
   auKm: () => number;
   formatDistance: (kilometers: number) => string;
+  smallBodyOrbitPathAu: (body: Body) => SmallBodyPosition[] | null;
 };
 
 const POINT_ALPHA = 0.82;
@@ -80,13 +82,14 @@ export class AtlasOverlayRenderer {
     ctx.save();
     for (const body of bodies) {
       const screens = this.orbitGuideScreens(body);
-      if (!screens || !screens.some((point) => point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom)) continue;
-      ctx.strokeStyle = body.key === frame.selectedKey ? "rgba(248, 218, 136, 0.72)" : "rgba(136, 189, 166, 0.36)";
-      ctx.lineWidth = body.key === frame.selectedKey ? 1.8 : 1.15;
-      ctx.beginPath();
-      screens.forEach((screen, index) => index === 0 ? ctx.moveTo(screen.x, screen.y) : ctx.lineTo(screen.x, screen.y));
-      ctx.closePath();
-      ctx.stroke();
+      if (!screens || !screens.some((point) => pointInRect(point, rect))) continue;
+      this.strokeOrbitPath(screens, body.key === frame.selectedKey);
+    }
+    const selected = frame.selected;
+    if (selected && !bodies.some((body) => body.key === selected.key)) {
+      const path = this.options.smallBodyOrbitPathAu(selected);
+      const screens = path?.map((point) => this.options.worldToScreen(point.xAu, point.yAu));
+      if (screens && screens.some((point) => pointInRect(point, rect))) this.strokeOrbitPath(screens, true);
     }
     ctx.restore();
   }
@@ -202,6 +205,16 @@ export class AtlasOverlayRenderer {
     ctx.stroke();
     ctx.font = "12px Inter, system-ui, sans-serif";
     ctx.fillText(this.options.formatDistance((lengthPx / camera.pxPerAu) * this.options.auKm()), x, y - 10);
+  }
+
+  private strokeOrbitPath(screens: ScreenPoint[], highlighted: boolean) {
+    const ctx = this.options.context;
+    ctx.strokeStyle = highlighted ? "rgba(248, 218, 136, 0.72)" : "rgba(136, 189, 166, 0.36)";
+    ctx.lineWidth = highlighted ? 1.8 : 1.15;
+    ctx.beginPath();
+    screens.forEach((screen, index) => index === 0 ? ctx.moveTo(screen.x, screen.y) : ctx.lineTo(screen.x, screen.y));
+    ctx.closePath();
+    ctx.stroke();
   }
 
   private orbitGuideScreens(body: Body) {
