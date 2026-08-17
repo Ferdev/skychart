@@ -9,6 +9,7 @@ defmodule StarsmapApiWeb.PythonProxyController do
 
   def ephemeris(conn, _params), do: proxy(conn, "/api/ephemeris")
   def small_body_ephemeris(conn, _params), do: proxy(conn, "/api/small-body-ephemeris")
+  def small_body_orbit(conn, _params), do: proxy(conn, "/api/small-body-orbit")
   def orbits(conn, _params), do: proxy(conn, "/api/orbits")
   def trails(conn, _params), do: proxy(conn, "/api/trails")
   def observe(conn, _params), do: proxy(conn, "/api/observe")

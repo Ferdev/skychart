@@ -213,7 +213,7 @@ export async function resolveSmallBodyPosition(
   }
 }
 
-function smallBodyDesignation(body: Body): string | null {
+export function smallBodyDesignation(body: Body): string | null {
   const value = body.catalog?.external_ids?.primary_designation;
   if (typeof value === "string" && value.trim()) return value.trim();
   if (typeof value === "number" && Number.isFinite(value)) return String(value);

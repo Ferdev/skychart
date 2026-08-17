@@ -57,7 +57,7 @@ jobs:
         run: npm ci
 
       - name: Build frontend
-        run: npm run validate:tours && npm run build && npm run test:view-state && npm run test:helpers && npm run test:catalog-point-decoder && npm run test:catalog-point-manifest
+        run: npm run validate:tours && npm run build && npm run test:view-state && npm run test:helpers && npm run test:catalog-point-decoder && npm run test:catalog-point-manifest && npm run test:small-body-propagation && npm run test:small-body-orbit
 
       - name: Build frontend for Phoenix
         run: npm run build:phoenix
