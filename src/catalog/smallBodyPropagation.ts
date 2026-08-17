@@ -9,6 +9,17 @@ export type SmallBodyPosition = {
   zAu: number;
 };
 
+type SmallBodyEphemerisPayload = {
+  position?: Body["position"];
+  distance_from_earth_km?: number;
+  position_model?: string;
+};
+
+type FetchSmallBodyEphemeris = (input: string) => Promise<{
+  ok: boolean;
+  json(): Promise<unknown>;
+}>;
+
 /**
  * Propagates a heliocentric small body from its JPL osculating elements.
  *
@@ -91,7 +102,11 @@ export function propagateSmallBody(
 
   return {
     ...body,
-    catalog: body.catalog ? { ...body.catalog, dynamic_position: true } : body.catalog,
+    catalog: body.catalog ? {
+      ...body.catalog,
+      dynamic_position: true,
+      position_model: "jpl_sbdb_two_body_osculating_elements",
+    } : body.catalog,
     position: {
       x_au: propagated.xAu,
       y_au: propagated.yAu,
@@ -109,6 +124,66 @@ export function propagateSmallBody(
         ) * auKm
       : body.distance_from_earth_km,
   };
+}
+
+/** Resolves a selected small body through JPL Horizons, with element propagation as fallback. */
+export async function resolveSmallBodyPosition(
+  body: Body,
+  timestamp: string,
+  auKm: number,
+  earth?: Body,
+  fetchEphemeris: FetchSmallBodyEphemeris = fetch,
+): Promise<Body> {
+  const fallback = propagateSmallBody(body, timestamp, auKm, earth);
+  const designation = smallBodyDesignation(body);
+  if (!designation || body.catalog_group !== "jpl_small_bodies" || body.parent_key !== "sun") {
+    return fallback;
+  }
+
+  const params = new URLSearchParams({ designation, timestamp });
+  try {
+    const response = await fetchEphemeris(`/api/small-body-ephemeris?${params.toString()}`);
+    if (!response.ok) return fallback;
+    const payload = await response.json() as SmallBodyEphemerisPayload;
+    const position = payload.position;
+    const distanceFromEarthKm = payload.distance_from_earth_km;
+    if (!isPosition(position) || typeof distanceFromEarthKm !== "number" || !Number.isFinite(distanceFromEarthKm)) {
+      return fallback;
+    }
+
+    return {
+      ...body,
+      catalog: body.catalog ? {
+        ...body.catalog,
+        dynamic_position: true,
+        position_model: payload.position_model || "jpl_horizons_vectors",
+      } : body.catalog,
+      position,
+      distance_from_earth_km: distanceFromEarthKm,
+    };
+  } catch (error) {
+    console.warn(`JPL Horizons position unavailable for ${body.name}; using orbital elements.`, error);
+    return fallback;
+  }
+}
+
+function smallBodyDesignation(body: Body): string | null {
+  const value = body.catalog?.external_ids?.primary_designation;
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function isPosition(position: Body["position"] | undefined): position is Body["position"] {
+  return Boolean(position) && [
+    position?.x_au,
+    position?.y_au,
+    position?.z_au,
+    position?.x_km,
+    position?.y_km,
+    position?.z_km,
+    position?.heliocentric_distance_km,
+  ].every((value) => Number.isFinite(value));
 }
 
 function solveKepler(meanAnomaly: number, eccentricity: number): number {

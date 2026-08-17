@@ -41,6 +41,13 @@ export function formatNumber(value: number) {
   return Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }).format(value);
 }
 
+export function formatLightYears(value: number) {
+  if (value >= 1_000_000_000) return `${formatNumber(value / 1_000_000_000)} Gly`;
+  if (value >= 1_000_000) return `${formatNumber(value / 1_000_000)} Mly`;
+  if (value >= 1_000) return `${formatNumber(value / 1_000)} kly`;
+  return `${formatNumber(value)} ly`;
+}
+
 export function formatCount(value: number) {
   return Intl.NumberFormat(undefined, { maximumFractionDigits: value >= 1_000_000 ? 2 : 1, notation: value >= 100_000 ? "compact" : "standard" }).format(value);
 }

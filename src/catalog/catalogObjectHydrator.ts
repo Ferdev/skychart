@@ -1,5 +1,6 @@
 import type { Body, CatalogObjectPayload, Ephemeris, ObjectDetailHydrationState } from "../atlas/contracts";
 import type { CatalogObjectMapper } from "./catalogObjectMapper";
+import { resolveSmallBodyPosition } from "./smallBodyPropagation";
 
 type CatalogObjectHydratorOptions = {
   mapper: CatalogObjectMapper;
@@ -94,7 +95,16 @@ export class CatalogObjectHydrator {
       if (!response.ok) return null;
       const payload = (await response.json()) as { object?: CatalogObjectPayload };
       if (!payload.object) return null;
-      const body = this.options.mapper.map(payload.object);
+      let body = this.options.mapper.map(payload.object);
+      const ephemeris = this.options.ephemeris();
+      if (ephemeris) {
+        body = await resolveSmallBodyPosition(
+          body,
+          ephemeris.timestamp_utc,
+          ephemeris.au_km,
+          ephemeris.bodies.find((candidate) => candidate.key === "earth"),
+        );
+      }
       if (body.catalog) body.catalog.preview = false;
       return body;
     } catch {
