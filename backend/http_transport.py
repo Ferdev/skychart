@@ -34,6 +34,7 @@ from backend.scientific_calculation import (
     observe_payload,
     orbits_payload,
     small_body_ephemeris_payload,
+    small_body_ephemeris_unavailable,
     trails_payload,
 )
 
@@ -106,6 +107,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(cached_payload("api", key, lambda: small_body_ephemeris_payload(designation, timestamp)))
             except (QueryInputError, ValueError) as exc:
                 self.respond({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            except (OSError, RuntimeError) as exc:
+                # Horizons is an upstream dependency. The atlas falls back to
+                # two-body propagation when it is unreachable, so report explicit
+                # unavailability instead of a transport error (a failed response
+                # would surface as a browser console error).
+                self.respond(small_body_ephemeris_unavailable(designation, timestamp, exc))
             except Exception:
                 self.log_internal_error("small-body ephemeris calculation")
                 self.respond({"error": "small-body ephemeris calculation failed", "request_id": self.request_id()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)

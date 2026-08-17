@@ -66,7 +66,10 @@ export class CatalogObjectHydrator {
 
     const catalogFirstKeys = detailKeys.filter((key) => {
       const existing = this.options.body(key);
-      return key === this.options.serverBootKey || Boolean(existing?.catalog?.source_type && existing.catalog.source_type !== "test_catalog");
+      // Keys with no local body (cold URL restore) must try the catalog
+      // semantic index first: the Python ephemeris only knows its static
+      // bodies and rejects catalog-only keys such as jpl-sbdb-*.
+      return key === this.options.serverBootKey || !existing || Boolean(existing?.catalog?.source_type && existing.catalog.source_type !== "test_catalog");
     });
     const catalogResults = await Promise.all(catalogFirstKeys.map((key) => this.loadCatalogObject(key)));
     const catalogBodies = catalogResults.filter((body): body is Body => body !== null);
