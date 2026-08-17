@@ -460,8 +460,7 @@
     transition: opacity 140ms ease;
   }
 
-  .map-hud.scale-expanded ~ .atlas-footer,
-  .map-hud.workspace-open ~ .atlas-footer {
+  .map-hud.scale-expanded ~ .atlas-footer {
     opacity: 0;
     visibility: hidden;
     pointer-events: none;

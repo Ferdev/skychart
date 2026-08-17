@@ -360,6 +360,23 @@ def small_body_ephemeris_payload(designation: str, timestamp: datetime) -> dict[
     }
 
 
+def small_body_ephemeris_unavailable(designation: str, timestamp: datetime, cause: Exception) -> dict[str, Any]:
+    """Explicit missing-position payload for Horizons outages.
+
+    The atlas falls back to two-body propagation when position is null, so an
+    upstream failure keeps provenance semantics instead of becoming a 500.
+    """
+    return {
+        "designation": designation,
+        "timestamp_utc": isoformat_utc(timestamp),
+        "position": None,
+        "distance_from_earth_km": None,
+        "position_model": "horizons_unavailable",
+        "error": str(cause),
+        "source": "NASA/JPL Horizons",
+    }
+
+
 def add_relative_position(origin: dict[str, float], relative: dict[str, float]) -> dict[str, float]:
     x_km = origin["x_km"] + relative["x_km"]
     y_km = origin["y_km"] + relative["y_km"]

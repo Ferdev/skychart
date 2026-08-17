@@ -63,12 +63,6 @@
   background: rgba(241, 197, 104, 0.1);
 }
 
-.map-hud.workspace-open ~ .atlas-footer {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
 .scale-options .map-filter-buttons button:hover,
 .scale-options .map-filter-buttons button.active {
   border-color: rgba(239, 196, 104, 0.52);
