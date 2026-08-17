@@ -33,6 +33,7 @@ from backend.scientific_calculation import (
     isoformat_utc,
     observe_payload,
     orbits_payload,
+    small_body_ephemeris_payload,
     trails_payload,
 )
 
@@ -88,6 +89,26 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self.log_internal_error("ephemeris calculation")
                 self.respond({"error": "ephemeris calculation failed", "request_id": self.request_id()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if parsed.path == "/api/small-body-ephemeris":
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                timestamp = parse_timestamp(query.get("timestamp", [None])[0])
+                designation = query.get("designation", [""])[0].strip()
+                if not re.fullmatch(r"[A-Za-z0-9 ./()+-]{1,80}", designation):
+                    raise QueryInputError("designation is invalid")
+                key = cache_key_payload(
+                    "small_body_ephemeris",
+                    timestamp_utc=isoformat_utc(timestamp),
+                    designation=designation,
+                )
+                self.respond(cached_payload("api", key, lambda: small_body_ephemeris_payload(designation, timestamp)))
+            except (QueryInputError, ValueError) as exc:
+                self.respond({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            except Exception:
+                self.log_internal_error("small-body ephemeris calculation")
+                self.respond({"error": "small-body ephemeris calculation failed", "request_id": self.request_id()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
         if parsed.path == "/api/catalog/search":

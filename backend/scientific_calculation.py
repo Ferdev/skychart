@@ -237,7 +237,11 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
 
     timestamp_key = timestamp.astimezone(timezone.utc).replace(microsecond=0).isoformat()
     center = horizons_center_for_item(item)
-    cache_key = (f"{horizons_id}@{center}", timestamp_key)
+    # The atlas renders in Skyfield's true ecliptic/equinox of date. Horizons'
+    # ECLIPTIC output is fixed to J2000, so request ICRF vectors and rotate them
+    # into the atlas frame below.
+    coordinate_frame = "true_ecliptic_of_date_ut_v1"
+    cache_key = (f"{horizons_id}@{center}:{coordinate_frame}", timestamp_key)
     cached = _horizons_vectors.get(cache_key)
     if cached is not None:
         return cached
@@ -247,6 +251,7 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
         horizons_id=str(horizons_id),
         center=center,
         timestamp_utc=timestamp_key,
+        coordinate_frame=coordinate_frame,
     )
     disk_cached = read_cache("horizons", disk_cache_key)
     if disk_cached is not None:
@@ -260,8 +265,9 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
             "COMMAND": f"'{horizons_id}'",
             "EPHEM_TYPE": "VECTORS",
             "CENTER": f"'{center}'",
-            "REF_PLANE": "ECLIPTIC",
+            "REF_PLANE": "FRAME",
             "REF_SYSTEM": "ICRF",
+            "TIME_TYPE": "UT",
             "OUT_UNITS": "KM-S",
             "VEC_TABLE": "2",
             "START_TIME": f"'{horizons_timestamp(timestamp)}'",
@@ -277,18 +283,12 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
         raise RuntimeError(f"Horizons API error for {item['name']}: {payload['error']}")
 
     result = str(payload.get("result", ""))
-    x_match = re.search(r"X\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
-    y_match = re.search(r"Y\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
-    z_match = re.search(r"Z\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
-    vx_match = re.search(r"VX\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
-    vy_match = re.search(r"VY\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
-    vz_match = re.search(r"VZ\s*=\s*([+-]?\d+\.\d+E[+-]\d+)", result)
-    if not x_match or not y_match or not z_match or not vx_match or not vy_match or not vz_match:
-        raise RuntimeError(f"Horizons API did not return vector coordinates for {item['name']}")
-
-    x_km = float(x_match.group(1))
-    y_km = float(y_match.group(1))
-    z_km = float(z_match.group(1))
+    icrf_position, icrf_velocity = parse_horizons_state_vector(result, item["name"])
+    timescale, _ephemeris = skyfield_context()
+    time = timescale.from_datetime(timestamp)
+    rotation = ecliptic_frame.rotation_at(time)
+    x_km, y_km, z_km = (float(value) for value in rotation.dot(icrf_position))
+    vx_km_s, vy_km_s, vz_km_s = (float(value) for value in rotation.dot(icrf_velocity))
     position = {
         "x_au": x_km / AU_KM,
         "y_au": y_km / AU_KM,
@@ -296,14 +296,68 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
         "x_km": x_km,
         "y_km": y_km,
         "z_km": z_km,
-        "vx_km_s": float(vx_match.group(1)),
-        "vy_km_s": float(vy_match.group(1)),
-        "vz_km_s": float(vz_match.group(1)),
+        "vx_km_s": vx_km_s,
+        "vy_km_s": vy_km_s,
+        "vz_km_s": vz_km_s,
         "heliocentric_distance_km": math.sqrt(x_km * x_km + y_km * y_km + z_km * z_km),
     }
     _horizons_vectors[cache_key] = position
     write_cache("horizons", disk_cache_key, position)
     return position
+
+
+def parse_horizons_state_vector(result: str, object_name: str) -> tuple[list[float], list[float]]:
+    """Read only the generated vector table, never osculating data in its header."""
+    try:
+        vector_table = result.split("$$SOE", 1)[1].split("$$EOE", 1)[0]
+    except IndexError as exc:
+        raise RuntimeError(f"Horizons API did not return vector coordinates for {object_name}") from exc
+
+    number = r"([+-]?(?:\d+(?:\.\d*)?|\.\d+)[Ee][+-]?\d+)"
+
+    def component(label: str) -> float:
+        match = re.search(rf"(?:^|\s){label}\s*=\s*{number}", vector_table)
+        if match is None:
+            raise RuntimeError(f"Horizons API did not return vector coordinates for {object_name}")
+        return float(match.group(1))
+
+    return (
+        [component("X"), component("Y"), component("Z")],
+        [component("VX"), component("VY"), component("VZ")],
+    )
+
+
+def small_body_horizons_command(designation: str) -> str:
+    cleaned = designation.strip()
+    return f"{cleaned};" if cleaned.isdigit() else f"DES={cleaned};"
+
+
+def small_body_ephemeris_payload(designation: str, timestamp: datetime) -> dict[str, Any]:
+    position = horizons_vector_payload(
+        {
+            "key": f"small-body:{designation}",
+            "name": designation,
+            "horizons_id": small_body_horizons_command(designation),
+            "parent_key": "sun",
+        },
+        timestamp,
+    )
+    timescale, ephemeris = skyfield_context()
+    time = timescale.from_datetime(timestamp)
+    earth_position = vector_payload((ephemeris["earth"] - ephemeris["sun"]).at(time))
+    distance_from_earth_km = math.sqrt(
+        (position["x_km"] - earth_position["x_km"]) ** 2
+        + (position["y_km"] - earth_position["y_km"]) ** 2
+        + (position["z_km"] - earth_position["z_km"]) ** 2
+    )
+    return {
+        "designation": designation,
+        "timestamp_utc": isoformat_utc(timestamp),
+        "position": position,
+        "distance_from_earth_km": distance_from_earth_km,
+        "position_model": "jpl_horizons_vectors",
+        "source": "NASA/JPL Horizons",
+    }
 
 
 def add_relative_position(origin: dict[str, float], relative: dict[str, float]) -> dict[str, float]:
