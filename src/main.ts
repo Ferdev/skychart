@@ -357,6 +357,7 @@ const atlasOverlay = new AtlasOverlayRenderer({
   bodyMatchesActiveFilter,
   isSolarSystemBody,
   currentViewWidthAu,
+  pxPerAu: () => camera.pxPerAu,
   auKm,
   formatDistance,
   smallBodyOrbitPathAu: (body) => smallBodyOrbitPathForBody(body, ephemeris?.timestamp_utc ?? new Date().toISOString(), () => requestRender()),
