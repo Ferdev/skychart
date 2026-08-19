@@ -225,6 +225,10 @@
                     <button id="time-now" class="text-action" type="button" data-i18n="time.now">Now</button>
                   </div>
                   <strong id="time-summary" data-i18n="time.currentUtc">Current UTC</strong>
+                  <div id="time-busy" class="time-busy" role="status" aria-live="polite" hidden>
+                    <span class="time-busy__spinner" aria-hidden="true"></span>
+                    <span data-i18n="time.updating">Updating positions…</span>
+                  </div>
                   <div class="time-input-row">
                     <input id="time-input" type="datetime-local" step="1" aria-label="UTC timestamp" />
                     <button id="apply-time" class="primary-action" type="button" data-i18n="time.apply">Apply</button>
