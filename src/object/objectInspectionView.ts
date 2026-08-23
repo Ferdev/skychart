@@ -1,7 +1,7 @@
 import { classifyBody } from "../destinationPicker";
 import { pointInRect, isPresent, type Rect, type ScreenPoint } from "../geometry";
 import { t } from "../i18n";
-import { objectMediaItemsFor, objectMediaStatusFor, type ObjectMediaFallback } from "../objectMedia";
+import { objectMediaItemsFor, objectMediaStatusFor, pixelBufferHasVisibleVariation, type ObjectMediaFallback } from "../objectMedia";
 import { measuredRedshift, scienceSemanticsFor, uncertaintySummary } from "../scienceSemantics";
 import { trackEvent } from "../analytics";
 import {
@@ -572,7 +572,7 @@ private renderObjectMedia(body: Body) {
   return `<div class="object-media-list">${mediaItems.map((media) => `
       <section class="object-media object-media--${escapeHtml(media.kind)}" data-media-provider="${escapeHtml(media.provider ?? media.kind)}" ${media.fallback ? this.renderMediaFallbackData(media.fallback) : ""} aria-label="${escapeHtml(t("object.mediaLabel"))}">
         <div class="object-media__image">
-          <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+          <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" ${media.fallback ? 'crossorigin="anonymous"' : ""} referrerpolicy="no-referrer" />
           <span class="object-media__badge">${escapeHtml(media.badge)}</span>
         </div>
         <div class="object-media__caption">
@@ -643,15 +643,22 @@ private installMediaFallbacks() {
       settled = true;
       clearPending();
     };
+    const validateLoadedImage = () => {
+      if (settled) return;
+      if (image.naturalWidth <= 0 || image.naturalHeight <= 0 || !this.mediaImageHasVisibleData(image)) {
+        useFallback();
+        return;
+      }
+      markLoaded();
+    };
     const startTimeout = () => {
       if (timeoutId == null && !settled) timeoutId = window.setTimeout(useFallback, 12_000);
     };
 
-    image.addEventListener("load", markLoaded, { once: true });
+    image.addEventListener("load", validateLoadedImage, { once: true });
     image.addEventListener("error", useFallback, { once: true });
     if (image.complete) {
-      if (image.naturalWidth > 0) markLoaded();
-      else useFallback();
+      validateLoadedImage();
     } else if ("IntersectionObserver" in window) {
       observer = new IntersectionObserver((entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
@@ -663,6 +670,22 @@ private installMediaFallbacks() {
     } else {
       startTimeout();
     }
+  }
+}
+
+private mediaImageHasVisibleData(image: HTMLImageElement) {
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return true;
+  try {
+    context.drawImage(image, 0, 0);
+    return pixelBufferHasVisibleVariation(context.getImageData(0, 0, canvas.width, canvas.height).data);
+  } catch {
+    // A readable DR11 response currently supplies CORS headers. Preserve an
+    // otherwise valid image if a browser cannot inspect its pixel buffer.
+    return true;
   }
 }
 
