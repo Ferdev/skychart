@@ -40,6 +40,41 @@
   grid-template-columns: repeat(2, 1fr);
 }
 
+.time-busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(243, 238, 223, 0.72);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.time-busy[hidden] {
+  display: none;
+}
+
+.time-busy__spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 2px solid rgba(243, 238, 223, 0.2);
+  border-top-color: rgba(243, 238, 223, 0.85);
+  border-radius: 50%;
+  animation: time-busy-spin 0.8s linear infinite;
+}
+
+@keyframes time-busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .time-busy__spinner {
+    animation: none;
+  }
+}
+
 .map-tool-row {
   display: flex;
   align-items: center;
