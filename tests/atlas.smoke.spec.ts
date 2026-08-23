@@ -93,7 +93,8 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
       status: 200,
       contentType: "image/png",
-      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+      headers: { "access-control-allow-origin": "*" },
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64")
     }));
 
     await selectCatalogObject(page, "M13", "m13", /M13/);
@@ -126,7 +127,23 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(fallback).toBeVisible();
     await expect(fallback.locator(".object-media__badge")).toHaveText("AllWISE fallback");
     await expect(fallback.locator("img")).toHaveAttribute("src", /alasky\.cds\.unistra\.fr\/.*allWISE%2Fcolor/);
-    await expect(fallback.locator(".object-media__description")).toContainText("live DR11 service did not answer");
+    await expect(fallback.locator(".object-media__description")).toContainText("DR11 did not return a usable field");
+  });
+
+  test("DR11 no-data images fall back instead of showing a blank field", async ({ page }) => {
+    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      headers: { "access-control-allow-origin": "*" },
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+    }));
+
+    await selectCatalogObject(page, "M1", "m1", /M1/);
+
+    const fallback = page.locator('[data-media-provider="allwise"]');
+    await expect(fallback).toBeVisible();
+    await expect(fallback.locator(".object-media__badge")).toHaveText("AllWISE fallback");
+    await expect(fallback.locator(".object-media__description")).toContainText("DR11 did not return a usable field");
   });
 
   test("server-driven object detail hydration exposes loading and error states", async ({ page }) => {

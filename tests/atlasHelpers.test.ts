@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { escapeHtml, formatRatio, identifierLabel, identifierValue, shortBodyName, uniquePairs, uniqueTextValues } from "../src/atlasFormatting.ts";
 import { clamp, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectUnion } from "../src/geometry.ts";
-import { objectMediaFor, objectMediaItemsFor } from "../src/objectMedia.ts";
+import { objectMediaFor, objectMediaItemsFor, pixelBufferHasVisibleVariation } from "../src/objectMedia.ts";
 
 assert.equal(escapeHtml(`<a title="x">Tom & 'Ada'</a>`), "&lt;a title=&quot;x&quot;&gt;Tom &amp; &#039;Ada&#039;&lt;/a&gt;");
 assert.equal(identifierLabel("gaia_dr3_source_id"), "Gaia DR3 Source ID");
@@ -20,6 +20,8 @@ assert.deepEqual(pointRect({ x: 10, y: 20 }, 4), { left: 8, top: 18, right: 12, 
 assert.deepEqual(rectUnion(pointRect({ x: 10, y: 20 }, 4), pointRect({ x: 20, y: 30 }, 4)), { left: 8, top: 18, right: 22, bottom: 32, width: 14, height: 14 });
 assert.equal(pointInRect({ x: 100, y: 80 }, bounds), true);
 assert.deepEqual(edgeAnchorForScreen({ x: 200, y: 40 }, { x: 50, y: 40 }, bounds), { point: { x: 84, y: 40 }, side: "right" });
+assert.equal(pixelBufferHasVisibleVariation(new Uint8ClampedArray([32, 32, 32, 255, 32, 32, 32, 255])), false);
+assert.equal(pixelBufferHasVisibleVariation(new Uint8ClampedArray([32, 32, 32, 255, 32, 36, 32, 255])), true);
 
 const legacySurveyBody = {
   key: "example-galaxy",
