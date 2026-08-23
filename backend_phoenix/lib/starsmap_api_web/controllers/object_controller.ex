@@ -12,6 +12,16 @@ defmodule StarsmapApiWeb.ObjectController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "object_not_found", key: key})
+
+      {:error, :invalid_target_id} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "invalid_object_id", key: key})
+
+      {:error, :upstream_unavailable} ->
+        conn
+        |> put_status(:bad_gateway)
+        |> json(%{error: "object_detail_upstream_unavailable", key: key})
     end
   end
 

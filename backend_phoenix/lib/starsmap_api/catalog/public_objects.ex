@@ -7,6 +7,7 @@ defmodule StarsmapApi.Catalog.PublicObjects do
   import Ecto.Query
 
   alias StarsmapApi.Catalog.CatalogSourceObject
+  alias StarsmapApi.Catalog.DesiObject
   alias StarsmapApi.Catalog.GaiaObjectCache
   alias StarsmapApi.Catalog.PublicCache
   alias StarsmapApi.Repo
@@ -14,13 +15,18 @@ defmodule StarsmapApi.Catalog.PublicObjects do
   @summary_timeout 120_000
 
   def get_by_key(key) when is_binary(key) do
+    normalized = String.downcase(key)
+
     CatalogSourceObject
-    |> Repo.get_by(key: String.downcase(key))
+    |> Repo.get_by(key: normalized)
     |> case do
-      nil -> {:error, :not_found}
+      nil -> dynamic_object(normalized)
       object -> {:ok, catalog_object_payload(object)}
     end
   end
+
+  defp dynamic_object("desi-dr1-" <> target_id), do: DesiObject.lookup(target_id)
+  defp dynamic_object(_key), do: {:error, :not_found}
 
   @public_cache_ttl_ms 300_000
   @bulk_only_groups ~w(gaia_500pc_stars gaia_10kpc_bright_stars desi_dr1_galaxies desi_dr1_quasars quaia_g20_quasars)

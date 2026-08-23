@@ -34,11 +34,12 @@ defmodule StarsmapApiWeb.MethodologyContent do
         plain:
           "Nearby-star distance can come from parallax; nearby-galaxy distance can come from published literature; distant-survey positions can use redshift converted to comoving distance. These are not interchangeable measurements.",
         technical:
-          "DESI spectroscopic and Quaia inferred-redshift projections use the checked-in flat LambdaCDM parameters H0=67.66 km/s/Mpc, Omega_m=0.30966, and Omega_lambda=0.69034. A comoving distance is not converted back into a precise measured redshift or lookback time in the UI.",
+          "DESI spectroscopic and Quaia inferred-redshift projections use the checked-in flat LambdaCDM parameters H0=67.66 km/s/Mpc, Omega_m=0.30966, and Omega_lambda=0.69034. Compact DESI tiles retain TARGETID; selected points resolve their primary zpix/photometry row through NSF NOIRLab Astro Data Lab before the same 3D projection is rebuilt. A comoving distance is not converted back into a precise measured redshift or lookback time in the UI.",
         sources: [
           {"Checked-in DESI projection pipeline",
            "https://github.com/Ferdev/skychart/blob/trunk/scripts/desi_bulk_pipeline.py"},
           {"DESI DR1", "https://data.desi.lbl.gov/doc/releases/dr1/"},
+          {"DESI DR1 at NSF NOIRLab Astro Data Lab", "https://datalab.noirlab.edu/data/desi"},
           {"Quaia dataset", "https://doi.org/10.5281/zenodo.10403370"}
         ]
       },
