@@ -34,3 +34,8 @@ Other generated snapshots identify their originating archives and source URLs
 inside each JSON file. The `/about` page and
 [`docs/scientific-methodology.md`](docs/scientific-methodology.md) provide the
 human-readable acknowledgments and methodological caveats.
+
+DESI Legacy Imaging Surveys DR11 cutouts are requested at display time from
+the official Legacy Survey Sky Viewer; they are not committed to this
+repository or relicensed under MIT. The object inspector credits the survey
+and links each cutout back to the DR11 viewer and release documentation.

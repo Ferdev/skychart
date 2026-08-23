@@ -80,6 +80,16 @@ Missing uncertainty is shown as unavailable. The application does not invent
 precision, convert unrelated quality fields into error bars, or treat a
 literature compilation as a uniform volume-limited survey.
 
+## Sky-survey imagery
+
+Objects with valid ICRS right ascension and declination can show an optical
+color cutout from the DESI Legacy Imaging Surveys DR11 map. This cutout is an
+Earth-view angular image centered on the catalog coordinates; it is not
+reprojected onto the atlas canvas and does not supply or alter the object's
+physical distance. Blank image regions can reflect the DR11 footprint rather
+than an absence of astronomical sources. Curated mission imagery, when
+available, is shown alongside the DR11 field instead of being replaced by it.
+
 ## Primary sources
 
 - [Gaia Data Release 3](https://www.cosmos.esa.int/web/gaia/dr3)
@@ -89,6 +99,7 @@ literature compilation as a uniform volume-limited survey.
 - [BASS Data Release 2](https://www.bass-survey.com/dr2.html)
 - [BASS DR2 black-hole mass catalog at VizieR](https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2)
 - [DESI Data Release 1](https://data.desi.lbl.gov/doc/releases/dr1/)
+- [DESI Legacy Imaging Surveys Data Release 11](https://www.legacysurvey.org/dr11/)
 - [Quaia G<20.0](https://doi.org/10.5281/zenodo.10403370)
 - [OpenNGC](https://github.com/mattiaverga/OpenNGC)
 - [HEASARC Nearby Galaxies Catalog](https://heasarc.gsfc.nasa.gov/W3Browse/galaxy-catalog/neargalcat.html)

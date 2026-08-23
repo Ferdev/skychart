@@ -175,6 +175,7 @@ let displayLayers: Record<DisplayLayer, boolean> = {
 };
 let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
 let viewTime: "now" | string = "now";
+let loadSequence = 0;
 let tourBootHandled = false;
 let hoverKey: string | null = null;
 let compareTargetKey: string | null = null;
@@ -578,6 +579,9 @@ requestRender({ data: true });
 
 async function loadAtlas(timestampIso?: string) {
   if (timestampIso) viewTime = new Date(timestampIso).toISOString();
+  const loadId = ++loadSequence;
+  const showTimeBusy = loadingScreen.hidden;
+  if (showTimeBusy) setTimeBusy(true);
   loadingView.begin();
   setLoading("api", 8, t("loading.connecting"));
   setError("");
@@ -602,6 +606,7 @@ async function loadAtlas(timestampIso?: string) {
     const propagatedPreservedBodies = await Promise.all(preservedBodies.map((body) => (
       resolveSmallBodyPosition(body, payload.timestamp_utc, payload.au_km, payloadEarth)
     )));
+    if (loadId !== loadSequence) return; // A newer time change superseded this load.
     const bodies = mergeBodyList(payload.bodies, propagatedPreservedBodies);
     ephemeris = { ...payload, bodies };
     catalogSummary = catalogSummaryFromEphemeris(payload);
@@ -630,11 +635,22 @@ async function loadAtlas(timestampIso?: string) {
     scheduleViewStateReplace();
     startBootTour();
   } catch (error) {
+    if (loadId !== loadSequence) return; // A newer load owns the UI state now.
     loadState.textContent = t("status.error");
     setError(error instanceof Error ? error.message : String(error));
     loadingDetail.textContent = t("error.unableLoad");
     loadingProgressLabel.textContent = t("status.error");
+  } finally {
+    if (showTimeBusy && loadId === loadSequence) setTimeBusy(false);
   }
+}
+
+function setTimeBusy(busy: boolean): void {
+  atlasDom.timeBusy.hidden = !busy;
+  atlasDom.timeNow.disabled = busy;
+  atlasDom.applyTime.disabled = busy;
+  atlasDom.timeStepBack.disabled = busy;
+  atlasDom.timeStepForward.disabled = busy;
 }
 
 function bindEvents() {

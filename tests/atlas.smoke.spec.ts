@@ -15,6 +15,52 @@ const STATIC_POINT_TILE_WITH_ONE_POINT = (() => {
   return tile;
 })();
 
+const TIME_CHANGE_EPHEMERIS = {
+  timestamp_utc: "2026-01-01T00:00:00Z",
+  generated_at_utc: "2026-01-01T00:00:00Z",
+  data_source: "playwright fixture",
+  coordinate_frame: "heliocentric_ecliptic_cartesian_au",
+  au_km: 149_597_870.7,
+  bodies: []
+};
+
+test("time changes remain responsive while positions update", async ({ page, request }) => {
+  await skipIfAtlasUnavailable(request);
+  let releaseTimeUpdate: (() => void) | null = null;
+
+  await page.route("**/api/ephemeris?**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.has("timestamp")) {
+      await new Promise<void>((resolve) => {
+        releaseTimeUpdate = resolve;
+      });
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(TIME_CHANGE_EPHEMERIS)
+    });
+  });
+
+  await openAtlas(page);
+  const timeToggle = page.locator('[aria-controls="scale-time-controls"]');
+  if (await timeToggle.getAttribute("aria-expanded") !== "true") await timeToggle.click();
+
+  await page.locator("#time-step-forward").click();
+  await expect(page.locator("#time-busy")).toContainText("Updating positions");
+  await expect(page.locator("#time-busy")).toBeVisible();
+  await expect(page.locator("#time-step-back")).toBeDisabled();
+  await expect(page.locator("#time-step-forward")).toBeDisabled();
+  await expect(page.locator("#loading-screen")).toBeHidden();
+
+  await expect.poll(() => Boolean(releaseTimeUpdate)).toBe(true);
+  releaseTimeUpdate?.();
+
+  await expect(page.locator("#time-busy")).toBeHidden();
+  await expect(page.locator("#time-step-forward")).toBeEnabled();
+  await expect(page.locator("#load-state")).toHaveText("ready");
+});
+
 test.describe("Cosmic Atlas browser smoke", () => {
   test.beforeEach(async ({ page, request }) => {
     await skipIfAtlasUnavailable(request);
@@ -50,6 +96,11 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator(".object-media--curated")).toBeVisible();
     await expect(page.locator(".object-media__badge").first()).toHaveText("Curated NASA image");
     await expect(page.locator(".object-media img").first()).toHaveAttribute("src", /m13-xlarge_web/);
+    const dr11Media = page.locator(".object-media--survey");
+    await expect(dr11Media).toBeVisible();
+    await expect(dr11Media.locator(".object-media__badge")).toHaveText("Legacy Surveys DR11");
+    await expect(dr11Media.locator("img")).toHaveAttribute("src", /legacysurvey\.org\/viewer\/jpeg-cutout\?.*layer=ls-dr11/);
+    await expect(dr11Media.locator("a")).toHaveAttribute("href", /legacysurvey\.org\/viewer\?.*layer=ls-dr11/);
     await expect(page.locator(".object-summary-card")).toContainText("dense star cluster");
     const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
     await expect(position).toContainText("Right ascension");
