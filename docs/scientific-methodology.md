@@ -56,7 +56,13 @@ parameters remain attributed to JPL sources.
 DESI and Quaia projections use a checked-in flat Lambda-CDM convention with
 `H0 = 67.66 km/s/Mpc`, `Omega_m = 0.30966`, and `Omega_lambda = 0.69034`.
 Comoving distance is a display coordinate, not a claim of exact lookback time
-or independently measured geometric distance.
+or independently measured geometric distance. Dense DESI point tiles retain a
+stable TARGETID but omit the line-of-sight coordinate and catalog RA/Dec to stay
+compact. When a point or shared link is opened, the atlas resolves its primary
+DR1 `zpix` and `photometry` row through NSF NOIRLab Astro Data Lab, then rebuilds
+the same 3D projection and caches the result. If that service is unavailable,
+an already visible tile point remains selectable but its richer detail and
+survey imagery are explicitly unavailable rather than inferred from 2D data.
 
 The eROSITA-DE DR2 and SDSS-V DR20 SPIDERS layers reuse the same cosmology.
 SPIDERS rows use the BOSS spectroscopic redshift only when
@@ -101,6 +107,7 @@ instead of leaving a broken image or pretending the fallback is DR11.
 - [BASS Data Release 2](https://www.bass-survey.com/dr2.html)
 - [BASS DR2 black-hole mass catalog at VizieR](https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2)
 - [DESI Data Release 1](https://data.desi.lbl.gov/doc/releases/dr1/)
+- [DESI DR1 at NSF NOIRLab Astro Data Lab](https://datalab.noirlab.edu/data/desi)
 - [DESI Legacy Imaging Surveys Data Release 11](https://www.legacysurvey.org/dr11/)
 - [Quaia G<20.0](https://doi.org/10.5281/zenodo.10403370)
 - [OpenNGC](https://github.com/mattiaverga/OpenNGC)
