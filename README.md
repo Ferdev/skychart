@@ -16,7 +16,7 @@ Cosmic Atlas is a scientific 2D celestial atlas. It renders Solar System bodies,
 - A compact curated extragalactic survey landmark catalog covering Local Volume galaxies, Virgo/Fornax/Abell cluster anchors, Shapley/Great Attractor supercluster context, and famous 3C/APM/Tonantzintla quasars/blazars without a bulk survey download.
 - Catalog metadata for each loaded object: object type, parent body, source kernel or catalog source, catalog group, and dynamic/static position model.
 - Object inspection for physical radius, Earth distance, heliocentric distance, state-vector speeds, osculating orbital elements, stellar data, and deep-sky observing metadata.
-- Curated NASA/JPL and NASA/Hubble media for selected high-value objects, with title, credit, license, and source link shown directly in object detail.
+- Curated NASA/JPL and NASA/Hubble media for selected high-value objects, plus coordinate-centered DESI Legacy Imaging Surveys DR11 cutouts and Sky Viewer links, with attribution shown directly in object detail.
 - Distance measurement between selected objects or map points, including light-time and scale comparisons.
 - UTC time controls: apply a timestamp, jump to now, or step by days/weeks/months.
 - Map view controls for object labels, orbit guides, scale grid, Milky Way projection, edge references, zoom presets, and readable/hybrid/true-size rendering. Universe-scale structure is drawn only from measured catalog points; procedural filaments and density artwork are intentionally absent.
@@ -194,7 +194,7 @@ named cosmic-web regions. DESI DR1 galaxies and quasars provide the broad
 physical point distribution; curated Messier, OpenNGC, and SIMBAD objects
 remain the searchable named landmarks.
 
-Object media is resolved in `src/objectMedia.ts`. Curated NASA Image and Video Library assets cover the Sun, major planets, Pluto, the Moon, M31, M42, M45, and M57 with visible attribution. Objects with right ascension and declination but no curated image use a deterministic CDS/Aladin DSS2 survey cutout, so searched catalog objects can still show real sky imagery without live media search. Objects without either source show an explicit catalog-only state instead of an empty media gap.
+Object media is resolved in `src/objectMedia.ts`. Curated NASA Image and Video Library assets cover the Sun, major planets, Pluto, the Moon, M31, M42, M45, and M57 with visible attribution. Objects with right ascension and declination also show a deterministic color cutout from the [DESI Legacy Imaging Surveys DR11](https://www.legacysurvey.org/dr11/) map and link to the same coordinates in its Sky Viewer. DR11 combines 263,407 exposures into a 5.6-trillion-pixel optical/near-infrared map containing about 3.9 billion unique sources; its imaging footprint covers roughly 31,000 square degrees rather than the full sky. The survey image is angular observing context only: the atlas continues to place each object using its separately documented distance model. Objects without either source show an explicit catalog-only state instead of an empty media gap. See the [Berkeley Lab DR11 release](https://newscenter.lbl.gov/2026/08/10/scientists-release-biggest-2d-map-of-the-universe/).
 
 The API exposes the scientific catalog layer:
 

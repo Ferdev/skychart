@@ -49,6 +49,7 @@ defmodule StarsmapApiWeb.PageControllerTest do
     for credit <- [
           "ESA / Gaia / DPAC",
           "DESI DR1",
+          "DESI Legacy Imaging Surveys DR11",
           "NASA Exoplanet Archive",
           "SIMBAD / CDS",
           "BASS DR2 / VizieR",

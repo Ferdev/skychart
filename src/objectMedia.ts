@@ -349,6 +349,21 @@ const OBJECT_MEDIA_ALIASES: Record<string, string> = {
 };
 
 export function objectMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
+  return objectMediaItemsFor(body)[0] ?? null;
+}
+
+export function objectMediaItemsFor(body: MediaLookupBody): ObjectMediaItem[] {
+  const items: ObjectMediaItem[] = [];
+  const curated = curatedMediaFor(body);
+  if (curated) items.push(curated);
+
+  const survey = surveyMediaFor(body);
+  if (survey) items.push(survey);
+
+  return items;
+}
+
+function curatedMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
   const direct = OBJECT_MEDIA_BY_KEY[body.key.toLowerCase()];
   if (direct) return direct;
 
@@ -358,7 +373,7 @@ export function objectMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
     if (key && OBJECT_MEDIA_BY_KEY[key]) return OBJECT_MEDIA_BY_KEY[key];
   }
 
-  return surveyMediaFor(body);
+  return null;
 }
 
 export function objectMediaStatusFor(body: MediaLookupBody): ObjectMediaStatus {
@@ -376,33 +391,34 @@ function surveyMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
   if (!coordinate) return null;
 
   const fov = surveyFieldOfViewDeg(body);
+  const width = 512;
+  const height = 320;
+  const pixscale = (fov * 3_600) / width;
   const imageParams = new URLSearchParams({
-    hips: "CDS/P/DSS2/color",
-    width: "920",
-    height: "520",
-    fov: fov.toFixed(3),
-    projection: "TAN",
-    coordsys: "icrs",
     ra: coordinate.raDeg.toFixed(6),
     dec: coordinate.decDeg.toFixed(6),
-    format: "jpg"
+    width: width.toString(),
+    height: height.toString(),
+    layer: "ls-dr11",
+    pixscale: pixscale.toFixed(3)
   });
   const sourceParams = new URLSearchParams({
-    target: `${coordinate.raDeg.toFixed(6)} ${coordinate.decDeg.toFixed(6)}`,
-    fov: fov.toFixed(3),
-    survey: "P/DSS2/color"
+    ra: coordinate.raDeg.toFixed(6),
+    dec: coordinate.decDeg.toFixed(6),
+    layer: "ls-dr11",
+    zoom: "14"
   });
 
   return {
     kind: "survey",
-    imageUrl: `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?${imageParams.toString()}`,
-    title: `${body.name} survey field`,
-    alt: `DSS2 color sky-survey cutout centered on ${body.name}.`,
-    credit: "CDS/Aladin HiPS using DSS2 color survey data",
-    license: "Sky-survey cutout",
-    sourceUrl: `https://aladin.cds.unistra.fr/AladinLite/?${sourceParams.toString()}`,
-    badge: "Survey cutout",
-    description: `Generated from catalog coordinates at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg.`
+    imageUrl: `https://www.legacysurvey.org/viewer/jpeg-cutout?${imageParams.toString()}`,
+    title: `${body.name} in Legacy Surveys DR11`,
+    alt: `DESI Legacy Imaging Surveys DR11 color cutout centered on ${body.name}.`,
+    credit: "DESI Legacy Imaging Surveys / DOE / NSF / NOIRLab",
+    license: "Explore in the DR11 Sky Viewer",
+    sourceUrl: `https://www.legacysurvey.org/viewer?${sourceParams.toString()}`,
+    badge: "Legacy Surveys DR11",
+    description: `Optical color cutout at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg. Coverage follows the DR11 survey footprint.`
   };
 }
 
