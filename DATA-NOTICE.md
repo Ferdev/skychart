@@ -35,6 +35,12 @@ inside each JSON file. The `/about` page and
 [`docs/scientific-methodology.md`](docs/scientific-methodology.md) provide the
 human-readable acknowledgments and methodological caveats.
 
+Selectable DESI DR1 tile points resolve their source coordinates and redshift
+at display time from the public `desi_dr1.zpix` and `desi_dr1.photometry`
+tables hosted by NSF NOIRLab Astro Data Lab. Those on-demand records are cached
+temporarily, are not committed to this repository, and retain the DESI DR1 CC
+BY 4.0 license, citation, and acknowledgment requirements.
+
 DESI Legacy Imaging Surveys DR11 cutouts are requested at display time from
 the official Legacy Survey Sky Viewer; they are not committed to this
 repository or relicensed under MIT. The object inspector credits the survey
