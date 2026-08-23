@@ -1,7 +1,7 @@
 import { classifyBody } from "../destinationPicker";
 import { pointInRect, isPresent, type Rect, type ScreenPoint } from "../geometry";
 import { t } from "../i18n";
-import { objectMediaItemsFor, objectMediaStatusFor } from "../objectMedia";
+import { objectMediaItemsFor, objectMediaStatusFor, type ObjectMediaFallback } from "../objectMedia";
 import { measuredRedshift, scienceSemanticsFor, uncertaintySummary } from "../scienceSemantics";
 import { trackEvent } from "../analytics";
 import {
@@ -66,9 +66,12 @@ export type ObjectInspectionContext = {
 
 /** Renders the complete scientific meaning of one selected object. */
 export class ObjectInspectionView {
+  private mediaFallbackCleanups: (() => void)[] = [];
+
   constructor(private readonly context: ObjectInspectionContext) {}
 
 update() {
+  this.clearMediaFallbacks();
   const body = this.context.selectedBody();
   if (!body) {
     this.context.bodyInfo.innerHTML = this.renderObjectEmptyState();
@@ -211,6 +214,7 @@ update() {
       </section>
     </article>
   `;
+  this.installMediaFallbacks();
 }
 
 private renderObservePanel(body: Body) {
@@ -566,19 +570,105 @@ private renderObjectMedia(body: Body) {
   }
 
   return `<div class="object-media-list">${mediaItems.map((media) => `
-      <section class="object-media object-media--${escapeHtml(media.kind)}" aria-label="${escapeHtml(t("object.mediaLabel"))}">
+      <section class="object-media object-media--${escapeHtml(media.kind)}" data-media-provider="${escapeHtml(media.provider ?? media.kind)}" ${media.fallback ? this.renderMediaFallbackData(media.fallback) : ""} aria-label="${escapeHtml(t("object.mediaLabel"))}">
         <div class="object-media__image">
           <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
           <span class="object-media__badge">${escapeHtml(media.badge)}</span>
         </div>
         <div class="object-media__caption">
-          <strong>${escapeHtml(media.title)}</strong>
-          ${media.description ? `<p>${escapeHtml(media.description)}</p>` : ""}
-          <span>${escapeHtml(media.credit)}</span>
-          <a href="${escapeHtml(media.sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(media.license)}</a>
+          <strong class="object-media__title">${escapeHtml(media.title)}</strong>
+          ${media.description ? `<p class="object-media__description">${escapeHtml(media.description)}</p>` : ""}
+          <span class="object-media__credit">${escapeHtml(media.credit)}</span>
+          <a class="object-media__source" href="${escapeHtml(media.sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(media.license)}</a>
         </div>
       </section>
     `).join("")}</div>`;
+}
+
+private renderMediaFallbackData(fallback: ObjectMediaFallback) {
+  return [
+    ["data-fallback-provider", fallback.provider],
+    ["data-fallback-src", fallback.imageUrl],
+    ["data-fallback-title", fallback.title],
+    ["data-fallback-alt", fallback.alt],
+    ["data-fallback-credit", fallback.credit],
+    ["data-fallback-license", fallback.license],
+    ["data-fallback-source-url", fallback.sourceUrl],
+    ["data-fallback-badge", fallback.badge],
+    ["data-fallback-description", fallback.description]
+  ].map(([name, value]) => `${name}="${escapeHtml(value)}"`).join(" ");
+}
+
+private installMediaFallbacks() {
+  for (const card of this.context.bodyInfo.querySelectorAll<HTMLElement>(".object-media[data-fallback-src]")) {
+    const image = card.querySelector<HTMLImageElement>("img");
+    if (!image) continue;
+
+    let settled = false;
+    let timeoutId: number | null = null;
+    let observer: IntersectionObserver | null = null;
+    const clearPending = () => {
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      observer?.disconnect();
+    };
+    this.mediaFallbackCleanups.push(clearPending);
+    const useFallback = () => {
+      if (settled) return;
+      settled = true;
+      clearPending();
+      const fallbackSrc = card.dataset.fallbackSrc;
+      if (!fallbackSrc) return;
+      card.dataset.mediaProvider = card.dataset.fallbackProvider ?? "fallback";
+      card.classList.add("object-media--fallback");
+      image.src = fallbackSrc;
+      image.alt = card.dataset.fallbackAlt ?? image.alt;
+      const updates: [string, string | undefined][] = [
+        [".object-media__badge", card.dataset.fallbackBadge],
+        [".object-media__title", card.dataset.fallbackTitle],
+        [".object-media__description", card.dataset.fallbackDescription],
+        [".object-media__credit", card.dataset.fallbackCredit]
+      ];
+      for (const [selector, value] of updates) {
+        const element = card.querySelector<HTMLElement>(selector);
+        if (element && value) element.textContent = value;
+      }
+      const source = card.querySelector<HTMLAnchorElement>(".object-media__source");
+      if (source) {
+        if (card.dataset.fallbackSourceUrl) source.href = card.dataset.fallbackSourceUrl;
+        if (card.dataset.fallbackLicense) source.textContent = card.dataset.fallbackLicense;
+      }
+    };
+    const markLoaded = () => {
+      if (settled) return;
+      settled = true;
+      clearPending();
+    };
+    const startTimeout = () => {
+      if (timeoutId == null && !settled) timeoutId = window.setTimeout(useFallback, 12_000);
+    };
+
+    image.addEventListener("load", markLoaded, { once: true });
+    image.addEventListener("error", useFallback, { once: true });
+    if (image.complete) {
+      if (image.naturalWidth > 0) markLoaded();
+      else useFallback();
+    } else if ("IntersectionObserver" in window) {
+      observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer?.disconnect();
+          startTimeout();
+        }
+      }, { rootMargin: "240px" });
+      observer.observe(image);
+    } else {
+      startTimeout();
+    }
+  }
+}
+
+private clearMediaFallbacks() {
+  for (const cleanup of this.mediaFallbackCleanups) cleanup();
+  this.mediaFallbackCleanups = [];
 }
 
 private aliasesForBody(body: Body) {

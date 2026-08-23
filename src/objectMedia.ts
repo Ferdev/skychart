@@ -1,5 +1,6 @@
 export type ObjectMediaItem = {
   kind: "curated" | "survey";
+  provider?: "dss2" | "legacy-dr11";
   imageUrl: string;
   title: string;
   alt: string;
@@ -8,6 +9,19 @@ export type ObjectMediaItem = {
   sourceUrl: string;
   badge: string;
   description?: string;
+  fallback?: ObjectMediaFallback;
+};
+
+export type ObjectMediaFallback = {
+  provider: "allwise";
+  imageUrl: string;
+  title: string;
+  alt: string;
+  credit: string;
+  license: string;
+  sourceUrl: string;
+  badge: string;
+  description: string;
 };
 
 export type ObjectMediaStatus = {
@@ -354,10 +368,10 @@ export function objectMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
 
 export function objectMediaItemsFor(body: MediaLookupBody): ObjectMediaItem[] {
   const items: ObjectMediaItem[] = [];
-  const curated = curatedMediaFor(body);
-  if (curated) items.push(curated);
+  const primary = curatedMediaFor(body) ?? dss2MediaFor(body);
+  if (primary) items.push(primary);
 
-  const survey = surveyMediaFor(body);
+  const survey = legacySurveyMediaFor(body);
   if (survey) items.push(survey);
 
   return items;
@@ -386,7 +400,43 @@ export function objectMediaStatusFor(body: MediaLookupBody): ObjectMediaStatus {
   };
 }
 
-function surveyMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
+function dss2MediaFor(body: MediaLookupBody): ObjectMediaItem | null {
+  const coordinate = coordinateFor(body);
+  if (!coordinate) return null;
+
+  const fov = surveyFieldOfViewDeg(body);
+  const imageParams = new URLSearchParams({
+    hips: "CDS/P/DSS2/color",
+    width: "512",
+    height: "320",
+    fov: fov.toFixed(3),
+    projection: "TAN",
+    coordsys: "icrs",
+    ra: coordinate.raDeg.toFixed(6),
+    dec: coordinate.decDeg.toFixed(6),
+    format: "jpg"
+  });
+  const sourceParams = new URLSearchParams({
+    target: `${coordinate.raDeg.toFixed(6)} ${coordinate.decDeg.toFixed(6)}`,
+    fov: fov.toFixed(3),
+    survey: "P/DSS2/color"
+  });
+
+  return {
+    kind: "survey",
+    provider: "dss2",
+    imageUrl: `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?${imageParams.toString()}`,
+    title: `${body.name} all-sky context`,
+    alt: `DSS2 color sky-survey cutout centered on ${body.name}.`,
+    credit: "CDS/Aladin HiPS using DSS2 color survey data",
+    license: "Explore the DSS2 field in Aladin",
+    sourceUrl: `https://aladin.cds.unistra.fr/AladinLite/?${sourceParams.toString()}`,
+    badge: "All-sky DSS2 context",
+    description: `Reliable all-sky reference at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg.`
+  };
+}
+
+function legacySurveyMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
   const coordinate = coordinateFor(body);
   if (!coordinate) return null;
 
@@ -411,6 +461,7 @@ function surveyMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
 
   return {
     kind: "survey",
+    provider: "legacy-dr11",
     imageUrl: `https://www.legacysurvey.org/viewer/jpeg-cutout?${imageParams.toString()}`,
     title: `${body.name} in Legacy Surveys DR11`,
     alt: `DESI Legacy Imaging Surveys DR11 color cutout centered on ${body.name}.`,
@@ -418,7 +469,39 @@ function surveyMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
     license: "Explore in the DR11 Sky Viewer",
     sourceUrl: `https://www.legacysurvey.org/viewer?${sourceParams.toString()}`,
     badge: "Legacy Surveys DR11",
-    description: `Optical color cutout at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg. Coverage follows the DR11 survey footprint.`
+    description: `Optical color cutout at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg. Coverage follows the DR11 survey footprint.`,
+    fallback: allWiseFallbackFor(coordinate, fov, body.name)
+  };
+}
+
+function allWiseFallbackFor(coordinate: { raDeg: number; decDeg: number }, fov: number, bodyName: string): ObjectMediaFallback {
+  const imageParams = new URLSearchParams({
+    hips: "CDS/P/allWISE/color",
+    width: "512",
+    height: "320",
+    fov: fov.toFixed(3),
+    projection: "TAN",
+    coordsys: "icrs",
+    ra: coordinate.raDeg.toFixed(6),
+    dec: coordinate.decDeg.toFixed(6),
+    format: "jpg"
+  });
+  const sourceParams = new URLSearchParams({
+    target: `${coordinate.raDeg.toFixed(6)} ${coordinate.decDeg.toFixed(6)}`,
+    fov: fov.toFixed(3),
+    survey: "CDS/P/allWISE/color"
+  });
+
+  return {
+    provider: "allwise",
+    imageUrl: `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?${imageParams.toString()}`,
+    title: `${bodyName} in AllWISE infrared`,
+    alt: `AllWISE infrared color cutout centered on ${bodyName}, shown because the live DR11 cutout was unavailable.`,
+    credit: "NASA/IPAC AllWISE / CDS Aladin HiPS",
+    license: "Explore the AllWISE field in Aladin",
+    sourceUrl: `https://aladin.cds.unistra.fr/AladinLite/?${sourceParams.toString()}`,
+    badge: "AllWISE fallback",
+    description: "The live DR11 service did not answer in time, so this card is showing a reliable all-sky infrared comparison from AllWISE."
   };
 }
 
