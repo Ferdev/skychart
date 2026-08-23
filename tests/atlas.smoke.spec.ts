@@ -90,13 +90,18 @@ test.describe("Cosmic Atlas browser smoke", () => {
 
   test("curated media and coordinate readouts appear for M13", async ({ page }) => {
     const issues = collectBrowserIssues(page);
+    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+    }));
 
     await selectCatalogObject(page, "M13", "m13", /M13/);
 
     await expect(page.locator(".object-media--curated")).toBeVisible();
     await expect(page.locator(".object-media__badge").first()).toHaveText("Curated NASA image");
     await expect(page.locator(".object-media img").first()).toHaveAttribute("src", /m13-xlarge_web/);
-    const dr11Media = page.locator(".object-media--survey");
+    const dr11Media = page.locator('[data-media-provider="legacy-dr11"]');
     await expect(dr11Media).toBeVisible();
     await expect(dr11Media.locator(".object-media__badge")).toHaveText("Legacy Surveys DR11");
     await expect(dr11Media.locator("img")).toHaveAttribute("src", /legacysurvey\.org\/viewer\/jpeg-cutout\?.*layer=ls-dr11/);
@@ -107,6 +112,21 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(position).toContainText("Galactic longitude");
 
     issues.assertClean();
+  });
+
+  test("DR11 failures keep two useful survey views by falling back to AllWISE", async ({ page }) => {
+    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({ status: 429, contentType: "text/plain", body: "rate limited" }));
+
+    await selectCatalogObject(page, "M1", "m1", /M1/);
+
+    const media = page.locator(".object-media-list .object-media");
+    await expect(media).toHaveCount(2);
+    await expect(media.nth(0)).toHaveAttribute("data-media-provider", "dss2");
+    const fallback = page.locator('[data-media-provider="allwise"]');
+    await expect(fallback).toBeVisible();
+    await expect(fallback.locator(".object-media__badge")).toHaveText("AllWISE fallback");
+    await expect(fallback.locator("img")).toHaveAttribute("src", /alasky\.cds\.unistra\.fr\/.*allWISE%2Fcolor/);
+    await expect(fallback.locator(".object-media__description")).toContainText("live DR11 service did not answer");
   });
 
   test("server-driven object detail hydration exposes loading and error states", async ({ page }) => {
