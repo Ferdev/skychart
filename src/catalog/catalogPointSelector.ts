@@ -141,8 +141,23 @@ export class CatalogPointSelector {
     if (!targetId || !hit.tile.payload) return null;
     const point = decodedPoint(hit.tile.payload, hit.pointIndex);
     const objectType = point.typeCode === 3 ? "quasar" : "galaxy";
+    const key = `desi-dr1-${targetId}`;
+    try {
+      const response = await this.fetcher(`/api/objects/${key}`, { signal });
+      if (response.ok) {
+        const payload = await response.json() as { object?: CatalogObjectPayload };
+        if (payload.object) {
+          const hydrated = this.options.mapper.map(payload.object);
+          if (hydrated.catalog) hydrated.catalog.preview = false;
+          return hydrated;
+        }
+      }
+    } catch (error) {
+      if (signal?.aborted) return null;
+      console.warn("Unable to hydrate DESI tile point details; using its local tile record.", error);
+    }
     const body = this.options.mapper.map({
-      key: `desi-dr1-${targetId}`,
+      key,
       name: `DESI DR1 ${objectType} ${targetId}`,
       object_type: objectType,
       catalog_group: objectType === "quasar" ? "desi_dr1_quasars" : "desi_dr1_galaxies",

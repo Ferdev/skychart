@@ -140,6 +140,12 @@ container. Run its `project`, `partition`, and `encode` commands in that order,
 then verify the result with `scripts/audit_desi_bulk_release.py` and compose it
 with the current release using `scripts/compose_desi_catalog_release.py`.
 
+Because those compact tiles retain only projected coordinates and a DESI
+TARGETID, selecting a DESI point resolves its matching DR1 `zpix` and
+`photometry` record on demand through NSF NOIRLab Astro Data Lab. The cached
+detail supplies the original RA/Dec, redshift, classification, and full 3D
+position needed by shared links and coordinate-centered survey imagery.
+
 ```bash
 export DESI_ROOT="$HOME/skychart-data/desi"
 mkdir -p "$DESI_ROOT"/{source,work,artifact}

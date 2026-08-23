@@ -115,6 +115,56 @@ test.describe("Cosmic Atlas browser smoke", () => {
     issues.assertClean();
   });
 
+  test("cold DESI permalinks hydrate survey coordinates and imagery", async ({ page }) => {
+    const targetId = "39633286493899023";
+    const key = `desi-dr1-${targetId}`;
+    await page.route(`**/api/objects/${key}`, (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        object: {
+          key,
+          name: `DESI DR1 galaxy ${targetId}`,
+          object_type: "galaxy",
+          catalog_group: "desi_dr1_galaxies",
+          source_type: "desi_dr1_datalab",
+          position_model: "catalog_redshift_comoving",
+          color: "#a0cdff",
+          external_ids: { desi_targetid: targetId },
+          astrometry: {
+            ra_deg: 227.2928137114773,
+            dec_deg: 52.53885918418612,
+            distance_pc: 49_249_929.0673,
+            distance_ly: 160_632_918.329,
+            apparent_magnitude: 17.3229
+          },
+          facts: { redshift: 0.01114409699928142, spectype: "GALAXY" },
+          position: {
+            x_au: -4_190_682_128_246.59,
+            y_au: -958_131_612_681.30,
+            z_au: 9_204_120_788_104.85
+          }
+        }
+      })
+    }));
+    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      headers: { "access-control-allow-origin": "*" },
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64")
+    }));
+
+    await openAtlas(page, `/?v=1&c=-3177965196100.67%2C-4992103948401.26&z=4.75867651410515e-11&t=now&o=${key}`);
+
+    await expect(page.locator("#selected-summary-name")).toContainText(targetId);
+    await expect(page.locator(".object-media--empty")).toHaveCount(0);
+    await expect(page.locator('[data-media-provider="dss2"]')).toBeVisible();
+    await expect(page.locator('[data-media-provider="legacy-dr11"]')).toBeVisible();
+    const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
+    await expect(position).toContainText("15h 09m 10s");
+    await expect(position).toContainText("+52° 32′ 20″");
+  });
+
   test("DR11 failures keep two useful survey views by falling back to AllWISE", async ({ page }) => {
     await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({ status: 429, contentType: "text/plain", body: "rate limited" }));
 
