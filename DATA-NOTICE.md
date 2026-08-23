@@ -38,4 +38,7 @@ human-readable acknowledgments and methodological caveats.
 DESI Legacy Imaging Surveys DR11 cutouts are requested at display time from
 the official Legacy Survey Sky Viewer; they are not committed to this
 repository or relicensed under MIT. The object inspector credits the survey
-and links each cutout back to the DR11 viewer and release documentation.
+and links each cutout back to the DR11 viewer and release documentation. It
+also requests DSS2 all-sky context and, only when DR11 fails, a labeled
+AllWISE infrared fallback from the CDS/Aladin HiPS image service; those images keep
+their upstream terms and attribution.

@@ -59,6 +59,9 @@ defmodule StarsmapApiWeb.PageControllerTest do
           "NAIF"
         ],
         do: assert(html =~ credit)
+
+    assert html =~ "curated or DSS2 context"
+    assert html =~ "all-sky AllWISE infrared field from CDS/Aladin"
   end
 
   test "forced Sentry hook is available only through compiled dev routes", %{conn: conn} do

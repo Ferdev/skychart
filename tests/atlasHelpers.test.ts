@@ -28,7 +28,9 @@ const legacySurveyBody = {
   catalog: { ra_deg: 190.1086, dec_deg: 1.2005 },
   deep_sky: { angular_size_arcmin: "12.0 x 6.0" }
 };
-const legacySurveyMedia = objectMediaFor(legacySurveyBody);
+const legacySurveyItems = objectMediaItemsFor(legacySurveyBody);
+assert.deepEqual(legacySurveyItems.map((media) => media.provider), ["dss2", "legacy-dr11"]);
+const legacySurveyMedia = legacySurveyItems[1];
 assert.ok(legacySurveyMedia);
 assert.equal(legacySurveyMedia.badge, "Legacy Surveys DR11");
 const legacySurveyImageUrl = new URL(legacySurveyMedia.imageUrl);
@@ -39,6 +41,15 @@ assert.equal(legacySurveyImageUrl.searchParams.get("width"), "512");
 assert.equal(legacySurveyImageUrl.searchParams.get("height"), "320");
 assert.equal(legacySurveyImageUrl.searchParams.get("ra"), "190.108600");
 assert.equal(legacySurveyImageUrl.searchParams.get("dec"), "1.200500");
+assert.ok(legacySurveyMedia.fallback);
+assert.equal(legacySurveyMedia.fallback.provider, "allwise");
+const legacyFallbackImageUrl = new URL(legacySurveyMedia.fallback.imageUrl);
+assert.equal(legacyFallbackImageUrl.origin, "https://alasky.cds.unistra.fr");
+assert.equal(legacyFallbackImageUrl.searchParams.get("hips"), "CDS/P/allWISE/color");
+
+const defaultSurveyMedia = objectMediaFor(legacySurveyBody);
+assert.ok(defaultSurveyMedia);
+assert.equal(defaultSurveyMedia.provider, "dss2");
 
 const curatedAndSurveyMedia = objectMediaItemsFor({
   key: "m31",
@@ -47,6 +58,7 @@ const curatedAndSurveyMedia = objectMediaItemsFor({
   catalog: { ra_deg: 10.684708, dec_deg: 41.26875 }
 });
 assert.deepEqual(curatedAndSurveyMedia.map((media) => media.kind), ["curated", "survey"]);
+assert.deepEqual(curatedAndSurveyMedia.map((media) => media.provider ?? media.kind), ["curated", "legacy-dr11"]);
 assert.equal(curatedAndSurveyMedia[1]?.badge, "Legacy Surveys DR11");
 assert.equal(objectMediaFor({ key: "unknown", name: "Unknown", catalog: { ra_deg: 361, dec_deg: 0 } }), null);
 
