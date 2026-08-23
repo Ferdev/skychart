@@ -130,6 +130,15 @@
   filter: saturate(0.96) contrast(1.04);
 }
 
+.object-media--fallback {
+  border-color: rgba(130, 203, 179, 0.28);
+}
+
+.object-media--fallback .object-media__badge {
+  border-color: rgba(130, 203, 179, 0.35);
+  color: rgba(130, 203, 179, 0.92);
+}
+
 .object-media--empty {
   overflow: visible;
   background:

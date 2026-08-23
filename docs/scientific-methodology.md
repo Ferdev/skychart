@@ -82,13 +82,15 @@ literature compilation as a uniform volume-limited survey.
 
 ## Sky-survey imagery
 
-Objects with valid ICRS right ascension and declination can show an optical
-color cutout from the DESI Legacy Imaging Surveys DR11 map. This cutout is an
-Earth-view angular image centered on the catalog coordinates; it is not
-reprojected onto the atlas canvas and does not supply or alter the object's
-physical distance. Blank image regions can reflect the DR11 footprint rather
-than an absence of astronomical sources. Curated mission imagery, when
-available, is shown alongside the DR11 field instead of being replaced by it.
+Objects with valid ICRS right ascension and declination show two views: curated
+mission imagery when available (otherwise all-sky DSS2 context), and an optical
+color cutout from the DESI Legacy Imaging Surveys DR11 map. These are Earth-view
+angular images centered on the catalog coordinates; they are not reprojected
+onto the atlas canvas and do not supply or alter the object's physical distance.
+Blank image regions can reflect the DR11 footprint rather than an absence of
+astronomical sources. If the live DR11 cutout is rate-limited or unavailable,
+the card clearly switches to an all-sky AllWISE infrared field from CDS/Aladin
+instead of leaving a broken image or pretending the fallback is DR11.
 
 ## Primary sources
 
