@@ -1,7 +1,7 @@
 import { classifyBody } from "../destinationPicker";
 import { pointInRect, isPresent, type Rect, type ScreenPoint } from "../geometry";
 import { t } from "../i18n";
-import { objectMediaFor, objectMediaStatusFor } from "../objectMedia";
+import { objectMediaItemsFor, objectMediaStatusFor } from "../objectMedia";
 import { measuredRedshift, scienceSemanticsFor, uncertaintySummary } from "../scienceSemantics";
 import { trackEvent } from "../analytics";
 import {
@@ -551,8 +551,8 @@ private renderRelatedObjects(body: Body) {
 }
 
 private renderObjectMedia(body: Body) {
-  const media = objectMediaFor(body);
-  if (!media) {
+  const mediaItems = objectMediaItemsFor(body);
+  if (mediaItems.length === 0) {
     const status = objectMediaStatusFor(body);
     return `
       <section class="object-media object-media--empty" aria-label="${escapeHtml(t("object.mediaStatus"))}">
@@ -565,20 +565,20 @@ private renderObjectMedia(body: Body) {
     `;
   }
 
-  return `
-    <section class="object-media object-media--${escapeHtml(media.kind)}" aria-label="${escapeHtml(t("object.mediaLabel"))}">
-      <div class="object-media__image">
-        <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
-        <span class="object-media__badge">${escapeHtml(media.badge)}</span>
-      </div>
-      <div class="object-media__caption">
-        <strong>${escapeHtml(media.title)}</strong>
-        ${media.description ? `<p>${escapeHtml(media.description)}</p>` : ""}
-        <span>${escapeHtml(media.credit)}</span>
-        <a href="${escapeHtml(media.sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(media.license)}</a>
-      </div>
-    </section>
-  `;
+  return `<div class="object-media-list">${mediaItems.map((media) => `
+      <section class="object-media object-media--${escapeHtml(media.kind)}" aria-label="${escapeHtml(t("object.mediaLabel"))}">
+        <div class="object-media__image">
+          <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+          <span class="object-media__badge">${escapeHtml(media.badge)}</span>
+        </div>
+        <div class="object-media__caption">
+          <strong>${escapeHtml(media.title)}</strong>
+          ${media.description ? `<p>${escapeHtml(media.description)}</p>` : ""}
+          <span>${escapeHtml(media.credit)}</span>
+          <a href="${escapeHtml(media.sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(media.license)}</a>
+        </div>
+      </section>
+    `).join("")}</div>`;
 }
 
 private aliasesForBody(body: Body) {

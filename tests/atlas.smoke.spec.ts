@@ -96,6 +96,11 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator(".object-media--curated")).toBeVisible();
     await expect(page.locator(".object-media__badge").first()).toHaveText("Curated NASA image");
     await expect(page.locator(".object-media img").first()).toHaveAttribute("src", /m13-xlarge_web/);
+    const dr11Media = page.locator(".object-media--survey");
+    await expect(dr11Media).toBeVisible();
+    await expect(dr11Media.locator(".object-media__badge")).toHaveText("Legacy Surveys DR11");
+    await expect(dr11Media.locator("img")).toHaveAttribute("src", /legacysurvey\.org\/viewer\/jpeg-cutout\?.*layer=ls-dr11/);
+    await expect(dr11Media.locator("a")).toHaveAttribute("href", /legacysurvey\.org\/viewer\?.*layer=ls-dr11/);
     await expect(page.locator(".object-summary-card")).toContainText("dense star cluster");
     const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
     await expect(position).toContainText("Right ascension");
