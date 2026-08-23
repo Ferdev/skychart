@@ -30,6 +30,19 @@ export type ObjectMediaStatus = {
   description: string;
 };
 
+export function pixelBufferHasVisibleVariation(pixels: Uint8ClampedArray, tolerance = 2) {
+  if (pixels.length < 8) return false;
+  const [red, green, blue] = pixels;
+  for (let index = 4; index + 2 < pixels.length; index += 4) {
+    if (
+      Math.abs(pixels[index] - red) > tolerance
+      || Math.abs(pixels[index + 1] - green) > tolerance
+      || Math.abs(pixels[index + 2] - blue) > tolerance
+    ) return true;
+  }
+  return false;
+}
+
 type MediaLookupBody = {
   key: string;
   name: string;
@@ -496,12 +509,12 @@ function allWiseFallbackFor(coordinate: { raDeg: number; decDeg: number }, fov: 
     provider: "allwise",
     imageUrl: `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?${imageParams.toString()}`,
     title: `${bodyName} in AllWISE infrared`,
-    alt: `AllWISE infrared color cutout centered on ${bodyName}, shown because the live DR11 cutout was unavailable.`,
+    alt: `AllWISE infrared color cutout centered on ${bodyName}, shown because DR11 did not return a usable field.`,
     credit: "NASA/IPAC AllWISE / CDS Aladin HiPS",
     license: "Explore the AllWISE field in Aladin",
     sourceUrl: `https://aladin.cds.unistra.fr/AladinLite/?${sourceParams.toString()}`,
     badge: "AllWISE fallback",
-    description: "The live DR11 service did not answer in time, so this card is showing a reliable all-sky infrared comparison from AllWISE."
+    description: "DR11 did not return a usable field at these coordinates, so this card is showing a reliable all-sky infrared comparison from AllWISE."
   };
 }
 
