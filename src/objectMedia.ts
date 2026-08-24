@@ -1,3 +1,5 @@
+import { eclipticCartesianToEquatorial } from "./coordinates.ts";
+
 export type ObjectMediaItem = {
   kind: "curated" | "survey";
   provider?: "dss2" | "legacy-dr11";
@@ -59,6 +61,24 @@ type MediaLookupBody = {
     angular_size_arcmin?: string | null;
     deep_sky_type_label?: string | null;
   } | null;
+  position?: MediaLookupPosition | null;
+};
+
+type MediaLookupPosition = {
+  x_au?: number | null;
+  y_au?: number | null;
+  z_au?: number | null;
+};
+
+type MediaObserver = {
+  position?: MediaLookupPosition | null;
+} | null;
+
+type SurveyCoordinate = {
+  raDeg: number;
+  decDeg: number;
+  source: "catalog" | "atlas-position";
+  movingTarget: boolean;
 };
 
 const OBJECT_MEDIA_BY_KEY: Record<string, ObjectMediaItem> = {
@@ -375,16 +395,17 @@ const OBJECT_MEDIA_ALIASES: Record<string, string> = {
   "ring nebula": "m57"
 };
 
-export function objectMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
-  return objectMediaItemsFor(body)[0] ?? null;
+export function objectMediaFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMediaItem | null {
+  return objectMediaItemsFor(body, observer)[0] ?? null;
 }
 
-export function objectMediaItemsFor(body: MediaLookupBody): ObjectMediaItem[] {
+export function objectMediaItemsFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMediaItem[] {
   const items: ObjectMediaItem[] = [];
-  const primary = curatedMediaFor(body) ?? dss2MediaFor(body);
+  const curated = curatedMediaFor(body);
+  const primary = curated ?? dss2MediaFor(body, observer);
   if (primary) items.push(primary);
 
-  const survey = legacySurveyMediaFor(body);
+  const survey = legacySurveyMediaFor(body, observer, !curated);
   if (survey) items.push(survey);
 
   return items;
@@ -403,9 +424,9 @@ function curatedMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
   return null;
 }
 
-export function objectMediaStatusFor(body: MediaLookupBody): ObjectMediaStatus {
+export function objectMediaStatusFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMediaStatus {
   const sourceLabel = sourceLabelFor(body);
-  const coordinateLabel = coordinateFor(body) ? "The object has survey-ready sky coordinates." : "The object does not expose survey-ready sky coordinates yet.";
+  const coordinateLabel = coordinateFor(body, observer) ? "The object has survey-ready sky coordinates." : "The object does not expose survey-ready sky coordinates yet.";
   return {
     badge: "Catalog-only object",
     title: "No image attached yet",
@@ -413,8 +434,8 @@ export function objectMediaStatusFor(body: MediaLookupBody): ObjectMediaStatus {
   };
 }
 
-function dss2MediaFor(body: MediaLookupBody): ObjectMediaItem | null {
-  const coordinate = coordinateFor(body);
+function dss2MediaFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMediaItem | null {
+  const coordinate = coordinateFor(body, observer);
   if (!coordinate) return null;
 
   const fov = surveyFieldOfViewDeg(body);
@@ -439,18 +460,20 @@ function dss2MediaFor(body: MediaLookupBody): ObjectMediaItem | null {
     kind: "survey",
     provider: "dss2",
     imageUrl: `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?${imageParams.toString()}`,
-    title: `${body.name} all-sky context`,
-    alt: `DSS2 color sky-survey cutout centered on ${body.name}.`,
+    title: coordinate.movingTarget ? `${body.name} current sky field` : `${body.name} all-sky context`,
+    alt: coordinate.movingTarget
+      ? `Archival DSS2 color sky-survey cutout centered on the current modeled sky position of ${body.name}.`
+      : `DSS2 color sky-survey cutout centered on ${body.name}.`,
     credit: "CDS/Aladin HiPS using DSS2 color survey data",
     license: "Explore the DSS2 field in Aladin",
     sourceUrl: `https://aladin.cds.unistra.fr/AladinLite/?${sourceParams.toString()}`,
     badge: "All-sky DSS2 context",
-    description: `Reliable all-sky reference at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg.`
+    description: surveyDescription(body, coordinate, "Reliable all-sky reference")
   };
 }
 
-function legacySurveyMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
-  const coordinate = coordinateFor(body);
+function legacySurveyMediaFor(body: MediaLookupBody, observer?: MediaObserver, allowPosition = true): ObjectMediaItem | null {
+  const coordinate = coordinateFor(body, observer, allowPosition);
   if (!coordinate) return null;
 
   const fov = surveyFieldOfViewDeg(body);
@@ -476,18 +499,20 @@ function legacySurveyMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
     kind: "survey",
     provider: "legacy-dr11",
     imageUrl: `https://www.legacysurvey.org/viewer/jpeg-cutout?${imageParams.toString()}`,
-    title: `${body.name} in Legacy Surveys DR11`,
-    alt: `DESI Legacy Imaging Surveys DR11 color cutout centered on ${body.name}.`,
+    title: coordinate.movingTarget ? `${body.name} current sky field in Legacy Surveys DR11` : `${body.name} in Legacy Surveys DR11`,
+    alt: coordinate.movingTarget
+      ? `Archival DESI Legacy Imaging Surveys DR11 color cutout centered on the current modeled sky position of ${body.name}.`
+      : `DESI Legacy Imaging Surveys DR11 color cutout centered on ${body.name}.`,
     credit: "DESI Legacy Imaging Surveys / DOE / NSF / NOIRLab",
     license: "Explore in the DR11 Sky Viewer",
     sourceUrl: `https://www.legacysurvey.org/viewer?${sourceParams.toString()}`,
     badge: "Legacy Surveys DR11",
-    description: `Optical color cutout at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg. Coverage follows the DR11 survey footprint.`,
+    description: surveyDescription(body, coordinate, "Optical color cutout") + " Coverage follows the DR11 survey footprint.",
     fallback: allWiseFallbackFor(coordinate, fov, body.name)
   };
 }
 
-function allWiseFallbackFor(coordinate: { raDeg: number; decDeg: number }, fov: number, bodyName: string): ObjectMediaFallback {
+function allWiseFallbackFor(coordinate: SurveyCoordinate, fov: number, bodyName: string): ObjectMediaFallback {
   const imageParams = new URLSearchParams({
     hips: "CDS/P/allWISE/color",
     width: "512",
@@ -508,22 +533,61 @@ function allWiseFallbackFor(coordinate: { raDeg: number; decDeg: number }, fov: 
   return {
     provider: "allwise",
     imageUrl: `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?${imageParams.toString()}`,
-    title: `${bodyName} in AllWISE infrared`,
-    alt: `AllWISE infrared color cutout centered on ${bodyName}, shown because DR11 did not return a usable field.`,
+    title: coordinate.movingTarget ? `${bodyName} current sky field in AllWISE infrared` : `${bodyName} in AllWISE infrared`,
+    alt: coordinate.movingTarget
+      ? `Archival AllWISE infrared color cutout centered on the current modeled sky position of ${bodyName}, shown because DR11 did not return a usable field.`
+      : `AllWISE infrared color cutout centered on ${bodyName}, shown because DR11 did not return a usable field.`,
     credit: "NASA/IPAC AllWISE / CDS Aladin HiPS",
     license: "Explore the AllWISE field in Aladin",
     sourceUrl: `https://aladin.cds.unistra.fr/AladinLite/?${sourceParams.toString()}`,
     badge: "AllWISE fallback",
-    description: "DR11 did not return a usable field at these coordinates, so this card is showing a reliable all-sky infrared comparison from AllWISE."
+    description: coordinate.movingTarget
+      ? "DR11 did not return a usable field at these coordinates, so this card is showing an archival all-sky infrared comparison from AllWISE. Because this object moves, the survey image may not contain the object itself."
+      : "DR11 did not return a usable field at these coordinates, so this card is showing a reliable all-sky infrared comparison from AllWISE."
   };
 }
 
-function coordinateFor(body: MediaLookupBody): { raDeg: number; decDeg: number } | null {
+function coordinateFor(body: MediaLookupBody, observer?: MediaObserver, allowPosition = true): SurveyCoordinate | null {
   const raDeg = finiteCoordinate(body.catalog?.ra_deg);
   const decDeg = finiteCoordinate(body.catalog?.dec_deg);
-  if (raDeg == null || decDeg == null) return null;
-  if (raDeg < 0 || raDeg >= 360 || decDeg < -90 || decDeg > 90) return null;
-  return { raDeg, decDeg };
+  if (raDeg != null && decDeg != null && raDeg >= 0 && raDeg < 360 && decDeg >= -90 && decDeg <= 90) {
+    return { raDeg, decDeg, source: "catalog", movingTarget: false };
+  }
+  if (!allowPosition) return null;
+
+  const target = positionVectorFor(body.position);
+  const observerPosition = positionVectorFor(observer?.position);
+  const movingTarget = isMovingTarget(body);
+  if (!target || (movingTarget && !observerPosition)) return null;
+  const equatorial = eclipticCartesianToEquatorial(
+    target.xAu - (observerPosition?.xAu ?? 0),
+    target.yAu - (observerPosition?.yAu ?? 0),
+    target.zAu - (observerPosition?.zAu ?? 0)
+  );
+  return equatorial ? { ...equatorial, source: "atlas-position", movingTarget } : null;
+}
+
+function positionVectorFor(position: MediaLookupPosition | null | undefined) {
+  const xAu = finiteCoordinate(position?.x_au);
+  const yAu = finiteCoordinate(position?.y_au);
+  const zAu = finiteCoordinate(position?.z_au);
+  return xAu == null || yAu == null || zAu == null ? null : { xAu, yAu, zAu };
+}
+
+function isMovingTarget(body: MediaLookupBody) {
+  return body.catalog?.catalog_group === "jpl_small_bodies"
+    || ["asteroid", "comet", "small_body"].includes(body.object_type ?? "");
+}
+
+function surveyDescription(body: MediaLookupBody, coordinate: SurveyCoordinate, prefix: string) {
+  const position = `at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg.`;
+  if (coordinate.movingTarget) {
+    return `${prefix} ${position} This is an archival field centered on ${body.name}'s current modeled direction; a moving object may not appear in the survey exposure.`;
+  }
+  if (coordinate.source === "atlas-position") {
+    return `${prefix} ${position} Sky coordinates were reconstructed from the atlas position.`;
+  }
+  return `${prefix} ${position}`;
 }
 
 function finiteCoordinate(value: number | null | undefined): number | null {
