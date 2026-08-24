@@ -24,6 +24,19 @@ const TIME_CHANGE_EPHEMERIS = {
   bodies: []
 };
 
+const VISIBLE_SURVEY_IMAGE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC",
+  "base64"
+);
+const BLANK_SURVEY_IMAGE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64"
+);
+
+function surveyProvider(url: string) {
+  return new URL(url).searchParams.get("provider");
+}
+
 test("time changes remain responsive while positions update", async ({ page, request }) => {
   await skipIfAtlasUnavailable(request);
   let releaseTimeUpdate: (() => void) | null = null;
@@ -90,11 +103,10 @@ test.describe("Cosmic Atlas browser smoke", () => {
 
   test("curated media and coordinate readouts appear for M13", async ({ page }) => {
     const issues = collectBrowserIssues(page);
-    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
+    await page.route("**/api/survey-image?**", (route) => route.fulfill({
       status: 200,
       contentType: "image/png",
-      headers: { "access-control-allow-origin": "*" },
-      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64")
+      body: VISIBLE_SURVEY_IMAGE
     }));
 
     await selectCatalogObject(page, "M13", "m13", /M13/);
@@ -105,7 +117,8 @@ test.describe("Cosmic Atlas browser smoke", () => {
     const dr11Media = page.locator('[data-media-provider="legacy-dr11"]');
     await expect(dr11Media).toBeVisible();
     await expect(dr11Media.locator(".object-media__badge")).toHaveText("Legacy Surveys DR11");
-    await expect(dr11Media.locator("img")).toHaveAttribute("src", /legacysurvey\.org\/viewer\/jpeg-cutout\?.*layer=ls-dr11/);
+    await expect(dr11Media.locator("img")).toHaveAttribute("src", /\/api\/survey-image\?.*provider=legacy-dr11/);
+    expect(await dr11Media.locator("img").getAttribute("crossorigin")).toBeNull();
     await expect(dr11Media.locator("a")).toHaveAttribute("href", /legacysurvey\.org\/viewer\?.*layer=ls-dr11/);
     await expect(page.locator(".object-summary-card")).toContainText("dense star cluster");
     const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
@@ -147,11 +160,10 @@ test.describe("Cosmic Atlas browser smoke", () => {
         }
       })
     }));
-    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
+    await page.route("**/api/survey-image?**", (route) => route.fulfill({
       status: 200,
       contentType: "image/png",
-      headers: { "access-control-allow-origin": "*" },
-      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64")
+      body: VISIBLE_SURVEY_IMAGE
     }));
 
     await openAtlas(page, `/?v=1&c=-3177965196100.67%2C-4992103948401.26&z=4.75867651410515e-11&t=now&o=${key}`);
@@ -167,7 +179,6 @@ test.describe("Cosmic Atlas browser smoke", () => {
 
   test("cold JPL permalinks derive survey imagery from the current atlas position", async ({ page }) => {
     const key = "jpl-sbdb-20001404";
-    const visibleImage = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64");
     await page.route(`**/api/objects/${key}`, (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -188,17 +199,10 @@ test.describe("Cosmic Atlas browser smoke", () => {
         }
       })
     }));
-    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
+    await page.route("**/api/survey-image?**", (route) => route.fulfill({
       status: 200,
       contentType: "image/png",
-      headers: { "access-control-allow-origin": "*" },
-      body: visibleImage
-    }));
-    await page.route("**/hips-image-services/hips2fits?**", (route) => route.fulfill({
-      status: 200,
-      contentType: "image/png",
-      headers: { "access-control-allow-origin": "*" },
-      body: visibleImage
+      body: VISIBLE_SURVEY_IMAGE
     }));
 
     await openAtlas(page, `/?v=1&c=-4.9078%2C-0.7735&z=30.1969&t=now&o=${key}`);
@@ -209,14 +213,45 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(dr11Media).toBeVisible();
     await expect(dr11Media.locator(".object-media__title")).toContainText("current sky field");
     await expect(dr11Media.locator(".object-media__description")).toContainText("moving object may not appear");
-    const imageUrl = new URL((await dr11Media.locator("img").getAttribute("src")) ?? "");
-    expect(imageUrl.searchParams.get("layer")).toBe("ls-dr11");
+    const imageUrl = new URL((await dr11Media.locator("img").getAttribute("src")) ?? "", "http://127.0.0.1");
+    expect(imageUrl.pathname).toBe("/api/survey-image");
+    expect(imageUrl.searchParams.get("provider")).toBe("legacy-dr11");
     expect(Number.isFinite(Number(imageUrl.searchParams.get("ra")))).toBe(true);
     expect(Number.isFinite(Number(imageUrl.searchParams.get("dec")))).toBe(true);
   });
 
+  test("survey media shows a loading state before revealing images", async ({ page }) => {
+    let releaseSurveyRequests: (() => void) | null = null;
+    const surveyGate = new Promise<void>((resolve) => {
+      releaseSurveyRequests = resolve;
+    });
+    await page.route("**/api/survey-image?**", async (route) => {
+      await surveyGate;
+      await route.fulfill({ status: 200, contentType: "image/png", body: VISIBLE_SURVEY_IMAGE });
+    });
+
+    await selectCatalogObject(page, "M1", "m1", /M1/);
+
+    const loading = page.locator('[data-media-status="loading"]');
+    await expect(loading).toBeVisible();
+    await expect(loading).toContainText("Loading survey images");
+    await expect(page.locator('[data-media-provider="dss2"]')).toBeHidden();
+    await expect(page.locator('[data-media-provider="legacy-dr11"]')).toBeHidden();
+
+    releaseSurveyRequests?.();
+    await expect(page.locator('[data-media-provider="dss2"]')).toBeVisible();
+    await expect(page.locator('[data-media-provider="legacy-dr11"]')).toBeVisible();
+    await expect(loading).toBeHidden();
+  });
+
   test("DR11 failures keep two useful survey views by falling back to AllWISE", async ({ page }) => {
-    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({ status: 429, contentType: "text/plain", body: "rate limited" }));
+    await page.route("**/api/survey-image?**", (route) => {
+      if (surveyProvider(route.request().url()) === "legacy-dr11") {
+        void route.fulfill({ status: 502, contentType: "application/json", body: "{}" });
+      } else {
+        void route.fulfill({ status: 200, contentType: "image/png", body: VISIBLE_SURVEY_IMAGE });
+      }
+    });
 
     await selectCatalogObject(page, "M1", "m1", /M1/);
 
@@ -226,54 +261,70 @@ test.describe("Cosmic Atlas browser smoke", () => {
     const fallback = page.locator('[data-media-provider="allwise"]');
     await expect(fallback).toBeVisible();
     await expect(fallback.locator(".object-media__badge")).toHaveText("AllWISE fallback");
-    await expect(fallback.locator("img")).toHaveAttribute("src", /alasky\.cds\.unistra\.fr\/.*allWISE%2Fcolor/);
+    await expect(fallback.locator("img")).toHaveAttribute("src", /\/api\/survey-image\?.*provider=allwise/);
     await expect(fallback.locator(".object-media__description")).toContainText("DR11 did not return a usable field");
   });
 
-  test("blank DSS2 images are omitted without hiding available media", async ({ page }) => {
-    await page.route("**/hips-image-services/hips2fits?**", (route) => {
-      const hips = new URL(route.request().url()).searchParams.get("hips");
-      if (hips === "CDS/P/DSS2/color") {
+  test("blank DSS2 images stay hidden without hiding available media", async ({ page }) => {
+    await page.route("**/api/survey-image?**", (route) => {
+      if (surveyProvider(route.request().url()) === "dss2") {
         void route.fulfill({
           status: 200,
           contentType: "image/png",
-          headers: { "access-control-allow-origin": "*" },
-          body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+          body: BLANK_SURVEY_IMAGE
         });
         return;
       }
-      void route.continue();
+      void route.fulfill({ status: 200, contentType: "image/png", body: VISIBLE_SURVEY_IMAGE });
     });
-    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
-      status: 200,
-      contentType: "image/png",
-      headers: { "access-control-allow-origin": "*" },
-      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64")
-    }));
 
     await selectCatalogObject(page, "M1", "m1", /M1/);
 
-    await expect(page.locator('[data-media-provider="dss2"]')).toHaveCount(0);
+    await expect(page.locator('[data-media-provider="dss2"]')).toBeHidden();
+    await expect(page.locator('[data-media-provider="dss2"]')).toHaveAttribute("data-media-state", "unavailable");
     await expect(page.locator('[data-media-provider="legacy-dr11"]')).toBeVisible();
     await expect(page.locator(".object-media-section")).toBeVisible();
   });
 
-  test("the media section is omitted when none of its images are available", async ({ page }) => {
-    await page.route("**/hips-image-services/hips2fits?**", (route) => route.abort());
-    await page.route("**/viewer/jpeg-cutout?**", (route) => route.abort());
+  test("the media section explains when no survey images are available", async ({ page }) => {
+    await page.route("**/api/survey-image?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: BLANK_SURVEY_IMAGE
+    }));
 
     await selectCatalogObject(page, "M1", "m1", /M1/);
 
-    await expect(page.locator(".object-media-section")).toHaveCount(0);
+    await expect(page.locator(".object-media-section")).toBeVisible();
+    await expect(page.locator('[data-media-status="unavailable"]')).toBeVisible();
+    await expect(page.locator('[data-media-status="unavailable"]')).toContainText("No survey images found");
+    await expect(page.locator(".object-media-list")).toBeHidden();
+  });
+
+  test("the media section distinguishes provider failures from missing images", async ({ page }) => {
+    await page.route("**/api/survey-image?**", (route) => route.fulfill({
+      status: 502,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "survey image providers unavailable" })
+    }));
+
+    await selectCatalogObject(page, "M1", "m1", /M1/);
+
+    const failed = page.locator('[data-media-status="failed"]');
+    await expect(failed).toBeVisible();
+    await expect(failed).toContainText("temporarily unavailable");
+    await expect(failed).toContainText("Try again later");
   });
 
   test("DR11 no-data images fall back instead of showing a blank field", async ({ page }) => {
-    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
-      status: 200,
-      contentType: "image/png",
-      headers: { "access-control-allow-origin": "*" },
-      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
-    }));
+    await page.route("**/api/survey-image?**", (route) => {
+      const provider = surveyProvider(route.request().url());
+      void route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: provider === "legacy-dr11" ? BLANK_SURVEY_IMAGE : VISIBLE_SURVEY_IMAGE
+      });
+    });
 
     await selectCatalogObject(page, "M1", "m1", /M1/);
 
