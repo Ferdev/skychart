@@ -4,6 +4,7 @@ const FULL_CIRCLE_DEG = 360;
 const J2000_NORTH_GALACTIC_POLE_RA_DEG = 192.85948;
 const J2000_NORTH_GALACTIC_POLE_DEC_DEG = 27.12825;
 const J2000_GALACTIC_ASCENDING_NODE_DEG = 32.93192;
+const J2000_MEAN_OBLIQUITY_DEG = 23.4392911;
 
 export type EquatorialCoordinates = {
   raDeg: number;
@@ -73,6 +74,20 @@ export function eclipticCartesianToSpherical(xAu: number, yAu: number, zAu: numb
     longitudeDeg: normalizeDegrees(toDegrees(Math.atan2(yAu, xAu))),
     latitudeDeg: toDegrees(Math.asin(clamp(zAu / radiusAu, -1, 1))),
     radiusAu
+  };
+}
+
+export function eclipticCartesianToEquatorial(xAu: number, yAu: number, zAu: number): EquatorialCoordinates | null {
+  if (!Number.isFinite(xAu) || !Number.isFinite(yAu) || !Number.isFinite(zAu)) return null;
+  const radiusAu = Math.hypot(xAu, yAu, zAu);
+  if (radiusAu <= 0) return null;
+
+  const obliquity = toRadians(J2000_MEAN_OBLIQUITY_DEG);
+  const equatorialY = yAu * Math.cos(obliquity) - zAu * Math.sin(obliquity);
+  const equatorialZ = yAu * Math.sin(obliquity) + zAu * Math.cos(obliquity);
+  return {
+    raDeg: normalizeDegrees(toDegrees(Math.atan2(equatorialY, xAu))),
+    decDeg: toDegrees(Math.asin(clamp(equatorialZ / radiusAu, -1, 1)))
   };
 }
 
