@@ -114,6 +114,14 @@ normal deployment path.
 The workflow serializes host-writing jobs so a deployment cleanup cannot race
 an active tile build.
 
+Staging uses Kamal's `redeploy` path, which does not prune by itself. The
+staging workflow therefore prunes only SkyChart staging containers and images
+before deployment, requires at least 6 GiB free on both the root and Docker
+storage filesystems, and prunes again after the health check. The shared
+`retain_containers: 2` policy keeps two stopped rollback versions alongside the
+running version. This is deliberately service-scoped; do not replace it with a
+host-wide Docker prune because the deployment host runs other applications.
+
 ## Rollback
 
 Application releases are rolled back with Kamal using the previous healthy
