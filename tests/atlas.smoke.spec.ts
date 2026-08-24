@@ -165,6 +165,55 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(position).toContainText("+52° 32′ 20″");
   });
 
+  test("cold JPL permalinks derive survey imagery from the current atlas position", async ({ page }) => {
+    const key = "jpl-sbdb-20001404";
+    const visibleImage = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64");
+    await page.route(`**/api/objects/${key}`, (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        object: {
+          key,
+          name: "Ajax",
+          object_type: "asteroid",
+          parent_key: "sun",
+          catalog_group: "jpl_small_bodies",
+          source_type: "jpl_sbdb_query",
+          position_model: "jpl_sbdb_two_body_osculating_elements",
+          color: "#b8a48a",
+          astrometry: { ra_deg: null, dec_deg: null },
+          external_ids: { jpl_spkid: "20001404" },
+          facts: {},
+          position: { x_au: -5.5591, y_au: 1.0073, z_au: -0.5332 }
+        }
+      })
+    }));
+    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      headers: { "access-control-allow-origin": "*" },
+      body: visibleImage
+    }));
+    await page.route("**/hips-image-services/hips2fits?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: visibleImage
+    }));
+
+    await openAtlas(page, `/?v=1&c=-4.9078%2C-0.7735&z=30.1969&t=now&o=${key}`);
+
+    await expect(page.locator("#selected-summary-name")).toContainText("Ajax");
+    await expect(page.locator('[data-media-provider="dss2"]')).toBeVisible();
+    const dr11Media = page.locator('[data-media-provider="legacy-dr11"]');
+    await expect(dr11Media).toBeVisible();
+    await expect(dr11Media.locator(".object-media__title")).toContainText("current sky field");
+    await expect(dr11Media.locator(".object-media__description")).toContainText("moving object may not appear");
+    const imageUrl = new URL((await dr11Media.locator("img").getAttribute("src")) ?? "");
+    expect(imageUrl.searchParams.get("layer")).toBe("ls-dr11");
+    expect(Number.isFinite(Number(imageUrl.searchParams.get("ra")))).toBe(true);
+    expect(Number.isFinite(Number(imageUrl.searchParams.get("dec")))).toBe(true);
+  });
+
   test("DR11 failures keep two useful survey views by falling back to AllWISE", async ({ page }) => {
     await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({ status: 429, contentType: "text/plain", body: "rate limited" }));
 

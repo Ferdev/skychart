@@ -555,9 +555,10 @@ private renderRelatedObjects(body: Body) {
 }
 
 private renderObjectMedia(body: Body) {
-  const mediaItems = objectMediaItemsFor(body);
+  const observer = this.context.ephemeris()?.bodies.find((candidate) => candidate.key === "earth");
+  const mediaItems = objectMediaItemsFor(body, observer);
   if (mediaItems.length === 0) {
-    const status = objectMediaStatusFor(body);
+    const status = objectMediaStatusFor(body, observer);
     return `
       <section class="object-media object-media--empty" aria-label="${escapeHtml(t("object.mediaStatus"))}">
         <div class="object-media__empty">

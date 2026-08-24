@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { escapeHtml, formatRatio, identifierLabel, identifierValue, shortBodyName, uniquePairs, uniqueTextValues } from "../src/atlasFormatting.ts";
 import { clamp, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectUnion } from "../src/geometry.ts";
+import { eclipticCartesianToEquatorial } from "../src/coordinates.ts";
 import { objectMediaFor, objectMediaItemsFor, pixelBufferHasVisibleVariation } from "../src/objectMedia.ts";
 
 assert.equal(escapeHtml(`<a title="x">Tom & 'Ada'</a>`), "&lt;a title=&quot;x&quot;&gt;Tom &amp; &#039;Ada&#039;&lt;/a&gt;");
@@ -22,6 +23,11 @@ assert.equal(pointInRect({ x: 100, y: 80 }, bounds), true);
 assert.deepEqual(edgeAnchorForScreen({ x: 200, y: 40 }, { x: 50, y: 40 }, bounds), { point: { x: 84, y: 40 }, side: "right" });
 assert.equal(pixelBufferHasVisibleVariation(new Uint8ClampedArray([32, 32, 32, 255, 32, 32, 32, 255])), false);
 assert.equal(pixelBufferHasVisibleVariation(new Uint8ClampedArray([32, 32, 32, 255, 32, 36, 32, 255])), true);
+assert.deepEqual(eclipticCartesianToEquatorial(1, 0, 0), { raDeg: 0, decDeg: 0 });
+const eclipticYAxis = eclipticCartesianToEquatorial(0, 1, 0);
+assert.ok(eclipticYAxis);
+assert.ok(Math.abs(eclipticYAxis.raDeg - 90) < 1e-9);
+assert.ok(Math.abs(eclipticYAxis.decDeg - 23.4392911) < 1e-9);
 
 const legacySurveyBody = {
   key: "example-galaxy",
@@ -63,5 +69,38 @@ assert.deepEqual(curatedAndSurveyMedia.map((media) => media.kind), ["curated", "
 assert.deepEqual(curatedAndSurveyMedia.map((media) => media.provider ?? media.kind), ["curated", "legacy-dr11"]);
 assert.equal(curatedAndSurveyMedia[1]?.badge, "Legacy Surveys DR11");
 assert.equal(objectMediaFor({ key: "unknown", name: "Unknown", catalog: { ra_deg: 361, dec_deg: 0 } }), null);
+
+const earthObserver = { position: { x_au: 1, y_au: 0, z_au: 0 } };
+const asteroidMedia = objectMediaItemsFor({
+  key: "jpl-sbdb-example",
+  name: "Example asteroid",
+  object_type: "asteroid",
+  catalog: { catalog_group: "jpl_small_bodies", ra_deg: null, dec_deg: null },
+  position: { x_au: 1, y_au: 1, z_au: 0 }
+}, earthObserver);
+assert.deepEqual(asteroidMedia.map((media) => media.provider), ["dss2", "legacy-dr11"]);
+const asteroidDr11Url = new URL(asteroidMedia[1]!.imageUrl);
+assert.equal(asteroidDr11Url.searchParams.get("ra"), "90.000000");
+assert.equal(asteroidDr11Url.searchParams.get("dec"), "23.439291");
+assert.match(asteroidMedia[1]!.description ?? "", /moving object may not appear/i);
+assert.deepEqual(objectMediaItemsFor({
+  key: "jpl-sbdb-no-observer",
+  name: "Observerless asteroid",
+  object_type: "asteroid",
+  position: { x_au: 0, y_au: 1, z_au: 0 }
+}), []);
+
+const gaiaMedia = objectMediaItemsFor({
+  key: "gaia_dr3_example",
+  name: "Gaia DR3 example",
+  object_type: "star",
+  catalog: { catalog_group: "gaia_dr3_bulk", ra_deg: null, dec_deg: null },
+  position: { x_au: 2, y_au: 0, z_au: 0 }
+}, earthObserver);
+assert.deepEqual(gaiaMedia.map((media) => media.provider), ["dss2", "legacy-dr11"]);
+const gaiaDr11Url = new URL(gaiaMedia[1]!.imageUrl);
+assert.equal(gaiaDr11Url.searchParams.get("ra"), "0.000000");
+assert.equal(gaiaDr11Url.searchParams.get("dec"), "0.000000");
+assert.match(gaiaMedia[1]!.description ?? "", /reconstructed from the atlas position/i);
 
 console.log("atlas helper tests passed");
