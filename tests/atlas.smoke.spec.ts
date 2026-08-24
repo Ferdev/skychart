@@ -229,6 +229,38 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(fallback.locator(".object-media__description")).toContainText("DR11 did not return a usable field");
   });
 
+  test("unavailable DSS2 images are omitted without hiding available media", async ({ page }) => {
+    await page.route("**/hips-image-services/hips2fits?**", (route) => {
+      const hips = new URL(route.request().url()).searchParams.get("hips");
+      if (hips === "CDS/P/DSS2/color") {
+        void route.abort();
+        return;
+      }
+      void route.continue();
+    });
+    await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      headers: { "access-control-allow-origin": "*" },
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64")
+    }));
+
+    await selectCatalogObject(page, "M1", "m1", /M1/);
+
+    await expect(page.locator('[data-media-provider="dss2"]')).toHaveCount(0);
+    await expect(page.locator('[data-media-provider="legacy-dr11"]')).toBeVisible();
+    await expect(page.locator(".object-media-section")).toBeVisible();
+  });
+
+  test("the media section is omitted when none of its images are available", async ({ page }) => {
+    await page.route("**/hips-image-services/hips2fits?**", (route) => route.abort());
+    await page.route("**/viewer/jpeg-cutout?**", (route) => route.abort());
+
+    await selectCatalogObject(page, "M1", "m1", /M1/);
+
+    await expect(page.locator(".object-media-section")).toHaveCount(0);
+  });
+
   test("DR11 no-data images fall back instead of showing a blank field", async ({ page }) => {
     await page.route("**/viewer/jpeg-cutout?**", (route) => route.fulfill({
       status: 200,
