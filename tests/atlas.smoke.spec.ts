@@ -197,6 +197,7 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await page.route("**/hips-image-services/hips2fits?**", (route) => route.fulfill({
       status: 200,
       contentType: "image/png",
+      headers: { "access-control-allow-origin": "*" },
       body: visibleImage
     }));
 
@@ -229,11 +230,16 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(fallback.locator(".object-media__description")).toContainText("DR11 did not return a usable field");
   });
 
-  test("unavailable DSS2 images are omitted without hiding available media", async ({ page }) => {
+  test("blank DSS2 images are omitted without hiding available media", async ({ page }) => {
     await page.route("**/hips-image-services/hips2fits?**", (route) => {
       const hips = new URL(route.request().url()).searchParams.get("hips");
       if (hips === "CDS/P/DSS2/color") {
-        void route.abort();
+        void route.fulfill({
+          status: 200,
+          contentType: "image/png",
+          headers: { "access-control-allow-origin": "*" },
+          body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+        });
         return;
       }
       void route.continue();
