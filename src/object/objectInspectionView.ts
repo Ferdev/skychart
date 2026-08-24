@@ -1,7 +1,7 @@
 import { classifyBody } from "../destinationPicker";
 import { pointInRect, isPresent, type Rect, type ScreenPoint } from "../geometry";
 import { t } from "../i18n";
-import { objectMediaItemsFor, objectMediaStatusFor, pixelBufferHasVisibleVariation, type ObjectMediaFallback } from "../objectMedia";
+import { objectMediaItemsFor, pixelBufferHasVisibleVariation, type ObjectMediaFallback } from "../objectMedia";
 import { measuredRedshift, scienceSemanticsFor, uncertaintySummary } from "../scienceSemantics";
 import { trackEvent } from "../analytics";
 import {
@@ -407,10 +407,12 @@ private renderIdentifierSection(body: Body) {
 }
 
 private renderMediaSection(body: Body) {
+  const media = this.renderObjectMedia(body);
+  if (!media) return "";
   return `
     <section class="data-section object-media-section">
       <h3>${escapeHtml(t("object.media"))}</h3>
-      ${this.renderObjectMedia(body)}
+      ${media}
     </section>
   `;
 }
@@ -557,18 +559,7 @@ private renderRelatedObjects(body: Body) {
 private renderObjectMedia(body: Body) {
   const observer = this.context.ephemeris()?.bodies.find((candidate) => candidate.key === "earth");
   const mediaItems = objectMediaItemsFor(body, observer);
-  if (mediaItems.length === 0) {
-    const status = objectMediaStatusFor(body, observer);
-    return `
-      <section class="object-media object-media--empty" aria-label="${escapeHtml(t("object.mediaStatus"))}">
-        <div class="object-media__empty">
-          <span class="object-media__badge">${escapeHtml(status.badge)}</span>
-          <strong>${escapeHtml(status.title)}</strong>
-          <p>${escapeHtml(status.description)}</p>
-        </div>
-      </section>
-    `;
-  }
+  if (mediaItems.length === 0) return "";
 
   return `<div class="object-media-list">${mediaItems.map((media) => `
       <section class="object-media object-media--${escapeHtml(media.kind)}" data-media-provider="${escapeHtml(media.provider ?? media.kind)}" ${media.fallback ? this.renderMediaFallbackData(media.fallback) : ""} aria-label="${escapeHtml(t("object.mediaLabel"))}">
@@ -601,11 +592,14 @@ private renderMediaFallbackData(fallback: ObjectMediaFallback) {
 }
 
 private installMediaFallbacks() {
-  for (const card of this.context.bodyInfo.querySelectorAll<HTMLElement>(".object-media[data-fallback-src]")) {
+  for (const card of this.context.bodyInfo.querySelectorAll<HTMLElement>(".object-media")) {
     const image = card.querySelector<HTMLImageElement>("img");
     if (!image) continue;
 
+    const fallbackSrc = card.dataset.fallbackSrc;
+    const mediaSection = card.closest<HTMLElement>(".object-media-section");
     let settled = false;
+    let usingFallback = false;
     let timeoutId: number | null = null;
     let observer: IntersectionObserver | null = null;
     const clearPending = () => {
@@ -613,14 +607,33 @@ private installMediaFallbacks() {
       observer?.disconnect();
     };
     this.mediaFallbackCleanups.push(clearPending);
-    const useFallback = () => {
+    const hideUnavailable = () => {
       if (settled) return;
       settled = true;
       clearPending();
-      const fallbackSrc = card.dataset.fallbackSrc;
-      if (!fallbackSrc) return;
+      card.remove();
+      if (mediaSection && !mediaSection.querySelector(".object-media")) mediaSection.remove();
+    };
+    const markLoaded = () => {
+      if (settled) return;
+      settled = true;
+      clearPending();
+    };
+
+    if (!fallbackSrc) {
+      image.addEventListener("error", hideUnavailable, { once: true });
+      if (image.complete && image.naturalWidth <= 0) hideUnavailable();
+      continue;
+    }
+
+    const useFallback = () => {
+      if (settled || usingFallback) return;
+      usingFallback = true;
+      clearPending();
       card.dataset.mediaProvider = card.dataset.fallbackProvider ?? "fallback";
       card.classList.add("object-media--fallback");
+      image.addEventListener("load", markLoaded, { once: true });
+      image.addEventListener("error", hideUnavailable, { once: true });
       image.src = fallbackSrc;
       image.alt = card.dataset.fallbackAlt ?? image.alt;
       const updates: [string, string | undefined][] = [
@@ -639,13 +652,12 @@ private installMediaFallbacks() {
         if (card.dataset.fallbackLicense) source.textContent = card.dataset.fallbackLicense;
       }
     };
-    const markLoaded = () => {
-      if (settled) return;
-      settled = true;
-      clearPending();
-    };
     const validateLoadedImage = () => {
       if (settled) return;
+      if (usingFallback) {
+        markLoaded();
+        return;
+      }
       if (image.naturalWidth <= 0 || image.naturalHeight <= 0 || !this.mediaImageHasVisibleData(image)) {
         useFallback();
         return;
