@@ -77,15 +77,19 @@ export class ObjectInspectionView {
   private mediaFallbackCleanups: (() => void)[] = [];
   private activeView: ObjectViewId = "overview";
   private renderedBodyKey = "";
+  private activeMediaBodyKey: string | null = null;
+  private activeMediaMarkup: string | null = null;
 
   constructor(private readonly context: ObjectInspectionContext) {}
 
 update() {
-  this.clearMediaFallbacks();
   const body = this.context.selectedBody();
   if (!body) {
+    this.clearMediaFallbacks();
     this.renderedBodyKey = "";
     this.activeView = "overview";
+    this.activeMediaBodyKey = null;
+    this.activeMediaMarkup = null;
     this.context.bodyInfo.innerHTML = this.renderObjectEmptyState();
     return;
   }
@@ -207,6 +211,7 @@ update() {
       ]
     : [];
 
+  const mediaMarkup = this.renderMediaSection(body);
   const scienceContent = [
     this.renderUniverseSciencePanel(body),
     this.renderDataSection(t("section.stellarFacts"), stellarRows),
@@ -220,7 +225,7 @@ update() {
       id: "overview",
       label: t("section.overview"),
       content: [
-        this.renderMediaSection(body),
+        mediaMarkup,
         this.renderDataSection(t("section.overview"), overviewRows),
         this.renderRelatedObjects(body),
       ].join(""),
@@ -243,6 +248,12 @@ update() {
     },
   ];
   if (!views.some((view) => view.id === this.activeView)) this.activeView = "overview";
+  const currentMediaSection = this.context.bodyInfo.querySelector<HTMLElement>(".object-media-section");
+  const preserveMediaSection = currentMediaSection != null
+    && this.activeMediaBodyKey === body.key
+    && this.activeMediaMarkup === mediaMarkup;
+  if (preserveMediaSection) currentMediaSection.remove();
+  else this.clearMediaFallbacks();
 
   this.context.bodyInfo.innerHTML = `
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
@@ -259,7 +270,15 @@ update() {
       </div>
     </article>
   `;
-  this.installMediaFallbacks();
+  const replacementMediaSection = this.context.bodyInfo.querySelector<HTMLElement>(".object-media-section");
+  if (preserveMediaSection && replacementMediaSection) {
+    replacementMediaSection.replaceWith(currentMediaSection);
+  } else {
+    if (preserveMediaSection) this.clearMediaFallbacks();
+    this.installMediaFallbacks();
+  }
+  this.activeMediaBodyKey = body.key;
+  this.activeMediaMarkup = mediaMarkup;
 }
 
 handleViewClick(target: EventTarget | null): boolean {

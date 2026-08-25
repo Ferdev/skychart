@@ -430,8 +430,15 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await page.locator("#body-search").press("Enter");
     await expect(page.locator("#selected-summary-name")).toContainText("Hydration Preview");
     await expect(page.locator(".object-detail-state--loading")).toContainText("Loading object detail");
+    const dss2Media = page.locator('[data-media-provider="dss2"]');
+    await expect(dss2Media).toBeVisible();
+    await dss2Media.evaluate((element) => {
+      element.setAttribute("data-test-loaded-media", "preserve");
+    });
     releaseHydration?.();
     await expect(page.locator(".object-detail-state--error")).toContainText("Object detail unavailable");
+    await expect(dss2Media).toHaveAttribute("data-test-loaded-media", "preserve");
+    await expect(page.locator('[data-media-status="loading"]')).toBeHidden();
     await page.getByRole("tab", { name: "Position", exact: true }).click();
     const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
     await expect(position).toContainText("Right ascension");
