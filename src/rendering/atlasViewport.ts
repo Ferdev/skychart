@@ -89,9 +89,12 @@ export class AtlasViewport {
       : window.innerWidth;
     const top = Math.max(0, topBoundary + 8);
     const mobileObjectSheetTop = !isWide && this.options.activeTab() === "object" ? workspaceRect?.top : undefined;
+    const desktopObjectBottom = isWide && this.options.activeTab() === "object"
+      ? scaleRailRect?.top
+      : undefined;
     const bottomBoundary = !isWide
       ? Math.min(scaleRailRect?.top ?? window.innerHeight, mobileObjectSheetTop ?? window.innerHeight)
-      : window.innerHeight;
+      : desktopObjectBottom ?? window.innerHeight;
     const bottom = Math.max(top + 1, bottomBoundary - 10);
     return {
       left: 0,
