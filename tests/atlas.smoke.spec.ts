@@ -100,7 +100,8 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator(".object-media--curated")).toBeVisible();
     await expect(page.locator(".object-media__badge").first()).toHaveText("Curated NASA image");
     await expect(page.locator(".object-media img").first()).toHaveAttribute("src", /PIA02873/);
-    const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
+    await page.getByRole("tab", { name: "Position", exact: true }).click();
+    const position = page.locator("#object-view-panel-position");
     await expect(position).toContainText("Ecliptic longitude");
     await expect(position).toContainText("Ecliptic latitude");
 
@@ -156,7 +157,8 @@ test.describe("Cosmic Atlas browser smoke", () => {
     expect(await dr11Media.locator("img").getAttribute("crossorigin")).toBeNull();
     await expect(dr11Media.locator("a")).toHaveAttribute("href", /legacysurvey\.org\/viewer\?.*layer=ls-dr11/);
     await expect(page.locator(".object-summary-card")).toContainText("dense star cluster");
-    const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
+    await page.getByRole("tab", { name: "Position", exact: true }).click();
+    const position = page.locator("#object-view-panel-position");
     await expect(position).toContainText("Right ascension");
     await expect(position).toContainText("Galactic longitude");
 
@@ -207,7 +209,8 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator(".object-media--empty")).toHaveCount(0);
     await expect(page.locator('[data-media-provider="dss2"]')).toBeVisible();
     await expect(page.locator('[data-media-provider="legacy-dr11"]')).toBeVisible();
-    const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
+    await page.getByRole("tab", { name: "Position", exact: true }).click();
+    const position = page.locator("#object-view-panel-position");
     await expect(position).toContainText("15h 09m 10s");
     await expect(position).toContainText("+52° 32′ 20″");
   });
