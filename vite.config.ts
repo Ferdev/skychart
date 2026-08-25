@@ -16,6 +16,7 @@ export default defineConfig({
     proxy: {
       "/api/catalog": "http://127.0.0.1:4020",
       "/api/objects": "http://127.0.0.1:4020",
+      "/api/survey-image": "http://127.0.0.1:4020",
       "/api/ephemeris": ephemerisApi,
       "/api/small-body-ephemeris": ephemerisApi,
       "/api/orbits": ephemerisApi,
