@@ -459,7 +459,7 @@ function dss2MediaFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMe
   return {
     kind: "survey",
     provider: "dss2",
-    imageUrl: `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?${imageParams.toString()}`,
+    imageUrl: surveyImageProxyUrl("dss2", imageParams),
     title: coordinate.movingTarget ? `${body.name} current sky field` : `${body.name} all-sky context`,
     alt: coordinate.movingTarget
       ? `Archival DSS2 color sky-survey cutout centered on the current modeled sky position of ${body.name}.`
@@ -498,7 +498,7 @@ function legacySurveyMediaFor(body: MediaLookupBody, observer?: MediaObserver, a
   return {
     kind: "survey",
     provider: "legacy-dr11",
-    imageUrl: `https://www.legacysurvey.org/viewer/jpeg-cutout?${imageParams.toString()}`,
+    imageUrl: surveyImageProxyUrl("legacy-dr11", imageParams),
     title: coordinate.movingTarget ? `${body.name} current sky field in Legacy Surveys DR11` : `${body.name} in Legacy Surveys DR11`,
     alt: coordinate.movingTarget
       ? `Archival DESI Legacy Imaging Surveys DR11 color cutout centered on the current modeled sky position of ${body.name}.`
@@ -532,7 +532,7 @@ function allWiseFallbackFor(coordinate: SurveyCoordinate, fov: number, bodyName:
 
   return {
     provider: "allwise",
-    imageUrl: `https://alasky.cds.unistra.fr/hips-image-services/hips2fits?${imageParams.toString()}`,
+    imageUrl: surveyImageProxyUrl("allwise", imageParams),
     title: coordinate.movingTarget ? `${bodyName} current sky field in AllWISE infrared` : `${bodyName} in AllWISE infrared`,
     alt: coordinate.movingTarget
       ? `Archival AllWISE infrared color cutout centered on the current modeled sky position of ${bodyName}, shown because DR11 did not return a usable field.`
@@ -545,6 +545,16 @@ function allWiseFallbackFor(coordinate: SurveyCoordinate, fov: number, bodyName:
       ? "DR11 did not return a usable field at these coordinates, so this card is showing an archival all-sky infrared comparison from AllWISE. Because this object moves, the survey image may not contain the object itself."
       : "DR11 did not return a usable field at these coordinates, so this card is showing a reliable all-sky infrared comparison from AllWISE."
   };
+}
+
+function surveyImageProxyUrl(provider: "dss2" | "legacy-dr11" | "allwise", imageParams: URLSearchParams) {
+  const proxyParams = new URLSearchParams({
+    provider,
+    ra: imageParams.get("ra") ?? "",
+    dec: imageParams.get("dec") ?? "",
+    fov: imageParams.get("fov") ?? ""
+  });
+  return `/api/survey-image?${proxyParams.toString()}`;
 }
 
 function coordinateFor(body: MediaLookupBody, observer?: MediaObserver, allowPosition = true): SurveyCoordinate | null {

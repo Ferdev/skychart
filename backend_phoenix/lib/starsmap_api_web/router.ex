@@ -37,6 +37,7 @@ defmodule StarsmapApiWeb.Router do
     pipe_through :api
 
     get "/health", HealthController, :show
+    get "/survey-image", SurveyImageController, :show
     get "/now", NowController, :index
     post "/events", EventController, :create
     get "/catalog", CatalogController, :summary
