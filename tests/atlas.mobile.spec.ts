@@ -143,6 +143,7 @@ test.describe("Cosmic Atlas mobile layout", () => {
     await page.mouse.click(initialJupiter!.x, initialJupiter!.y);
     await expect(page.locator("#selected-object-panel")).toBeVisible();
     await expect(page.locator("#selected-summary-name")).toContainText("Jupiter");
+    await expect(page.locator("#selection-connector")).toBeHidden();
 
     const geometry = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry());
     expect(geometry.workspaceTop, "mobile object sheet top").not.toBeNull();

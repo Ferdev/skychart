@@ -107,6 +107,35 @@ test.describe("Cosmic Atlas browser smoke", () => {
     issues.assertClean();
   });
 
+  test("selected object inspector uses progressive task views and an anchored connector", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    await selectCatalogObject(page, "Jupiter", "jupiter", "Jupiter");
+
+    const overviewTab = page.getByRole("tab", { name: "Overview", exact: true });
+    const positionTab = page.getByRole("tab", { name: "Position", exact: true });
+    await expect(overviewTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#object-view-panel-overview")).toBeVisible();
+    await expect(page.locator('#selection-connector[data-visible="true"]')).toBeVisible();
+    await expect(page.locator("#selection-connector .selection-connector__leader")).toHaveAttribute("d", /^M /);
+
+    await positionTab.click();
+    await expect(positionTab).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#object-view-panel-position")).toBeVisible();
+    await expect(page.locator("#object-view-panel-overview")).toBeHidden();
+
+    await positionTab.press("ArrowRight");
+    await expect(page.getByRole("tab", { name: "Observe", exact: true })).toHaveAttribute("aria-selected", "true");
+
+    await page.locator("#compare-selected").click();
+    await expect(page.locator("#body-info")).toBeHidden();
+    await expect(page.locator("#selection-compare")).toBeVisible();
+    await expect(page.locator("#compare-selected")).toHaveAttribute("aria-expanded", "true");
+    await page.locator("#compare-selected").click();
+    await expect(page.locator("#body-info")).toBeVisible();
+
+    issues.assertClean();
+  });
+
   test("curated media and coordinate readouts appear for M13", async ({ page }) => {
     const issues = collectBrowserIssues(page);
     await page.route("**/api/survey-image?**", (route) => route.fulfill({
@@ -341,6 +370,7 @@ test.describe("Cosmic Atlas browser smoke", () => {
   });
 
   test("server-driven object detail hydration exposes loading and error states", async ({ page }) => {
+    await page.waitForLoadState("networkidle");
     const issues = collectBrowserIssues(page);
     let releaseHydration: (() => void) | null = null;
 
@@ -399,6 +429,7 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator(".object-detail-state--loading")).toContainText("Loading object detail");
     releaseHydration?.();
     await expect(page.locator(".object-detail-state--error")).toContainText("Object detail unavailable");
+    await page.getByRole("tab", { name: "Position", exact: true }).click();
     const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
     await expect(position).toContainText("Right ascension");
 
@@ -428,6 +459,7 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await page.locator("#body-search").press("ArrowDown");
     await page.locator("#body-search").press("Enter");
     await expect(page.locator("#selected-summary-name")).toContainText("Jupiter");
+    await page.locator("#compare-selected").click();
     await page.locator("#compare-search").fill("Mars");
 
     const marsResult = page.locator('#compare-picker [data-body-key="mars"]').first();
@@ -470,6 +502,7 @@ test.describe("Cosmic Atlas browser smoke", () => {
     const issues = collectBrowserIssues(page);
 
     await selectCatalogObject(page, "Jupiter", "jupiter", "Jupiter");
+    await page.locator("#compare-selected").click();
     await page.locator("#compare-search").fill("Mars");
     await expect(page.locator('#compare-picker [data-body-key="mars"]')).toBeVisible();
 
@@ -552,6 +585,7 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await page.locator("#body-search").press("ArrowDown");
     await page.locator("#body-search").press("Enter");
     await expect(page.locator("#selected-summary-name")).toContainText("Jupiter");
+    await page.locator("#compare-selected").click();
     await page.locator("#compare-search").fill("SlowCompare");
     await expect(page.locator("#compare-picker .picker-status--loading")).toContainText("Searching catalog");
     releaseSearch?.();
@@ -596,10 +630,16 @@ test.describe("Cosmic Atlas browser smoke", () => {
   });
 
   test("catalog broad search paginates and preserves selected object across filters", async ({ page }) => {
+    await page.waitForLoadState("networkidle");
     const issues = collectBrowserIssues(page);
     const searchOffsets: string[] = [];
 
     await page.route("**/api/survey-image?**", fulfillValidSurveyImage);
+    await page.route("**/api/catalog/viewport?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ bounds: {}, limit: 0, total: 0, objects: [] })
+    }));
 
     await page.route("**/api/catalog/search?**", async (route) => {
       const url = new URL(route.request().url());
@@ -735,6 +775,7 @@ test.describe("Cosmic Atlas browser smoke", () => {
   });
 
   test("shared view-state links restore a selected small body", async ({ page }) => {
+    await page.waitForLoadState("networkidle");
     const issues = collectBrowserIssues(page);
 
     await page.route("**/api/survey-image?**", fulfillValidSurveyImage);

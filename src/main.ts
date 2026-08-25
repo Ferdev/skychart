@@ -19,6 +19,7 @@ import { smallBodyOrbitPathForBody } from "./catalog/smallBodyOrbit";
 import { CatalogPointStream } from "./catalog/catalogPointStream";
 import { CatalogPointSelector } from "./catalog/catalogPointSelector";
 import { ObjectInspectionView, normalizeExternalLinks } from "./object/objectInspectionView";
+import { SelectionConnectorView } from "./object/selectionConnectorView";
 import { CatalogSearchGateway } from "./catalog/catalogSearchGateway";
 import { DestinationSearchView, type DestinationSearchConfig, type DestinationSearchState } from "./destination/destinationSearchView";
 import { MilkyWayRenderer } from "./rendering/milkyWayRenderer";
@@ -433,6 +434,15 @@ const objectInspection: ObjectInspectionView = new ObjectInspectionView({
   usableViewportRect,
   worldToScreen,
 });
+const selectionConnector = new SelectionConnectorView({
+  element: atlasDom.selectionConnector,
+  workspacePanel,
+  bodyInfo,
+  selectedBody,
+  active: () => activeTab === "object" && !selectedObjectPanel.hidden,
+  viewport: usableViewportRect,
+  bodyToScreen,
+});
 const mapSelection: CatalogMapSelectionController = new CatalogMapSelectionController({
   selector: catalogPointSelector,
   hydrationStates: objectDetailHydrationStates,
@@ -756,6 +766,7 @@ function updateAllUi() {
   updateContextModeStatus();
   updateScaleUi();
   updateSelectedPanelMetrics();
+  selectionConnector.update();
   updateEmbedAttribution();
 }
 
@@ -767,6 +778,7 @@ function render() {
   renderFrameId = null;
   atlasVisibility.invalidate();
   resizeCanvas();
+  selectionConnector.update();
   atlasViewport.beginFrame();
   const dpr = renderScale();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

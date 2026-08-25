@@ -18,14 +18,25 @@ export class AtlasControlView {
       atlasDom.selectedSummaryOrb.style.setProperty("--body-color", "#d8a23f");
       atlasDom.centerSelected.disabled = true;
       atlasDom.zoomSelected.disabled = true;
+      this.setComparisonMode(false);
+      delete atlasDom.selectedObjectPanel.dataset.selectedKey;
       return;
     }
+    if (atlasDom.selectedObjectPanel.dataset.selectedKey !== body.key) this.setComparisonMode(false);
+    atlasDom.selectedObjectPanel.dataset.selectedKey = body.key;
     atlasDom.selectedObjectPanel.hidden = false;
     atlasDom.selectedSummaryName.textContent = body.name;
     atlasDom.selectedSummaryMeta.textContent = `${classifyBody(body).label} · ${formatDistance(body.distance_from_earth_km)} ${t("object.fromEarth")}`;
     atlasDom.selectedSummaryOrb.style.setProperty("--body-color", body.color || "#d8a23f");
     atlasDom.centerSelected.disabled = false;
     atlasDom.zoomSelected.disabled = false;
+  }
+
+  private setComparisonMode(open: boolean) {
+    atlasDom.bodyInfo.hidden = open;
+    atlasDom.selectionCompare.hidden = !open;
+    atlasDom.selectedObjectPanel.classList.toggle("is-comparing", open);
+    atlasDom.compareSelected.setAttribute("aria-expanded", String(open));
   }
 
   updateQuickFocus(bodyByKey: ReadonlyMap<string, Body>) {

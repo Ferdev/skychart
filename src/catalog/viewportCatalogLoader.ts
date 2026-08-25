@@ -24,6 +24,7 @@ export class ViewportCatalogLoader {
   private requestId = 0;
   private loadedSignature = "";
   private inFlightSignature = "";
+  private abortController: AbortController | null = null;
 
   constructor(private readonly options: ViewportCatalogLoaderOptions) {}
 
@@ -35,6 +36,8 @@ export class ViewportCatalogLoader {
   cancel() {
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
+    this.abortController?.abort();
+    this.abortController = null;
     this.requestId += 1;
     this.inFlightSignature = "";
   }
@@ -61,11 +64,14 @@ export class ViewportCatalogLoader {
 
   private async load(request: { signature: string; params: URLSearchParams }) {
     if (request.signature === this.loadedSignature || request.signature === this.inFlightSignature) return;
+    this.abortController?.abort();
+    const abortController = new AbortController();
+    this.abortController = abortController;
     const requestId = ++this.requestId;
     this.inFlightSignature = request.signature;
     const startedAt = performance.now();
     try {
-      const response = await fetch(`/api/catalog/viewport?${request.params.toString()}`);
+      const response = await fetch(`/api/catalog/viewport?${request.params.toString()}`, { signal: abortController.signal });
       if (!response.ok) throw new Error(`Viewport catalog load failed with ${response.status}`);
       const payload = (await response.json()) as CatalogViewportPayload;
       if (requestId !== this.requestId) return;
@@ -78,8 +84,10 @@ export class ViewportCatalogLoader {
       this.options.afterMerge();
     } catch (error) {
       if (requestId === this.requestId) this.inFlightSignature = "";
+      if (error instanceof DOMException && error.name === "AbortError") return;
       console.warn("Unable to load viewport catalog objects.", error);
     } finally {
+      if (this.abortController === abortController) this.abortController = null;
       if (requestId === this.requestId) this.options.recordLoad(performance.now() - startedAt);
     }
   }
