@@ -1,4 +1,4 @@
-function requiredElement<T extends HTMLElement>(selector: string): T {
+function requiredElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
   if (!element) throw new Error(`Missing required element: ${selector}`);
   return element;
@@ -14,6 +14,7 @@ export const atlasDom = {
   canvas,
   ctx: context,
   catalogPointHover: requiredElement<HTMLElement>("#catalog-point-hover"),
+  selectionConnector: requiredElement<SVGSVGElement>("#selection-connector"),
   loadingScreen: requiredElement<HTMLElement>("#loading-screen"),
   loadingDetail: requiredElement<HTMLElement>("#loading-detail"),
   loadingFill: requiredElement<HTMLElement>("#loading-progress-fill"),
@@ -44,6 +45,8 @@ export const atlasDom = {
   exploreDomains: requiredElement<HTMLElement>("#explore-domains"),
   guidedTours: requiredElement<HTMLElement>("#guided-tours"),
   bodyInfo: requiredElement<HTMLElement>("#body-info"),
+  selectionCompare: requiredElement<HTMLElement>("#selection-compare"),
+  compareSelected: requiredElement<HTMLButtonElement>("#compare-selected"),
   nowStatus: requiredElement<HTMLElement>("#now-status"),
   nowEvents: requiredElement<HTMLOListElement>("#now-events"),
   centerSelected: requiredElement<HTMLButtonElement>("#center-selected"),

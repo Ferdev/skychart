@@ -77,6 +77,7 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
     if (button) options.selectBody(button.dataset.focusKey ?? "", { center: true, zoom: "local" });
   });
   dom.bodyInfo.addEventListener("click", (event) => {
+    if (options.inspection.handleViewClick(event.target)) return;
     const observe = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-observe-location]");
     if (observe) { void options.inspection.requestObservation(observe.dataset.observeLocation === "browser"); return; }
     const citation = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-copy-citation]");
@@ -87,6 +88,9 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
     }
     const related = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-related-key]");
     if (related) void options.selectBodyByKey(related.dataset.relatedKey ?? "", { center: true, animate: true });
+  });
+  dom.bodyInfo.addEventListener("keydown", (event) => {
+    if (options.inspection.handleViewKeydown(event)) event.preventDefault();
   });
   dom.tabButtons.forEach((button) => button.addEventListener("click", () => {
     const tab = (button.dataset.tab as "catalog" | "object") ?? "catalog";
@@ -148,6 +152,15 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
   });
   dom.centerSelected.addEventListener("click", () => options.centerOnSelected(false));
   dom.zoomSelected.addEventListener("click", () => options.centerOnSelected(true));
+  dom.compareSelected.addEventListener("click", () => {
+    const open = dom.selectionCompare.hidden;
+    dom.bodyInfo.hidden = open;
+    dom.selectionCompare.hidden = !open;
+    dom.selectedObjectPanel.classList.toggle("is-comparing", open);
+    dom.compareSelected.setAttribute("aria-expanded", String(open));
+    if (open) dom.compareSearch.focus();
+    options.requestRender();
+  });
 
   dom.compareSearch.addEventListener("input", () => {
     options.searchView.reset(options.compareSearchState);

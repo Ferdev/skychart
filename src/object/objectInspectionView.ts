@@ -64,18 +64,39 @@ export type ObjectInspectionContext = {
   worldToScreen: (xAu: number, yAu: number) => ScreenPoint;
 };
 
+type ObjectViewId = "overview" | "science" | "position" | "observe" | "sources";
+
+type ObjectView = {
+  id: ObjectViewId;
+  label: string;
+  content: string;
+};
+
 /** Renders the complete scientific meaning of one selected object. */
 export class ObjectInspectionView {
   private mediaFallbackCleanups: (() => void)[] = [];
+  private activeView: ObjectViewId = "overview";
+  private renderedBodyKey = "";
+  private activeMediaBodyKey: string | null = null;
+  private activeMediaMarkup: string | null = null;
 
   constructor(private readonly context: ObjectInspectionContext) {}
 
 update() {
-  this.clearMediaFallbacks();
   const body = this.context.selectedBody();
   if (!body) {
+    this.clearMediaFallbacks();
+    this.renderedBodyKey = "";
+    this.activeView = "overview";
+    this.activeMediaBodyKey = null;
+    this.activeMediaMarkup = null;
     this.context.bodyInfo.innerHTML = this.renderObjectEmptyState();
     return;
+  }
+
+  if (this.renderedBodyKey !== body.key) {
+    this.renderedBodyKey = body.key;
+    this.activeView = "overview";
   }
 
   const classification = classifyBody(body);
@@ -190,31 +211,122 @@ update() {
       ]
     : [];
 
+  const mediaMarkup = this.renderMediaSection(body);
+  const scienceContent = [
+    this.renderUniverseSciencePanel(body),
+    this.renderDataSection(t("section.stellarFacts"), stellarRows),
+    this.renderDataSection(t("section.confirmedExoplanets"), exoplanetRows, this.renderExoplanetList(body.exoplanet_system?.planets ?? [])),
+    this.renderDataSection(t("section.deepSkyFacts"), deepSkyRows),
+    this.renderDataSection(t("section.smallBodyFacts"), smallBodyRows),
+    this.renderObjectNotes(body),
+  ].join("");
+  const views: ObjectView[] = [
+    {
+      id: "overview",
+      label: t("section.overview"),
+      content: [
+        mediaMarkup,
+        this.renderDataSection(t("section.overview"), overviewRows),
+        this.renderRelatedObjects(body),
+      ].join(""),
+    },
+    ...(scienceContent ? [{ id: "science" as const, label: t("object.viewScience"), content: scienceContent }] : []),
+    {
+      id: "position",
+      label: t("section.position"),
+      content: [
+        this.renderDataSection(t("section.position"), positionRows),
+        this.renderDataSection(t("section.motion"), stateRows),
+        this.renderDataSection(t("section.orbit"), orbitRows),
+      ].join(""),
+    },
+    { id: "observe", label: t("object.viewObserve"), content: this.renderObservePanel(body) },
+    {
+      id: "sources",
+      label: t("object.viewSources"),
+      content: [this.renderIdentifierSection(body), this.renderSourceSection(body)].join(""),
+    },
+  ];
+  if (!views.some((view) => view.id === this.activeView)) this.activeView = "overview";
+  const currentMediaSection = this.context.bodyInfo.querySelector<HTMLElement>(".object-media-section");
+  const preserveMediaSection = currentMediaSection != null
+    && this.activeMediaBodyKey === body.key
+    && this.activeMediaMarkup === mediaMarkup;
+  if (preserveMediaSection) currentMediaSection.remove();
+  else this.clearMediaFallbacks();
+
   this.context.bodyInfo.innerHTML = `
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
-      <section class="object-data-pane">
+      <div class="object-orientation">
         ${this.renderObjectDetailState(body)}
         ${this.renderObjectSummaryCard(body, classification.label)}
         ${this.renderFactTiles(primaryStats)}
-        ${this.renderUniverseSciencePanel(body)}
-        ${this.renderObservePanel(body)}
-        ${this.renderIdentifierSection(body)}
-        ${this.renderMediaSection(body)}
-        ${this.renderDataSection(t("section.overview"), overviewRows)}
-        ${this.renderDataSection(t("section.position"), positionRows)}
-        ${this.renderDataSection(t("section.motion"), stateRows)}
-        ${this.renderDataSection(t("section.orbit"), orbitRows)}
-        ${this.renderDataSection(t("section.stellarFacts"), stellarRows)}
-        ${this.renderDataSection(t("section.confirmedExoplanets"), exoplanetRows, this.renderExoplanetList(body.exoplanet_system?.planets ?? []))}
-        ${this.renderDataSection(t("section.deepSkyFacts"), deepSkyRows)}
-        ${this.renderDataSection(t("section.smallBodyFacts"), smallBodyRows)}
-        ${this.renderObjectNotes(body)}
-        ${this.renderSourceSection(body)}
-        ${this.renderRelatedObjects(body)}
-      </section>
+      </div>
+      <nav class="object-view-tabs" role="tablist" aria-label="${escapeHtml(t("object.detailViews"))}">
+        ${views.map((view) => this.renderObjectViewTab(view)).join("")}
+      </nav>
+      <div class="object-view-panels">
+        ${views.map((view) => this.renderObjectViewPanel(view)).join("")}
+      </div>
     </article>
   `;
-  this.installMediaFallbacks();
+  const replacementMediaSection = this.context.bodyInfo.querySelector<HTMLElement>(".object-media-section");
+  if (preserveMediaSection && replacementMediaSection) {
+    replacementMediaSection.replaceWith(currentMediaSection);
+  } else {
+    if (preserveMediaSection) this.clearMediaFallbacks();
+    this.installMediaFallbacks();
+  }
+  this.activeMediaBodyKey = body.key;
+  this.activeMediaMarkup = mediaMarkup;
+}
+
+handleViewClick(target: EventTarget | null): boolean {
+  const button = target instanceof Element ? target.closest<HTMLButtonElement>("[data-object-view]") : null;
+  const view = button?.dataset.objectView as ObjectViewId | undefined;
+  if (!view) return false;
+  this.activateView(view, false);
+  return true;
+}
+
+handleViewKeydown(event: KeyboardEvent): boolean {
+  const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("[data-object-view]") : null;
+  if (!button || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return false;
+  const tabs = [...this.context.bodyInfo.querySelectorAll<HTMLButtonElement>("[data-object-view]")];
+  const currentIndex = tabs.indexOf(button);
+  if (currentIndex < 0 || tabs.length === 0) return false;
+  const nextIndex = event.key === "Home"
+    ? 0
+    : event.key === "End"
+      ? tabs.length - 1
+      : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+  this.activateView(tabs[nextIndex].dataset.objectView as ObjectViewId, true);
+  return true;
+}
+
+private activateView(view: ObjectViewId, focus: boolean) {
+  const tab = this.context.bodyInfo.querySelector<HTMLButtonElement>(`[data-object-view="${view}"]`);
+  if (!tab) return;
+  this.activeView = view;
+  for (const button of this.context.bodyInfo.querySelectorAll<HTMLButtonElement>("[data-object-view]")) {
+    const active = button === tab;
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+  }
+  for (const panel of this.context.bodyInfo.querySelectorAll<HTMLElement>("[data-object-view-panel]")) {
+    panel.hidden = panel.dataset.objectViewPanel !== view;
+  }
+  if (focus) tab.focus();
+}
+
+private renderObjectViewTab(view: ObjectView) {
+  const active = view.id === this.activeView;
+  return `<button type="button" id="object-view-tab-${view.id}" role="tab" data-object-view="${view.id}" aria-selected="${active}" aria-controls="object-view-panel-${view.id}" tabindex="${active ? "0" : "-1"}">${escapeHtml(view.label)}</button>`;
+}
+
+private renderObjectViewPanel(view: ObjectView) {
+  const active = view.id === this.activeView;
+  return `<section id="object-view-panel-${view.id}" class="object-view-panel" role="tabpanel" data-object-view-panel="${view.id}" aria-labelledby="object-view-tab-${view.id}"${active ? "" : " hidden"}>${view.content}</section>`;
 }
 
 private renderObservePanel(body: Body) {

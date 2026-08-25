@@ -1,3 +1,5 @@
+import type { Body } from "./atlas/contracts";
+
 export function uniqueTextValues(values: readonly (string | null | undefined)[]) {
   const seen = new Set<string>();
   const unique: string[] = [];
@@ -61,6 +63,14 @@ export function formatRatio(value: number) {
   if (value >= 100) return value.toFixed(1);
   if (value >= 10) return value.toFixed(2);
   return value.toFixed(3);
+}
+
+export function bodyDistanceKm(left: Body, right: Body, auKm: number) {
+  return Math.hypot(
+    left.position.x_au - right.position.x_au,
+    left.position.y_au - right.position.y_au,
+    left.position.z_au - right.position.z_au,
+  ) * auKm;
 }
 
 export function shortBodyName(name: string) { return name.replace(/^M(\d+)\s+/, "M$1 "); }
