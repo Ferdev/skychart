@@ -338,6 +338,12 @@ test.describe("Cosmic Atlas browser smoke", () => {
     const issues = collectBrowserIssues(page);
     let releaseHydration: (() => void) | null = null;
 
+    await page.route("**/api/survey-image?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: VISIBLE_SURVEY_IMAGE
+    }));
+
     await page.route("**/api/catalog/search?**", async (route) => {
       const url = route.request().url();
       if (!url.includes("q=Hydrate")) {
@@ -389,8 +395,15 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await page.locator("#body-search").press("Enter");
     await expect(page.locator("#selected-summary-name")).toContainText("Hydration Preview");
     await expect(page.locator(".object-detail-state--loading")).toContainText("Loading object detail");
+    const dss2Media = page.locator('[data-media-provider="dss2"]');
+    await expect(dss2Media).toBeVisible();
+    await dss2Media.evaluate((element) => {
+      element.setAttribute("data-test-loaded-media", "preserve");
+    });
     releaseHydration?.();
     await expect(page.locator(".object-detail-state--error")).toContainText("Object detail unavailable");
+    await expect(dss2Media).toHaveAttribute("data-test-loaded-media", "preserve");
+    await expect(page.locator('[data-media-status="loading"]')).toBeHidden();
     const position = page.locator(".data-section").filter({ has: page.getByRole("heading", { name: "Position", exact: true }) });
     await expect(position).toContainText("Right ascension");
 
