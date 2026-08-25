@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import { collectBrowserIssues, openAtlas, openSearchWorkspace, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
 
 const STATIC_POINT_TILE_WITH_ONE_POINT = (() => {
@@ -35,6 +35,12 @@ const BLANK_SURVEY_IMAGE = Buffer.from(
 
 function surveyProvider(url: string) {
   return new URL(url).searchParams.get("provider");
+}
+
+async function fulfillValidSurveyImage(route: Route) {
+  const url = new URL(route.request().url());
+  expect(url.searchParams.get("fov"), "survey image requests include a field of view").toMatch(/^\d+(?:\.\d+)?$/);
+  await route.fulfill({ status: 200, contentType: "image/png", body: VISIBLE_SURVEY_IMAGE });
 }
 
 test("time changes remain responsive while positions update", async ({ page, request }) => {
@@ -338,6 +344,8 @@ test.describe("Cosmic Atlas browser smoke", () => {
     const issues = collectBrowserIssues(page);
     let releaseHydration: (() => void) | null = null;
 
+    await page.route("**/api/survey-image?**", fulfillValidSurveyImage);
+
     await page.route("**/api/catalog/search?**", async (route) => {
       const url = route.request().url();
       if (!url.includes("q=Hydrate")) {
@@ -591,6 +599,8 @@ test.describe("Cosmic Atlas browser smoke", () => {
     const issues = collectBrowserIssues(page);
     const searchOffsets: string[] = [];
 
+    await page.route("**/api/survey-image?**", fulfillValidSurveyImage);
+
     await page.route("**/api/catalog/search?**", async (route) => {
       const url = new URL(route.request().url());
       if (url.searchParams.get("q") !== "Paged") {
@@ -726,6 +736,8 @@ test.describe("Cosmic Atlas browser smoke", () => {
 
   test("shared view-state links restore a selected small body", async ({ page }) => {
     const issues = collectBrowserIssues(page);
+
+    await page.route("**/api/survey-image?**", fulfillValidSurveyImage);
 
     await openAtlas(page, "/?v=1&c=0%2C0&z=24&t=now&o=jpl-sbdb-20000001&L=");
 

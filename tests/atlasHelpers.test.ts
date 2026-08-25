@@ -47,6 +47,7 @@ assert.equal(legacySurveyImageUrl.pathname, "/api/survey-image");
 assert.equal(legacySurveyImageUrl.searchParams.get("provider"), "legacy-dr11");
 assert.equal(legacySurveyImageUrl.searchParams.get("ra"), "190.108600");
 assert.equal(legacySurveyImageUrl.searchParams.get("dec"), "1.200500");
+assert.equal(legacySurveyImageUrl.searchParams.get("fov"), "0.420");
 assert.ok(legacySurveyMedia.fallback);
 assert.equal(legacySurveyMedia.fallback.provider, "allwise");
 const legacyFallbackImageUrl = new URL(legacySurveyMedia.fallback.imageUrl, "https://skychart.org");
@@ -60,6 +61,7 @@ assert.equal(defaultSurveyMedia.provider, "dss2");
 const defaultSurveyImageUrl = new URL(defaultSurveyMedia.imageUrl, "https://skychart.org");
 assert.equal(defaultSurveyImageUrl.pathname, "/api/survey-image");
 assert.equal(defaultSurveyImageUrl.searchParams.get("provider"), "dss2");
+assert.equal(defaultSurveyImageUrl.searchParams.get("fov"), "0.420");
 
 const curatedAndSurveyMedia = objectMediaItemsFor({
   key: "m31",

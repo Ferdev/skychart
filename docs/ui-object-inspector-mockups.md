@@ -86,13 +86,29 @@ This keeps a full-height inspector but gives advanced data a stable taxonomy.
 
 **Tradeoff:** it is the most structured and potentially the most intimidating direction for first-time visitors. Tabs must adapt carefully for each catalog family.
 
+## Direction D — Anchored progressive disclosure
+
+![Anchored progressive-disclosure inspector](mockups/object-inspector-anchored-progressive-disclosure.png)
+
+This combines Direction A's hierarchy with Direction B's spatial connection to the selected object.
+
+- The full-height inspector retains the explanation, primary facts, task tabs, and explicit Compare action.
+- A restrained leader line runs from the selected map point to a small anchor on the inspector edge.
+- The map-to-panel relationship is visible immediately without introducing a second compact card or duplicating content.
+- The connector is selection context, not navigation: Center and Zoom remain explicit actions in the sticky header.
+
+**Best for:** the default implementation when preserving spatial context is as important as simplifying the information hierarchy.
+
+**Tradeoff:** the connector needs collision, viewport-edge, and clustered-object rules; on narrow mobile layouts it should disappear once the inspector becomes a full-width sheet.
+
 ## Recommendation
 
-Start with Direction A. It offers the largest clarity improvement with the least disruption to the current selection model, DOM structure, and responsive behavior. Treat Direction B as a possible second-stage “quick selection” layer after the inspector hierarchy is proven. Borrow Direction C's aligned metric row and compact disclosures where they improve dense object types.
+Start with Direction D: implement Direction A's inspector structure and add Direction B's spatial anchor as a desktop enhancement. This preserves the current selection model while making the relationship between the map object and its inspector unambiguous. Borrow Direction C's aligned metric row and compact disclosures where they improve dense object types.
 
 The first implementation slice should:
 
 - keep the object header sticky;
+- anchor the desktop inspector to the selected point with a single unobtrusive leader line;
 - show only the explanation and type-appropriate primary facts before navigation;
 - introduce accessible task tabs;
 - move comparison behind one clear action;
