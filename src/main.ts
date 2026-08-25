@@ -8,7 +8,7 @@ import { installAnalytics, trackEvent } from "./analytics";
 import { initializeErrorReporting } from "./errorReporting";
 import { decodeViewState, type BodyFilter, type DisplayLayer, type ViewState } from "./viewState";
 import { TourPlayer } from "./tourPlayer";
-import { formatLightYears, formatNumber } from "./atlasFormatting";
+import { bodyDistanceKm as calculateBodyDistanceKm, formatLightYears, formatNumber } from "./atlasFormatting";
 import { isPresent, type Rect, type ScreenPoint } from "./geometry";
 import { CatalogPointDecoder } from "./catalog/catalogPointDecoder";
 import { CatalogPointManifestRepository } from "./catalog/catalogPointManifest";
@@ -19,6 +19,7 @@ import { smallBodyOrbitPathForBody } from "./catalog/smallBodyOrbit";
 import { CatalogPointStream } from "./catalog/catalogPointStream";
 import { CatalogPointSelector } from "./catalog/catalogPointSelector";
 import { ObjectInspectionView, normalizeExternalLinks } from "./object/objectInspectionView";
+import { SelectionConnectorView } from "./object/selectionConnectorView";
 import { CatalogSearchGateway } from "./catalog/catalogSearchGateway";
 import { DestinationSearchView, type DestinationSearchConfig, type DestinationSearchState } from "./destination/destinationSearchView";
 import { MilkyWayRenderer } from "./rendering/milkyWayRenderer";
@@ -433,6 +434,15 @@ const objectInspection: ObjectInspectionView = new ObjectInspectionView({
   usableViewportRect,
   worldToScreen,
 });
+const selectionConnector = new SelectionConnectorView({
+  element: atlasDom.selectionConnector,
+  workspacePanel,
+  bodyInfo,
+  selectedBody,
+  active: () => activeTab === "object" && !selectedObjectPanel.hidden,
+  viewport: usableViewportRect,
+  bodyToScreen,
+});
 const mapSelection: CatalogMapSelectionController = new CatalogMapSelectionController({
   selector: catalogPointSelector,
   hydrationStates: objectDetailHydrationStates,
@@ -756,6 +766,7 @@ function updateAllUi() {
   updateContextModeStatus();
   updateScaleUi();
   updateSelectedPanelMetrics();
+  selectionConnector.update();
   updateEmbedAttribution();
 }
 
@@ -767,6 +778,7 @@ function render() {
   renderFrameId = null;
   atlasVisibility.invalidate();
   resizeCanvas();
+  selectionConnector.update();
   atlasViewport.beginFrame();
   const dpr = renderScale();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1024,15 +1036,7 @@ function selectedBody(): Body | null { return objectSelection.selectedBody(); }
 function compareTarget(): Body | null { return objectSelection.compareTarget(); }
 function ensureCompareTarget() { objectSelection.ensureCompareTarget(); }
 
-function bodyDistanceKm(a: Body, b: Body) {
-  return (
-    Math.hypot(
-      a.position.x_au - b.position.x_au,
-      a.position.y_au - b.position.y_au,
-      a.position.z_au - b.position.z_au
-    ) * auKm()
-  );
-}
+function bodyDistanceKm(a: Body, b: Body) { return calculateBodyDistanceKm(a, b, auKm()); }
 
 function worldToScreen(xAu: number, yAu: number): ScreenPoint { return atlasViewport.worldToScreen(xAu, yAu); }
 function bodyToScreen(body: Body): ScreenPoint { return worldToScreen(body.position.x_au, body.position.y_au); }

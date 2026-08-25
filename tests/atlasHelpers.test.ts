@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { escapeHtml, formatRatio, identifierLabel, identifierValue, shortBodyName, uniquePairs, uniqueTextValues } from "../src/atlasFormatting.ts";
+import { bodyDistanceKm, escapeHtml, formatRatio, identifierLabel, identifierValue, shortBodyName, uniquePairs, uniqueTextValues } from "../src/atlasFormatting.ts";
 import { clamp, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectUnion } from "../src/geometry.ts";
 import { eclipticCartesianToEquatorial } from "../src/coordinates.ts";
 import { objectMediaFor, objectMediaItemsFor, pixelBufferHasVisibleVariation } from "../src/objectMedia.ts";
@@ -12,6 +12,11 @@ assert.deepEqual(uniqueTextValues(["Mars", " mars ", null, "Earth"]), ["Mars", "
 assert.deepEqual(uniquePairs([["ID", "1"], ["id", "1"], ["ID", "2"]]), [["ID", "1"], ["ID", "2"]]);
 assert.equal(shortBodyName("M31 Andromeda"), "M31 Andromeda");
 assert.equal(formatRatio(12.3456), "12.35");
+assert.equal(bodyDistanceKm(
+  { position: { x_au: 1, y_au: 2, z_au: 3 } } as never,
+  { position: { x_au: 4, y_au: 6, z_au: 3 } } as never,
+  10,
+), 50);
 
 const bounds = { left: 0, top: 0, right: 100, bottom: 80, width: 100, height: 80 };
 assert.equal(clamp(12, 0, 10), 10);
@@ -47,6 +52,7 @@ assert.equal(legacySurveyImageUrl.pathname, "/api/survey-image");
 assert.equal(legacySurveyImageUrl.searchParams.get("provider"), "legacy-dr11");
 assert.equal(legacySurveyImageUrl.searchParams.get("ra"), "190.108600");
 assert.equal(legacySurveyImageUrl.searchParams.get("dec"), "1.200500");
+assert.equal(legacySurveyImageUrl.searchParams.get("fov"), "0.420");
 assert.ok(legacySurveyMedia.fallback);
 assert.equal(legacySurveyMedia.fallback.provider, "allwise");
 const legacyFallbackImageUrl = new URL(legacySurveyMedia.fallback.imageUrl, "https://skychart.org");
@@ -60,6 +66,7 @@ assert.equal(defaultSurveyMedia.provider, "dss2");
 const defaultSurveyImageUrl = new URL(defaultSurveyMedia.imageUrl, "https://skychart.org");
 assert.equal(defaultSurveyImageUrl.pathname, "/api/survey-image");
 assert.equal(defaultSurveyImageUrl.searchParams.get("provider"), "dss2");
+assert.equal(defaultSurveyImageUrl.searchParams.get("fov"), "0.420");
 
 const curatedAndSurveyMedia = objectMediaItemsFor({
   key: "m31",

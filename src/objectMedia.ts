@@ -483,6 +483,7 @@ function legacySurveyMediaFor(body: MediaLookupBody, observer?: MediaObserver, a
   const imageParams = new URLSearchParams({
     ra: coordinate.raDeg.toFixed(6),
     dec: coordinate.decDeg.toFixed(6),
+    fov: fov.toFixed(3),
     width: width.toString(),
     height: height.toString(),
     layer: "ls-dr11",

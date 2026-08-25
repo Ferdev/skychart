@@ -27,6 +27,11 @@
       <canvas id="point-map" aria-hidden="true"></canvas>
       <canvas id="map" aria-label="2D heliocentric ecliptic celestial atlas" data-i18n-attrs="aria-label:app.mapLabel"></canvas>
       <div id="catalog-point-hover" class="catalog-point-hover" aria-hidden="true"></div>
+      <svg id="selection-connector" class="selection-connector" aria-hidden="true" hidden>
+        <path class="selection-connector__leader"></path>
+        <circle class="selection-connector__source" r="11"></circle>
+        <circle class="selection-connector__anchor" r="4"></circle>
+      </svg>
 
       <section class="loading-screen" id="loading-screen" role="status" aria-live="polite" aria-label="Loading Cosmic Atlas" data-i18n-attrs="aria-label:loading.label">
         <div class="loading-panel">
@@ -277,8 +282,9 @@
                 <button id="zoom-selected" class="text-action" type="button" data-i18n="object.zoom">Zoom</button>
               </div>
             </div>
-            <div id="body-info" class="selected-object-details"></div>
-            <section class="selection-compare" aria-label="Compare selected object" data-i18n-attrs="aria-label:compare.label">
+            <div class="object-workspace-stage">
+              <div id="body-info" class="selected-object-details"></div>
+              <section id="selection-compare" class="selection-compare" aria-label="Compare selected object" data-i18n-attrs="aria-label:compare.label" hidden>
               <div class="selection-compare-head">
                 <div>
                   <p class="eyebrow" data-i18n="compare.eyebrow">Compare</p>
@@ -308,7 +314,14 @@
                   <div class="body-picker compare-picker" id="compare-picker" role="group" aria-label="Comparison objects" data-i18n-attrs="aria-label:compare.objects"></div>
                 </div>
               </div>
-            </section>
+              </section>
+            </div>
+            <footer class="object-inspector-footer">
+              <button id="compare-selected" class="compare-selected-action" type="button" aria-controls="selection-compare" aria-expanded="false">
+                <span aria-hidden="true">⇄</span>
+                <strong data-i18n="compare.eyebrow">Compare</strong>
+              </button>
+            </footer>
           </section>
 
           <section class="tab-panel search-workspace" id="tab-catalog" data-tab-panel="catalog" aria-label="Catalog search" data-i18n-attrs="aria-label:search.catalog">

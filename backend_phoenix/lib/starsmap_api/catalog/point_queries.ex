@@ -23,6 +23,34 @@ defmodule StarsmapApi.Catalog.PointQueries do
   @point_layer_groups ~w(gaia_local_stars gaia_500pc_stars gaia_10kpc_bright_stars)
   @point_layer_rgb {224, 196, 128}
   @point_binary_magic "SMP2"
+  @viewport_fields [
+    :id,
+    :key,
+    :name,
+    :object_type,
+    :catalog_group,
+    :source_type,
+    :position_model,
+    :parent_key,
+    :color,
+    :radius_km,
+    :ra_deg,
+    :dec_deg,
+    :distance_pc,
+    :distance_ly,
+    :x_au,
+    :y_au,
+    :z_au,
+    :x_km,
+    :y_km,
+    :z_km,
+    :apparent_magnitude,
+    :absolute_magnitude,
+    :aliases,
+    :external_ids,
+    :facts,
+    :source
+  ]
 
   def list_viewport(params) do
     with {:ok, bounds} <- viewport_bounds(params) do
@@ -41,6 +69,7 @@ defmodule StarsmapApi.Catalog.PointQueries do
           asc: object.name
         )
         |> limit(^limit)
+        |> select([object], struct(object, ^@viewport_fields))
         |> Repo.all()
 
       {:ok,
