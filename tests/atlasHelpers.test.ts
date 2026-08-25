@@ -41,23 +41,25 @@ assert.deepEqual(legacySurveyItems.map((media) => media.provider), ["dss2", "leg
 const legacySurveyMedia = legacySurveyItems[1];
 assert.ok(legacySurveyMedia);
 assert.equal(legacySurveyMedia.badge, "Legacy Surveys DR11");
-const legacySurveyImageUrl = new URL(legacySurveyMedia.imageUrl);
-assert.equal(legacySurveyImageUrl.origin, "https://www.legacysurvey.org");
-assert.equal(legacySurveyImageUrl.pathname, "/viewer/jpeg-cutout");
-assert.equal(legacySurveyImageUrl.searchParams.get("layer"), "ls-dr11");
-assert.equal(legacySurveyImageUrl.searchParams.get("width"), "512");
-assert.equal(legacySurveyImageUrl.searchParams.get("height"), "320");
+const legacySurveyImageUrl = new URL(legacySurveyMedia.imageUrl, "https://skychart.org");
+assert.equal(legacySurveyImageUrl.origin, "https://skychart.org");
+assert.equal(legacySurveyImageUrl.pathname, "/api/survey-image");
+assert.equal(legacySurveyImageUrl.searchParams.get("provider"), "legacy-dr11");
 assert.equal(legacySurveyImageUrl.searchParams.get("ra"), "190.108600");
 assert.equal(legacySurveyImageUrl.searchParams.get("dec"), "1.200500");
 assert.ok(legacySurveyMedia.fallback);
 assert.equal(legacySurveyMedia.fallback.provider, "allwise");
-const legacyFallbackImageUrl = new URL(legacySurveyMedia.fallback.imageUrl);
-assert.equal(legacyFallbackImageUrl.origin, "https://alasky.cds.unistra.fr");
-assert.equal(legacyFallbackImageUrl.searchParams.get("hips"), "CDS/P/allWISE/color");
+const legacyFallbackImageUrl = new URL(legacySurveyMedia.fallback.imageUrl, "https://skychart.org");
+assert.equal(legacyFallbackImageUrl.origin, "https://skychart.org");
+assert.equal(legacyFallbackImageUrl.pathname, "/api/survey-image");
+assert.equal(legacyFallbackImageUrl.searchParams.get("provider"), "allwise");
 
 const defaultSurveyMedia = objectMediaFor(legacySurveyBody);
 assert.ok(defaultSurveyMedia);
 assert.equal(defaultSurveyMedia.provider, "dss2");
+const defaultSurveyImageUrl = new URL(defaultSurveyMedia.imageUrl, "https://skychart.org");
+assert.equal(defaultSurveyImageUrl.pathname, "/api/survey-image");
+assert.equal(defaultSurveyImageUrl.searchParams.get("provider"), "dss2");
 
 const curatedAndSurveyMedia = objectMediaItemsFor({
   key: "m31",
@@ -79,7 +81,7 @@ const asteroidMedia = objectMediaItemsFor({
   position: { x_au: 1, y_au: 1, z_au: 0 }
 }, earthObserver);
 assert.deepEqual(asteroidMedia.map((media) => media.provider), ["dss2", "legacy-dr11"]);
-const asteroidDr11Url = new URL(asteroidMedia[1]!.imageUrl);
+const asteroidDr11Url = new URL(asteroidMedia[1]!.imageUrl, "https://skychart.org");
 assert.equal(asteroidDr11Url.searchParams.get("ra"), "90.000000");
 assert.equal(asteroidDr11Url.searchParams.get("dec"), "23.439291");
 assert.match(asteroidMedia[1]!.description ?? "", /moving object may not appear/i);
@@ -98,7 +100,7 @@ const gaiaMedia = objectMediaItemsFor({
   position: { x_au: 2, y_au: 0, z_au: 0 }
 }, earthObserver);
 assert.deepEqual(gaiaMedia.map((media) => media.provider), ["dss2", "legacy-dr11"]);
-const gaiaDr11Url = new URL(gaiaMedia[1]!.imageUrl);
+const gaiaDr11Url = new URL(gaiaMedia[1]!.imageUrl, "https://skychart.org");
 assert.equal(gaiaDr11Url.searchParams.get("ra"), "0.000000");
 assert.equal(gaiaDr11Url.searchParams.get("dec"), "0.000000");
 assert.match(gaiaMedia[1]!.description ?? "", /reconstructed from the atlas position/i);

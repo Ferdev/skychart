@@ -30,6 +30,7 @@ jobs:
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+      MINIMUM_DEPLOY_FREE_GIB: "6"
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -103,6 +104,15 @@ jobs:
       - name: Release stale deploy lock
         run: kamal lock release -d staging || true
 
+      # `kamal redeploy` intentionally omits pruning. Enforce the shared
+      # retain_containers policy before pulling another image and after the
+      # replacement is proven healthy.
+      - name: Prune superseded staging artifacts
+        run: kamal prune all -d staging
+
+      - name: Verify staging host storage headroom
+        run: bash scripts/verify_deploy_storage.sh
+
       - name: Ensure Kamal proxy
         run: kamal proxy boot -d staging || true
 
@@ -111,3 +121,6 @@ jobs:
 
       - name: Smoke test staging
         run: curl -fsS https://staging.skychart.org/api/health
+
+      - name: Enforce staging artifact retention
+        run: kamal prune all -d staging

@@ -560,11 +560,20 @@ private renderObjectMedia(body: Body) {
   const observer = this.context.ephemeris()?.bodies.find((candidate) => candidate.key === "earth");
   const mediaItems = objectMediaItemsFor(body, observer);
   if (mediaItems.length === 0) return "";
+  const hasSurveyMedia = mediaItems.some((media) => media.kind === "survey");
 
-  return `<div class="object-media-list">${mediaItems.map((media) => `
-      <section class="object-media object-media--${escapeHtml(media.kind)}" data-media-provider="${escapeHtml(media.provider ?? media.kind)}" ${media.kind === "survey" ? 'data-media-validation="pixels" hidden' : ""} ${media.fallback ? this.renderMediaFallbackData(media.fallback) : ""} aria-label="${escapeHtml(t("object.mediaLabel"))}">
+  return `${hasSurveyMedia ? `
+    <div class="object-media-status object-media-status--loading" data-media-status="loading" role="status" aria-live="polite">
+      <span class="object-media-status__spinner" aria-hidden="true"></span>
+      <div>
+        <strong data-media-status-title>${escapeHtml(t("object.mediaLoading"))}</strong>
+        <p data-media-status-body>${escapeHtml(t("object.mediaLoadingBody"))}</p>
+      </div>
+    </div>
+  ` : ""}<div class="object-media-list">${mediaItems.map((media) => `
+      <section class="object-media object-media--${escapeHtml(media.kind)}" data-media-provider="${escapeHtml(media.provider ?? media.kind)}" data-media-state="${media.kind === "survey" ? "loading" : "available"}" ${media.kind === "survey" ? 'data-media-validation="pixels" hidden' : ""} ${media.fallback ? this.renderMediaFallbackData(media.fallback) : ""} aria-label="${escapeHtml(t("object.mediaLabel"))}">
         <div class="object-media__image">
-          <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="${media.kind === "survey" ? "eager" : "lazy"}" decoding="async" ${media.kind === "survey" ? 'crossorigin="anonymous"' : ""} referrerpolicy="no-referrer" />
+          <img src="${escapeHtml(media.imageUrl)}" alt="${escapeHtml(media.alt)}" loading="${media.kind === "survey" ? "eager" : "lazy"}" decoding="async" referrerpolicy="no-referrer" />
           <span class="object-media__badge">${escapeHtml(media.badge)}</span>
         </div>
         <div class="object-media__caption">
@@ -592,17 +601,31 @@ private renderMediaFallbackData(fallback: ObjectMediaFallback) {
 }
 
 private installMediaFallbacks() {
-  const syncSectionVisibility = (mediaSection: HTMLElement | null) => {
+  const syncSectionState = (mediaSection: HTMLElement | null) => {
     if (!mediaSection) return;
     const cards = [...mediaSection.querySelectorAll<HTMLElement>(".object-media")];
-    if (cards.length === 0) {
-      mediaSection.remove();
-      return;
+    const mediaList = mediaSection.querySelector<HTMLElement>(".object-media-list");
+    if (mediaList) mediaList.hidden = cards.every((candidate) => candidate.hidden);
+
+    const status = mediaSection.querySelector<HTMLElement>("[data-media-status]");
+    if (!status) return;
+    const surveys = cards.filter((candidate) => candidate.dataset.mediaValidation === "pixels");
+    const loading = surveys.filter((candidate) => candidate.dataset.mediaState === "loading");
+    const available = surveys.filter((candidate) => candidate.dataset.mediaState === "available");
+    const failed = surveys.filter((candidate) => candidate.dataset.mediaState === "failed");
+
+    if (loading.length > 0) {
+      this.updateMediaStatus(status, "loading", t("object.mediaLoading"), t("object.mediaLoadingBody"));
+    } else if (available.length > 0) {
+      status.hidden = true;
+    } else if (failed.length > 0) {
+      this.updateMediaStatus(status, "failed", t("object.mediaFailed"), t("object.mediaFailedBody"));
+    } else {
+      this.updateMediaStatus(status, "unavailable", t("object.mediaUnavailable"), t("object.mediaUnavailableBody"));
     }
-    mediaSection.hidden = cards.every((candidate) => candidate.hidden);
   };
   for (const mediaSection of this.context.bodyInfo.querySelectorAll<HTMLElement>(".object-media-section")) {
-    syncSectionVisibility(mediaSection);
+    syncSectionState(mediaSection);
   }
 
   for (const card of this.context.bodyInfo.querySelectorAll<HTMLElement>(".object-media")) {
@@ -614,51 +637,48 @@ private installMediaFallbacks() {
     const requiresPixelValidation = card.dataset.mediaValidation === "pixels";
     let settled = false;
     let usingFallback = false;
+    let fallbackFailureState: "unavailable" | "failed" = "unavailable";
     let timeoutId: number | null = null;
-    let observer: IntersectionObserver | null = null;
     const clearPending = () => {
       if (timeoutId != null) window.clearTimeout(timeoutId);
       timeoutId = null;
-      observer?.disconnect();
-      observer = null;
     };
-    this.mediaFallbackCleanups.push(clearPending);
-    const hideUnavailable = () => {
+    this.mediaFallbackCleanups.push(() => {
+      settled = true;
+      clearPending();
+    });
+    const finish = (state: "available" | "unavailable" | "failed") => {
       if (settled) return;
       settled = true;
       clearPending();
-      card.remove();
-      syncSectionVisibility(mediaSection);
-    };
-    const markLoaded = () => {
-      if (settled) return;
-      settled = true;
-      clearPending();
-      card.hidden = false;
-      syncSectionVisibility(mediaSection);
+      card.dataset.mediaState = state;
+      card.hidden = state !== "available";
+      syncSectionState(mediaSection);
     };
 
     if (!requiresPixelValidation) {
-      image.addEventListener("error", hideUnavailable, { once: true });
-      if (image.complete && image.naturalWidth <= 0) hideUnavailable();
+      image.addEventListener("error", () => finish("failed"), { once: true });
+      if (image.complete && image.naturalWidth <= 0) finish("failed");
       continue;
     }
 
     const startTimeout = (onTimeout: () => void) => {
-      if (timeoutId == null && !settled) timeoutId = window.setTimeout(onTimeout, 12_000);
+      if (timeoutId == null && !settled) timeoutId = window.setTimeout(onTimeout, 30_000);
     };
     let validateLoadedImage = () => {};
-    const useFallback = () => {
+    const useFallback = (reason: "unavailable" | "failed") => {
       if (settled || usingFallback || !fallbackSrc) {
-        if (!fallbackSrc) hideUnavailable();
+        if (!fallbackSrc) finish(reason);
         return;
       }
       usingFallback = true;
+      fallbackFailureState = reason;
       clearPending();
       card.dataset.mediaProvider = card.dataset.fallbackProvider ?? "fallback";
+      card.dataset.mediaState = "loading";
       card.classList.add("object-media--fallback");
       image.addEventListener("load", validateLoadedImage, { once: true });
-      image.addEventListener("error", hideUnavailable, { once: true });
+      image.addEventListener("error", () => finish("failed"), { once: true });
       image.src = fallbackSrc;
       image.alt = card.dataset.fallbackAlt ?? image.alt;
       const updates: [string, string | undefined][] = [
@@ -676,34 +696,43 @@ private installMediaFallbacks() {
         if (card.dataset.fallbackSourceUrl) source.href = card.dataset.fallbackSourceUrl;
         if (card.dataset.fallbackLicense) source.textContent = card.dataset.fallbackLicense;
       }
-      startTimeout(hideUnavailable);
+      syncSectionState(mediaSection);
+      startTimeout(() => finish("failed"));
     };
     validateLoadedImage = () => {
       if (settled) return;
-      if (image.naturalWidth <= 0 || image.naturalHeight <= 0 || !this.mediaImageHasVisibleData(image)) {
-        if (usingFallback) hideUnavailable();
-        else useFallback();
+      if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+        if (usingFallback) finish("failed");
+        else useFallback("failed");
         return;
       }
-      markLoaded();
+      if (!this.mediaImageHasVisibleData(image)) {
+        if (usingFallback) finish(fallbackFailureState);
+        else useFallback("unavailable");
+        return;
+      }
+      finish("available");
     };
 
     image.addEventListener("load", validateLoadedImage, { once: true });
-    image.addEventListener("error", useFallback, { once: true });
+    image.addEventListener("error", () => useFallback("failed"), { once: true });
     if (image.complete) {
-      validateLoadedImage();
-    } else if (!card.hidden && "IntersectionObserver" in window) {
-      observer = new IntersectionObserver((entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          observer?.disconnect();
-          startTimeout(useFallback);
-        }
-      }, { rootMargin: "240px" });
-      observer.observe(image);
+      if (image.naturalWidth > 0) validateLoadedImage();
+      else useFallback("failed");
     } else {
-      startTimeout(useFallback);
+      startTimeout(() => useFallback("failed"));
     }
   }
+}
+
+private updateMediaStatus(status: HTMLElement, state: "loading" | "unavailable" | "failed", title: string, body: string) {
+  status.hidden = false;
+  status.dataset.mediaStatus = state;
+  status.className = `object-media-status object-media-status--${state}`;
+  const titleElement = status.querySelector<HTMLElement>("[data-media-status-title]");
+  const bodyElement = status.querySelector<HTMLElement>("[data-media-status-body]");
+  if (titleElement) titleElement.textContent = title;
+  if (bodyElement) bodyElement.textContent = body;
 }
 
 private mediaImageHasVisibleData(image: HTMLImageElement) {
@@ -716,8 +745,8 @@ private mediaImageHasVisibleData(image: HTMLImageElement) {
     context.drawImage(image, 0, 0);
     return pixelBufferHasVisibleVariation(context.getImageData(0, 0, canvas.width, canvas.height).data);
   } catch {
-    // A readable DR11 response currently supplies CORS headers. Preserve an
-    // otherwise valid image if a browser cannot inspect its pixel buffer.
+    // Keep a successfully loaded image if canvas access is unexpectedly
+    // unavailable; transport policy is not evidence that survey data is blank.
     return true;
   }
 }
