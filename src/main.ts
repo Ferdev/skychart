@@ -8,7 +8,7 @@ import { installAnalytics, trackEvent } from "./analytics";
 import { initializeErrorReporting } from "./errorReporting";
 import { decodeViewState, type BodyFilter, type DisplayLayer, type ViewState } from "./viewState";
 import { TourPlayer } from "./tourPlayer";
-import { formatLightYears, formatNumber } from "./atlasFormatting";
+import { bodyDistanceKm as calculateBodyDistanceKm, formatLightYears, formatNumber } from "./atlasFormatting";
 import { isPresent, type Rect, type ScreenPoint } from "./geometry";
 import { CatalogPointDecoder } from "./catalog/catalogPointDecoder";
 import { CatalogPointManifestRepository } from "./catalog/catalogPointManifest";
@@ -1036,15 +1036,7 @@ function selectedBody(): Body | null { return objectSelection.selectedBody(); }
 function compareTarget(): Body | null { return objectSelection.compareTarget(); }
 function ensureCompareTarget() { objectSelection.ensureCompareTarget(); }
 
-function bodyDistanceKm(a: Body, b: Body) {
-  return (
-    Math.hypot(
-      a.position.x_au - b.position.x_au,
-      a.position.y_au - b.position.y_au,
-      a.position.z_au - b.position.z_au
-    ) * auKm()
-  );
-}
+function bodyDistanceKm(a: Body, b: Body) { return calculateBodyDistanceKm(a, b, auKm()); }
 
 function worldToScreen(xAu: number, yAu: number): ScreenPoint { return atlasViewport.worldToScreen(xAu, yAu); }
 function bodyToScreen(body: Body): ScreenPoint { return worldToScreen(body.position.x_au, body.position.y_au); }
