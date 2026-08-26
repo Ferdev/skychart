@@ -103,6 +103,92 @@
   background: rgba(32, 29, 19, 0.9);
 }
 
+.sky-view__filters {
+  position: relative;
+  z-index: 2;
+  grid-row: 2;
+  align-self: start;
+  width: min(248px, calc(100vw - 40px));
+  max-height: calc(100% - 16px);
+  margin: 0 20px;
+  overflow: hidden;
+  border: 1px solid rgba(116, 184, 183, 0.22);
+  border-radius: 7px;
+  background: rgba(3, 7, 8, 0.78);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.sky-view__filters > summary {
+  padding: 9px 11px;
+  color: rgba(238, 242, 234, 0.86);
+  font-size: 0.74rem;
+  font-weight: 780;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sky-view__filters[open] > summary {
+  border-bottom: 1px solid rgba(116, 184, 183, 0.16);
+}
+
+.sky-view__filters > summary:focus-visible {
+  outline: 2px solid rgba(248, 203, 101, 0.82);
+  outline-offset: -3px;
+}
+
+.sky-view__filter-groups {
+  display: grid;
+  max-height: min(56vh, 520px);
+  padding: 8px;
+  overflow-y: auto;
+  scrollbar-color: rgba(116, 184, 183, 0.42) transparent;
+}
+
+.sky-view__filter-section-label {
+  padding: 4px 5px;
+  color: rgba(130, 203, 179, 0.72);
+  font-size: 0.61rem;
+  font-weight: 820;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.sky-view__object-filters {
+  display: grid;
+}
+
+.sky-view__filter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  color: rgba(238, 242, 234, 0.78);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.sky-view__filter:hover {
+  color: #f3eedf;
+  background: rgba(116, 184, 183, 0.1);
+}
+
+.sky-view__filter input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #f8cb65;
+}
+
+.sky-view__filter-count {
+  color: rgba(238, 242, 234, 0.42);
+  font-variant-numeric: tabular-nums;
+}
+
 .sky-view__footer {
   grid-row: 3;
   align-self: end;
@@ -154,6 +240,15 @@ body[data-sky-view="true"] .science-disclosure {
   .sky-view__actions button {
     min-height: 36px;
     padding: 7px 9px;
+  }
+
+  .sky-view__filters {
+    width: min(224px, calc(100vw - 24px));
+    margin: 0 12px;
+  }
+
+  .sky-view__filter-groups {
+    max-height: 38vh;
   }
 
   .sky-view__footer {
