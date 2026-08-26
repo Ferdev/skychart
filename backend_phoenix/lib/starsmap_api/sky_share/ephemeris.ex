@@ -22,18 +22,16 @@ defmodule StarsmapApi.SkyShare.Ephemeris do
       }
 
       with {:ok, uri} <- target_uri(params),
-           {:ok, 200, _headers, client} <-
+           {:ok, 200, _headers, body} <-
              :hackney.get(URI.to_string(uri), [{"accept", "application/json"}], "",
                recv_timeout: @timeout,
                connect_timeout: 3_000
              ),
-           {:ok, body} <- :hackney.body(client),
            {:ok, payload} <- Jason.decode(body),
            true <- is_list(payload["bodies"]) do
         {:ok, payload}
       else
-        {:ok, status, _headers, client} ->
-          _ = :hackney.body(client)
+        {:ok, status, _headers, _body} ->
           {:error, {:ephemeris_status, status}}
 
         false ->
