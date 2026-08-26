@@ -24,7 +24,7 @@ export interface AtlasDiagnostics {
 
 declare global {
   interface Window {
-    __ATLAS_BOOT__?: { objectKey?: string };
+    __ATLAS_BOOT__?: { objectKey?: string; viewState?: string };
     __ATLAS_DIAGNOSTICS__?: AtlasDiagnostics;
   }
 }

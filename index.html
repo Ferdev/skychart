@@ -37,10 +37,35 @@
           <div class="sky-view__actions">
             <button id="sky-time-back" type="button" title="Earlier" aria-label="Earlier" data-i18n-attrs="title:sky.earlier;aria-label:sky.earlier">←</button>
             <button id="sky-time-forward" type="button" title="Later" aria-label="Later" data-i18n-attrs="title:sky.later;aria-label:sky.later">→</button>
+            <button id="sky-share-button" class="sky-view__share-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-i18n="sky.shareAction" data-i18n-attrs="aria-label:sky.shareAction">Share this sky</button>
             <button id="sky-view-reset" type="button" data-i18n="sky.reset">Reset view</button>
             <button id="sky-view-close" type="button" data-i18n="sky.exit">Exit sky view</button>
           </div>
+          <section id="sky-share-popover" class="sky-share" popover="auto" role="dialog" aria-labelledby="sky-share-title">
+            <header class="sky-share__header">
+              <div>
+                <p class="sky-view__eyebrow" data-i18n="sky.shareEyebrow">Reproducible snapshot</p>
+                <h2 id="sky-share-title" data-i18n="sky.shareTitle">Share this sky</h2>
+              </div>
+              <button id="sky-share-close" class="sky-share__close" type="button" aria-label="Close Sky sharing" data-i18n-attrs="aria-label:sky.shareClose">×</button>
+            </header>
+            <p class="sky-share__description" data-i18n="sky.shareDescription">The link freezes the current UTC epoch, direction, zoom, and visible layers.</p>
+            <canvas id="sky-share-preview" class="sky-share__preview" width="1200" height="630" aria-label="Sky share card preview" data-i18n-attrs="aria-label:sky.sharePreviewLabel"></canvas>
+            <div class="sky-share__actions">
+              <button id="sky-copy-link" type="button" data-i18n="sky.copyLink">Copy viewpoint link</button>
+              <button id="sky-native-share" type="button" data-i18n="sky.nativeShare">Share…</button>
+              <button id="sky-download-card" type="button" data-i18n="sky.downloadCard">Download card</button>
+            </div>
+            <p class="sky-share__disclosure" data-i18n="sky.disclosure">Geometric same-epoch view · observer hidden · no surface, atmosphere, or light-time correction</p>
+            <span id="sky-share-status" class="sky-share__status" role="status" aria-live="polite"></span>
+          </section>
         </header>
+        <section id="sky-view-error" class="sky-view__error" role="alert" hidden>
+          <p class="sky-view__eyebrow" data-i18n="sky.unavailableEyebrow">Sky view unavailable</p>
+          <h2 id="sky-view-error-title" data-i18n="sky.unavailableTitle">This sky could not be restored</h2>
+          <p id="sky-view-error-message"></p>
+          <a href="/" data-i18n="sky.backToAtlas">Return to the atlas</a>
+        </section>
         <details id="sky-layer-controls" class="sky-view__filters" open>
           <summary data-i18n="sky.layers">Layers &amp; objects</summary>
           <div class="sky-view__filter-groups">
