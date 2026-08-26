@@ -6,6 +6,7 @@ const state = {
   time: "2042-04-05T06:07:08.000Z" as const, objectKey: "gaia:123",
   compare: ["gaia:123", "mars"] as const, catalogRelease: "v9",
   layers: { labels: true, grid: false, milkyWay: true }, filters: { primary: "galaxy", compare: "all" } as const,
+  sky: { observerKey: "earth", yawDeg: 182.5, pitchDeg: -12, fovDeg: 64 },
   tour: "local-group", step: 3
 };
 const encoded = encodeViewState(state);
@@ -18,4 +19,5 @@ assert.deepEqual(decodeViewState("?v=1&c=0,0&z=1&t=now&L=labels.1~futureLayer.1&
 assert.deepEqual(decodeViewState("?v=1&c=0,0&z=1&t=now&L=labels.10")?.layers, {});
 assert.deepEqual(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&F=galaxy.all")?.filters, { primary: "galaxy", compare: "all" });
 assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&F=galaxy.unknown")?.filters, undefined);
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&sky=earth&sc=0,95,60")?.sky, undefined);
 console.log("viewState tests passed");

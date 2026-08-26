@@ -26,6 +26,28 @@
     <main id="app">
       <canvas id="point-map" aria-hidden="true"></canvas>
       <canvas id="map" aria-label="2D heliocentric ecliptic celestial atlas" data-i18n-attrs="aria-label:app.mapLabel"></canvas>
+      <section id="sky-view" class="sky-view" aria-label="Object-centered sky view" data-i18n-attrs="aria-label:sky.label" hidden>
+        <canvas id="sky-map" class="sky-view__canvas" tabindex="0" aria-label="Interactive horizonless sky" data-i18n-attrs="aria-label:sky.canvasLabel"></canvas>
+        <header class="sky-view__header">
+          <div class="sky-view__heading">
+            <p class="sky-view__eyebrow" data-i18n="sky.eyebrow">Object-centered view</p>
+            <h1 id="sky-view-title">Sky from selected object</h1>
+            <span id="sky-view-meta"></span>
+          </div>
+          <div class="sky-view__actions">
+            <button id="sky-time-back" type="button" title="Earlier" aria-label="Earlier" data-i18n-attrs="title:sky.earlier;aria-label:sky.earlier">←</button>
+            <button id="sky-time-forward" type="button" title="Later" aria-label="Later" data-i18n-attrs="title:sky.later;aria-label:sky.later">→</button>
+            <button id="sky-view-reset" type="button" data-i18n="sky.reset">Reset view</button>
+            <button id="sky-view-close" type="button" data-i18n="sky.exit">Exit sky view</button>
+          </div>
+        </header>
+        <div id="sky-view-tooltip" class="sky-view__tooltip" hidden></div>
+        <footer class="sky-view__footer">
+          <span data-i18n="sky.controls">Drag to look around · wheel or pinch to zoom · select a point to inspect it</span>
+          <span id="sky-view-status" class="sky-view__status" role="status" aria-live="polite"></span>
+          <span data-i18n="sky.disclosure">Geometric same-epoch view · observer hidden · no surface, atmosphere, or light-time correction</span>
+        </footer>
+      </section>
       <div id="catalog-point-hover" class="catalog-point-hover" aria-hidden="true"></div>
       <svg id="selection-connector" class="selection-connector" aria-hidden="true" hidden>
         <path class="selection-connector__leader"></path>
@@ -280,6 +302,7 @@
               <div class="object-actions" aria-label="Selected object actions" data-i18n-attrs="aria-label:object.actions">
                 <button id="center-selected" class="text-action" type="button" data-i18n="object.center">Center</button>
                 <button id="zoom-selected" class="text-action" type="button" data-i18n="object.zoom">Zoom</button>
+                <button id="view-sky-selected" class="text-action" type="button" aria-label="View sky from here" data-i18n="sky.action" data-i18n-attrs="aria-label:sky.actionLabel">Sky</button>
               </div>
             </div>
             <div class="object-workspace-stage">

@@ -10,7 +10,7 @@ const WORKSPACE_LABEL_KEYS = { catalog: "workspace.searchCatalog", object: "work
 
 /** Renders the atlas controls, workspace chrome, domain cards, and selected summary. */
 export class AtlasControlView {
-  updateSelectedSummary(body: Body | null, formatDistance: (kilometers: number) => string) {
+  updateSelectedSummary(body: Body | null, formatDistance: (kilometers: number) => string, canViewSky: (body: Body) => boolean) {
     if (!body) {
       atlasDom.selectedObjectPanel.hidden = true;
       atlasDom.selectedSummaryName.textContent = "";
@@ -18,6 +18,7 @@ export class AtlasControlView {
       atlasDom.selectedSummaryOrb.style.setProperty("--body-color", "#d8a23f");
       atlasDom.centerSelected.disabled = true;
       atlasDom.zoomSelected.disabled = true;
+      atlasDom.viewSkySelected.disabled = true;
       this.setComparisonMode(false);
       delete atlasDom.selectedObjectPanel.dataset.selectedKey;
       return;
@@ -30,6 +31,9 @@ export class AtlasControlView {
     atlasDom.selectedSummaryOrb.style.setProperty("--body-color", body.color || "#d8a23f");
     atlasDom.centerSelected.disabled = false;
     atlasDom.zoomSelected.disabled = false;
+    atlasDom.viewSkySelected.disabled = !canViewSky(body);
+    if (atlasDom.viewSkySelected.disabled) atlasDom.viewSkySelected.title = t("sky.positionUnavailable");
+    else atlasDom.viewSkySelected.removeAttribute("title");
   }
 
   private setComparisonMode(open: boolean) {

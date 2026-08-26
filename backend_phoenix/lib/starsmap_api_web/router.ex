@@ -47,6 +47,7 @@ defmodule StarsmapApiWeb.Router do
     get "/objects/gaia/:source_id", CatalogController, :gaia
     get "/catalog/points.bin", CatalogController, :points_binary
     get "/catalog/points", CatalogController, :points
+    get "/catalog/sky", CatalogController, :sky
     get "/catalog/viewport", CatalogController, :viewport
     get "/ephemeris", PythonProxyController, :ephemeris
     get "/small-body-ephemeris", PythonProxyController, :small_body_ephemeris
