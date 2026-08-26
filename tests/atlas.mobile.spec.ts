@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, skipIfAtlasUnavailable } from "./atlas-test-utils";
+import { collectBrowserIssues, openAtlas, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
 
 test.describe("Cosmic Atlas mobile layout", () => {
   test.beforeEach(async ({ page, request }) => {
@@ -131,6 +131,46 @@ test.describe("Cosmic Atlas mobile layout", () => {
     });
     expect(workspaceGap, "share trigger must stay above the open mobile workspace").toBeGreaterThanOrEqual(8);
 
+    issues.assertClean();
+  });
+
+  test("keeps Sky sharing keyboard-reachable and contained on a narrow viewport", async ({ page, context }) => {
+    const issues = collectBrowserIssues(page);
+    await context.route("**/api/ephemeris?**", (route) => {
+      const timestamp = new URL(route.request().url()).searchParams.get("timestamp") ?? "2026-08-26T12:00:00.000Z";
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(skyEphemerisFixture(timestamp))
+      });
+    });
+    await context.route("**/api/catalog/sky?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ returned: 0, points: [] })
+    }));
+    await openAtlas(page, "/sky/earth?v=1&t=2026-08-26T12%3A00%3A00.000Z&sc=0%2C0%2C72&lang=en");
+    await expect(page.locator("#sky-view")).toBeVisible();
+    await expect(page.locator("#sky-share-button")).toBeVisible();
+    await page.locator("#sky-share-button").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#sky-share-popover")).toBeVisible();
+    await expect(page.locator("#sky-share-close")).toBeFocused();
+    await expect(page.locator("#sky-copy-link")).toBeVisible();
+    await expect(page.locator("#sky-download-card")).toBeVisible();
+
+    const geometry = await page.locator("#sky-share-popover").evaluate((popover) => {
+      const bounds = popover.getBoundingClientRect();
+      const actions = [...popover.querySelectorAll<HTMLButtonElement>(".sky-share__actions button")]
+        .filter((button) => !button.hidden)
+        .map((button) => button.getBoundingClientRect().height);
+      return { left: bounds.left, right: bounds.right, top: bounds.top, bottom: bounds.bottom, actions };
+    });
+    expect(geometry.left).toBeGreaterThanOrEqual(0);
+    expect(geometry.right).toBeLessThanOrEqual(390);
+    expect(geometry.top).toBeGreaterThanOrEqual(0);
+    expect(geometry.bottom).toBeLessThanOrEqual(844);
+    expect(geometry.actions.every((height) => height >= 44)).toBe(true);
     issues.assertClean();
   });
 

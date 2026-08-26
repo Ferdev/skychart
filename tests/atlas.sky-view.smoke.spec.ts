@@ -1,16 +1,25 @@
 import { expect, test } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
+import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
 
-test("selected objects open an interactive object-centered sky view", async ({ page, request }) => {
+test("selected objects open and replay a shareable object-centered sky view", async ({ page, request, context }) => {
   await skipIfAtlasUnavailable(request);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.addInitScript(() => {
+    const methods: string[] = [];
+    (window as Window & { __skyShareMethods?: string[] }).__skyShareMethods = methods;
+    window.addEventListener("cosmic-atlas:analytics", (event) => {
+      const detail = (event as CustomEvent<{ event?: string; method?: string }>).detail;
+      if (detail?.event === "share" && detail.method) methods.push(detail.method);
+    });
+  });
   const issues = collectBrowserIssues(page);
   let skyRequests = 0;
-  await page.route(/\/api\/catalog(?:\?.*)?$/, (route) => route.fulfill({
+  await context.route(/\/api\/catalog(?:\?.*)?$/, (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify({ object_count: 0, group_counts: {}, type_counts: {}, available_groups: [] })
   }));
-  await page.route("**/api/catalog/search?**", (route) => {
+  await context.route("**/api/catalog/search?**", (route) => {
     const url = new URL(route.request().url());
     return route.fulfill({
       status: 200,
@@ -21,27 +30,27 @@ test("selected objects open an interactive object-centered sky view", async ({ p
       })
     });
   });
-  await page.route("**/api/catalog/viewport?**", (route) => route.fulfill({
+  await context.route("**/api/catalog/viewport?**", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify({ bounds: {}, limit: 0, total: 0, objects: [] })
   }));
-  await page.route("**/api/ephemeris?**", (route) => {
+  await context.route("**/api/ephemeris?**", (route) => {
     const timestamp = new URL(route.request().url()).searchParams.get("timestamp") ?? "2026-08-26T12:00:00.000Z";
     return route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(ephemerisFixture(timestamp))
+      body: JSON.stringify(skyEphemerisFixture(timestamp))
     });
   });
-  await page.route("**/api/events", (route) => route.fulfill({ status: 202, contentType: "application/json", body: "{}" }));
-  await page.route("**/api/now", (route) => route.fulfill({
+  await context.route("**/api/events", (route) => route.fulfill({ status: 202, contentType: "application/json", body: "{}" }));
+  await context.route("**/api/now", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
     body: JSON.stringify({ stale: false, refreshed_at: new Date().toISOString(), events: [] })
   }));
-  await page.route("**/catalog-tiles/v1/manifest.json", (route) => route.fulfill({ status: 404, body: "" }));
-  await page.route("**/api/catalog/sky?**", (route) => {
+  await context.route("**/catalog-tiles/v1/manifest.json", (route) => route.fulfill({ status: 404, body: "" }));
+  await context.route("**/api/catalog/sky?**", (route) => {
     skyRequests += 1;
     const url = new URL(route.request().url());
     const observer = {
@@ -131,33 +140,63 @@ test("selected objects open an interactive object-centered sky view", async ({ p
   await expect.poll(() => skyRequests).toBeGreaterThan(1);
   await expect(page.locator("#sky-view-title")).toContainText("Earth");
 
-  await page.locator("#sky-view-close").click();
-  await expect(page.locator("#sky-view")).toBeHidden();
-  await expect.poll(() => new URL(page.url()).searchParams.has("sky")).toBe(false);
+  await page.locator("#sky-map").focus();
+  await page.locator("#sky-map").press("ArrowRight");
+  await expect.poll(() => new URL(page.url()).searchParams.get("sl")).toBe("0");
+  await expect.poll(() => new URL(page.url()).searchParams.get("sf")).toBe("asteroid");
+
+  await expect(page.locator("#sky-share-button")).toHaveAccessibleName("Share this sky");
+  await page.locator("#sky-share-button").click();
+  await expect(page.locator("#sky-share-popover")).toBeVisible();
+  await expect(page.locator("#sky-share-preview")).toHaveAttribute("width", "1200");
+  await expect(page.locator("#sky-share-preview")).toHaveAttribute("height", "630");
+  await expect.poll(() => page.locator("#sky-share-preview").evaluate((canvas: HTMLCanvasElement) => {
+    const pixel = canvas.getContext("2d")!.getImageData(60, 50, 1, 1).data;
+    return pixel[0]! + pixel[1]! + pixel[2]!;
+  })).toBeGreaterThan(0);
+
+  await page.locator("#sky-copy-link").click();
+  await expect(page.locator("#sky-share-status")).toHaveText("Sky viewpoint link copied");
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  const copiedUrl = new URL(copied);
+  expect(copiedUrl.pathname).toBe("/sky/earth");
+  expect(copiedUrl.searchParams.get("t")).not.toBe("now");
+  expect(Number.isNaN(Date.parse(copiedUrl.searchParams.get("t") ?? ""))).toBe(false);
+  expect(copiedUrl.searchParams.get("sl")).toBe("0");
+  expect(copiedUrl.searchParams.get("sf")).toBe("asteroid");
+  expect(copiedUrl.searchParams.has("c")).toBe(false);
+  expect(copiedUrl.searchParams.has("z")).toBe(false);
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.locator("#sky-download-card").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^cosmic-atlas-sky-from-earth-\d{4}-\d{2}-\d{2}\.png$/);
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const png = Buffer.concat(chunks);
+  expect(png.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  expect(png.readUInt32BE(16)).toBe(1200);
+  expect(png.readUInt32BE(20)).toBe(630);
+  await expect.poll(() => page.evaluate(() => (window as Window & { __skyShareMethods?: string[] }).__skyShareMethods ?? []))
+    .toEqual(expect.arrayContaining(["sky_link", "sky_card"]));
+
+  await page.locator("#sky-share-close").click();
+  const replay = await context.newPage();
+  const replayIssues = collectBrowserIssues(replay);
+  await openAtlas(replay, copied);
+  await expect(replay.locator("#sky-view")).toBeVisible();
+  await expect(replay.locator("#sky-view-title")).toContainText("Earth");
+  await expect(replay.locator("#sky-constellations-toggle")).not.toBeChecked();
+  await expect(replay.locator('#sky-object-type-filters input[value="asteroid"]')).not.toBeChecked();
+  expect(new URL(replay.url()).searchParams.get("t")).toBe(copiedUrl.searchParams.get("t"));
+  expect(new URL(replay.url()).searchParams.get("sc")).toBe(copiedUrl.searchParams.get("sc"));
+
+  await replay.locator("#sky-view-close").click();
+  await expect(replay.locator("#sky-view")).toBeHidden();
+  await expect.poll(() => new URL(replay.url()).pathname).toBe("/");
+  await replay.goBack();
+  await expect(replay.locator("#sky-view")).toBeVisible();
+  replayIssues.assertClean();
   issues.assertClean();
 });
-
-function ephemerisFixture(timestamp: string) {
-  const position = (xAu: number) => ({
-    x_au: xAu, y_au: 0, z_au: 0,
-    x_km: xAu * 149_597_870.7, y_km: 0, z_km: 0,
-    heliocentric_distance_km: Math.abs(xAu) * 149_597_870.7,
-  });
-  return {
-    timestamp_utc: new Date(timestamp).toISOString(),
-    generated_at_utc: "2026-08-26T12:00:00.000Z",
-    data_source: "Sky view smoke fixture",
-    coordinate_frame: "Heliocentric ecliptic Cartesian coordinates",
-    au_km: 149_597_870.7,
-    catalog: { groups: {}, object_count: 2, group_counts: { core: 2 } },
-    bodies: [{
-      key: "sun", name: "Sun", radius_km: 695_700, color: "#ffd166",
-      object_type: "star", catalog_group: "core", position: position(0),
-      distance_from_earth_km: 149_597_870.7,
-    }, {
-      key: "earth", name: "Earth", radius_km: 6_371, color: "#62a8ff",
-      object_type: "planet", parent_key: "sun", catalog_group: "core", position: position(1),
-      distance_from_earth_km: 0,
-    }],
-  };
-}

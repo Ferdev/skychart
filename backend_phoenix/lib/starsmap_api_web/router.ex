@@ -12,6 +12,15 @@ defmodule StarsmapApiWeb.Router do
     plug StarsmapApiWeb.Plugs.RateLimit, capacity: 180, refill_per_second: 3.0
   end
 
+  pipeline :sky_card do
+    plug StarsmapApiWeb.Plugs.RateLimit, capacity: 30, refill_per_second: 0.25
+  end
+
+  scope "/", StarsmapApiWeb do
+    pipe_through :sky_card
+    get "/sky/:key/card.png", SkyShareController, :card
+  end
+
   scope "/", StarsmapApiWeb do
     get "/catalog-tiles/v1/*path", CatalogTileProxyController, :show
 
@@ -21,6 +30,7 @@ defmodule StarsmapApiWeb.Router do
     get "/embed", PageController, :embed
     get "/about", PageController, :about
     get "/methodology", MethodologyController, :show
+    get "/sky/:key", SkyShareController, :show
     get "/o/:key", ObjectPageController, :show
     get "/object-types/:type", ObjectPageController, :type_image
     get "/sitemap.xml", SitemapController, :index

@@ -8,10 +8,15 @@ defmodule StarsmapApiWeb.ServerShell do
     {"property", "og:description"},
     {"property", "og:url"},
     {"property", "og:image"},
+    {"property", "og:image:type"},
+    {"property", "og:image:width"},
+    {"property", "og:image:height"},
+    {"property", "og:image:alt"},
     {"name", "twitter:card"},
     {"name", "twitter:title"},
     {"name", "twitter:description"},
-    {"name", "twitter:image"}
+    {"name", "twitter:image"},
+    {"name", "twitter:image:alt"}
   ]
 
   def render(options \\ []) when is_list(options) do
@@ -91,12 +96,17 @@ defmodule StarsmapApiWeb.ServerShell do
       ~s(<meta property="og:type" content="#{escape(Map.get(metadata, :type, "website"))}">),
       ~s(<meta property="og:title" content="#{escape(title)}">),
       ~s(<meta property="og:description" content="#{escape(description)}">),
-      ~s(<meta property="og:url" content="#{escape(canonical)}">),
+      ~s(<meta property="og:url" content="#{escape(Map.get(metadata, :og_url, canonical))}">),
       optional_meta("property", "og:image", image),
+      optional_meta("property", "og:image:type", image && Map.get(metadata, :image_type)),
+      optional_meta("property", "og:image:width", image && Map.get(metadata, :image_width)),
+      optional_meta("property", "og:image:height", image && Map.get(metadata, :image_height)),
+      optional_meta("property", "og:image:alt", image && Map.get(metadata, :image_alt)),
       optional_meta("name", "twitter:card", image && "summary_large_image"),
       optional_meta("name", "twitter:title", image && title),
       optional_meta("name", "twitter:description", image && description),
-      optional_meta("name", "twitter:image", image)
+      optional_meta("name", "twitter:image", image),
+      optional_meta("name", "twitter:image:alt", image && Map.get(metadata, :image_alt))
     ]
     |> Enum.reject(&is_nil/1)
     |> Enum.join("\n")
