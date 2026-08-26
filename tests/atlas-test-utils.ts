@@ -54,6 +54,31 @@ export async function selectCatalogObject(page: Page, query: string, key: string
   await expect(page.locator("#selected-summary-name")).toContainText(expectedName);
 }
 
+export function skyEphemerisFixture(timestamp: string) {
+  const position = (xAu: number) => ({
+    x_au: xAu, y_au: 0, z_au: 0,
+    x_km: xAu * 149_597_870.7, y_km: 0, z_km: 0,
+    heliocentric_distance_km: Math.abs(xAu) * 149_597_870.7,
+  });
+  return {
+    timestamp_utc: new Date(timestamp).toISOString(),
+    generated_at_utc: "2026-08-26T12:00:00.000Z",
+    data_source: "Sky view smoke fixture",
+    coordinate_frame: "Heliocentric ecliptic Cartesian coordinates",
+    au_km: 149_597_870.7,
+    catalog: { groups: {}, object_count: 2, group_counts: { core: 2 } },
+    bodies: [{
+      key: "sun", name: "Sun", radius_km: 695_700, color: "#ffd166",
+      object_type: "star", catalog_group: "core", position: position(0),
+      distance_from_earth_km: 149_597_870.7,
+    }, {
+      key: "earth", name: "Earth", radius_km: 6_371, color: "#62a8ff",
+      object_type: "planet", parent_key: "sun", catalog_group: "core", position: position(1),
+      distance_from_earth_km: 0,
+    }],
+  };
+}
+
 export function collectBrowserIssues(page: Page): BrowserIssueCollector {
   const errors: string[] = [];
   page.on("console", (message) => {

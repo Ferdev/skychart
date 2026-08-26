@@ -2,11 +2,11 @@ import "./destinationPicker.css";
 import "./styles.css";
 import { readRecentDestinations, type RecentDestination } from "./destinationPicker";
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL } from "./galacticModel";
-import { initI18n, t } from "./i18n";
+import { initI18n, locale, t } from "./i18n";
 import { WebglPointRenderer } from "./webglPointRenderer";
 import { installAnalytics, trackEvent } from "./analytics";
 import { initializeErrorReporting } from "./errorReporting";
-import { decodeViewState, type BodyFilter, type DisplayLayer, type ViewState } from "./viewState";
+import { decodeSkyPermalink, decodeViewState, skyPermalinkToViewState, type BodyFilter, type DisplayLayer, type ViewState } from "./viewState";
 import { TourPlayer } from "./tourPlayer";
 import { bodyDistanceKm as calculateBodyDistanceKm, formatLightYears, formatNumber } from "./atlasFormatting";
 import { isPresent, type Rect, type ScreenPoint } from "./geometry";
@@ -152,7 +152,12 @@ const catalogPointSelector = new CatalogPointSelector({
   minimumZoom: MIN_ZOOM,
 });
 pointCanvas.addEventListener("point-renderer-unavailable", () => requestRender());
-const bootViewState = decodeViewState(window.location.search);
+const skyRouteRequested = /^\/sky\/[^/]+\/?$/.test(window.location.pathname);
+const bootSkyPermalink = decodeSkyPermalink(window.location.pathname, window.location.search);
+const bootViewState = bootSkyPermalink
+  ? skyPermalinkToViewState(bootSkyPermalink)
+  : decodeViewState(window.__ATLAS_BOOT__?.viewState ?? window.location.search);
+const invalidSkyRoute = skyRouteRequested && !bootSkyPermalink && !bootViewState?.sky;
 const serverBootObjectKey = window.__ATLAS_BOOT__?.objectKey;
 const isEmbedMode = window.location.pathname === "/embed" && document.querySelector<HTMLMetaElement>('meta[name="cosmic-atlas-boot-mode"]')?.content === "embed";
 
@@ -551,7 +556,16 @@ const viewStateController = new AtlasViewStateController({
   animateCameraTo,
   skyState: () => skyView?.state(), restoreSky: (state) => skyView?.restore(state) ?? Promise.resolve(),
 }, bootViewState);
-skyView = createSkyViewController(atlasDom, { bodyByKey: () => bodyByKey, ephemeris: () => ephemeris, translate: t, selectBody: selectBodyByKey, stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), resolveObserver: async (key) => bodyByKey.get(key) ?? (await objectHydrator.hydrateMany([key]))[0] ?? null });
+skyView = createSkyViewController(atlasDom, {
+  bodyByKey: () => bodyByKey,
+  ephemeris: () => ephemeris,
+  translate: t,
+  selectBody: selectBodyByKey,
+  stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(),
+  resolveObserver: async (key) => bodyByKey.get(key) ?? (await objectHydrator.hydrateMany([key]))[0] ?? null,
+  catalogRelease: () => catalogPointManifest.value?.version,
+  locale,
+});
 const embedController: AtlasEmbedController = new AtlasEmbedController({
   enabled: isEmbedMode,
   canvas,
@@ -643,6 +657,7 @@ async function loadAtlas(timestampIso?: string) {
     const selectionState = viewStateController.takePendingSelection();
     if (selectionState) await restoreSelectionFromViewState(selectionState);
     else if (serverBootObjectKey) await selectBodyByKey(serverBootObjectKey, { center: true });
+    else if (invalidSkyRoute) skyView?.showUnavailable(t("sky.invalidLink"));
     if (skyView?.active && !selectionState?.sky) await skyView.refreshForTime();
     requestDataRefresh({ immediate: true });
     loadingScreen.hidden = true;

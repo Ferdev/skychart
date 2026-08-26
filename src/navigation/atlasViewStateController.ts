@@ -112,13 +112,15 @@ export class AtlasViewStateController {
   }
 
   currentUrl(): string {
-    const params = new URLSearchParams(encodeViewState(this.current()));
+    const state = this.current();
+    const params = new URLSearchParams(encodeViewState(state));
     const existing = new URLSearchParams(window.location.search);
-    for (const name of ["perf", "dynamicPointFallback"]) {
+    for (const name of ["perf", "dynamicPointFallback", "lang"]) {
       const value = existing.get(name);
       if (value !== null) params.set(name, value);
     }
-    return `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+    const pathname = !state.sky && /^\/sky\/[^/]+\/?$/.test(window.location.pathname) ? "/" : window.location.pathname;
+    return `${pathname}?${params.toString()}${window.location.hash}`;
   }
 
   replace(): void {
