@@ -1,4 +1,4 @@
-import { DISPLAY_LAYERS, encodeViewState, type BodyFilter, type DisplayLayer, type ViewState } from "../viewState";
+import { DISPLAY_LAYERS, encodeViewState, type BodyFilter, type DisplayLayer, type SkyViewState, type ViewState } from "../viewState";
 import type { Camera, SelectBodyOptions, ZoomPreset } from "../atlas/contracts";
 import type { CatalogPointManifestRepository } from "../catalog/catalogPointManifest";
 import type { CatalogPointStream } from "../catalog/catalogPointStream";
@@ -33,6 +33,8 @@ interface AtlasViewStateControllerOptions {
   requestDataRefresh: () => void;
   loadAtlas: (timestampIso?: string) => Promise<void>;
   animateCameraTo: (target: Camera, durationMs: number, onComplete: () => void) => void;
+  skyState: () => SkyViewState | undefined;
+  restoreSky: (state: SkyViewState | undefined) => Promise<void>;
 }
 
 export interface TourNavigationOptions {
@@ -93,6 +95,7 @@ export class AtlasViewStateController {
     const stableSelectedKey = state.selectedKey && state.selectedKey !== this.options.transientSelectedKey()
       ? state.selectedKey
       : "";
+    const sky = this.options.skyState();
     return {
       center: { x: state.camera.xAu, y: state.camera.yAu },
       zoom: state.camera.pxPerAu,
@@ -104,6 +107,7 @@ export class AtlasViewStateController {
       catalogRelease: this.options.manifest.value?.version ?? this.requestedCatalogRelease,
       layers: { ...state.displayLayers },
       filters: { primary: state.activeFilter, compare: state.activeCompareFilter },
+      ...(sky ? { sky } : {}),
     };
   }
 
@@ -143,6 +147,7 @@ export class AtlasViewStateController {
     const selected = view.compare?.[0] ?? view.objectKey;
     if (selected) await this.options.selectBodyByKey(selected);
     if (view.compare?.[1]) await this.options.setCompareTargetByKey(view.compare[1]);
+    await this.options.restoreSky(view.sky);
   }
 
   async restore(view: ViewState): Promise<void> {

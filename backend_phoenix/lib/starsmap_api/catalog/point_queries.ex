@@ -16,6 +16,9 @@ defmodule StarsmapApi.Catalog.PointQueries do
   @default_point_limit 250_000
   @max_point_limit 1_000_000
   @point_query_timeout 10_000
+  @default_sky_limit 12_000
+  @max_sky_limit 50_000
+  @sky_query_timeout 30_000
   @point_cache_version 1
   @point_cache_max_limit 50_000
   @point_cache_max_binary_bytes 2_000_000
@@ -361,6 +364,88 @@ defmodule StarsmapApi.Catalog.PointQueries do
     end
   end
 
+  @doc """
+  Returns a brightness-prioritized set of catalog directions as seen from an
+  arbitrary heliocentric ecliptic position. The observer-relative direction
+  is normalized server-side so large catalog coordinates never need to be
+  subtracted in the browser.
+  """
+  def sky(params) do
+    with {:ok, observer_x_au} <- required_float(params, "observer_x_au"),
+         {:ok, observer_y_au} <- required_float(params, "observer_y_au"),
+         {:ok, observer_z_au} <- required_float(params, "observer_z_au") do
+      limit = bounded_integer(params["limit"], @default_sky_limit, 1, @max_sky_limit)
+      groups = csv_param(params["groups"])
+      types = csv_param(params["types"])
+      observer_key = normalized_observer_key(params["observer_key"])
+
+      rows =
+        CatalogSourceObject
+        |> where(
+          [object],
+          not is_nil(object.x_au) and not is_nil(object.y_au) and not is_nil(object.z_au)
+        )
+        |> maybe_exclude_key(observer_key)
+        |> maybe_filter_groups(groups)
+        |> maybe_filter_types(types)
+        |> order_by([object],
+          asc_nulls_last: object.apparent_magnitude,
+          asc: object.key
+        )
+        |> limit(^limit)
+        |> select([object], [
+          object.key,
+          object.name,
+          object.object_type,
+          object.catalog_group,
+          object.color,
+          object.apparent_magnitude,
+          object.x_au,
+          object.y_au,
+          object.z_au
+        ])
+        |> Repo.all(timeout: @sky_query_timeout)
+
+      points =
+        Enum.flat_map(rows, fn [key, name, type, group, color, magnitude, x, y, z] ->
+          dx = x - observer_x_au
+          dy = y - observer_y_au
+          dz = z - observer_z_au
+          distance_au = :math.sqrt(dx * dx + dy * dy + dz * dz)
+
+          if distance_au > 1.0e-12 do
+            [
+              %{
+                key: key,
+                name: name,
+                object_type: type,
+                catalog_group: group,
+                color: color,
+                apparent_magnitude: magnitude,
+                direction: %{x: dx / distance_au, y: dy / distance_au, z: dz / distance_au}
+              }
+            ]
+          else
+            []
+          end
+        end)
+
+      {:ok,
+       %{
+         observer: %{
+           key: observer_key,
+           position_au: %{x: observer_x_au, y: observer_y_au, z: observer_z_au}
+         },
+         coordinate_frame: "heliocentric_ecliptic_cartesian_au",
+         groups: groups,
+         types: types,
+         limit: limit,
+         returned: length(points),
+         points: points
+       }}
+    end
+  end
+
   defp point_base_query(bounds, groups, types) do
     CatalogSourceObject
     |> where([object], not is_nil(object.x_au) and not is_nil(object.y_au))
@@ -445,6 +530,16 @@ defmodule StarsmapApi.Catalog.PointQueries do
   defp maybe_filter_types(query, types) do
     where(query, [object], object.object_type in ^types)
   end
+
+  defp maybe_exclude_key(query, nil), do: query
+  defp maybe_exclude_key(query, key), do: where(query, [object], object.key != ^key)
+
+  defp normalized_observer_key(value) when is_binary(value) do
+    value = value |> String.trim() |> String.downcase()
+    if value == "" or byte_size(value) > 180, do: nil, else: value
+  end
+
+  defp normalized_observer_key(_value), do: nil
 
   defp optional_array_filter(_column, [], _param_index), do: {"", []}
 

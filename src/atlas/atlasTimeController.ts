@@ -17,6 +17,8 @@ interface AtlasTimeControllerOptions {
   toLocalInput: (date: Date) => string;
   translate: (key: string) => string;
   loadAtlas: (timestamp: string) => void;
+  busyStatus: HTMLElement;
+  busyControls: readonly HTMLButtonElement[];
 }
 
 export class AtlasTimeController {
@@ -42,6 +44,11 @@ export class AtlasTimeController {
     if (!this.options.timeInput.value) return null;
     const date = new Date(`${this.options.timeInput.value}Z`);
     return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  setBusy(busy: boolean): void {
+    this.options.busyStatus.hidden = !busy;
+    for (const control of this.options.busyControls) control.disabled = busy;
   }
 
   private currentStep(): TimeStep {
