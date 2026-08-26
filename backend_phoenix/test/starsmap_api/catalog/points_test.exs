@@ -94,7 +94,35 @@ defmodule StarsmapApi.Catalog.PointsTest do
     assert payload.returned == expected_count
   end
 
-  defp insert_object!(key, group, x_au, y_au, color) do
+  test "sky returns normalized 3D directions and removes the observer" do
+    insert_object!("observer", "gaia_500pc_stars", 10.0, 20.0, "#ffffff", 30.0)
+    insert_object!("target", "gaia_500pc_stars", 11.0, 22.0, "#ffcc88", 32.0)
+    insert_object!("flat-only", "gaia_500pc_stars", 12.0, 24.0, nil)
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_key" => "observer",
+               "observer_x_au" => "10",
+               "observer_y_au" => "20",
+               "observer_z_au" => "30",
+               "groups" => "gaia_500pc_stars",
+               "limit" => "10"
+             })
+
+    assert payload.returned == 1
+    assert [point] = payload.points
+    assert point.key == "target"
+    assert_in_delta point.direction.x, 1.0 / 3.0, 1.0e-12
+    assert_in_delta point.direction.y, 2.0 / 3.0, 1.0e-12
+    assert_in_delta point.direction.z, 2.0 / 3.0, 1.0e-12
+  end
+
+  test "sky requires all three observer coordinates" do
+    assert {:error, {:missing_param, "observer_z_au"}} =
+             PointQueries.sky(%{"observer_x_au" => "0", "observer_y_au" => "0"})
+  end
+
+  defp insert_object!(key, group, x_au, y_au, color, z_au \\ nil) do
     SnapshotStore.upsert_source_objects([
       %{
         key: key,
@@ -110,6 +138,7 @@ defmodule StarsmapApi.Catalog.PointsTest do
         source: %{},
         x_au: x_au,
         y_au: y_au,
+        z_au: z_au,
         color: color
       }
     ])
