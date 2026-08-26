@@ -50,6 +50,20 @@ defmodule StarsmapApiWeb.CatalogController do
     end
   end
 
+  def sky(conn, params) do
+    case PointQueries.sky(params) do
+      {:ok, payload} ->
+        conn
+        |> put_resp_header("cache-control", "private, max-age=60")
+        |> json(payload)
+
+      {:error, {reason, key}} when reason in [:missing_param, :invalid_float] ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: Atom.to_string(reason), parameter: key})
+    end
+  end
+
   def points_binary(conn, params) do
     if dynamic_points_disabled?() do
       conn

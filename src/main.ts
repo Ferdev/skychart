@@ -50,6 +50,7 @@ import { installAtlasDiagnostics } from "./atlas/atlasDiagnostics";
 import { AtlasEmbedController } from "./atlas/atlasEmbedController";
 import { AtlasTimeController } from "./atlas/atlasTimeController";
 import { AtlasLoadingView } from "./atlas/atlasLoadingView";
+import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController";
 import type {
   ActiveAtlasTab,
   SizeMode,
@@ -194,7 +195,7 @@ let perfDrawMs = 0;
 let perfHitTestMs = 0;
 let perfLastViewportMs = 0;
 let perfMilkyWayMs = 0;
-let perfViewportLoads = 0;
+let perfViewportLoads = 0; let skyView: SkyViewController | null = null;
 
 const {
   formatDistance, nullableDistance, nullableNumber, nullableDegrees, nullableDays, nullableLightYears,
@@ -335,6 +336,7 @@ const timeController = new AtlasTimeController({
   timeSummary, timeInput, timeStepLabel, timeStepSlider, steps: TIME_STEPS,
   ephemeris: () => ephemeris, formatDate: formatFullDate, toLocalInput: toDatetimeLocalValue,
   translate: t, loadAtlas: (timestamp) => { void loadAtlas(timestamp); },
+  busyStatus: atlasDom.timeBusy, busyControls: [atlasDom.timeNow, atlasDom.applyTime, atlasDom.timeStepBack, atlasDom.timeStepForward, atlasDom.skyTimeBack, atlasDom.skyTimeForward],
 });
 const atlasOverlay = new AtlasOverlayRenderer({
   context: ctx,
@@ -359,6 +361,7 @@ const atlasOverlay = new AtlasOverlayRenderer({
   bodyMatchesActiveFilter,
   isSolarSystemBody,
   currentViewWidthAu,
+  pxPerAu: () => camera.pxPerAu,
   auKm,
   formatDistance,
   smallBodyOrbitPathAu: (body) => smallBodyOrbitPathForBody(body, ephemeris?.timestamp_utc ?? new Date().toISOString(), () => requestRender()),
@@ -546,7 +549,9 @@ const viewStateController = new AtlasViewStateController({
   requestDataRefresh: () => requestDataRefresh({ immediate: true }),
   loadAtlas,
   animateCameraTo,
+  skyState: () => skyView?.state(), restoreSky: (state) => skyView?.restore(state) ?? Promise.resolve(),
 }, bootViewState);
+skyView = createSkyViewController(atlasDom, { bodyByKey: () => bodyByKey, ephemeris: () => ephemeris, translate: t, selectBody: selectBodyByKey, stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), resolveObserver: async (key) => bodyByKey.get(key) ?? (await objectHydrator.hydrateMany([key]))[0] ?? null });
 const embedController: AtlasEmbedController = new AtlasEmbedController({
   enabled: isEmbedMode,
   canvas,
@@ -601,7 +606,7 @@ async function loadAtlas(timestampIso?: string) {
     const query = new URLSearchParams();
     query.set("groups", STARTUP_EPHEMERIS_GROUPS.join(","));
     if (timestampIso) query.set("timestamp", timestampIso);
-    const preservedBodies = [selectedKey ? bodyByKey.get(selectedKey) : null, compareTargetKey ? bodyByKey.get(compareTargetKey) : null].filter(isPresent);
+    const preservedBodies = [selectedKey ? bodyByKey.get(selectedKey) : null, compareTargetKey ? bodyByKey.get(compareTargetKey) : null, skyView?.observerBody()].filter(isPresent);
     const url = `/api/ephemeris${query.toString() ? `?${query.toString()}` : ""}`;
     setLoading("download", 28, t("loading.corePayload"));
     const response = await fetch(url);
@@ -638,6 +643,7 @@ async function loadAtlas(timestampIso?: string) {
     const selectionState = viewStateController.takePendingSelection();
     if (selectionState) await restoreSelectionFromViewState(selectionState);
     else if (serverBootObjectKey) await selectBodyByKey(serverBootObjectKey, { center: true });
+    if (skyView?.active && !selectionState?.sky) await skyView.refreshForTime();
     requestDataRefresh({ immediate: true });
     loadingScreen.hidden = true;
     loadState.textContent = t("status.ready");
@@ -655,13 +661,7 @@ async function loadAtlas(timestampIso?: string) {
   }
 }
 
-function setTimeBusy(busy: boolean): void {
-  atlasDom.timeBusy.hidden = !busy;
-  atlasDom.timeNow.disabled = busy;
-  atlasDom.applyTime.disabled = busy;
-  atlasDom.timeStepBack.disabled = busy;
-  atlasDom.timeStepForward.disabled = busy;
-}
+function setTimeBusy(busy: boolean): void { timeController.setBusy(busy); }
 
 function bindEvents() {
   bindAtlasEvents({
@@ -701,6 +701,7 @@ function bindEvents() {
     updateSizeModes, updateDisplayToggles, updatePerformanceHud: updatePerfHud, updateAllUi, resizeCanvas,
     updateSelectedPanelMetrics, requestRender: (data = false) => requestRender(data ? { data: true } : {}),
     scheduleViewStateReplace, translate: t,
+    viewSkySelected: () => { const body = selectedBody(); if (body && bodyCanObserveSky(body)) void skyView?.open(body); },
   });
 }
 
@@ -856,7 +857,7 @@ async function refreshCatalogSummary() {
   }
 }
 
-function updateSelectedSummary() { controlView.updateSelectedSummary(selectedBody(), formatDistance); }
+function updateSelectedSummary() { controlView.updateSelectedSummary(selectedBody(), formatDistance, bodyCanObserveSky); }
 
 function updateSelectedPanelMetrics() {
   mapHud.classList.remove("has-selected-object");

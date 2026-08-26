@@ -29,6 +29,7 @@ type AtlasOverlayRendererOptions = {
   bodyMatchesActiveFilter: (body: Body) => boolean;
   isSolarSystemBody: (body: Body) => boolean | undefined;
   currentViewWidthAu: () => number;
+  pxPerAu: () => number;
   auKm: () => number;
   formatDistance: (kilometers: number) => string;
   smallBodyOrbitPathAu: (body: Body) => SmallBodyPosition[] | null;
@@ -36,6 +37,10 @@ type AtlasOverlayRendererOptions = {
 
 const POINT_ALPHA = 0.82;
 const SELECTION_RING_PX = 8.5;
+// Orbit guides are polylines; a fixed sample count makes their chords drift
+// visibly off the true ellipse once the on-screen orbit radius grows large.
+const ORBIT_MIN_SAMPLES = 180;
+const ORBIT_MAX_SAMPLES = 8192;
 
 /** Draws the navigational overlays layered above the catalog point renderer. */
 export class AtlasOverlayRenderer {
@@ -81,8 +86,8 @@ export class AtlasOverlayRenderer {
     const ctx = this.options.context;
     ctx.save();
     for (const body of bodies) {
-      const screens = this.orbitGuideScreens(body);
-      if (!screens || !screens.some((point) => pointInRect(point, rect))) continue;
+      const screens = this.orbitGuideScreens(body, rect);
+      if (!screens) continue;
       this.strokeOrbitPath(screens, body.key === frame.selectedKey);
     }
     const selected = frame.selected;
@@ -217,19 +222,35 @@ export class AtlasOverlayRenderer {
     ctx.stroke();
   }
 
-  private orbitGuideScreens(body: Body) {
+  private orbitGuideScreens(body: Body, rect: Rect) {
     const orbit = body.orbit;
     const parent = this.options.bodyByKey().get(body.parent_key ?? "");
     if (!orbit || !parent || !orbit.semi_major_axis_km || orbit.semi_major_axis_km <= 0) return null;
     const aAu = orbit.semi_major_axis_km / this.options.auKm();
     const eccentricity = clamp(orbit.eccentricity ?? 0, 0, 0.98);
+    const parentScreen = this.options.worldToScreen(parent.position.x_au, parent.position.y_au);
+    const screenRadiusPx = aAu * (1 + eccentricity) * this.options.pxPerAu();
+    // Cull against the orbit's on-screen circle rather than polyline vertices:
+    // at deep zoom the sampled vertices can all fall outside the viewport even
+    // though the orbit itself crosses it.
+    if (!circleIntersectsRect(parentScreen, screenRadiusPx, rect)) return null;
     const pAu = aAu * (1 - eccentricity * eccentricity);
     const omega = degToRad(orbit.argument_of_periapsis_deg ?? 0);
     const inclination = degToRad(orbit.inclination_deg ?? 0);
     const ascendingNode = degToRad(orbit.longitude_of_ascending_node_deg ?? 0);
+    // Chord sagitta of an N-gon is ~r·(2π/N)²/8; keep it under half a pixel so
+    // the drawn line tracks the true ellipse at any zoom.
+    const samples = clamp(Math.ceil(Math.PI * Math.sqrt(screenRadiusPx)), ORBIT_MIN_SAMPLES, ORBIT_MAX_SAMPLES);
+    const anomalies: number[] = [];
+    for (let index = 0; index <= samples; index += 1) anomalies.push((index / samples) * Math.PI * 2);
+    // The osculating ellipse passes through the body's current position by
+    // construction; include its true anomaly so the polyline does too.
+    if (orbit.true_anomaly_deg !== null && orbit.true_anomaly_deg !== undefined && Number.isFinite(orbit.true_anomaly_deg)) {
+      anomalies.push(degToRad(orbit.true_anomaly_deg));
+      anomalies.sort((a, b) => a - b);
+    }
     const screens: ScreenPoint[] = [];
-    for (let index = 0; index <= 180; index += 1) {
-      const anomaly = (index / 180) * Math.PI * 2;
+    for (const anomaly of anomalies) {
       const radiusAu = pAu / Math.max(0.02, 1 + eccentricity * Math.cos(anomaly));
       const orbitalX = radiusAu * Math.cos(anomaly);
       const orbitalY = radiusAu * Math.sin(anomaly);
@@ -305,6 +326,12 @@ export class AtlasOverlayRenderer {
 
 function rectInCanvas(rect: Rect) {
   return rect.right >= 0 && rect.left <= window.innerWidth && rect.bottom >= 0 && rect.top <= window.innerHeight;
+}
+
+function circleIntersectsRect(center: ScreenPoint, radiusPx: number, rect: Rect) {
+  const x = clamp(center.x, rect.left, rect.right);
+  const y = clamp(center.y, rect.top, rect.bottom);
+  return (center.x - x) ** 2 + (center.y - y) ** 2 <= radiusPx * radiusPx;
 }
 
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {

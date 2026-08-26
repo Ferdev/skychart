@@ -38,6 +38,7 @@ interface AtlasEventBindingsOptions {
   updateSelectedPanelMetrics: () => void;
   requestRender: (withData?: boolean) => void;
   scheduleViewStateReplace: () => void;
+  viewSkySelected: () => void;
   translate: (key: string) => string;
 }
 
@@ -102,6 +103,8 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
   dom.timeStepSlider.addEventListener("input", options.updateTimeStepUi);
   dom.timeStepBack.addEventListener("click", () => options.stepTime(-1));
   dom.timeStepForward.addEventListener("click", () => options.stepTime(1));
+  dom.skyTimeBack.addEventListener("click", () => options.stepTime(-1));
+  dom.skyTimeForward.addEventListener("click", () => options.stepTime(1));
   dom.zoomPresets.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-zoom-preset]");
     if (button) options.applyZoomPreset((button.dataset.zoomPreset as ZoomPreset) ?? "solar");
@@ -109,6 +112,7 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
   dom.zoomOut.addEventListener("click", () => options.zoomViewportCenter(1 / 2.4));
   dom.zoomIn.addEventListener("click", () => options.zoomViewportCenter(2.4));
   dom.zoomScaleSlider.addEventListener("input", options.setZoomFromSlider);
+  dom.viewSkySelected.addEventListener("click", options.viewSkySelected);
   dom.sizeModeButtons.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-size-mode]");
     if (!button) return;

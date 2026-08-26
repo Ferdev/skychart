@@ -7,10 +7,17 @@ export const BODY_FILTERS = ["all", "solar_system", "planet", "moon", "star", "b
 export type BodyFilter = typeof BODY_FILTERS[number];
 export type ViewFilters = { primary: BodyFilter; compare: BodyFilter };
 
+export type SkyViewState = {
+  observerKey: string;
+  yawDeg: number;
+  pitchDeg: number;
+  fovDeg: number;
+};
+
 export type ViewState = {
   center: { x: number; y: number }; zoom: number; time: "now" | string;
   objectKey?: string; compare?: readonly [string, string]; catalogRelease?: string;
-  layers: Partial<Record<DisplayLayer, boolean>>; filters?: ViewFilters; tour?: string; step?: number;
+  layers: Partial<Record<DisplayLayer, boolean>>; filters?: ViewFilters; sky?: SkyViewState; tour?: string; step?: number;
 };
 
 const finite = (value: string | null) => {
@@ -57,6 +64,10 @@ export function encodeViewState(state: ViewState): string {
   if (state.catalogRelease) params.set("r", state.catalogRelease);
   params.set("L", encodeLayerFlags(state.layers));
   if (state.filters) params.set("F", encodeFilters(state.filters));
+  if (state.sky) {
+    params.set("sky", state.sky.observerKey);
+    params.set("sc", [state.sky.yawDeg, state.sky.pitchDeg, state.sky.fovDeg].map(compactNumber).join(","));
+  }
   if (state.tour) params.set("tour", state.tour);
   if (state.step !== undefined) params.set("step", String(state.step));
   return params.toString();
@@ -73,11 +84,24 @@ export function decodeViewState(input: URLSearchParams | string): ViewState | nu
   const compare = params.get("cmp")?.split(",").filter(Boolean) ?? [];
   const rawStep = params.get("step"), step = rawStep === null ? undefined : Number(rawStep);
   if (step !== undefined && (!Number.isSafeInteger(step) || step < 0)) return null;
+  const sky = decodeSkyState(params);
   return {
     center: { x, y }, zoom, time: rawTime === "now" ? "now" : new Date(rawTime).toISOString(),
     objectKey: params.get("o") || undefined,
     compare: compare.length === 2 ? [compare[0]!, compare[1]!] : undefined,
     catalogRelease: params.get("r") || undefined, layers: decodeLayerFlags(params.get("L")),
-    filters: decodeFilters(params.get("F")), tour: params.get("tour") || undefined, step
+    filters: decodeFilters(params.get("F")), ...(sky ? { sky } : {}), tour: params.get("tour") || undefined, step
   };
+}
+
+function decodeSkyState(params: URLSearchParams): SkyViewState | undefined {
+  const observerKey = params.get("sky")?.trim();
+  if (!observerKey) return undefined;
+  const values = params.get("sc")?.split(",") ?? [];
+  const yawDeg = finite(values[0] ?? null);
+  const pitchDeg = finite(values[1] ?? null);
+  const fovDeg = finite(values[2] ?? null);
+  if (yawDeg === null || pitchDeg === null || fovDeg === null) return undefined;
+  if (pitchDeg < -89.5 || pitchDeg > 89.5 || fovDeg < 20 || fovDeg > 110) return undefined;
+  return { observerKey, yawDeg, pitchDeg, fovDeg };
 }
