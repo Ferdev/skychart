@@ -112,4 +112,3 @@ export const CONSTELLATIONS: readonly ConstellationFigure[] = RAW_CONSTELLATIONS
         polyline.split(",").map((hip) => `hip-${hip}`)),
     };
   });
-
