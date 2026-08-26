@@ -41,6 +41,18 @@
             <button id="sky-view-close" type="button" data-i18n="sky.exit">Exit sky view</button>
           </div>
         </header>
+        <details id="sky-layer-controls" class="sky-view__filters" open>
+          <summary data-i18n="sky.layers">Layers &amp; objects</summary>
+          <div class="sky-view__filter-groups">
+            <span class="sky-view__filter-section-label" data-i18n="sky.overlays">Overlays</span>
+            <label class="sky-view__filter">
+              <input id="sky-constellations-toggle" type="checkbox" checked />
+              <span data-i18n="sky.constellations">Constellation lines</span>
+            </label>
+            <span class="sky-view__filter-section-label" data-i18n="sky.objects">Objects</span>
+            <div id="sky-object-type-filters" class="sky-view__object-filters" role="group" aria-label="Sky object visibility" data-i18n-attrs="aria-label:sky.filtersLabel"></div>
+          </div>
+        </details>
         <div id="sky-view-tooltip" class="sky-view__tooltip" hidden></div>
         <footer class="sky-view__footer">
           <span data-i18n="sky.controls">Drag to look around · wheel or pinch to zoom · select a point to inspect it</span>
