@@ -35,6 +35,13 @@ inside each JSON file. The `/about` page and
 [`docs/scientific-methodology.md`](docs/scientific-methodology.md) provide the
 human-readable acknowledgments and methodological caveats.
 
+Constellation line topology in `src/sky/constellations.ts` follows the
+IAU/Sky & Telescope figures created with Alan MacRobert and published by the
+IAU under CC BY 4.0, using the Hipparcos transcription maintained by Dominic
+Ford at `https://github.com/dcf21/constellation-stick-figures` (accessed
+2026-08-26). The IAU standardizes constellation regions; stick-figure line
+patterns are a conventional visualization rather than official boundaries.
+
 Selectable DESI DR1 tile points resolve their source coordinates and redshift
 at display time from the public `desi_dr1.zpix` and `desi_dr1.photometry`
 tables hosted by NSF NOIRLab Astro Data Lab. Those on-demand records are cached
