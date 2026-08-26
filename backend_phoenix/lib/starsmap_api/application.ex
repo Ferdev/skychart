@@ -22,6 +22,7 @@ defmodule StarsmapApi.Application do
         StarsmapApi.Repo,
         StarsmapApi.Catalog.PointTileCache,
         StarsmapApi.Catalog.PublicCache,
+        StarsmapApi.SkyShare.CardCache,
         StarsmapApiWeb.Plugs.RateLimitStore
       ] ++
         sky_event_children ++

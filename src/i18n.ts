@@ -1,4 +1,5 @@
 import { LAUNCH_TRANSLATIONS } from "./launchTranslations";
+import { SKY_SHARE_TRANSLATIONS } from "./sky/skyShareTranslations";
 
 export type LocaleCode = "en" | "es" | "fr" | "de" | "pt-BR" | "it" | "zh-Hans" | "ja" | "ko";
 
@@ -22,6 +23,31 @@ const en: Record<string, string> = {
   "sky.eyebrow": "Object-centered view",
   "sky.action": "Sky",
   "sky.actionLabel": "View sky from here",
+  "sky.shareAction": "Share this sky",
+  "sky.shareEyebrow": "Reproducible snapshot",
+  "sky.shareTitle": "Share this sky",
+  "sky.shareClose": "Close Sky sharing",
+  "sky.shareDescription": "The link freezes the current UTC epoch, direction, zoom, and visible layers.",
+  "sky.sharePreviewLabel": "Sky share card preview",
+  "sky.copyLink": "Copy viewpoint link",
+  "sky.nativeShare": "Share…",
+  "sky.downloadCard": "Download card",
+  "sky.linkCopied": "Sky viewpoint link copied",
+  "sky.skyShared": "Sky snapshot shared",
+  "sky.preparingCard": "Preparing Sky card…",
+  "sky.cardDownloaded": "Sky card downloaded",
+  "sky.shareFailed": "Could not share this sky",
+  "sky.cardTitle": "The sky from {name}",
+  "sky.cardDisclosure": "Catalog-based geometric reconstruction · observer hidden · no atmosphere, surface, or light-time correction",
+  "sky.distanceUnknown": "Distance from Earth not supplied",
+  "sky.distanceEarth": "Observer context · Earth",
+  "sky.distanceAu": "Distance from Earth · {distance} AU",
+  "sky.distanceLy": "Distance from Earth · {distance} ly",
+  "sky.unavailableEyebrow": "Sky view unavailable",
+  "sky.unavailableTitle": "This sky could not be restored",
+  "sky.observerUnavailable": "The observer “{key}” is unavailable or is not a public catalog object.",
+  "sky.invalidLink": "This Sky link has malformed or unsupported camera, time, or layer settings.",
+  "sky.backToAtlas": "Return to the atlas",
   "sky.reset": "Reset view",
   "sky.exit": "Exit sky view",
   "sky.earlier": "Earlier",
@@ -802,14 +828,14 @@ const FILTER_COUNT_TRANSLATIONS: Record<Exclude<LocaleCode, "en">, Record<string
 
 export const LOCALES: Record<LocaleCode, LocaleDefinition> = {
   en: { label: "English", strings: en },
-  es: { label: PARTIAL_TRANSLATIONS.es.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.es.strings, ...FILTER_COUNT_TRANSLATIONS.es, ...LAUNCH_TRANSLATIONS.es } },
-  fr: { label: PARTIAL_TRANSLATIONS.fr.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.fr.strings, ...FILTER_COUNT_TRANSLATIONS.fr, ...LAUNCH_TRANSLATIONS.fr } },
-  de: { label: PARTIAL_TRANSLATIONS.de.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.de.strings, ...FILTER_COUNT_TRANSLATIONS.de, ...LAUNCH_TRANSLATIONS.de } },
-  "pt-BR": { label: PARTIAL_TRANSLATIONS["pt-BR"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["pt-BR"].strings, ...FILTER_COUNT_TRANSLATIONS["pt-BR"], ...LAUNCH_TRANSLATIONS["pt-BR"] } },
-  it: { label: PARTIAL_TRANSLATIONS.it.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.it.strings, ...FILTER_COUNT_TRANSLATIONS.it, ...LAUNCH_TRANSLATIONS.it } },
-  "zh-Hans": { label: PARTIAL_TRANSLATIONS["zh-Hans"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["zh-Hans"].strings, ...FILTER_COUNT_TRANSLATIONS["zh-Hans"], ...LAUNCH_TRANSLATIONS["zh-Hans"] } },
-  ja: { label: PARTIAL_TRANSLATIONS.ja.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ja.strings, ...FILTER_COUNT_TRANSLATIONS.ja, ...LAUNCH_TRANSLATIONS.ja } },
-  ko: { label: PARTIAL_TRANSLATIONS.ko.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ko.strings, ...FILTER_COUNT_TRANSLATIONS.ko, ...LAUNCH_TRANSLATIONS.ko } }
+  es: { label: PARTIAL_TRANSLATIONS.es.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.es.strings, ...FILTER_COUNT_TRANSLATIONS.es, ...LAUNCH_TRANSLATIONS.es, ...SKY_SHARE_TRANSLATIONS.es } },
+  fr: { label: PARTIAL_TRANSLATIONS.fr.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.fr.strings, ...FILTER_COUNT_TRANSLATIONS.fr, ...LAUNCH_TRANSLATIONS.fr, ...SKY_SHARE_TRANSLATIONS.fr } },
+  de: { label: PARTIAL_TRANSLATIONS.de.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.de.strings, ...FILTER_COUNT_TRANSLATIONS.de, ...LAUNCH_TRANSLATIONS.de, ...SKY_SHARE_TRANSLATIONS.de } },
+  "pt-BR": { label: PARTIAL_TRANSLATIONS["pt-BR"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["pt-BR"].strings, ...FILTER_COUNT_TRANSLATIONS["pt-BR"], ...LAUNCH_TRANSLATIONS["pt-BR"], ...SKY_SHARE_TRANSLATIONS["pt-BR"] } },
+  it: { label: PARTIAL_TRANSLATIONS.it.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.it.strings, ...FILTER_COUNT_TRANSLATIONS.it, ...LAUNCH_TRANSLATIONS.it, ...SKY_SHARE_TRANSLATIONS.it } },
+  "zh-Hans": { label: PARTIAL_TRANSLATIONS["zh-Hans"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["zh-Hans"].strings, ...FILTER_COUNT_TRANSLATIONS["zh-Hans"], ...LAUNCH_TRANSLATIONS["zh-Hans"], ...SKY_SHARE_TRANSLATIONS["zh-Hans"] } },
+  ja: { label: PARTIAL_TRANSLATIONS.ja.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ja.strings, ...FILTER_COUNT_TRANSLATIONS.ja, ...LAUNCH_TRANSLATIONS.ja, ...SKY_SHARE_TRANSLATIONS.ja } },
+  ko: { label: PARTIAL_TRANSLATIONS.ko.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ko.strings, ...FILTER_COUNT_TRANSLATIONS.ko, ...LAUNCH_TRANSLATIONS.ko, ...SKY_SHARE_TRANSLATIONS.ko } }
 };
 
 let currentLocale = detectLocale();
@@ -866,6 +892,8 @@ function applyTranslations() {
 }
 
 function detectLocale(): LocaleCode {
+  const shared = normalizeLocale(new URLSearchParams(window.location.search).get("lang") ?? "");
+  if (shared) return shared;
   const stored = normalizeLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY) ?? "");
   if (stored) return stored;
   for (const language of navigator.languages.length ? navigator.languages : [navigator.language]) {

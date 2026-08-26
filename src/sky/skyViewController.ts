@@ -1,6 +1,15 @@
 import type { Body, Ephemeris } from "../atlas/contracts";
 import type { atlasDom } from "../atlas/atlasDom";
-import type { SkyViewState } from "../viewState";
+import { trackEvent } from "../analytics";
+import {
+  buildSkyPermalink,
+  normalizeSkyViewState,
+  SKY_OBJECT_TYPES,
+  type SkyObjectType,
+  type SkyPermalinkState,
+  type SkyShareLocale,
+  type SkyViewState,
+} from "../viewState";
 import { CONSTELLATIONS } from "./constellations";
 import {
   cameraForDirection,
@@ -45,6 +54,17 @@ type SkyViewControllerOptions = {
   tooltip: HTMLElement;
   objectTypeFilters: HTMLElement;
   constellationsToggle: HTMLInputElement;
+  shareButton: HTMLButtonElement;
+  sharePopover: HTMLElement;
+  shareCloseButton: HTMLButtonElement;
+  sharePreview: HTMLCanvasElement;
+  copyLinkButton: HTMLButtonElement;
+  nativeShareButton: HTMLButtonElement;
+  downloadCardButton: HTMLButtonElement;
+  shareStatus: HTMLElement;
+  errorPanel: HTMLElement;
+  errorTitle: HTMLElement;
+  errorMessage: HTMLElement;
   closeButton: HTMLButtonElement;
   resetButton: HTMLButtonElement;
   bodyByKey: () => ReadonlyMap<string, Body>;
@@ -53,19 +73,16 @@ type SkyViewControllerOptions = {
   selectBody: (key: string) => Promise<void>;
   stateChanged: (mode: "push" | "replace") => void;
   resolveObserver: (key: string) => Promise<Body | null>;
+  catalogRelease: () => string | undefined;
+  locale: () => SkyShareLocale;
 };
 
 type SkyViewIntegrationOptions = Pick<SkyViewControllerOptions,
-  "bodyByKey" | "ephemeris" | "translate" | "selectBody" | "stateChanged" | "resolveObserver">;
+  "bodyByKey" | "ephemeris" | "translate" | "selectBody" | "stateChanged" | "resolveObserver" | "catalogRelease" | "locale">;
 
 const DEFAULT_FOV_DEG = 72;
 const MAX_LABELS = 28;
 const SKY_POINT_LIMIT = 12_000;
-const SKY_OBJECT_TYPES = [
-  "star", "planet", "moon", "dwarf_planet", "asteroid", "comet", "small_body",
-  "galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula",
-  "star_cluster", "xray_source", "xray_extended", "asterism", "milky_way_patch", "unknown",
-] as const;
 const SKY_OBJECT_TYPE_ORDER = new Map<string, number>(SKY_OBJECT_TYPES.map((type, index) => [type, index]));
 const OBJECT_TYPE_LABEL_KEYS: Readonly<Record<string, string>> = {
   star: "type.star",
@@ -89,6 +106,13 @@ const OBJECT_TYPE_LABEL_KEYS: Readonly<Record<string, string>> = {
   unknown: "type.object",
 };
 
+type SkyShareSnapshot = {
+  state: SkyPermalinkState;
+  observer: Body;
+  url: string;
+  card: Blob | null;
+};
+
 /** Owns the horizonless, object-centered celestial-sphere overlay. */
 export class SkyViewController {
   private observer: Body | null = null;
@@ -102,6 +126,8 @@ export class SkyViewController {
   private dragMoved = false;
   private pinch: { distance: number; fovDeg: number } | null = null;
   private readonly visibleObjectTypes = new Map<string, boolean>();
+  private shareSnapshot: SkyShareSnapshot | null = null;
+  private shareStatusTimer: number | null = null;
 
   constructor(private readonly options: SkyViewControllerOptions) {
     options.closeButton.addEventListener("click", () => this.close());
@@ -113,8 +139,20 @@ export class SkyViewController {
     options.canvas.addEventListener("pointerleave", () => this.hideTooltip());
     options.canvas.addEventListener("wheel", (event) => this.wheel(event), { passive: false });
     options.canvas.addEventListener("keydown", (event) => this.keyDown(event));
-    options.constellationsToggle.addEventListener("change", () => this.requestRender());
+    options.constellationsToggle.addEventListener("change", () => {
+      this.options.stateChanged("replace");
+      this.requestRender();
+    });
     options.objectTypeFilters.addEventListener("change", (event) => this.objectTypeFilterChanged(event));
+    options.shareButton.addEventListener("click", () => void this.toggleSharePanel());
+    options.shareCloseButton.addEventListener("click", () => this.closeSharePanel());
+    options.copyLinkButton.addEventListener("click", () => void this.copyViewpointLink());
+    options.nativeShareButton.addEventListener("click", () => void this.nativeShare());
+    options.downloadCardButton.addEventListener("click", () => void this.downloadCard());
+    options.sharePopover.addEventListener("toggle", () => {
+      options.shareButton.setAttribute("aria-expanded", String(options.sharePopover.matches(":popover-open")));
+    });
+    options.nativeShareButton.hidden = typeof navigator.share !== "function";
     window.addEventListener("resize", () => this.requestRender());
     window.addEventListener("cosmic-atlas:locale-change", () => this.updateLocale());
   }
@@ -125,7 +163,12 @@ export class SkyViewController {
 
   state(): SkyViewState | undefined {
     if (!this.active || !this.observer) return undefined;
-    return { observerKey: this.observer.key, ...normalizeCamera(this.camera) };
+    return normalizeSkyViewState({
+      observerKey: this.observer.key,
+      ...normalizeCamera(this.camera),
+      constellations: this.options.constellationsToggle.checked,
+      hiddenObjectTypes: this.hiddenObjectTypes(),
+    }) ?? undefined;
   }
 
   observerBody(): Body | null {
@@ -133,10 +176,18 @@ export class SkyViewController {
   }
 
   async open(observer: Body, restoredCamera?: Omit<SkyViewState, "observerKey">): Promise<void> {
-    if (!bodyCanObserveSky(observer)) return;
+    if (!bodyCanObserveSky(observer)) {
+      this.showUnavailable(this.options.translate("sky.positionUnavailable"));
+      return;
+    }
     this.observer = observer;
     this.catalogPoints = [];
     this.camera = restoredCamera ? normalizeCamera(restoredCamera) : this.initialCamera(observer);
+    this.visibleObjectTypes.clear();
+    for (const type of restoredCamera?.hiddenObjectTypes ?? []) this.visibleObjectTypes.set(type, false);
+    this.options.constellationsToggle.checked = restoredCamera?.constellations ?? true;
+    this.options.errorPanel.hidden = true;
+    this.shareSnapshot = null;
     this.options.root.hidden = false;
     document.body.dataset.skyView = "true";
     this.updateChrome();
@@ -155,21 +206,25 @@ export class SkyViewController {
     }
     const observer = await this.options.resolveObserver(state.observerKey);
     if (!observer || !bodyCanObserveSky(observer)) {
-      this.close({ updateHistory: false });
+      this.showUnavailable(observer
+        ? this.options.translate("sky.positionUnavailable")
+        : this.options.translate("sky.observerUnavailable", { key: state.observerKey }));
       return;
     }
     await this.open(observer, state);
   }
 
   close(options: { updateHistory?: boolean } = {}): void {
-    if (!this.active) return;
+    if (this.options.root.hidden) return;
     this.requestId += 1;
+    this.closeSharePanel();
     this.options.root.hidden = true;
     delete document.body.dataset.skyView;
     this.hideTooltip();
     this.renderedHits = [];
     this.catalogPoints = [];
     this.observer = null;
+    this.shareSnapshot = null;
     if (options.updateHistory !== false) this.options.stateChanged("push");
   }
 
@@ -188,6 +243,20 @@ export class SkyViewController {
     this.updateFilterControls();
     this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
     this.requestRender();
+  }
+
+  showUnavailable(message: string): void {
+    this.requestId += 1;
+    this.observer = null;
+    this.catalogPoints = [];
+    this.renderedHits = [];
+    this.shareSnapshot = null;
+    this.options.root.hidden = false;
+    this.options.errorPanel.hidden = false;
+    this.options.errorTitle.textContent = this.options.translate("sky.unavailableTitle");
+    this.options.errorMessage.textContent = message;
+    document.body.dataset.skyView = "true";
+    this.options.closeButton.focus({ preventScroll: true });
   }
 
   private async loadCatalog(): Promise<void> {
@@ -276,29 +345,41 @@ export class SkyViewController {
     const context = canvas.getContext("2d");
     if (!context) return;
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.renderScene(context, width, height, this.camera, true);
+  }
+
+  private renderScene(
+    context: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    camera: SkyCamera,
+    recordHits: boolean,
+  ): void {
+    const observer = this.currentObserver();
+    if (!observer) return;
     const background = context.createRadialGradient(width * 0.5, height * 0.45, 0, width * 0.5, height * 0.45, Math.max(width, height) * 0.72);
     background.addColorStop(0, "#0c1519");
     background.addColorStop(0.5, "#080d11");
     background.addColorStop(1, "#030506");
     context.fillStyle = background;
     context.fillRect(0, 0, width, height);
-    this.drawGrid(context, width, height);
+    this.drawGrid(context, width, height, camera);
     const points = this.mergedPoints(observer);
-    this.drawConstellations(context, points, width, height);
-    this.drawPoints(context, points, width, height);
+    this.drawConstellations(context, points, width, height, camera);
+    this.drawPoints(context, points, width, height, camera, recordHits);
     this.drawReticle(context, width, height);
   }
 
-  private drawGrid(context: CanvasRenderingContext2D, width: number, height: number): void {
+  private drawGrid(context: CanvasRenderingContext2D, width: number, height: number, camera: SkyCamera): void {
     context.save();
     context.lineWidth = 1;
     for (let longitude = 0; longitude < 360; longitude += 30) {
       this.drawDirectionLine(context, width, height, Array.from({ length: 73 }, (_, index) =>
-        directionFromEcliptic(longitude, -90 + index * 2.5)), longitude % 90 === 0 ? 0.2 : 0.1);
+        directionFromEcliptic(longitude, -90 + index * 2.5)), longitude % 90 === 0 ? 0.2 : 0.1, camera);
     }
     for (const latitude of [-60, -30, 0, 30, 60]) {
       this.drawDirectionLine(context, width, height, Array.from({ length: 145 }, (_, index) =>
-        directionFromEcliptic(index * 2.5, latitude)), latitude === 0 ? 0.28 : 0.12);
+        directionFromEcliptic(index * 2.5, latitude)), latitude === 0 ? 0.28 : 0.12, camera);
     }
     context.restore();
   }
@@ -309,12 +390,13 @@ export class SkyViewController {
     height: number,
     directions: Vector3[],
     opacity: number,
+    camera: SkyCamera,
   ): void {
     context.beginPath();
     context.strokeStyle = `rgba(116, 184, 183, ${opacity})`;
     let previous: { x: number; y: number } | null = null;
     for (const direction of directions) {
-      const projected = projectDirection(direction, this.camera, width, height);
+      const projected = projectDirection(direction, camera, width, height);
       if (!projected || (previous && Math.hypot(projected.x - previous.x, projected.y - previous.y) > width * 0.3)) {
         previous = null;
         continue;
@@ -330,6 +412,7 @@ export class SkyViewController {
     points: SkyPoint[],
     width: number,
     height: number,
+    camera: SkyCamera,
   ): void {
     if (!this.options.constellationsToggle.checked) return;
     const pointByKey = new Map(points.map((point) => [point.key, point]));
@@ -345,7 +428,7 @@ export class SkyViewController {
         let connected = false;
         for (const key of polyline) {
           const point = pointByKey.get(key);
-          const projected = point ? projectDirection(point.direction, this.camera, width, height) : null;
+          const projected = point ? projectDirection(point.direction, camera, width, height) : null;
           if (!projected) {
             connected = false;
             continue;
@@ -400,12 +483,19 @@ export class SkyViewController {
     context.restore();
   }
 
-  private drawPoints(context: CanvasRenderingContext2D, points: SkyPoint[], width: number, height: number): void {
+  private drawPoints(
+    context: CanvasRenderingContext2D,
+    points: SkyPoint[],
+    width: number,
+    height: number,
+    camera: SkyCamera,
+    recordHits: boolean,
+  ): void {
     const hits: RenderedHit[] = [];
     const labelCandidates: RenderedHit[] = [];
     for (const point of points) {
       if (!this.objectTypeVisible(point)) continue;
-      const projected = projectDirection(point.direction, this.camera, width, height);
+      const projected = projectDirection(point.direction, camera, width, height);
       if (!projected) continue;
       const radius = pointRadius(point);
       const color = validColor(point.color) ? point.color! : "#d8e8ff";
@@ -425,7 +515,7 @@ export class SkyViewController {
       if (point.dynamic || (Number.isFinite(point.apparent_magnitude) && Number(point.apparent_magnitude) <= 4.5)) labelCandidates.push(hit);
     }
     context.globalAlpha = 1;
-    this.renderedHits = hits;
+    if (recordHits) this.renderedHits = hits;
     labelCandidates.sort((a, b) => Number(b.point.dynamic) - Number(a.point.dynamic) ||
       numericMagnitude(a.point.apparent_magnitude) - numericMagnitude(b.point.apparent_magnitude));
     this.drawLabels(context, labelCandidates.slice(0, MAX_LABELS), width, height);
@@ -521,7 +611,163 @@ export class SkyViewController {
     if (!(input instanceof HTMLInputElement) || !input.dataset.skyObjectType) return;
     this.visibleObjectTypes.set(input.dataset.skyObjectType, input.checked);
     this.hideTooltip();
+    this.options.stateChanged("replace");
     this.requestRender();
+  }
+
+  private hiddenObjectTypes(): SkyObjectType[] {
+    return SKY_OBJECT_TYPES.filter((type) => this.visibleObjectTypes.get(type) === false).sort();
+  }
+
+  private async toggleSharePanel(): Promise<void> {
+    if (this.options.sharePopover.matches(":popover-open")) {
+      this.closeSharePanel();
+      return;
+    }
+    const observer = this.currentObserver();
+    const sky = this.state();
+    const epochUtc = this.options.ephemeris()?.timestamp_utc;
+    if (!observer || !sky || !epochUtc || Number.isNaN(Date.parse(epochUtc))) {
+      this.setShareStatus(this.options.translate("sky.shareFailed"));
+      return;
+    }
+    const state: SkyPermalinkState = {
+      ...sky,
+      epochUtc: new Date(epochUtc).toISOString(),
+      catalogRelease: this.options.catalogRelease(),
+      locale: this.options.locale(),
+    };
+    const url = new URL(buildSkyPermalink(state), window.location.origin).toString();
+    this.shareSnapshot = { state, observer, url, card: null };
+    this.renderShareCard(state, observer);
+    this.options.sharePopover.showPopover();
+    this.options.shareCloseButton.focus({ preventScroll: true });
+  }
+
+  private closeSharePanel(): void {
+    if (this.options.sharePopover.matches(":popover-open")) this.options.sharePopover.hidePopover();
+    this.options.shareButton.setAttribute("aria-expanded", "false");
+  }
+
+  private async copyViewpointLink(): Promise<void> {
+    const snapshot = this.shareSnapshot;
+    if (!snapshot) return;
+    try {
+      await navigator.clipboard.writeText(snapshot.url);
+      this.setShareStatus(this.options.translate("sky.linkCopied"));
+      trackEvent("share", { method: "sky_link" });
+    } catch {
+      this.setShareStatus(this.options.translate("sky.shareFailed"));
+    }
+  }
+
+  private async nativeShare(): Promise<void> {
+    const snapshot = this.shareSnapshot;
+    if (!snapshot || !navigator.share) return;
+    try {
+      const blob = await this.shareCardBlob(snapshot);
+      const file = new File([blob], this.cardFilename(snapshot), { type: "image/png" });
+      const filePayload = { files: [file], title: this.options.translate("sky.cardTitle", { name: snapshot.observer.name }), text: this.options.translate("sky.shareDescription"), url: snapshot.url };
+      if (navigator.canShare?.({ files: [file] })) await navigator.share(filePayload);
+      else await navigator.share({ title: filePayload.title, text: filePayload.text, url: snapshot.url });
+      this.setShareStatus(this.options.translate("sky.skyShared"));
+      trackEvent("share", { method: "sky_native" });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      this.setShareStatus(this.options.translate("sky.shareFailed"));
+    }
+  }
+
+  private async downloadCard(): Promise<void> {
+    const snapshot = this.shareSnapshot;
+    if (!snapshot) return;
+    this.options.downloadCardButton.disabled = true;
+    this.setShareStatus(this.options.translate("sky.preparingCard"), false);
+    try {
+      const blob = await this.shareCardBlob(snapshot);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = this.cardFilename(snapshot);
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
+      this.setShareStatus(this.options.translate("sky.cardDownloaded"));
+      trackEvent("share", { method: "sky_card" });
+    } catch {
+      this.setShareStatus(this.options.translate("sky.shareFailed"));
+    } finally {
+      this.options.downloadCardButton.disabled = false;
+    }
+  }
+
+  private renderShareCard(state: SkyPermalinkState, observer: Body): void {
+    const canvas = this.options.sharePreview;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Sky share preview canvas unavailable");
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    this.renderScene(context, canvas.width, canvas.height, state, false);
+
+    const topShade = context.createLinearGradient(0, 0, 0, 250);
+    topShade.addColorStop(0, "rgba(2, 5, 6, 0.96)");
+    topShade.addColorStop(1, "rgba(2, 5, 6, 0)");
+    context.fillStyle = topShade;
+    context.fillRect(0, 0, canvas.width, 250);
+    const bottomShade = context.createLinearGradient(0, 350, 0, canvas.height);
+    bottomShade.addColorStop(0, "rgba(2, 5, 6, 0)");
+    bottomShade.addColorStop(1, "rgba(2, 5, 6, 0.98)");
+    context.fillStyle = bottomShade;
+    context.fillRect(0, 350, canvas.width, canvas.height - 350);
+
+    context.textBaseline = "top";
+    context.fillStyle = "#82cbb3";
+    context.font = "800 20px system-ui, sans-serif";
+    context.fillText("COSMIC ATLAS · SKYCHART.ORG", 64, 46);
+    context.fillStyle = "#f3eedf";
+    drawFittedText(context, this.options.translate("sky.cardTitle", { name: observer.name }), 64, 86, 940, 54);
+    context.fillStyle = "rgba(238, 242, 234, 0.86)";
+    context.font = "650 23px system-ui, sans-serif";
+    context.fillText(`UTC ${state.epochUtc}`, 64, 158);
+    context.fillStyle = "rgba(248, 203, 101, 0.92)";
+    context.font = "650 21px system-ui, sans-serif";
+    context.fillText(this.distanceContext(observer), 64, 526);
+    context.fillStyle = "rgba(238, 242, 234, 0.72)";
+    context.font = "500 17px system-ui, sans-serif";
+    context.fillText(this.options.translate("sky.cardDisclosure"), 64, 570, 1070);
+  }
+
+  private shareCardBlob(snapshot: SkyShareSnapshot): Promise<Blob> {
+    if (snapshot.card) return Promise.resolve(snapshot.card);
+    return new Promise<Blob>((resolve, reject) => {
+      this.options.sharePreview.toBlob((blob) => {
+        if (!blob) { reject(new Error("Unable to encode Sky share card")); return; }
+        snapshot.card = blob;
+        resolve(blob);
+      }, "image/png");
+    });
+  }
+
+  private distanceContext(observer: Body): string {
+    const distanceKm = observer.distance_from_earth_km;
+    if (!Number.isFinite(distanceKm) || Number(distanceKm) < 0) return this.options.translate("sky.distanceUnknown");
+    if (Number(distanceKm) < 1) return this.options.translate("sky.distanceEarth");
+    const distanceAu = Number(distanceKm) / 149_597_870.7;
+    if (distanceAu < 100_000) return this.options.translate("sky.distanceAu", { distance: formatCardNumber(distanceAu) });
+    return this.options.translate("sky.distanceLy", { distance: formatCardNumber(Number(distanceKm) / 9_460_730_472_580.8) });
+  }
+
+  private cardFilename(snapshot: SkyShareSnapshot): string {
+    const slug = slugify(snapshot.observer.name) || slugify(snapshot.observer.key) || "observer";
+    return `cosmic-atlas-sky-from-${slug}-${snapshot.state.epochUtc.slice(0, 10)}.png`;
+  }
+
+  private setShareStatus(message: string, clear = true): void {
+    if (this.shareStatusTimer !== null) window.clearTimeout(this.shareStatusTimer);
+    this.options.shareStatus.textContent = message;
+    this.shareStatusTimer = clear ? window.setTimeout(() => {
+      this.options.shareStatus.textContent = "";
+      this.shareStatusTimer = null;
+    }, 3_500) : null;
   }
 
   private objectTypeVisible(point: SkyPoint): boolean {
@@ -657,6 +903,17 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     tooltip: dom.skyTooltip,
     objectTypeFilters: dom.skyObjectTypeFilters,
     constellationsToggle: dom.skyConstellationsToggle,
+    shareButton: dom.skyShareButton,
+    sharePopover: dom.skySharePopover,
+    shareCloseButton: dom.skyShareClose,
+    sharePreview: dom.skySharePreview,
+    copyLinkButton: dom.skyCopyLink,
+    nativeShareButton: dom.skyNativeShare,
+    downloadCardButton: dom.skyDownloadCard,
+    shareStatus: dom.skyShareStatus,
+    errorPanel: dom.skyError,
+    errorTitle: dom.skyErrorTitle,
+    errorMessage: dom.skyErrorMessage,
     closeButton: dom.skyClose,
     resetButton: dom.skyReset,
   });
@@ -729,4 +986,32 @@ function nearestHit(hits: RenderedHit[], point: { x: number; y: number }): Rende
 
 function overlaps(a: { left: number; top: number; right: number; bottom: number }, b: { left: number; top: number; right: number; bottom: number }): boolean {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+function drawFittedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  initialSize: number,
+): void {
+  let size = initialSize;
+  do {
+    context.font = `750 ${size}px Georgia, serif`;
+    if (context.measureText(text).width <= maxWidth || size <= 30) break;
+    size -= 2;
+  } while (size > 30);
+  context.fillText(text, x, y, maxWidth);
+}
+
+function slugify(value: string): string {
+  return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+}
+
+function formatCardNumber(value: number): string {
+  if (!Number.isFinite(value)) return "unknown";
+  if (Math.abs(value) >= 10_000 || (Math.abs(value) > 0 && Math.abs(value) < 0.01)) return value.toExponential(2);
+  return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }).format(value);
 }
