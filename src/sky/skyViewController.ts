@@ -20,6 +20,7 @@ import {
   type SkyCamera,
   type Vector3,
 } from "./skyProjection";
+import { skyPointAppearance } from "./skyPointAppearance";
 
 type CatalogSkyPoint = {
   key: string;
@@ -493,28 +494,47 @@ export class SkyViewController {
   ): void {
     const hits: RenderedHit[] = [];
     const labelCandidates: RenderedHit[] = [];
+    context.save();
+    context.globalCompositeOperation = "lighter";
     for (const point of points) {
       if (!this.objectTypeVisible(point)) continue;
       const projected = projectDirection(point.direction, camera, width, height);
       if (!projected) continue;
-      const radius = pointRadius(point);
-      const color = validColor(point.color) ? point.color! : "#d8e8ff";
-      context.globalAlpha = point.dynamic ? 0.98 : starOpacity(point.apparent_magnitude);
-      if (radius >= 2.5) {
+      const appearance = skyPointAppearance(point);
+      if (appearance.glowRadius > 0) {
+        const glow = context.createRadialGradient(
+          projected.x,
+          projected.y,
+          0,
+          projected.x,
+          projected.y,
+          appearance.glowRadius,
+        );
+        glow.addColorStop(0, appearance.glowColors.inner);
+        glow.addColorStop(0.28, appearance.glowColors.middle);
+        glow.addColorStop(1, appearance.glowColors.outer);
         context.beginPath();
-        context.fillStyle = `${color}24`;
-        context.arc(projected.x, projected.y, radius * 3, 0, Math.PI * 2);
+        context.fillStyle = glow;
+        context.arc(projected.x, projected.y, appearance.glowRadius, 0, Math.PI * 2);
         context.fill();
       }
+      context.globalAlpha = appearance.opacity;
       context.beginPath();
-      context.fillStyle = color;
-      context.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+      context.fillStyle = appearance.color;
+      context.arc(projected.x, projected.y, appearance.coreRadius, 0, Math.PI * 2);
       context.fill();
-      const hit = { point, x: projected.x, y: projected.y, radius: Math.max(7, radius + 4) };
+      if (appearance.brightCore) {
+        context.globalAlpha = Math.min(1, appearance.opacity + 0.18);
+        context.beginPath();
+        context.fillStyle = "#fffef8";
+        context.arc(projected.x, projected.y, Math.min(0.48, appearance.coreRadius * 0.38), 0, Math.PI * 2);
+        context.fill();
+      }
+      const hit = { point, x: projected.x, y: projected.y, radius: Math.max(7, appearance.coreRadius + 4) };
       hits.push(hit);
       if (point.dynamic || (Number.isFinite(point.apparent_magnitude) && Number(point.apparent_magnitude) <= 4.5)) labelCandidates.push(hit);
     }
-    context.globalAlpha = 1;
+    context.restore();
     if (recordHits) this.renderedHits = hits;
     labelCandidates.sort((a, b) => Number(b.point.dynamic) - Number(a.point.dynamic) ||
       numericMagnitude(a.point.apparent_magnitude) - numericMagnitude(b.point.apparent_magnitude));
@@ -944,22 +964,6 @@ function skyObjectType(point: Pick<SkyPoint, "object_type">): string {
 function validCatalogPoint(point: CatalogSkyPoint): boolean {
   return Boolean(point && point.key && point.name && point.direction &&
     [point.direction.x, point.direction.y, point.direction.z].every(Number.isFinite));
-}
-
-function validColor(value: string | null | undefined): boolean {
-  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
-}
-
-function pointRadius(point: SkyPoint): number {
-  if (point.dynamic) return point.object_type === "star" ? 5 : 4;
-  const magnitude = point.apparent_magnitude;
-  if (!Number.isFinite(magnitude)) return 1.15;
-  return Math.max(0.7, Math.min(4.5, 3.2 - Number(magnitude) * 0.18));
-}
-
-function starOpacity(magnitude: number | null | undefined): number {
-  if (!Number.isFinite(magnitude)) return 0.72;
-  return Math.max(0.38, Math.min(1, 1.08 - Number(magnitude) * 0.025));
 }
 
 function numericMagnitude(value: number | null | undefined): number {
