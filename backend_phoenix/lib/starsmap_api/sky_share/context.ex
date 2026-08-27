@@ -32,7 +32,7 @@ defmodule StarsmapApi.SkyShare.Context do
   end
 
   defp resolve_catalog_observer(observer_key, epoch, core_result, core_bodies) do
-    case PublicObjects.public_object(observer_key) do
+    case PublicObjects.public_observer(observer_key) do
       {:ok, object} ->
         if dynamic_object?(object) do
           with {:ok, payload} <- Ephemeris.snapshot(epoch, [observer_key]),

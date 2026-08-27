@@ -30,6 +30,25 @@ defmodule StarsmapApi.Catalog.PublicObjects do
 
   @public_cache_ttl_ms 300_000
   @bulk_only_groups ~w(gaia_500pc_stars gaia_10kpc_bright_stars desi_dr1_galaxies desi_dr1_quasars quaia_g20_quasars)
+
+  def public_observer(key) when is_binary(key) and byte_size(key) <= 180 do
+    normalized = String.downcase(key)
+
+    case PublicCache.get({:observer, normalized}) do
+      {:ok, result} ->
+        result
+
+      :error ->
+        PublicCache.put(
+          {:observer, normalized},
+          load_public_observer(normalized),
+          @public_cache_ttl_ms
+        )
+    end
+  end
+
+  def public_observer(_), do: {:error, :not_found}
+
   def public_object(key) when is_binary(key) and byte_size(key) <= 180 do
     normalized = String.downcase(key)
 
@@ -48,15 +67,16 @@ defmodule StarsmapApi.Catalog.PublicObjects do
 
   def public_object(_), do: {:error, :not_found}
 
+  defp load_public_observer(key) do
+    case public_catalog_record(key) do
+      {:ok, object} -> {:ok, catalog_object_payload(object)}
+      error -> error
+    end
+  end
+
   defp load_public_object(key) do
-    case Repo.get_by(CatalogSourceObject, key: key) do
-      nil ->
-        {:error, :not_found}
-
-      %{catalog_group: group} when group in @bulk_only_groups ->
-        {:error, :not_found}
-
-      object ->
+    case public_catalog_record(key) do
+      {:ok, object} ->
         related =
           CatalogSourceObject
           |> where(
@@ -77,6 +97,17 @@ defmodule StarsmapApi.Catalog.PublicObjects do
            semantics: StarsmapApi.ScienceSemantics.for_object(object),
            updated_at: object.updated_at
          })}
+
+      error ->
+        error
+    end
+  end
+
+  defp public_catalog_record(key) do
+    case Repo.get_by(CatalogSourceObject, key: key) do
+      nil -> {:error, :not_found}
+      %{catalog_group: group} when group in @bulk_only_groups -> {:error, :not_found}
+      object -> {:ok, object}
     end
   end
 
