@@ -237,6 +237,13 @@ export class SkyViewController {
     if (options.updateHistory !== false) this.options.stateChanged("push");
   }
 
+  closeForAtlasNavigation(navigate: () => void): void {
+    const wasActive = this.active;
+    this.close({ updateHistory: false });
+    navigate();
+    if (wasActive) this.options.stateChanged("push");
+  }
+
   async refreshForTime(): Promise<void> {
     if (!this.active || !this.observer) return;
     this.observer = this.options.bodyByKey().get(this.observer.key) ?? this.observer;
