@@ -53,6 +53,8 @@ const en: Record<string, string> = {
   "sky.earlier": "Earlier",
   "sky.later": "Later",
   "sky.layers": "Layers & objects",
+  "sky.openFilters": "Open filters",
+  "sky.closeFilters": "Close filters",
   "sky.overlays": "Overlays",
   "sky.constellations": "Constellation lines",
   "sky.objects": "Objects",

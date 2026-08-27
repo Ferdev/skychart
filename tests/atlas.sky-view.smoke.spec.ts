@@ -50,6 +50,23 @@ test("selected objects open and replay a shareable object-centered sky view", as
     body: JSON.stringify({ stale: false, refreshed_at: new Date().toISOString(), events: [] })
   }));
   await context.route("**/catalog-tiles/v1/manifest.json", (route) => route.fulfill({ status: 404, body: "" }));
+  await context.route("**/api/objects/hip-25336", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      object: {
+        key: "hip-25336",
+        name: "Orion endpoint B",
+        object_type: "star",
+        catalog_group: "bright_stars",
+        source_type: "test_catalog",
+        position_model: "catalog_distance",
+        color: "#f8cb65",
+        astrometry: { apparent_magnitude: 1.2, distance_ly: 773 },
+        position: { x_au: -48_000_000, y_au: 0, z_au: 0 }
+      }
+    })
+  }));
   await context.route("**/api/catalog/sky?**", (route) => {
     skyRequests += 1;
     const url = new URL(route.request().url());
@@ -116,13 +133,37 @@ test("selected objects open and replay a shareable object-centered sky view", as
   await expect(page.locator("#sky-map")).toBeFocused();
   await expect.poll(() => new URL(page.url()).searchParams.get("sky")).toBe("earth");
 
-  await expect(page.locator("#sky-layer-controls")).toBeVisible();
+  const layerControls = page.locator("#sky-layer-controls");
+  await expect(layerControls).toBeVisible();
+  await expect(layerControls).not.toHaveAttribute("open", "");
+  await expect(layerControls.locator(".sky-view__filters-hint--open")).toBeVisible();
+  await layerControls.locator("summary").click();
+  await expect(layerControls).toHaveAttribute("open", "");
+  await expect(layerControls.locator(".sky-view__filters-hint--close")).toBeVisible();
   await expect(page.locator("#sky-constellations-toggle")).toBeChecked();
   await expect(page.locator('#sky-object-type-filters input[value="planet"]')).toBeChecked();
   const asteroidToggle = page.locator('#sky-object-type-filters input[value="asteroid"]');
   await expect(asteroidToggle).toBeChecked();
   await asteroidToggle.uncheck();
   await expect(asteroidToggle).not.toBeChecked();
+
+  const inspectorIsTopmost = () => page.locator("#workspace-panel").evaluate((panel) => {
+    const rect = panel.getBoundingClientRect();
+    const topmost = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return Boolean(topmost && panel.contains(topmost));
+  });
+  await expect.poll(inspectorIsTopmost).toBe(false);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  const skyBox = await page.locator("#sky-map").boundingBox();
+  expect(skyBox).not.toBeNull();
+  await page.mouse.click(skyBox!.x + skyBox!.width / 2, skyBox!.y + skyBox!.height / 2);
+  await expect(page.locator("#selected-summary-name")).toHaveText("Orion endpoint B");
+  await expect(page.locator("#sky-view")).toHaveAttribute("data-object-inspector", "true");
+  await expect.poll(inspectorIsTopmost).toBe(true);
+  await expect(page.locator("#body-info")).toContainText("Orion endpoint B");
+  await page.locator("#close-panel").click();
+  await expect(page.locator("#workspace-panel")).toBeHidden();
+  await expect(page.locator("#sky-view")).not.toHaveAttribute("data-object-inspector", /.+/);
 
   const canvasHash = () => page.locator("#sky-map").evaluate((canvas: HTMLCanvasElement) => {
     const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
