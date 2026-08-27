@@ -50,6 +50,7 @@ import { installAtlasDiagnostics } from "./atlas/atlasDiagnostics";
 import { AtlasEmbedController } from "./atlas/atlasEmbedController";
 import { AtlasTimeController } from "./atlas/atlasTimeController";
 import { AtlasLoadingView } from "./atlas/atlasLoadingView";
+import { catalogSummaryFromEphemeris, mergeBodyList } from "./atlas/atlasState";
 import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController";
 import type {
   ActiveAtlasTab,
@@ -178,7 +179,7 @@ let displayLayers: Record<DisplayLayer, boolean> = {
   milkyWayArms: true,
   milkyWayDust: true,
   milkyWayGuides: true,
-  references: true
+  references: true,
 };
 let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
 let viewTime: "now" | string = "now";
@@ -851,14 +852,6 @@ function drawMilkyWayLayer() { perfMilkyWayMs = milkyWayRenderer.draw(perfMilkyW
 function updateStats() { statsView.updateStats(); }
 function updatePerfHud() { statsView.updatePerfHud(); }
 
-function catalogSummaryFromEphemeris(payload: Ephemeris): CatalogSummary | null {
-  if (!payload.catalog?.object_count) return null;
-  return {
-    object_count: payload.catalog.object_count,
-    group_counts: payload.catalog.group_counts
-  };
-}
-
 async function refreshCatalogSummary() {
   try {
     const response = await fetch("/api/catalog");
@@ -966,15 +959,6 @@ function mergeBodies(bodies: readonly Body[]) {
   for (const body of ephemeris.bodies) {
     bodyByKey.set(body.key, body);
   }
-}
-
-function mergeBodyList(primaryBodies: readonly Body[], fallbackBodies: readonly Body[]) {
-  const merged = new Map(primaryBodies.map((body) => [body.key, body]));
-  for (const body of fallbackBodies) {
-    const existing = merged.get(body.key);
-    if (!existing || (existing.catalog?.preview && !body.catalog?.preview)) merged.set(body.key, body);
-  }
-  return Array.from(merged.values());
 }
 
 function centerOnSelected(zoom: boolean) {
