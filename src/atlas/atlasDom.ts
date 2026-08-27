@@ -58,6 +58,7 @@ export const atlasDom = {
   skyMeta: requiredElement<HTMLElement>("#sky-view-meta"),
   skyStatus: requiredElement<HTMLElement>("#sky-view-status"),
   skyTooltip: requiredElement<HTMLElement>("#sky-view-tooltip"),
+  skyLayerControls: requiredElement<HTMLDetailsElement>("#sky-layer-controls"),
   skyObjectTypeFilters: requiredElement<HTMLElement>("#sky-object-type-filters"),
   skyConstellationsToggle: requiredElement<HTMLInputElement>("#sky-constellations-toggle"),
   skyShareButton: requiredElement<HTMLButtonElement>("#sky-share-button"),
