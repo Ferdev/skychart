@@ -53,6 +53,7 @@ type SkyViewControllerOptions = {
   meta: HTMLElement;
   status: HTMLElement;
   tooltip: HTMLElement;
+  layerControls: HTMLDetailsElement;
   objectTypeFilters: HTMLElement;
   constellationsToggle: HTMLInputElement;
   shareButton: HTMLButtonElement;
@@ -68,6 +69,8 @@ type SkyViewControllerOptions = {
   errorMessage: HTMLElement;
   closeButton: HTMLButtonElement;
   resetButton: HTMLButtonElement;
+  workspacePanel: HTMLElement;
+  selectedObjectPanel: HTMLElement;
   bodyByKey: () => ReadonlyMap<string, Body>;
   ephemeris: () => Ephemeris | null;
   translate: (key: string, params?: Record<string, string | number>) => string;
@@ -153,6 +156,9 @@ export class SkyViewController {
     options.sharePopover.addEventListener("toggle", () => {
       options.shareButton.setAttribute("aria-expanded", String(options.sharePopover.matches(":popover-open")));
     });
+    new MutationObserver(() => {
+      if (options.workspacePanel.hidden) this.hideObjectInspector();
+    }).observe(options.workspacePanel, { attributes: true, attributeFilter: ["hidden"] });
     options.nativeShareButton.hidden = typeof navigator.share !== "function";
     window.addEventListener("resize", () => this.requestRender());
     window.addEventListener("cosmic-atlas:locale-change", () => this.updateLocale());
@@ -184,6 +190,8 @@ export class SkyViewController {
     this.observer = observer;
     this.catalogPoints = [];
     this.camera = restoredCamera ? normalizeCamera(restoredCamera) : this.initialCamera(observer);
+    this.hideObjectInspector();
+    this.options.layerControls.open = false;
     this.visibleObjectTypes.clear();
     for (const type of restoredCamera?.hiddenObjectTypes ?? []) this.visibleObjectTypes.set(type, false);
     this.options.constellationsToggle.checked = restoredCamera?.constellations ?? true;
@@ -220,6 +228,7 @@ export class SkyViewController {
     this.requestId += 1;
     this.closeSharePanel();
     this.options.root.hidden = true;
+    this.hideObjectInspector();
     delete document.body.dataset.skyView;
     this.hideTooltip();
     this.renderedHits = [];
@@ -227,6 +236,13 @@ export class SkyViewController {
     this.observer = null;
     this.shareSnapshot = null;
     if (options.updateHistory !== false) this.options.stateChanged("push");
+  }
+
+  closeForAtlasNavigation(navigate: () => void): void {
+    const wasActive = this.active;
+    this.close({ updateHistory: false });
+    navigate();
+    if (wasActive) this.options.stateChanged("push");
   }
 
   async refreshForTime(): Promise<void> {
@@ -252,6 +268,7 @@ export class SkyViewController {
     this.catalogPoints = [];
     this.renderedHits = [];
     this.shareSnapshot = null;
+    this.hideObjectInspector();
     this.options.root.hidden = false;
     this.options.errorPanel.hidden = false;
     this.options.errorTitle.textContent = this.options.translate("sky.unavailableTitle");
@@ -888,7 +905,15 @@ export class SkyViewController {
     if (!hit) return;
     this.options.status.textContent = this.options.translate("sky.selecting", { name: hit.point.name });
     await this.options.selectBody(hit.point.key);
-    if (this.active) this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
+    if (!this.active) return;
+    if (!this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === hit.point.key) {
+      this.options.root.dataset.objectInspector = "true";
+    }
+    this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
+  }
+
+  private hideObjectInspector(): void {
+    delete this.options.root.dataset.objectInspector;
   }
 
   private showTooltipAt(point: { x: number; y: number }): void {
@@ -921,6 +946,7 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     meta: dom.skyMeta,
     status: dom.skyStatus,
     tooltip: dom.skyTooltip,
+    layerControls: dom.skyLayerControls,
     objectTypeFilters: dom.skyObjectTypeFilters,
     constellationsToggle: dom.skyConstellationsToggle,
     shareButton: dom.skyShareButton,
@@ -936,6 +962,8 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     errorMessage: dom.skyErrorMessage,
     closeButton: dom.skyClose,
     resetButton: dom.skyReset,
+    workspacePanel: dom.workspacePanel,
+    selectedObjectPanel: dom.selectedObjectPanel,
   });
 }
 
