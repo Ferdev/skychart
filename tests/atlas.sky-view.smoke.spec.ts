@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
 
+const VISIBLE_SURVEY_IMAGE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC",
+  "base64"
+);
+
 test("selected objects open and replay a shareable object-centered sky view", async ({ page, request, context }) => {
   await skipIfAtlasUnavailable(request);
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -50,6 +55,11 @@ test("selected objects open and replay a shareable object-centered sky view", as
     body: JSON.stringify({ stale: false, refreshed_at: new Date().toISOString(), events: [] })
   }));
   await context.route("**/catalog-tiles/v1/manifest.json", (route) => route.fulfill({ status: 404, body: "" }));
+  await context.route("**/api/survey-image?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "image/png",
+    body: VISIBLE_SURVEY_IMAGE
+  }));
   await context.route("**/api/objects/hip-25336", (route) => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -223,6 +233,24 @@ test("selected objects open and replay a shareable object-centered sky view", as
     .toEqual(expect.arrayContaining(["sky_link", "sky_card"]));
 
   await page.locator("#sky-share-close").click();
+  await page.locator("#sky-view-reset").click();
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.mouse.click(skyBox!.x + skyBox!.width / 2, skyBox!.y + skyBox!.height / 2);
+  await expect(page.locator("#sky-view")).toHaveAttribute("data-object-inspector", "true");
+  await page.locator("#center-selected").click();
+  await expect(page.locator("#sky-view")).toBeHidden();
+  await expect.poll(() => new URL(page.url()).searchParams.has("sky")).toBe(false);
+
+  await page.locator("#view-sky-selected").click();
+  await expect(page.locator("#sky-view")).toBeVisible();
+  await expect(page.locator("#sky-view-status")).toContainText("4 catalog directions loaded");
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  await page.mouse.click(skyBox!.x + skyBox!.width / 2, skyBox!.y + skyBox!.height / 2);
+  await expect(page.locator("#sky-view")).toHaveAttribute("data-object-inspector", "true");
+  await page.locator("#zoom-selected").click();
+  await expect(page.locator("#sky-view")).toBeHidden();
+  await expect.poll(() => new URL(page.url()).searchParams.has("sky")).toBe(false);
+
   const replay = await context.newPage();
   const replayIssues = collectBrowserIssues(replay);
   await openAtlas(replay, copied);

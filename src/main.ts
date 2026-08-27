@@ -964,8 +964,11 @@ function mergeBodies(bodies: readonly Body[]) {
 function centerOnSelected(zoom: boolean) {
   const body = selectedBody();
   if (!body) return;
+  const exitedSkyView = skyView?.active ?? false;
+  if (exitedSkyView) skyView?.close({ updateHistory: false });
   centerOnBody(body, zoom, zoom);
   requestRender({ data: true });
+  if (exitedSkyView) pushCurrentViewState();
 }
 
 function centerOnBody(body: Body, zoom: boolean, animate = false) { cameraController.centerOnBody(body, zoom, animate); }
