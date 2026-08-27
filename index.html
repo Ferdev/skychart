@@ -66,8 +66,13 @@
           <p id="sky-view-error-message"></p>
           <a href="/" data-i18n="sky.backToAtlas">Return to the atlas</a>
         </section>
-        <details id="sky-layer-controls" class="sky-view__filters" open>
-          <summary data-i18n="sky.layers">Layers &amp; objects</summary>
+        <details id="sky-layer-controls" class="sky-view__filters">
+          <summary>
+            <span data-i18n="sky.layers">Layers &amp; objects</span>
+            <span class="sky-view__filters-hint sky-view__filters-hint--open" data-i18n="sky.openFilters">Open filters</span>
+            <span class="sky-view__filters-hint sky-view__filters-hint--close" data-i18n="sky.closeFilters">Close filters</span>
+            <span class="sky-view__filters-indicator" aria-hidden="true"></span>
+          </summary>
           <div class="sky-view__filter-groups">
             <span class="sky-view__filter-section-label" data-i18n="sky.overlays">Overlays</span>
             <label class="sky-view__filter">

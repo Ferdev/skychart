@@ -20,6 +20,7 @@ import {
   type SkyCamera,
   type Vector3,
 } from "./skyProjection";
+import { skyPointAppearance } from "./skyPointAppearance";
 
 type CatalogSkyPoint = {
   key: string;
@@ -52,6 +53,7 @@ type SkyViewControllerOptions = {
   meta: HTMLElement;
   status: HTMLElement;
   tooltip: HTMLElement;
+  layerControls: HTMLDetailsElement;
   objectTypeFilters: HTMLElement;
   constellationsToggle: HTMLInputElement;
   shareButton: HTMLButtonElement;
@@ -67,6 +69,8 @@ type SkyViewControllerOptions = {
   errorMessage: HTMLElement;
   closeButton: HTMLButtonElement;
   resetButton: HTMLButtonElement;
+  workspacePanel: HTMLElement;
+  selectedObjectPanel: HTMLElement;
   bodyByKey: () => ReadonlyMap<string, Body>;
   ephemeris: () => Ephemeris | null;
   translate: (key: string, params?: Record<string, string | number>) => string;
@@ -152,6 +156,9 @@ export class SkyViewController {
     options.sharePopover.addEventListener("toggle", () => {
       options.shareButton.setAttribute("aria-expanded", String(options.sharePopover.matches(":popover-open")));
     });
+    new MutationObserver(() => {
+      if (options.workspacePanel.hidden) this.hideObjectInspector();
+    }).observe(options.workspacePanel, { attributes: true, attributeFilter: ["hidden"] });
     options.nativeShareButton.hidden = typeof navigator.share !== "function";
     window.addEventListener("resize", () => this.requestRender());
     window.addEventListener("cosmic-atlas:locale-change", () => this.updateLocale());
@@ -183,6 +190,8 @@ export class SkyViewController {
     this.observer = observer;
     this.catalogPoints = [];
     this.camera = restoredCamera ? normalizeCamera(restoredCamera) : this.initialCamera(observer);
+    this.hideObjectInspector();
+    this.options.layerControls.open = false;
     this.visibleObjectTypes.clear();
     for (const type of restoredCamera?.hiddenObjectTypes ?? []) this.visibleObjectTypes.set(type, false);
     this.options.constellationsToggle.checked = restoredCamera?.constellations ?? true;
@@ -219,6 +228,7 @@ export class SkyViewController {
     this.requestId += 1;
     this.closeSharePanel();
     this.options.root.hidden = true;
+    this.hideObjectInspector();
     delete document.body.dataset.skyView;
     this.hideTooltip();
     this.renderedHits = [];
@@ -226,6 +236,13 @@ export class SkyViewController {
     this.observer = null;
     this.shareSnapshot = null;
     if (options.updateHistory !== false) this.options.stateChanged("push");
+  }
+
+  closeForAtlasNavigation(navigate: () => void): void {
+    const wasActive = this.active;
+    this.close({ updateHistory: false });
+    navigate();
+    if (wasActive) this.options.stateChanged("push");
   }
 
   async refreshForTime(): Promise<void> {
@@ -251,6 +268,7 @@ export class SkyViewController {
     this.catalogPoints = [];
     this.renderedHits = [];
     this.shareSnapshot = null;
+    this.hideObjectInspector();
     this.options.root.hidden = false;
     this.options.errorPanel.hidden = false;
     this.options.errorTitle.textContent = this.options.translate("sky.unavailableTitle");
@@ -493,28 +511,47 @@ export class SkyViewController {
   ): void {
     const hits: RenderedHit[] = [];
     const labelCandidates: RenderedHit[] = [];
+    context.save();
+    context.globalCompositeOperation = "lighter";
     for (const point of points) {
       if (!this.objectTypeVisible(point)) continue;
       const projected = projectDirection(point.direction, camera, width, height);
       if (!projected) continue;
-      const radius = pointRadius(point);
-      const color = validColor(point.color) ? point.color! : "#d8e8ff";
-      context.globalAlpha = point.dynamic ? 0.98 : starOpacity(point.apparent_magnitude);
-      if (radius >= 2.5) {
+      const appearance = skyPointAppearance(point);
+      if (appearance.glowRadius > 0) {
+        const glow = context.createRadialGradient(
+          projected.x,
+          projected.y,
+          0,
+          projected.x,
+          projected.y,
+          appearance.glowRadius,
+        );
+        glow.addColorStop(0, appearance.glowColors.inner);
+        glow.addColorStop(0.28, appearance.glowColors.middle);
+        glow.addColorStop(1, appearance.glowColors.outer);
         context.beginPath();
-        context.fillStyle = `${color}24`;
-        context.arc(projected.x, projected.y, radius * 3, 0, Math.PI * 2);
+        context.fillStyle = glow;
+        context.arc(projected.x, projected.y, appearance.glowRadius, 0, Math.PI * 2);
         context.fill();
       }
+      context.globalAlpha = appearance.opacity;
       context.beginPath();
-      context.fillStyle = color;
-      context.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+      context.fillStyle = appearance.color;
+      context.arc(projected.x, projected.y, appearance.coreRadius, 0, Math.PI * 2);
       context.fill();
-      const hit = { point, x: projected.x, y: projected.y, radius: Math.max(7, radius + 4) };
+      if (appearance.brightCore) {
+        context.globalAlpha = Math.min(1, appearance.opacity + 0.18);
+        context.beginPath();
+        context.fillStyle = "#fffef8";
+        context.arc(projected.x, projected.y, Math.min(0.48, appearance.coreRadius * 0.38), 0, Math.PI * 2);
+        context.fill();
+      }
+      const hit = { point, x: projected.x, y: projected.y, radius: Math.max(7, appearance.coreRadius + 4) };
       hits.push(hit);
       if (point.dynamic || (Number.isFinite(point.apparent_magnitude) && Number(point.apparent_magnitude) <= 4.5)) labelCandidates.push(hit);
     }
-    context.globalAlpha = 1;
+    context.restore();
     if (recordHits) this.renderedHits = hits;
     labelCandidates.sort((a, b) => Number(b.point.dynamic) - Number(a.point.dynamic) ||
       numericMagnitude(a.point.apparent_magnitude) - numericMagnitude(b.point.apparent_magnitude));
@@ -868,7 +905,15 @@ export class SkyViewController {
     if (!hit) return;
     this.options.status.textContent = this.options.translate("sky.selecting", { name: hit.point.name });
     await this.options.selectBody(hit.point.key);
-    if (this.active) this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
+    if (!this.active) return;
+    if (!this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === hit.point.key) {
+      this.options.root.dataset.objectInspector = "true";
+    }
+    this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
+  }
+
+  private hideObjectInspector(): void {
+    delete this.options.root.dataset.objectInspector;
   }
 
   private showTooltipAt(point: { x: number; y: number }): void {
@@ -901,6 +946,7 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     meta: dom.skyMeta,
     status: dom.skyStatus,
     tooltip: dom.skyTooltip,
+    layerControls: dom.skyLayerControls,
     objectTypeFilters: dom.skyObjectTypeFilters,
     constellationsToggle: dom.skyConstellationsToggle,
     shareButton: dom.skyShareButton,
@@ -916,6 +962,8 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     errorMessage: dom.skyErrorMessage,
     closeButton: dom.skyClose,
     resetButton: dom.skyReset,
+    workspacePanel: dom.workspacePanel,
+    selectedObjectPanel: dom.selectedObjectPanel,
   });
 }
 
@@ -944,22 +992,6 @@ function skyObjectType(point: Pick<SkyPoint, "object_type">): string {
 function validCatalogPoint(point: CatalogSkyPoint): boolean {
   return Boolean(point && point.key && point.name && point.direction &&
     [point.direction.x, point.direction.y, point.direction.z].every(Number.isFinite));
-}
-
-function validColor(value: string | null | undefined): boolean {
-  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
-}
-
-function pointRadius(point: SkyPoint): number {
-  if (point.dynamic) return point.object_type === "star" ? 5 : 4;
-  const magnitude = point.apparent_magnitude;
-  if (!Number.isFinite(magnitude)) return 1.15;
-  return Math.max(0.7, Math.min(4.5, 3.2 - Number(magnitude) * 0.18));
-}
-
-function starOpacity(magnitude: number | null | undefined): number {
-  if (!Number.isFinite(magnitude)) return 0.72;
-  return Math.max(0.38, Math.min(1, 1.08 - Number(magnitude) * 0.025));
 }
 
 function numericMagnitude(value: number | null | undefined): number {

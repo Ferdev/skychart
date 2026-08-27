@@ -964,8 +964,7 @@ function mergeBodies(bodies: readonly Body[]) {
 function centerOnSelected(zoom: boolean) {
   const body = selectedBody();
   if (!body) return;
-  centerOnBody(body, zoom, zoom);
-  requestRender({ data: true });
+  skyView?.closeForAtlasNavigation(() => { centerOnBody(body, zoom, zoom); requestRender({ data: true }); });
 }
 
 function centerOnBody(body: Body, zoom: boolean, animate = false) { cameraController.centerOnBody(body, zoom, animate); }

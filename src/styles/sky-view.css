@@ -262,12 +262,49 @@
 }
 
 .sky-view__filters > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
   padding: 9px 11px;
   color: rgba(238, 242, 234, 0.86);
   font-size: 0.74rem;
   font-weight: 780;
   cursor: pointer;
   user-select: none;
+  list-style: none;
+}
+
+.sky-view__filters > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sky-view__filters-hint {
+  color: rgba(248, 203, 101, 0.78);
+  font-size: 0.66rem;
+  font-weight: 720;
+}
+
+.sky-view__filters-hint--close,
+.sky-view__filters[open] .sky-view__filters-hint--open {
+  display: none;
+}
+
+.sky-view__filters[open] .sky-view__filters-hint--close {
+  display: inline;
+}
+
+.sky-view__filters-indicator {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid rgba(248, 203, 101, 0.82);
+  border-bottom: 2px solid rgba(248, 203, 101, 0.82);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 120ms ease;
+}
+
+.sky-view__filters[open] .sky-view__filters-indicator {
+  transform: translateY(2px) rotate(225deg);
 }
 
 .sky-view__filters[open] > summary {
@@ -364,6 +401,19 @@
 body[data-sky-view="true"] .atlas-footer,
 body[data-sky-view="true"] .science-disclosure {
   visibility: hidden;
+}
+
+.sky-view[data-object-inspector="true"] ~ #controls[data-workspace-tab="object"] {
+  z-index: 71;
+}
+
+.sky-view[data-object-inspector="true"] ~ #controls > .scale-rail,
+.sky-view[data-object-inspector="true"] ~ #controls > .mode-rail {
+  display: none;
+}
+
+.sky-view[data-object-inspector="true"] ~ #controls #workspace-search-link {
+  display: none;
 }
 
 @media (max-width: 640px) {
