@@ -74,7 +74,7 @@ end
 defmodule StarsmapApiWeb.SkyShareControllerTest do
   use StarsmapApiWeb.ConnCase, async: false
 
-  alias StarsmapApi.Catalog.{PublicCache, SnapshotStore}
+  alias StarsmapApi.Catalog.{PublicCache, PublicObjects, SnapshotStore}
   alias StarsmapApi.SkyShare.CardCache
 
   @query "v=1&t=2042-04-05T06%3A07%3A08.000Z&sc=182.5%2C-12%2C64&sl=0&sf=asteroid%2Ccomet&r=fixture-v9&lang=fr"
@@ -183,6 +183,16 @@ defmodule StarsmapApiWeb.SkyShareControllerTest do
     refute html =~ "<script>alert(1)</script>"
     assert html =~ "&lt;script&gt;alert(1)&lt;/script&gt;"
     refute html =~ "observer_x_au"
+  end
+
+  test "resolves catalog observers without loading object-page enrichment" do
+    assert {:ok, observer} = PublicObjects.public_observer("proxima-centauri")
+
+    assert observer.name == "Próxima <script>alert(1)</script> Centauri"
+    refute Map.has_key?(observer, :related)
+    refute Map.has_key?(observer, :semantics)
+
+    assert {:error, :not_found} = PublicObjects.public_observer("private-bulk")
   end
 
   test "serves deterministic cached PNG cards with ETag validation", %{conn: conn} do
