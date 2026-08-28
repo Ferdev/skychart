@@ -20,7 +20,7 @@ import {
   type SkyCamera,
   type Vector3,
 } from "./skyProjection";
-import { skyPointAppearance } from "./skyPointAppearance";
+import { estimateMinorBodyApparentMagnitude, skyPointAppearance } from "./skyPointAppearance";
 
 type CatalogSkyPoint = {
   key: string;
@@ -601,7 +601,9 @@ export class SkyViewController {
         object_type: body.object_type,
         catalog_group: body.catalog_group,
         color: body.color,
-        apparent_magnitude: body.stellar?.apparent_magnitude ?? body.deep_sky?.apparent_magnitude,
+        apparent_magnitude: body.stellar?.apparent_magnitude
+          ?? body.deep_sky?.apparent_magnitude
+          ?? observerRelativeMinorBodyMagnitude(body, observer),
         direction,
         dynamic: isDynamicBody(body),
       });
@@ -978,6 +980,22 @@ function isDynamicBody(body: Body): boolean {
   return Boolean(body.state_vector || body.catalog?.dynamic_position || [
     "core", "mars_moons", "jupiter_major_moons", "saturn_major_moons", "jpl_small_bodies",
   ].includes(body.catalog_group ?? ""));
+}
+
+function observerRelativeMinorBodyMagnitude(body: Body, observer: Body): number | null {
+  if (!["asteroid", "comet", "small_body", "dwarf_planet"].includes(body.object_type ?? "")) return null;
+  const catalogMagnitude = body.catalog?.facts?.h_absolute_magnitude;
+  const absoluteMagnitude = body.small_body?.h_absolute_magnitude
+    ?? (typeof catalogMagnitude === "number" ? catalogMagnitude : null);
+  return estimateMinorBodyApparentMagnitude({
+    absoluteMagnitude,
+    heliocentricDistanceAu: Math.hypot(body.position.x_au, body.position.y_au, body.position.z_au),
+    observerDistanceAu: Math.hypot(
+      body.position.x_au - observer.position.x_au,
+      body.position.y_au - observer.position.y_au,
+      body.position.z_au - observer.position.z_au,
+    ),
+  });
 }
 
 function bodyVector(body: Body): Vector3 {

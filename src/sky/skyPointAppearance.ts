@@ -20,14 +20,38 @@ export type SkyPointAppearance = {
 
 const STARLIGHT_TARGET: readonly [number, number, number] = [255, 250, 242];
 const OBJECT_LIGHT_TARGET: readonly [number, number, number] = [241, 245, 247];
+const MINOR_BODY_TYPES = new Set(["asteroid", "comet", "small_body", "dwarf_planet"]);
+
+type MinorBodyMagnitudeInput = {
+  absoluteMagnitude?: number | null;
+  heliocentricDistanceAu: number;
+  observerDistanceAu: number;
+};
+
+/**
+ * Estimates a minor body's brightest plausible apparent magnitude from its H
+ * magnitude. This is the standard distance term at opposition; an unavailable
+ * phase correction can only make the body fainter than this estimate.
+ */
+export function estimateMinorBodyApparentMagnitude(input: MinorBodyMagnitudeInput): number | null {
+  if (!Number.isFinite(input.absoluteMagnitude)
+    || !Number.isFinite(input.heliocentricDistanceAu)
+    || !Number.isFinite(input.observerDistanceAu)
+    || input.heliocentricDistanceAu <= 0
+    || input.observerDistanceAu <= 0) return null;
+  return Number(input.absoluteMagnitude)
+    + 5 * Math.log10(input.heliocentricDistanceAu * input.observerDistanceAu);
+}
 
 /** Maps catalog metadata to a compact, photographic point of light. */
 export function skyPointAppearance(point: SkyPointAppearanceInput): SkyPointAppearance {
   const magnitude = point.apparent_magnitude;
+  const objectType = point.object_type?.trim().toLowerCase() ?? "";
+  const isMinorBody = MINOR_BODY_TYPES.has(objectType);
   const brightness = Number.isFinite(magnitude)
     ? clamp((7 - Number(magnitude)) / 9, 0, 1)
-    : point.dynamic ? 0.7 : 0.2;
-  const isStar = point.object_type?.trim().toLowerCase() === "star";
+    : point.dynamic ? isMinorBody ? 0 : 0.7 : 0.2;
+  const isStar = objectType === "star";
   const coreRadius = 0.45 + 1.1 * brightness ** 0.8;
   const targetColor = isStar ? STARLIGHT_TARGET : OBJECT_LIGHT_TARGET;
   const sourceColor = parseHexColor(point.color) ?? targetColor;
