@@ -20,7 +20,8 @@ import {
   type SkyCamera,
   type Vector3,
 } from "./skyProjection";
-import { skyPointAppearance } from "./skyPointAppearance";
+import { estimateMinorBodyApparentMagnitude, skyPointAppearance } from "./skyPointAppearance";
+import { SkySelectionConnectorView } from "./skySelectionConnectorView";
 
 type CatalogSkyPoint = {
   key: string;
@@ -53,6 +54,7 @@ type SkyViewControllerOptions = {
   meta: HTMLElement;
   status: HTMLElement;
   tooltip: HTMLElement;
+  selectionConnector: SVGSVGElement;
   layerControls: HTMLDetailsElement;
   objectTypeFilters: HTMLElement;
   constellationsToggle: HTMLInputElement;
@@ -132,8 +134,13 @@ export class SkyViewController {
   private readonly visibleObjectTypes = new Map<string, boolean>();
   private shareSnapshot: SkyShareSnapshot | null = null;
   private shareStatusTimer: number | null = null;
+  private selectedPointKey: string | null = null;
+  private readonly selectionConnector: SkySelectionConnectorView;
 
   constructor(private readonly options: SkyViewControllerOptions) {
+    this.selectionConnector = new SkySelectionConnectorView({
+      element: options.selectionConnector, canvas: options.canvas, workspacePanel: options.workspacePanel,
+    });
     options.closeButton.addEventListener("click", () => this.close());
     options.resetButton.addEventListener("click", () => this.resetOrientation());
     options.canvas.addEventListener("pointerdown", (event) => this.pointerDown(event));
@@ -364,6 +371,7 @@ export class SkyViewController {
     if (!context) return;
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.renderScene(context, width, height, this.camera, true);
+    this.updateSelectionConnector();
   }
 
   private renderScene(
@@ -601,7 +609,9 @@ export class SkyViewController {
         object_type: body.object_type,
         catalog_group: body.catalog_group,
         color: body.color,
-        apparent_magnitude: body.stellar?.apparent_magnitude ?? body.deep_sky?.apparent_magnitude,
+        apparent_magnitude: body.stellar?.apparent_magnitude
+          ?? body.deep_sky?.apparent_magnitude
+          ?? observerRelativeMinorBodyMagnitude(body, observer),
         direction,
         dynamic: isDynamicBody(body),
       });
@@ -907,13 +917,22 @@ export class SkyViewController {
     await this.options.selectBody(hit.point.key);
     if (!this.active) return;
     if (!this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === hit.point.key) {
+      this.selectedPointKey = hit.point.key;
       this.options.root.dataset.objectInspector = "true";
+      this.updateSelectionConnector();
     }
     this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
   }
 
   private hideObjectInspector(): void {
+    this.selectedPointKey = null;
+    this.selectionConnector.hide();
     delete this.options.root.dataset.objectInspector;
+  }
+
+  private updateSelectionConnector(): void {
+    const hit = this.renderedHits.find((candidate) => candidate.point.key === this.selectedPointKey);
+    this.selectionConnector.update(hit ? { key: hit.point.key, x: hit.x, y: hit.y } : null);
   }
 
   private showTooltipAt(point: { x: number; y: number }): void {
@@ -946,6 +965,7 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     meta: dom.skyMeta,
     status: dom.skyStatus,
     tooltip: dom.skyTooltip,
+    selectionConnector: dom.skySelectionConnector,
     layerControls: dom.skyLayerControls,
     objectTypeFilters: dom.skyObjectTypeFilters,
     constellationsToggle: dom.skyConstellationsToggle,
@@ -978,6 +998,22 @@ function isDynamicBody(body: Body): boolean {
   return Boolean(body.state_vector || body.catalog?.dynamic_position || [
     "core", "mars_moons", "jupiter_major_moons", "saturn_major_moons", "jpl_small_bodies",
   ].includes(body.catalog_group ?? ""));
+}
+
+function observerRelativeMinorBodyMagnitude(body: Body, observer: Body): number | null {
+  if (!["asteroid", "comet", "small_body", "dwarf_planet"].includes(body.object_type ?? "")) return null;
+  const catalogMagnitude = body.catalog?.facts?.h_absolute_magnitude;
+  const absoluteMagnitude = body.small_body?.h_absolute_magnitude
+    ?? (typeof catalogMagnitude === "number" ? catalogMagnitude : null);
+  return estimateMinorBodyApparentMagnitude({
+    absoluteMagnitude,
+    heliocentricDistanceAu: Math.hypot(body.position.x_au, body.position.y_au, body.position.z_au),
+    observerDistanceAu: Math.hypot(
+      body.position.x_au - observer.position.x_au,
+      body.position.y_au - observer.position.y_au,
+      body.position.z_au - observer.position.z_au,
+    ),
+  });
 }
 
 function bodyVector(body: Body): Vector3 {
