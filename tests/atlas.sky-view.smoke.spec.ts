@@ -171,9 +171,19 @@ test("selected objects open and replay a shareable object-centered sky view", as
   await expect(page.locator("#sky-view")).toHaveAttribute("data-object-inspector", "true");
   await expect.poll(inspectorIsTopmost).toBe(true);
   await expect(page.locator("#body-info")).toContainText("Orion endpoint B");
+  const skyConnector = page.locator("#sky-selection-connector");
+  await expect(skyConnector).toBeVisible();
+  await expect(skyConnector).toHaveAttribute("data-source-key", "hip-25336");
+  await expect(skyConnector.locator(".sky-selection-connector__leader")).toHaveAttribute("d", /^M .+ C .+$/);
+  const connectorSource = skyConnector.locator(".sky-selection-connector__source");
+  const sourceX = Number(await connectorSource.getAttribute("cx"));
+  await page.locator("#sky-map").focus();
+  await page.locator("#sky-map").press("ArrowRight");
+  await expect.poll(async () => Number(await connectorSource.getAttribute("cx"))).not.toBe(sourceX);
   await page.locator("#close-panel").click();
   await expect(page.locator("#workspace-panel")).toBeHidden();
   await expect(page.locator("#sky-view")).not.toHaveAttribute("data-object-inspector", /.+/);
+  await expect(skyConnector).toBeHidden();
 
   const canvasHash = () => page.locator("#sky-map").evaluate((canvas: HTMLCanvasElement) => {
     const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
