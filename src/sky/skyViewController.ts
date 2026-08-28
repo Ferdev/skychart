@@ -21,6 +21,7 @@ import {
   type Vector3,
 } from "./skyProjection";
 import { skyPointAppearance } from "./skyPointAppearance";
+import { SkySelectionConnectorView } from "./skySelectionConnectorView";
 
 type CatalogSkyPoint = {
   key: string;
@@ -53,6 +54,7 @@ type SkyViewControllerOptions = {
   meta: HTMLElement;
   status: HTMLElement;
   tooltip: HTMLElement;
+  selectionConnector: SVGSVGElement;
   layerControls: HTMLDetailsElement;
   objectTypeFilters: HTMLElement;
   constellationsToggle: HTMLInputElement;
@@ -132,8 +134,13 @@ export class SkyViewController {
   private readonly visibleObjectTypes = new Map<string, boolean>();
   private shareSnapshot: SkyShareSnapshot | null = null;
   private shareStatusTimer: number | null = null;
+  private selectedPointKey: string | null = null;
+  private readonly selectionConnector: SkySelectionConnectorView;
 
   constructor(private readonly options: SkyViewControllerOptions) {
+    this.selectionConnector = new SkySelectionConnectorView({
+      element: options.selectionConnector, canvas: options.canvas, workspacePanel: options.workspacePanel,
+    });
     options.closeButton.addEventListener("click", () => this.close());
     options.resetButton.addEventListener("click", () => this.resetOrientation());
     options.canvas.addEventListener("pointerdown", (event) => this.pointerDown(event));
@@ -364,6 +371,7 @@ export class SkyViewController {
     if (!context) return;
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.renderScene(context, width, height, this.camera, true);
+    this.updateSelectionConnector();
   }
 
   private renderScene(
@@ -907,13 +915,22 @@ export class SkyViewController {
     await this.options.selectBody(hit.point.key);
     if (!this.active) return;
     if (!this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === hit.point.key) {
+      this.selectedPointKey = hit.point.key;
       this.options.root.dataset.objectInspector = "true";
+      this.updateSelectionConnector();
     }
     this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
   }
 
   private hideObjectInspector(): void {
+    this.selectedPointKey = null;
+    this.selectionConnector.hide();
     delete this.options.root.dataset.objectInspector;
+  }
+
+  private updateSelectionConnector(): void {
+    const hit = this.renderedHits.find((candidate) => candidate.point.key === this.selectedPointKey);
+    this.selectionConnector.update(hit ? { key: hit.point.key, x: hit.x, y: hit.y } : null);
   }
 
   private showTooltipAt(point: { x: number; y: number }): void {
@@ -946,6 +963,7 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     meta: dom.skyMeta,
     status: dom.skyStatus,
     tooltip: dom.skyTooltip,
+    selectionConnector: dom.skySelectionConnector,
     layerControls: dom.skyLayerControls,
     objectTypeFilters: dom.skyObjectTypeFilters,
     constellationsToggle: dom.skyConstellationsToggle,
