@@ -64,7 +64,7 @@ sudo -u postgres psql -v ON_ERROR_STOP=1 -Atqc \
 (cd backend_phoenix && mix ecto.migrate)
 
 catalog_count="$(PGUSER=postgres psql -d starsmap_api_dev -Atqc \
-  "SELECT count(*) FROM catalog_objects" 2>/dev/null || printf '0')"
+  "SELECT count(*) FROM catalog_source_objects" 2>/dev/null || printf '0')"
 if [[ ! "$catalog_count" =~ ^[0-9]+$ ]] || ((catalog_count < 1000)); then
   (cd backend_phoenix && mix starsmap.import_catalogs "$PROJECT_ROOT")
 fi

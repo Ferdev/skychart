@@ -39,6 +39,11 @@ defmodule StarsmapApiWeb.ObjectPageControllerTest do
     assert body =~ "J2000 equatorial"
     assert body =~ "window.__ATLAS_BOOT__={\"objectKey\":\"ngc-224\"}"
     assert body =~ "application/ld+json"
+    assert body =~ "Cosmic Atlas object record of type galaxy from Messier deep-sky objects"
+    assert body =~ "Catalog source"
+    assert body =~ "Messier deep-sky objects"
+    assert body =~ "Catalog identifier"
+    assert body =~ "messier_deep_sky"
     assert length(Regex.scan(~r/<link rel="canonical"/, body)) == 1
     assert length(Regex.scan(~r/<meta name="description"/, body)) == 1
     assert body =~ ~r/<meta property="og:url" content="https?:\/\/[^\"]+\/o\/ngc-224">/
@@ -48,6 +53,31 @@ defmodule StarsmapApiWeb.ObjectPageControllerTest do
 
     refute body =~ "<script>alert(1)</script>"
     assert body =~ "&lt;script&gt;"
+
+    json_ld =
+      Regex.scan(
+        ~r/<script type="application\/ld\+json">(.*?)<\/script>/s,
+        body,
+        capture: :all_but_first
+      )
+      |> Enum.map(fn [encoded] -> Jason.decode!(encoded) end)
+      |> Enum.find(&Map.has_key?(&1, "@graph"))
+
+    assert json_ld["@context"] == "https://schema.org"
+    assert Enum.map(json_ld["@graph"], & &1["@type"]) == ["Thing", "BreadcrumbList"]
+
+    thing = hd(json_ld["@graph"])
+    assert thing["name"] == "Andromeda <script>alert(1)</script>"
+    assert thing["url"] =~ "/o/ngc-224"
+    assert thing["description"] =~ "Messier deep-sky objects"
+
+    assert Enum.find(thing["additionalProperty"], &(&1["name"] == "Right ascension")) ==
+             %{
+               "@type" => "PropertyValue",
+               "name" => "Right ascension",
+               "unitText" => "degrees",
+               "value" => 10.684
+             }
   end
 
   test "unknown and bulk-only objects return 404", %{conn: conn} do
