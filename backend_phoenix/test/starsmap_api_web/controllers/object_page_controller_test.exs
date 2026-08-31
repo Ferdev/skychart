@@ -75,6 +75,70 @@ defmodule StarsmapApiWeb.ObjectPageControllerTest do
     assert conn |> recycle() |> get(~p"/o/bulk") |> html_response(404) =~ "Object not found"
   end
 
+  test "related objects return only the public card fields in magnitude and name order" do
+    SnapshotStore.upsert_source_objects([
+      %{
+        key: "ngc-224",
+        name: "Andromeda",
+        object_type: "galaxy",
+        catalog_group: "related-object-test",
+        source_type: "deep_sky_catalog",
+        position_model: "catalog",
+        search_text: "andromeda",
+        aliases: [],
+        external_ids: %{},
+        facts: %{},
+        source: %{}
+      }
+    ])
+
+    related = [
+      {"related-zeta", "Zeta", 1.0},
+      {"related-alpha", "Alpha", 1.0},
+      {"related-beta", "Beta", 2.0},
+      {"related-gamma", "Gamma", 3.0},
+      {"related-delta", "Delta", 4.0},
+      {"related-epsilon", "Epsilon", 5.0},
+      {"related-eta", "Eta", 6.0},
+      {"related-no-magnitude", "No magnitude", nil}
+    ]
+
+    SnapshotStore.upsert_source_objects(
+      Enum.map(related, fn {key, name, magnitude} ->
+        %{
+          key: key,
+          name: name,
+          object_type: "galaxy",
+          catalog_group: "related-object-test",
+          source_type: "deep_sky_catalog",
+          position_model: "catalog",
+          search_text: String.downcase(name),
+          aliases: [],
+          external_ids: %{},
+          facts: %{},
+          source: %{},
+          apparent_magnitude: magnitude
+        }
+      end)
+    )
+
+    StarsmapApi.Catalog.PublicCache.clear()
+    assert {:ok, object} = PublicObjects.public_object("ngc-224")
+
+    assert Enum.map(object.related, & &1.key) == [
+             "related-alpha",
+             "related-zeta",
+             "related-beta",
+             "related-gamma",
+             "related-delta",
+             "related-epsilon"
+           ]
+
+    assert Enum.all?(object.related, fn related_object ->
+             Map.keys(related_object) |> Enum.sort() == [:key, :name, :object_type]
+           end)
+  end
+
   test "stale OpenNGC Andromeda parallax cannot publish a false distance or position", %{
     conn: conn
   } do
