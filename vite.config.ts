@@ -15,6 +15,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api/catalog": "http://127.0.0.1:4020",
+      "/api/agent": "http://127.0.0.1:4020",
       "/api/objects": "http://127.0.0.1:4020",
       "/api/survey-image": "http://127.0.0.1:4020",
       "/api/ephemeris": ephemerisApi,
@@ -24,7 +25,14 @@ export default defineConfig({
       "/api/observe": ephemerisApi,
       "/api/now": "http://127.0.0.1:4020",
       "/api/events": "http://127.0.0.1:4020",
-      "/catalog-tiles": "http://127.0.0.1:4020"
+      "/catalog-tiles": "http://127.0.0.1:4020",
+      "/about": "http://127.0.0.1:4020",
+      "/agents": "http://127.0.0.1:4020",
+      "/llms.txt": "http://127.0.0.1:4020",
+      "/openapi.json": "http://127.0.0.1:4020",
+      "/o/": "http://127.0.0.1:4020",
+      "/sitemap.xml": "http://127.0.0.1:4020",
+      "/sitemaps/": "http://127.0.0.1:4020"
     }
   }
 });

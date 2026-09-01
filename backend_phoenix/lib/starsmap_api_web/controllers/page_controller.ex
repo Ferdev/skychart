@@ -40,36 +40,12 @@ defmodule StarsmapApiWeb.PageController do
   end
 
   def about(conn, _params) do
-    html(conn, """
-    <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>About and data credits — Cosmic Atlas</title><meta name="description" content="Data sources, acknowledgments, and licensing information for Cosmic Atlas.">
-    <link rel="canonical" href="https://skychart.org/about"><link rel="icon" href="/favicon.svg"><style>#{about_css()}</style></head><body><main><a href="/">← Return to the atlas</a>
-    <p class="eyebrow">Cosmic Atlas / field notes</p><h1>About the atlas</h1><p class="lede">Cosmic Atlas places public scientific catalogs into one continuous, physically scaled map. It is an orientation and discovery companion; source catalogs and specialist tools remain authoritative for quantitative work.</p>
-    <h2>Data credits and acknowledgments</h2><div class="ledger">
-    <section><h3>ESA / Gaia / DPAC</h3><p>This work has made use of data from the European Space Agency mission <a href="https://www.cosmos.esa.int/gaia">Gaia</a>, processed by the Gaia Data Processing and Analysis Consortium (DPAC). Funding for DPAC has been provided by national institutions participating in the Gaia Multilateral Agreement.</p></section>
-    <section><h3>DESI DR1</h3><p>This research uses data from the <a href="https://data.desi.lbl.gov/doc/acknowledgments/">Dark Energy Spectroscopic Instrument</a>, supported by the U.S. Department of Energy and participating institutions.</p></section>
-    <section><h3>DESI Legacy Imaging Surveys DR11</h3><p>Coordinate-centered object imagery uses the <a href="https://www.legacysurvey.org/dr11/">Legacy Surveys Data Release 11</a> optical map through its public Sky Viewer. Every coordinate-bearing object also gets curated or DSS2 context; if the live DR11 cutout is unavailable, the card identifies and displays an all-sky AllWISE infrared field from CDS/Aladin. Survey imagery provides angular observing context and does not determine distances in the atlas. See the <a href="https://newscenter.lbl.gov/2026/08/10/scientists-release-biggest-2d-map-of-the-universe/">Berkeley Lab release</a>.</p></section>
-    <section><h3>NASA Exoplanet Archive</h3><p>Exoplanet data come from the <a href="https://exoplanetarchive.ipac.caltech.edu/">NASA Exoplanet Archive</a>, operated by Caltech under contract with NASA.</p></section>
-    <section><h3>SIMBAD / CDS</h3><p>Selected object records use <a href="https://simbad.cds.unistra.fr/">SIMBAD</a>, operated at CDS, Strasbourg, France.</p></section>
-    <section><h3>BASS DR2 / VizieR</h3><p>Mass-bearing active-galaxy records use <a href="https://www.bass-survey.com/dr2.html">BASS Data Release 2</a> through the <a href="https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2">CDS/VizieR catalog service</a>.</p></section>
-    <section><h3>eROSITA-DE DR2</h3><p>X-ray point and extended sources use the <a href="https://erosita.mpe.mpg.de/dr2/">eROSITA-DE Data Release 2</a> (eRASS:3) catalogs from the German eROSITA consortium; acknowledge the release and cite Ramos-Ceja et al. 2026 when using these data.</p></section>
-    <section><h3>SDSS-V DR20 / SPIDERS</h3><p>Optical spectroscopy of eROSITA X-ray targets uses the <a href="https://www.sdss.org/dr20/">Sloan Digital Sky Survey DR20</a> SPIDERS DL1 value-added catalog from the Black Hole Mapper program.</p></section>
-    <section><h3>OpenNGC</h3><p>NGC and IC records use the community-maintained <a href="https://github.com/mattiaverga/OpenNGC">OpenNGC</a> database under its published license.</p></section>
-    <section><h3>JPL SSD / Horizons</h3><p>Solar-system object and ephemeris data use NASA Jet Propulsion Laboratory <a href="https://ssd.jpl.nasa.gov/">Solar System Dynamics</a> resources and <a href="https://ssd.jpl.nasa.gov/horizons/">Horizons</a>.</p></section>
-    <section><h3>International Astronomical Union</h3><p>Dwarf-planet labels follow formal <a href="https://www.iau.org/static/resolutions/Resolution_GA26-5-6.pdf">IAU classifications</a>; orbital and physical data remain credited to their originating JPL sources.</p></section>
-    <section><h3>NAIF</h3><p>Reference frames and kernels use resources from NASA's <a href="https://naif.jpl.nasa.gov/naif/">Navigation and Ancillary Information Facility</a> (NAIF/SPICE).</p></section></div>
-    <h2>Use with care</h2><p>Displayed density reflects catalog selection, measurement quality, and rendering level of detail. Missing uncertainty, epoch, completeness, or distance semantics means not supplied, never zero.</p>
-    <h2>Source code</h2><p>Cosmic Atlas is open source under the MIT license: <a href="https://github.com/Ferdev/skychart">github.com/Ferdev/skychart</a>. Third-party catalog records keep their upstream licenses and citation terms; see <a href="https://github.com/Ferdev/skychart/blob/trunk/DATA-NOTICE.md">DATA-NOTICE.md</a> in the repository.</p></main></body></html>
-    """)
+    html(conn, StarsmapApiWeb.DiscoveryContent.about_document())
   end
 
   def sentry_test(conn, _params) do
     Sentry.capture_message("Cosmic Atlas forced server test", level: :error)
     json(conn, %{ok: true})
-  end
-
-  defp about_css do
-    ":root{color-scheme:dark;background:#080a09;color:#e9eee8;font:16px/1.65 system-ui,sans-serif}body{margin:0;background:#080a09}main{max-width:900px;margin:auto;padding:5rem 1.5rem 8rem}a{color:#b9d9c9}.eyebrow{color:#82a593;text-transform:uppercase;letter-spacing:.18em;font-size:.72rem}h1{font:clamp(3rem,8vw,6rem)/.95 Georgia,serif}.lede{font-size:1.25rem;color:#bac5be}.ledger{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;background:#39443e}.ledger section{background:#101512;padding:1.4rem}h2{margin-top:4rem}h3{font:1.3rem Georgia,serif}p{color:#c8d0cb}"
   end
 
   defp catalog_tile_manifest_url do

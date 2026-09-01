@@ -37,6 +37,45 @@ defmodule StarsmapApi.AnalyticsTest do
                %{"name" => "search", "path" => "/", "properties" => %{"email" => "x@y.test"}},
                {127, 0, 0, 1}
              )
+
+    assert {:error, :invalid_event} =
+             Analytics.record(
+               %{
+                 "name" => "page_view",
+                 "path" => "/",
+                 "properties" => %{"referrer_surface" => "forged"}
+               },
+               {127, 0, 0, 1}
+             )
+  end
+
+  test "classifies known assistant referrals from the minimized hostname only" do
+    base = %{"name" => "page_view", "path" => "/agents", "properties" => %{}}
+
+    assert {:ok, chatgpt} =
+             Analytics.record(
+               Map.put(base, "referrer", "https://chatgpt.com/c/secret?prompt=private"),
+               {192, 0, 2, 1}
+             )
+
+    assert chatgpt.referrer_host == "chatgpt.com"
+    assert chatgpt.properties["referrer_surface"] == "chatgpt"
+
+    assert {:ok, claude} =
+             Analytics.record(
+               Map.put(base, "referrer", "https://subdomain.claude.ai/chat/secret"),
+               {192, 0, 2, 2}
+             )
+
+    assert claude.properties["referrer_surface"] == "claude"
+
+    assert {:ok, deceptive} =
+             Analytics.record(
+               Map.put(base, "referrer", "https://notchatgpt.com/path"),
+               {192, 0, 2, 3}
+             )
+
+    refute Map.has_key?(deceptive.properties, "referrer_surface")
   end
 
   test "accepts but does not persist events when analytics is disabled" do

@@ -33,6 +33,10 @@ defmodule StarsmapApiWeb.Router do
     get "/", PageController, :index
     get "/embed", PageController, :embed
     get "/about", PageController, :about
+    get "/agents", AgentController, :show
+    get "/agents.json", AgentController, :guide_json
+    get "/llms.txt", AgentController, :llms
+    get "/openapi.json", AgentController, :openapi
     get "/methodology", MethodologyController, :show
     get "/sky/:key", SkyShareController, :show
     get "/o/:key", ObjectPageController, :show
@@ -76,5 +80,9 @@ defmodule StarsmapApiWeb.Router do
     get "/observe", PythonProxyController, :observe
     get "/objects/:key/external-links", ObjectController, :external_links
     get "/objects/:key", ObjectController, :show
+    get "/agent/v1/objects/search", AgentApiController, :search
+    get "/agent/v1/objects/:key", AgentApiController, :object
+    get "/agent/v1/catalogs", AgentApiController, :catalogs
+    get "/agent/v1/view-link", AgentApiController, :view_link
   end
 end
