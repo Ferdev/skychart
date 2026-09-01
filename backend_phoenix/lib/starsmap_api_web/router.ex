@@ -12,6 +12,10 @@ defmodule StarsmapApiWeb.Router do
     plug StarsmapApiWeb.Plugs.RateLimit, capacity: 180, refill_per_second: 3.0
   end
 
+  pipeline :health do
+    plug :accepts, ["json"]
+  end
+
   pipeline :sky_card do
     plug StarsmapApiWeb.Plugs.RateLimit, capacity: 30, refill_per_second: 0.25
   end
@@ -44,9 +48,14 @@ defmodule StarsmapApiWeb.Router do
   end
 
   scope "/api", StarsmapApiWeb do
-    pipe_through :api
+    pipe_through :health
 
     get "/health", HealthController, :show
+  end
+
+  scope "/api", StarsmapApiWeb do
+    pipe_through :api
+
     get "/survey-image", SurveyImageController, :show
     get "/now", NowController, :index
     post "/events", EventController, :create

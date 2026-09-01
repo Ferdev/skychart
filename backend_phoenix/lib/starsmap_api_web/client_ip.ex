@@ -12,7 +12,7 @@ defmodule StarsmapApiWeb.ClientIp do
   @loopback_cidrs [{{127, 0, 0, 0}, 8}, {{0, 0, 0, 0, 0, 0, 0, 1}, 128}]
 
   def resolve(conn) do
-    peer = conn.remote_ip || {0, 0, 0, 0}
+    peer = normalize(conn.remote_ip || {0, 0, 0, 0})
 
     if trusted_proxy?(peer) do
       conn
@@ -32,7 +32,7 @@ defmodule StarsmapApiWeb.ClientIp do
   end
 
   def trusted_proxy?(ip) when tuple_size(ip) in [4, 8],
-    do: Enum.any?(trusted_proxy_cidrs(), &in_cidr?(ip, &1))
+    do: Enum.any?(trusted_proxy_cidrs(), &in_cidr?(normalize(ip), &1))
 
   def trusted_proxy?(_), do: false
 
@@ -71,10 +71,24 @@ defmodule StarsmapApiWeb.ClientIp do
     value = value |> String.trim() |> String.trim_leading("[") |> String.trim_trailing("]")
 
     case :inet.parse_address(String.to_charlist(value)) do
-      {:ok, ip} -> ip
+      {:ok, ip} -> normalize(ip)
       _ -> nil
     end
   end
+
+  # An IPv6 listener represents IPv4 peers as ::ffff:a.b.c.d. Normalize that
+  # socket representation before checking the configured IPv4 proxy networks
+  # or using the address as a rate-limit identity.
+  defp normalize({0, 0, 0, 0, 0, 65_535, high, low}) do
+    {
+      Bitwise.bsr(high, 8),
+      Bitwise.band(high, 255),
+      Bitwise.bsr(low, 8),
+      Bitwise.band(low, 255)
+    }
+  end
+
+  defp normalize(ip), do: ip
 
   defp in_cidr?(ip, {network, prefix}) do
     if tuple_size(ip) == tuple_size(network) do

@@ -88,8 +88,12 @@ defmodule StarsmapApi.Catalog.PublicObjects do
             asc: candidate.name
           )
           |> limit(6)
+          |> select([candidate], %{
+            key: candidate.key,
+            name: candidate.name,
+            object_type: candidate.object_type
+          })
           |> Repo.all()
-          |> Enum.map(&Map.take(&1, [:key, :name, :object_type]))
 
         {:ok,
          Map.merge(catalog_object_payload(object), %{
