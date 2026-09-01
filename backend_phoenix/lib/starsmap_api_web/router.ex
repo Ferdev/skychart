@@ -12,6 +12,10 @@ defmodule StarsmapApiWeb.Router do
     plug StarsmapApiWeb.Plugs.RateLimit, capacity: 180, refill_per_second: 3.0
   end
 
+  pipeline :health do
+    plug :accepts, ["json"]
+  end
+
   pipeline :sky_card do
     plug StarsmapApiWeb.Plugs.RateLimit, capacity: 30, refill_per_second: 0.25
   end
@@ -29,6 +33,10 @@ defmodule StarsmapApiWeb.Router do
     get "/", PageController, :index
     get "/embed", PageController, :embed
     get "/about", PageController, :about
+    get "/agents", AgentController, :show
+    get "/agents.json", AgentController, :guide_json
+    get "/llms.txt", AgentController, :llms
+    get "/openapi.json", AgentController, :openapi
     get "/methodology", MethodologyController, :show
     get "/sky/:key", SkyShareController, :show
     get "/o/:key", ObjectPageController, :show
@@ -44,9 +52,14 @@ defmodule StarsmapApiWeb.Router do
   end
 
   scope "/api", StarsmapApiWeb do
-    pipe_through :api
+    pipe_through :health
 
     get "/health", HealthController, :show
+  end
+
+  scope "/api", StarsmapApiWeb do
+    pipe_through :api
+
     get "/survey-image", SurveyImageController, :show
     get "/now", NowController, :index
     post "/events", EventController, :create
@@ -67,5 +80,9 @@ defmodule StarsmapApiWeb.Router do
     get "/observe", PythonProxyController, :observe
     get "/objects/:key/external-links", ObjectController, :external_links
     get "/objects/:key", ObjectController, :show
+    get "/agent/v1/objects/search", AgentApiController, :search
+    get "/agent/v1/objects/:key", AgentApiController, :object
+    get "/agent/v1/catalogs", AgentApiController, :catalogs
+    get "/agent/v1/view-link", AgentApiController, :view_link
   end
 end

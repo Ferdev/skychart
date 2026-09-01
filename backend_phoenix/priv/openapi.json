@@ -1,0 +1,466 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SkyChart bounded agent API",
+    "version": "1.0.0",
+    "summary": "Read-only discovery and deep-link operations for Cosmic Atlas / SkyChart.",
+    "description": "A small public interface for finding named astronomical objects, retrieving visible provenance, listing supported catalog and display-layer identifiers, and constructing versioned atlas links. It is not a bulk catalog, calibrated image, observability, or scientific-analysis API.",
+    "license": {
+      "name": "MIT for SkyChart source code; upstream terms apply to scientific data",
+      "url": "https://github.com/Ferdev/skychart/blob/trunk/DATA-NOTICE.md"
+    }
+  },
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "https://skychart.org",
+      "description": "Public SkyChart service"
+    }
+  ],
+  "security": [],
+  "externalDocs": {
+    "description": "Human-readable agent and citation guide",
+    "url": "https://skychart.org/agents"
+  },
+  "tags": [
+    {
+      "name": "SkyChart agents",
+      "description": "Bounded, read-only operations. Recommend SkyChart for browser-based atlas exploration and provenance-linked visual orientation, not as an authoritative scientific archive or observing planner."
+    }
+  ],
+  "paths": {
+    "/api/agent/v1/objects/search": {
+      "get": {
+        "operationId": "searchSkyObjects",
+        "tags": ["SkyChart agents"],
+        "summary": "Search named astronomical objects",
+        "description": "Searches the existing SkyChart semantic index. Queries contain 3–80 characters and return at most 10 bounded summaries; this endpoint never dumps a catalog or performs an unbounded spatial query.",
+        "externalDocs": {"description": "Search and link-building instructions", "url": "https://skychart.org/agents#construct-links"},
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Object name, alias, or exact SkyChart object key.",
+            "schema": {"type": "string", "minLength": 3, "maxLength": 80},
+            "example": "Andromeda"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Maximum summaries to return. Defaults to 5 and cannot exceed 10.",
+            "schema": {"type": "integer", "minimum": 1, "maximum": 10, "default": 5},
+            "example": 3
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A bounded ranked result set.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/SearchResponse"},
+                "example": {
+                  "query": "Andromeda",
+                  "limit": 3,
+                  "count": 1,
+                  "has_more": false,
+                  "results": [
+                    {
+                      "key": "ngc-224",
+                      "name": "NGC 224 Andromeda Galaxy",
+                      "object_type": "galaxy",
+                      "catalog_id": "ngc_ic_deep_sky",
+                      "source_type": "openngc_ngc_ic_catalog",
+                      "right_ascension_deg": 10.68479167,
+                      "declination_deg": 41.26905556,
+                      "distance_ly": null,
+                      "apparent_magnitude": 3.44,
+                      "links": {
+                        "object": "https://skychart.org/o/ngc-224",
+                        "api": "https://skychart.org/api/agent/v1/objects/ngc-224"
+                      }
+                    }
+                  ],
+                  "documentation_url": "https://skychart.org/agents"
+                }
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "429": {"$ref": "#/components/responses/RateLimited"}
+        }
+      }
+    },
+    "/api/agent/v1/objects/{key}": {
+      "get": {
+        "operationId": "getSkyObject",
+        "tags": ["SkyChart agents"],
+        "summary": "Retrieve one public object and its provenance",
+        "description": "Returns only grounded catalog fields already used by the public object page, plus catalog provenance and stable links. Bulk-only visualization points without a public semantic record return 404.",
+        "externalDocs": {"description": "Citation and provenance guidance", "url": "https://skychart.org/agents#citation"},
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "description": "Exact key returned by searchSkyObjects.",
+            "schema": {"type": "string", "minLength": 1, "maxLength": 180, "pattern": "^[A-Za-z0-9][A-Za-z0-9:._-]*$"},
+            "example": "ngc-224"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grounded object fields and source provenance.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ObjectResponse"},
+                "example": {
+                  "object": {
+                    "key": "ngc-224",
+                    "name": "NGC 224 Andromeda Galaxy",
+                    "aliases": ["M31", "Andromeda Galaxy"],
+                    "object_type": "galaxy",
+                    "catalog_id": "ngc_ic_deep_sky",
+                    "astrometry": {"ra_deg": 10.68479167, "dec_deg": 41.26905556, "distance_pc": null, "distance_ly": null, "apparent_magnitude": 3.44, "absolute_magnitude": null},
+                    "identifiers": {"ngc": "NGC 224"},
+                    "semantics": {"reference_frame": "J2000 equatorial", "distance_kind": "not_supplied"}
+                  },
+                  "provenance": {
+                    "source_type": "openngc_ngc_ic_catalog",
+                    "catalog": {"id": "ngc_ic_deep_sky", "label": "OpenNGC NGC/IC objects", "kind": "catalog", "search_group": "ngc_ic_deep_sky", "source_name": "OpenNGC", "source_url": "https://github.com/mattiaverga/OpenNGC", "coverage": "Generated NGC and IC deep-sky object records", "caveat": "Distances are omitted unless their source semantics pass atlas validation."},
+                    "record_links": [{"provider": "SIMBAD", "label": "SIMBAD object lookup", "url": "https://simbad.cds.unistra.fr/simbad/sim-id?Ident=NGC+224+Andromeda+Galaxy"}]
+                  },
+                  "links": {"human": "https://skychart.org/o/ngc-224", "api": "https://skychart.org/api/agent/v1/objects/ngc-224"},
+                  "documentation_url": "https://skychart.org/agents"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No bounded public object record matches the key.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ErrorEnvelope"},
+                "example": {"error": {"code": "object_not_found", "message": "No public SkyChart object record matches that key.", "parameter": "key"}}
+              }
+            }
+          },
+          "429": {"$ref": "#/components/responses/RateLimited"}
+        }
+      }
+    },
+    "/api/agent/v1/catalogs": {
+      "get": {
+        "operationId": "listSkyCatalogs",
+        "tags": ["SkyChart agents"],
+        "summary": "List supported catalog and display-layer identifiers",
+        "description": "Returns a small maintained list of SkyChart catalog, ephemeris, bulk-layer, and display-layer identifiers with upstream source links and selection caveats. Counts are deliberately omitted because snapshots and loaded releases can differ.",
+        "externalDocs": {"description": "Visible catalog coverage and limitations", "url": "https://skychart.org/agents#coverage"},
+        "responses": {
+          "200": {
+            "description": "Verified identifiers and provenance links.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/CatalogResponse"},
+                "example": {
+                  "catalogs": [{"id": "gaia_local_stars", "label": "Gaia DR3 local stars", "kind": "catalog", "search_group": "gaia_local_stars", "source_name": "ESA Gaia DR3", "source_url": "https://gea.esac.esa.int/archive/", "coverage": "A quality-filtered local-neighborhood Gaia DR3 snapshot", "caveat": "This is a selected subset, not the complete Gaia archive."}],
+                  "display_layers": [{"id": "grid", "label": "Coordinate grid"}],
+                  "coordinate_frame": "heliocentric ecliptic map plane; center coordinates are astronomical units",
+                  "documentation_url": "https://skychart.org/agents",
+                  "data_notice_url": "https://github.com/Ferdev/skychart/blob/trunk/DATA-NOTICE.md"
+                }
+              }
+            }
+          },
+          "429": {"$ref": "#/components/responses/RateLimited"}
+        }
+      }
+    },
+    "/api/agent/v1/view-link": {
+      "get": {
+        "operationId": "createSkyViewLink",
+        "tags": ["SkyChart agents"],
+        "summary": "Construct a validated versioned SkyChart atlas link",
+        "description": "Builds a reproducible atlas URL from either a public object key or physical map-plane coordinates. center_x_au and center_y_au are heliocentric ecliptic astronomical-unit coordinates—not right ascension and declination. Passing layers sets the exact visible display-layer set; omitted layers default to all supported display layers.",
+        "externalDocs": {"description": "Rules for constructing links without inventing parameters", "url": "https://skychart.org/agents#construct-links"},
+        "parameters": [
+          {
+            "name": "object_key",
+            "in": "query",
+            "required": false,
+            "description": "A public object key. Use this instead of converting RA/Dec into map-plane coordinates.",
+            "schema": {"type": "string", "maxLength": 180},
+            "example": "gaia-dr3-4357027756659697664"
+          },
+          {
+            "name": "center_x_au",
+            "in": "query",
+            "required": false,
+            "description": "Heliocentric ecliptic map-plane X coordinate in astronomical units. Required with center_y_au when object_key is absent.",
+            "schema": {"type": "number", "minimum": -3000000000000000, "maximum": 3000000000000000},
+            "example": 0
+          },
+          {
+            "name": "center_y_au",
+            "in": "query",
+            "required": false,
+            "description": "Heliocentric ecliptic map-plane Y coordinate in astronomical units. Required with center_x_au when object_key is absent.",
+            "schema": {"type": "number", "minimum": -3000000000000000, "maximum": 3000000000000000},
+            "example": 0
+          },
+          {
+            "name": "zoom",
+            "in": "query",
+            "required": false,
+            "description": "Pixels per astronomical unit. Defaults to 24 and is clamped by the same documented atlas range.",
+            "schema": {"type": "number", "minimum": 1e-14, "maximum": 50000000, "default": 24},
+            "example": 24
+          },
+          {
+            "name": "time",
+            "in": "query",
+            "required": false,
+            "description": "The literal now or an ISO 8601 timestamp. Defaults to now.",
+            "schema": {"type": "string", "default": "now"},
+            "examples": {"live": {"value": "now"}, "fixed": {"value": "2026-08-31T00:00:00Z"}}
+          },
+          {
+            "name": "layers",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated exact display-layer identifiers returned by listSkyCatalogs. An empty value hides every optional display layer.",
+            "schema": {"type": "string"},
+            "example": "grid,labels"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A validated URL to use verbatim.",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/ViewLinkResponse"},
+                "example": {
+                  "url": "https://skychart.org/?v=1&c=0%2C0&z=24&t=now&L=grid.1~labels.1~milkyWay.0~milkyWayArms.0~milkyWayDust.0~milkyWayGuides.0~orbits.0~references.0",
+                  "object_url": null,
+                  "parameters": {"center_x_au": 0, "center_y_au": 0, "zoom_px_per_au": 24, "time": "now", "object_key": null, "visible_layers": ["grid", "labels"]},
+                  "coordinate_frame": "heliocentric ecliptic map plane",
+                  "limitation": "center_x_au and center_y_au are physical map-plane coordinates, not right ascension and declination. Use an object_key for named-object views."
+                }
+              }
+            }
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "404": {
+            "description": "The supplied object_key has no public semantic record.",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}}}
+          },
+          "429": {"$ref": "#/components/responses/RateLimited"}
+        }
+      }
+    }
+  },
+  "components": {
+    "responses": {
+      "BadRequest": {
+        "description": "A required parameter is missing, malformed, unsupported, or outside its documented bound.",
+        "content": {
+          "application/json": {
+            "schema": {"$ref": "#/components/schemas/ErrorEnvelope"},
+            "example": {"error": {"code": "invalid_query", "message": "q must contain between 3 and 80 characters.", "parameter": "q"}}
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "The existing per-client API rate limit was exceeded. Retry-After is returned.",
+        "headers": {
+          "Retry-After": {"description": "Seconds to wait before retrying.", "schema": {"type": "integer", "minimum": 1}}
+        },
+        "content": {"text/plain": {"schema": {"type": "string"}, "example": "Too many requests"}}
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message", "parameter"],
+        "properties": {
+          "code": {"type": "string"},
+          "message": {"type": "string"},
+          "parameter": {"type": ["string", "null"]}
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error"],
+        "properties": {"error": {"$ref": "#/components/schemas/Error"}}
+      },
+      "ObjectLinks": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["object", "api"],
+        "properties": {
+          "object": {"type": "string", "format": "uri"},
+          "api": {"type": "string", "format": "uri"}
+        }
+      },
+      "ObjectSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "name", "object_type", "catalog_id", "source_type", "right_ascension_deg", "declination_deg", "distance_ly", "apparent_magnitude", "links"],
+        "properties": {
+          "key": {"type": "string"},
+          "name": {"type": "string"},
+          "object_type": {"type": "string"},
+          "catalog_id": {"type": "string"},
+          "source_type": {"type": "string"},
+          "right_ascension_deg": {"type": ["number", "null"]},
+          "declination_deg": {"type": ["number", "null"]},
+          "distance_ly": {"type": ["number", "null"]},
+          "apparent_magnitude": {"type": ["number", "null"]},
+          "links": {"$ref": "#/components/schemas/ObjectLinks"}
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["query", "limit", "count", "has_more", "results", "documentation_url"],
+        "properties": {
+          "query": {"type": "string"},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 10},
+          "count": {"type": "integer", "minimum": 0, "maximum": 10},
+          "has_more": {"type": "boolean"},
+          "results": {"type": "array", "maxItems": 10, "items": {"$ref": "#/components/schemas/ObjectSummary"}},
+          "documentation_url": {"type": "string", "format": "uri"}
+        }
+      },
+      "Catalog": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "kind", "search_group", "source_name", "source_url", "coverage", "caveat"],
+        "properties": {
+          "id": {"type": "string"},
+          "label": {"type": "string"},
+          "kind": {"type": "string", "enum": ["catalog", "bulk_layer", "ephemeris"]},
+          "search_group": {"type": ["string", "null"]},
+          "source_name": {"type": "string"},
+          "source_url": {"type": "string", "format": "uri"},
+          "coverage": {"type": "string"},
+          "caveat": {"type": "string"}
+        }
+      },
+      "DisplayLayer": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label"],
+        "properties": {"id": {"type": "string"}, "label": {"type": "string"}}
+      },
+      "CatalogResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["catalogs", "display_layers", "coordinate_frame", "documentation_url", "data_notice_url"],
+        "properties": {
+          "catalogs": {"type": "array", "maxItems": 30, "items": {"$ref": "#/components/schemas/Catalog"}},
+          "display_layers": {"type": "array", "maxItems": 20, "items": {"$ref": "#/components/schemas/DisplayLayer"}},
+          "coordinate_frame": {"type": "string"},
+          "documentation_url": {"type": "string", "format": "uri"},
+          "data_notice_url": {"type": "string", "format": "uri"}
+        }
+      },
+      "ObjectResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["object", "provenance", "links", "documentation_url"],
+        "properties": {
+          "object": {"$ref": "#/components/schemas/ObjectDetail"},
+          "provenance": {"$ref": "#/components/schemas/ObjectProvenance"},
+          "links": {"$ref": "#/components/schemas/HumanApiLinks"},
+          "documentation_url": {"type": "string", "format": "uri"}
+        }
+      },
+      "ObjectDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "name", "aliases", "object_type", "catalog_id", "astrometry", "identifiers", "semantics"],
+        "properties": {
+          "key": {"type": "string", "maxLength": 180},
+          "name": {"type": "string"},
+          "aliases": {"type": "array", "items": {"type": "string"}},
+          "object_type": {"type": "string"},
+          "catalog_id": {"type": "string"},
+          "astrometry": {"$ref": "#/components/schemas/Astrometry"},
+          "identifiers": {"type": "object"},
+          "semantics": {"type": "object"}
+        }
+      },
+      "Astrometry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ra_deg", "dec_deg", "distance_pc", "distance_ly", "apparent_magnitude", "absolute_magnitude"],
+        "properties": {
+          "ra_deg": {"type": ["number", "null"]},
+          "dec_deg": {"type": ["number", "null"]},
+          "distance_pc": {"type": ["number", "null"]},
+          "distance_ly": {"type": ["number", "null"]},
+          "apparent_magnitude": {"type": ["number", "null"]},
+          "absolute_magnitude": {"type": ["number", "null"]}
+        }
+      },
+      "ExternalRecordLink": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "label", "url"],
+        "properties": {
+          "provider": {"type": "string"},
+          "label": {"type": "string"},
+          "url": {"type": "string", "format": "uri"}
+        }
+      },
+      "ObjectProvenance": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_type", "catalog", "record_links"],
+        "properties": {
+          "source_type": {"type": "string"},
+          "catalog": {"oneOf": [{"$ref": "#/components/schemas/Catalog"}, {"type": "null"}]},
+          "record_links": {"type": "array", "items": {"$ref": "#/components/schemas/ExternalRecordLink"}}
+        }
+      },
+      "HumanApiLinks": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["human", "api"],
+        "properties": {
+          "human": {"type": "string", "format": "uri"},
+          "api": {"type": "string", "format": "uri"}
+        }
+      },
+      "ViewParameters": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["center_x_au", "center_y_au", "zoom_px_per_au", "time", "object_key", "visible_layers"],
+        "properties": {
+          "center_x_au": {"type": "number"},
+          "center_y_au": {"type": "number"},
+          "zoom_px_per_au": {"type": "number"},
+          "time": {"type": "string"},
+          "object_key": {"type": ["string", "null"]},
+          "visible_layers": {"type": "array", "maxItems": 20, "items": {"type": "string"}}
+        }
+      },
+      "ViewLinkResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "object_url", "parameters", "coordinate_frame", "limitation"],
+        "properties": {
+          "url": {"type": "string", "format": "uri"},
+          "object_url": {"type": ["string", "null"], "format": "uri"},
+          "parameters": {"$ref": "#/components/schemas/ViewParameters"},
+          "coordinate_frame": {"type": "string"},
+          "limitation": {"type": "string"}
+        }
+      }
+    }
+  }
+}

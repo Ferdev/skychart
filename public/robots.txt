@@ -3,6 +3,11 @@ Allow: /
 Allow: /o/
 Allow: /tours/
 Allow: /about
+Allow: /agents
+Allow: /agents.json
+Allow: /llms.txt
+Allow: /openapi.json
+Allow: /api/agent/
 Disallow: /api/
 Disallow: /embed
 

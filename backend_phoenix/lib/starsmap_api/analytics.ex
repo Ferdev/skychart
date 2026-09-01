@@ -4,6 +4,18 @@ defmodule StarsmapApi.Analytics do
 
   @event_names ~w(page_view search object compare share embed_loaded image_export tour_started tour_completed methodology citation_copied filter data_export cross_tool)
   @property_keys ~w(query_length object_type source filter format tour tool method resolution_tier)
+  @referrer_surfaces [
+    {"chatgpt", ["chatgpt.com", "chat.openai.com"]},
+    {"claude", ["claude.ai"]},
+    {"perplexity", ["perplexity.ai"]},
+    {"gemini", ["gemini.google.com"]},
+    {"microsoft_copilot", ["copilot.microsoft.com", "copilot.cloud.microsoft"]},
+    {"meta_ai", ["meta.ai"]},
+    {"google_search", ["google.com"]},
+    {"bing_search", ["bing.com"]},
+    {"brave_search", ["search.brave.com"]},
+    {"you_com", ["you.com"]}
+  ]
   def event_names, do: @event_names
   def record(params, remote_ip, now \\ DateTime.utc_now())
 
@@ -14,6 +26,8 @@ defmodule StarsmapApi.Analytics do
            {:ok, path} <- minimize_path(params["path"]),
            {:ok, referrer_host} <- minimize_referrer(params["referrer"]),
            {:ok, properties} <- validate_properties(params["properties"] || %{}) do
+        properties = annotate_referrer(properties, referrer_host)
+
         %Event{}
         |> Event.changeset(%{
           event_name: name,
@@ -60,6 +74,20 @@ defmodule StarsmapApi.Analytics do
   end
 
   defp validate_properties(_), do: :error
+
+  defp annotate_referrer(properties, nil), do: properties
+
+  defp annotate_referrer(properties, host) do
+    case Enum.find_value(@referrer_surfaces, fn {surface, domains} ->
+           if Enum.any?(domains, &domain_match?(host, &1)), do: surface
+         end) do
+      nil -> properties
+      surface -> Map.put(properties, "referrer_surface", surface)
+    end
+  end
+
+  defp domain_match?(host, domain),
+    do: host == domain or String.ends_with?(host, "." <> domain)
 
   defp anonymous_id(remote_ip, now) do
     salt =

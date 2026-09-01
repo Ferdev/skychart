@@ -2,6 +2,7 @@ defmodule StarsmapApiWeb.RateLimitTest do
   use ExUnit.Case, async: false
   import Plug.Conn
   import Plug.Test
+  alias StarsmapApiWeb.ClientIp
   alias StarsmapApiWeb.Plugs.RateLimit
 
   setup do
@@ -81,6 +82,47 @@ defmodule StarsmapApiWeb.RateLimitTest do
     assert spoofed_retry.status == 429
   end
 
+  test "IPv4-mapped IPv6 Kamal peer uses independent forwarded client buckets" do
+    RateLimit.reset()
+    mapped_kamal_peer = {0, 0, 0, 0, 0, 65_535, 44_050, 2}
+
+    client_one =
+      %{conn(:get, "/") | remote_ip: mapped_kamal_peer}
+      |> put_req_header("x-forwarded-for", "198.51.100.10")
+
+    client_two =
+      %{conn(:get, "/") | remote_ip: mapped_kamal_peer}
+      |> put_req_header("x-forwarded-for", "198.51.100.11")
+
+    assert ClientIp.resolve(client_one) == {198, 51, 100, 10}
+    refute RateLimit.call(client_one, capacity: 1, refill_per_second: 0).halted
+    assert RateLimit.call(client_one, capacity: 1, refill_per_second: 0).status == 429
+    refute RateLimit.call(client_two, capacity: 1, refill_per_second: 0).halted
+  end
+
+  test "forwarded chain stops at the first untrusted hop" do
+    RateLimit.reset()
+    mapped_kamal_peer = {0, 0, 0, 0, 0, 65_535, 44_050, 2}
+
+    first =
+      %{conn(:get, "/") | remote_ip: mapped_kamal_peer}
+      |> put_req_header(
+        "x-forwarded-for",
+        "203.0.113.1, 198.51.100.20, 172.18.0.3"
+      )
+
+    spoofed_retry =
+      %{conn(:get, "/") | remote_ip: mapped_kamal_peer}
+      |> put_req_header(
+        "x-forwarded-for",
+        "203.0.113.2, 198.51.100.20, 172.18.0.3"
+      )
+
+    assert ClientIp.resolve(first) == {198, 51, 100, 20}
+    refute RateLimit.call(first, capacity: 1, refill_per_second: 0).halted
+    assert RateLimit.call(spoofed_retry, capacity: 1, refill_per_second: 0).status == 429
+  end
+
   test "untrusted peer cannot spoof its identity with forwarded headers" do
     RateLimit.reset()
 
@@ -91,6 +133,24 @@ defmodule StarsmapApiWeb.RateLimitTest do
 
     second =
       %{conn(:get, "/") | remote_ip: {198, 51, 100, 20}}
+      |> put_req_header("x-forwarded-for", "203.0.113.2")
+      |> RateLimit.call(capacity: 1, refill_per_second: 0)
+
+    refute first.halted
+    assert second.status == 429
+  end
+
+  test "IPv4-mapped untrusted peer cannot spoof its identity" do
+    RateLimit.reset()
+    mapped_untrusted_peer = {0, 0, 0, 0, 0, 65_535, 50_739, 25_620}
+
+    first =
+      %{conn(:get, "/") | remote_ip: mapped_untrusted_peer}
+      |> put_req_header("x-forwarded-for", "203.0.113.1")
+      |> RateLimit.call(capacity: 1, refill_per_second: 0)
+
+    second =
+      %{conn(:get, "/") | remote_ip: mapped_untrusted_peer}
       |> put_req_header("x-forwarded-for", "203.0.113.2")
       |> RateLimit.call(capacity: 1, refill_per_second: 0)
 
