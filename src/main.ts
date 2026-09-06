@@ -1,4 +1,5 @@
-import { SpacecraftLoader, spacecraftBodies } from "./catalog/spacecraftCatalog";
+import { SpacecraftLoader } from "./catalog/spacecraftCatalog";
+import { loadAtlasEphemeris } from "./atlas/atlasEphemerisLoader";
 import "./destinationPicker.css";
 import "./styles.css";
 import { readRecentDestinations, type RecentDestination } from "./destinationPicker";
@@ -15,7 +16,6 @@ import { CatalogPointDecoder } from "./catalog/catalogPointDecoder";
 import { CatalogPointManifestRepository } from "./catalog/catalogPointManifest";
 import { CatalogPointPlanner, type CatalogPointViewport } from "./catalog/catalogPointPlanner";
 import { CatalogObjectMapper } from "./catalog/catalogObjectMapper";
-import { resolveSmallBodyPosition } from "./catalog/smallBodyPropagation";
 import { smallBodyOrbitPathForBody } from "./catalog/smallBodyOrbit";
 import { CatalogPointStream } from "./catalog/catalogPointStream";
 import { CatalogPointSelector } from "./catalog/catalogPointSelector";
@@ -28,7 +28,7 @@ import { ObjectComparisonView } from "./object/objectComparisonView";
 import { AtlasOverlayRenderer } from "./rendering/atlasOverlayRenderer";
 import { AtlasVisibilityModel, isSolarSystemBody } from "./rendering/atlasVisibilityModel";
 import { atlasDom } from "./atlas/atlasDom";
-import { FEATURED_KEYS, STARTUP_EPHEMERIS_GROUPS, TIME_STEPS, universeShellForRadius, zoomPresetBodies } from "./atlas/atlasDefinitions";
+import { FEATURED_KEYS, TIME_STEPS, universeShellForRadius, zoomPresetBodies } from "./atlas/atlasDefinitions";
 import { CURATED_OBJECT_SUMMARIES } from "./object/curatedObjectSummaries";
 import { ScientificValueFormatter, formatFullDate, toDatetimeLocalValue } from "./object/scientificValueFormatter";
 import { ViewportCatalogLoader } from "./catalog/viewportCatalogLoader";
@@ -630,26 +630,12 @@ async function loadAtlas(timestampIso?: string) {
   loadState.textContent = t("status.loading");
 
   try {
-    const query = new URLSearchParams();
-    query.set("groups", STARTUP_EPHEMERIS_GROUPS.join(","));
-    if (timestampIso) query.set("timestamp", timestampIso);
     const preservedBodies = [selectedKey ? bodyByKey.get(selectedKey) : null, compareTargetKey ? bodyByKey.get(compareTargetKey) : null, skyView?.observerBody()].filter(isPresent);
-    const url = `/api/ephemeris${query.toString() ? `?${query.toString()}` : ""}`;
     setLoading("download", 28, t("loading.corePayload"));
-    const response = await fetch(url);
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(message || `API request failed with ${response.status}`);
-    }
-
-    setLoading("parse", 64, t("loading.indexing"));
-    const payload = (await response.json()) as Ephemeris;
-    const payloadEarth = payload.bodies.find((body) => body.key === "earth");
-    const propagatedPreservedBodies = await Promise.all(preservedBodies.filter((body) => body.object_type !== "spacecraft").map((body) => (
-      resolveSmallBodyPosition(body, payload.timestamp_utc, payload.au_km, payloadEarth)
-    )));
+    const { payload, bodies } = await loadAtlasEphemeris(timestampIso, preservedBodies, () => {
+      setLoading("parse", 64, t("loading.indexing"));
+    });
     if (loadId !== loadSequence) return; // A newer time change superseded this load.
-    const bodies = mergeBodyList([...payload.bodies, ...spacecraftBodies(payload.timestamp_utc)], propagatedPreservedBodies);
     ephemeris = { ...payload, bodies };
     catalogSummary = catalogSummaryFromEphemeris(payload);
     void refreshCatalogSummary();
