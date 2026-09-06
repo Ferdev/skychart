@@ -1,3 +1,4 @@
+import { SpacecraftLoader, spacecraftBodies } from "./catalog/spacecraftCatalog";
 import "./destinationPicker.css";
 import "./styles.css";
 import { readRecentDestinations, type RecentDestination } from "./destinationPicker";
@@ -595,6 +596,16 @@ installAtlasDiagnostics({
   gestureState: () => mapInteraction.diagnostics(),
 });
 
+const spacecraftLoader = new SpacecraftLoader((bodies) => {
+  // Generic catalog merging retains already-hydrated records. Dated mission
+  // states must replace them, including transitions to an unavailable position.
+  if (ephemeris) ephemeris = { ...ephemeris, bodies: ephemeris.bodies.filter(body => body.object_type !== "spacecraft") };
+  mergeBodies(bodies);
+  objectSelection.positionsUpdated();
+  updateAllUi();
+  requestRender();
+}, () => selectedKey);
+
 if (bootViewState) applyDecodedViewStateFields(bootViewState);
 if (isEmbedMode) initializeEmbedMode();
 
@@ -610,6 +621,7 @@ requestRender({ data: true });
 async function loadAtlas(timestampIso?: string) {
   if (timestampIso) viewTime = new Date(timestampIso).toISOString();
   const loadId = ++loadSequence;
+  spacecraftLoader.stop();
   const showTimeBusy = loadingScreen.hidden;
   if (showTimeBusy) setTimeBusy(true);
   loadingView.begin();
@@ -633,11 +645,11 @@ async function loadAtlas(timestampIso?: string) {
     setLoading("parse", 64, t("loading.indexing"));
     const payload = (await response.json()) as Ephemeris;
     const payloadEarth = payload.bodies.find((body) => body.key === "earth");
-    const propagatedPreservedBodies = await Promise.all(preservedBodies.map((body) => (
+    const propagatedPreservedBodies = await Promise.all(preservedBodies.filter((body) => body.object_type !== "spacecraft").map((body) => (
       resolveSmallBodyPosition(body, payload.timestamp_utc, payload.au_km, payloadEarth)
     )));
     if (loadId !== loadSequence) return; // A newer time change superseded this load.
-    const bodies = mergeBodyList(payload.bodies, propagatedPreservedBodies);
+    const bodies = mergeBodyList([...payload.bodies, ...spacecraftBodies(payload.timestamp_utc)], propagatedPreservedBodies);
     ephemeris = { ...payload, bodies };
     catalogSummary = catalogSummaryFromEphemeris(payload);
     void refreshCatalogSummary();
@@ -666,6 +678,7 @@ async function loadAtlas(timestampIso?: string) {
     requestRender();
     scheduleViewStateReplace();
     startBootTour();
+    spacecraftLoader.start(payload.timestamp_utc);
   } catch (error) {
     if (loadId !== loadSequence) return; // A newer load owns the UI state now.
     loadState.textContent = t("status.error");

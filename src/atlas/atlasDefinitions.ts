@@ -16,7 +16,7 @@ export const FEATURED_KEYS = ["earth", "moon", "mars", "jupiter", "saturn", "pro
 
 export const BODY_FILTERS: BodyFilterDefinition[] = [
   { key: "all", labelKey: "filters.all" },
-  { key: "solar_system", labelKey: "filters.solarSystem", types: ["star", "planet", "moon", "dwarf_planet"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
+  { key: "solar_system", labelKey: "filters.solarSystem", types: ["star", "planet", "moon", "dwarf_planet", "spacecraft"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons", "spacecraft"] },
   { key: "planet", labelKey: "filters.planets", types: ["planet"] },
   { key: "moon", labelKey: "filters.moons", types: ["moon"], groups: ["core", "mars_moons", "jupiter_major_moons", "saturn_major_moons"] },
   { key: "star", labelKey: "filters.stars", types: ["star"] },

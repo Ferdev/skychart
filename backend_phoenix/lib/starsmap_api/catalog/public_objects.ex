@@ -14,6 +14,8 @@ defmodule StarsmapApi.Catalog.PublicObjects do
 
   @summary_timeout 120_000
 
+  def get_by_key("spacecraft-" <> _ = key), do: StarsmapApi.Spacecraft.get(key)
+
   def get_by_key(key) when is_binary(key) do
     normalized = String.downcase(key)
 
@@ -30,6 +32,8 @@ defmodule StarsmapApi.Catalog.PublicObjects do
 
   @public_cache_ttl_ms 300_000
   @bulk_only_groups ~w(gaia_500pc_stars gaia_10kpc_bright_stars desi_dr1_galaxies desi_dr1_quasars quaia_g20_quasars)
+
+  def public_observer("spacecraft-" <> _ = key), do: StarsmapApi.Spacecraft.get(key)
 
   def public_observer(key) when is_binary(key) and byte_size(key) <= 180 do
     normalized = String.downcase(key)
@@ -48,6 +52,17 @@ defmodule StarsmapApi.Catalog.PublicObjects do
   end
 
   def public_observer(_), do: {:error, :not_found}
+
+  def public_object("spacecraft-" <> _ = key) do
+    with {:ok, object} <- StarsmapApi.Spacecraft.get(key) do
+      {:ok,
+       Map.merge(object, %{
+         related: [],
+         updated_at: nil,
+         semantics: StarsmapApi.ScienceSemantics.for_object(object)
+       })}
+    end
+  end
 
   def public_object(key) when is_binary(key) and byte_size(key) <= 180 do
     normalized = String.downcase(key)
@@ -235,6 +250,10 @@ defmodule StarsmapApi.Catalog.PublicObjects do
 
   defp gaia_payload(_), do: {:error, :upstream_unavailable}
 
+  def external_links_by_key("spacecraft-" <> _ = key) do
+    with {:ok, object} <- StarsmapApi.Spacecraft.get(key), do: {:ok, object.external_links}
+  end
+
   def external_links_by_key(key) when is_binary(key) do
     CatalogSourceObject
     |> Repo.get_by(key: String.downcase(key))
@@ -362,7 +381,14 @@ defmodule StarsmapApi.Catalog.PublicObjects do
         nil
 
       object.source_type == "simbad_tap" or
-          object.object_type in ["galaxy", "quasar", "active_galaxy", "black_hole", "xray_source", "xray_extended"] ->
+          object.object_type in [
+            "galaxy",
+            "quasar",
+            "active_galaxy",
+            "black_hole",
+            "xray_source",
+            "xray_extended"
+          ] ->
         %{
           provider: "SIMBAD",
           label: "SIMBAD object lookup",

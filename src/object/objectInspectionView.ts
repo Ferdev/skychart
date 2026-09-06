@@ -1,3 +1,4 @@
+import { formatDuration } from "../navigationMetrics";
 import { classifyBody } from "../destinationPicker";
 import { pointInRect, isPresent, type Rect, type ScreenPoint } from "../geometry";
 import { t } from "../i18n";
@@ -113,6 +114,21 @@ update() {
     [t("field.diameter"), body.radius_km > 0 ? this.context.formatDistance(body.radius_km * 2) : t("value.unknown")],
     [t("field.heliocentric"), this.context.formatDistance(body.position.heliocentric_distance_km)]
   ];
+
+  if (body.spacecraft) {
+    const mission = body.spacecraft;
+    primaryStats[1] = [t("mission.signalTime"), Number.isFinite(body.distance_from_earth_km)
+      ? formatDuration(body.distance_from_earth_km / 299792.458) : t("value.unknown")];
+    overviewRows.push(
+      [t("mission.agency"), mission.agency],
+      [t("mission.launch"), mission.launch_date],
+      [t("field.heliocentricSpeed"), Number.isFinite(mission.heliocentric_speed_km_s) ? `${formatNumber(mission.heliocentric_speed_km_s!)} km/s` : null],
+      [t("field.positionModel"), t(`mission.${mission.availability}`)],
+      [t("mission.coverage"), `${mission.coverage_start_tdb} – ${mission.coverage_end_tdb}`],
+      [t("mission.epoch"), mission.position_epoch],
+      [t("mission.cutoff"), mission.end_utc ?? null],
+    );
+  }
 
   const positionRows = [
     [t("field.coordinateFrame"), this.context.ephemeris()?.coordinate_frame ?? null],
@@ -261,6 +277,8 @@ update() {
         ${this.renderObjectDetailState(body)}
         ${this.renderObjectSummaryCard(body, classification.label)}
         ${this.renderFactTiles(primaryStats)}
+        ${body.spacecraft ? `<p>${escapeHtml(t("mission.trajectory"))}</p>` : ""}
+        ${body.key === "spacecraft-31" ? `<p><a href="https://science.nasa.gov/mission/voyager/voyager-1/voyager-1-what-is-a-light-day/" target="_blank" rel="noopener noreferrer">${escapeHtml(t("mission.milestone"))}</a></p>` : ""}
       </div>
       <nav class="object-view-tabs" role="tablist" aria-label="${escapeHtml(t("object.detailViews"))}">
         ${views.map((view) => this.renderObjectViewTab(view)).join("")}
@@ -330,6 +348,7 @@ private renderObjectViewPanel(view: ObjectView) {
 }
 
 private renderObservePanel(body: Body) {
+  if (body.spacecraft) return `<p>${escapeHtml(t("launch.observeUnavailable"))}</p>`;
   return `<section class="observe-panel" data-observe-key="${escapeHtml(body.key)}"><div class="section-heading"><span>${escapeHtml(t("launch.skyTonight"))}</span></div><p>${escapeHtml(t("launch.observeHelp"))}</p><div class="observe-fields"><label>${escapeHtml(t("launch.latitude"))} <input id="observe-lat" inputmode="decimal"></label><label>${escapeHtml(t("launch.longitude"))} <input id="observe-lon" inputmode="decimal"></label></div><button type="button" data-observe-location="manual">${escapeHtml(t("launch.calculate"))}</button> <button type="button" data-observe-location="browser">${escapeHtml(t("launch.useLocation"))}</button><p id="observe-result" role="status"></p></section>`;
 }
 
@@ -404,7 +423,7 @@ private renderObjectSummaryCard(body: Body, typeLabel: string) {
 
 private renderUniverseSciencePanel(body: Body) {
   const distanceLy = body.distance_from_earth_km / 9_460_730_472_580.8;
-  if (distanceLy < 100_000) return "";
+  if (!Number.isFinite(distanceLy) || distanceLy < 100_000) return "";
   const shell = this.context.universeShellForRadius(distanceLy);
   const classification = classifyBody(body);
   const record = { position_model: body.catalog?.position_model, facts: body.catalog?.facts };
@@ -433,6 +452,7 @@ private renderUniverseSciencePanel(body: Body) {
 }
 
 private objectSummaryText(body: Body, typeLabel: string) {
+  if (body.spacecraft) return body.spacecraft.description ?? `${typeLabel} · ${t(`mission.${body.spacecraft.availability}`)}`;
   const curated = this.firstText([body.exoplanet_system?.why_interesting, body.deep_sky?.why_interesting]);
   if (curated) return curated;
   const curatedSummary = this.context.curatedSummaries[body.key.toLowerCase()] ?? this.curatedAliasSummary(body);
@@ -545,7 +565,9 @@ private renderSourceSection(body: Body) {
   const semantics = scienceSemanticsFor(body.catalog?.position_model);
   const ephemeris = this.context.ephemeris();
   const sourceRows = [
-    [t("field.catalogSource"), this.context.readableOptionalModel(body.catalog?.source_type)],
+    [t("field.catalogSource"), body.spacecraft ? "NASA/JPL Horizons" : this.context.readableOptionalModel(body.catalog?.source_type)],
+    [t("mission.revision"), body.spacecraft?.source_revision ?? null],
+    [t("mission.audit"), body.spacecraft?.audited_at ?? null],
     [t("field.positionModel"), this.context.readableOptionalModel(body.catalog?.position_model)],
     [t("field.catalogGroup"), this.context.readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)],
     [t("field.atlasSource"), ephemeris?.data_source ?? null],

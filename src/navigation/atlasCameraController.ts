@@ -1,3 +1,4 @@
+import { hasBodyPosition } from "../catalog/spacecraftCatalog";
 import type { Body, Camera } from "../atlas/contracts";
 import { classifyBody } from "../destinationPicker";
 import { clamp, easeInOutCubic, lerp, type Rect } from "../geometry";
@@ -30,6 +31,7 @@ export class AtlasCameraController {
   constructor(private readonly options: AtlasCameraControllerOptions) {}
 
   centerOnBody(body: Body, zoom: boolean, animate = false) {
+    if (!hasBodyPosition(body)) return;
     const current = this.options.camera();
     const target = zoom ? this.localCamera(body) : { ...current, xAu: body.position.x_au, yAu: body.position.y_au };
     this.options.clearPreset();
@@ -42,6 +44,7 @@ export class AtlasCameraController {
   }
 
   localCamera(body: Body): Camera {
+    if (body.object_type === "spacecraft") return { xAu: body.position.x_au, yAu: body.position.y_au, pxPerAu: this.options.camera().pxPerAu };
     const classification = classifyBody(body);
     const rect = this.options.viewport();
     const diameterAu = Math.max((body.radius_km * 2) / this.options.auKm(), 1e-9);
@@ -85,6 +88,8 @@ export class AtlasCameraController {
   }
 
   fitBodies(bodies: Body[], paddingRatio: number) {
+    bodies = bodies.filter(hasBodyPosition);
+    if (!bodies.length) return;
     this.cancelAnimation();
     this.fitWorldBounds(
       Math.min(...bodies.map((body) => body.position.x_au)), Math.max(...bodies.map((body) => body.position.x_au)),

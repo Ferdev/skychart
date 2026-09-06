@@ -103,6 +103,8 @@ def parse_catalog_keys(query: dict[str, list[str]]) -> list[str]:
             },
         )
 
+    if any(BODY_BY_KEY[key].get("source_type") == "spacecraft" for key in body_keys):
+        raise QueryInputError("Spacecraft trails are not supported")
     selected_keys: list[str] = []
     seen_keys: set[str] = set()
     for key in keys:

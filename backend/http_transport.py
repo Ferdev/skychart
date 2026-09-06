@@ -76,6 +76,19 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond({"error":"observation calculation failed","request_id":self.request_id()},status=HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
+        if parsed.path == "/api/spacecraft":
+            from backend.spacecraft import spacecraft_payload
+            try:
+                query = parse_qs(parsed.query, keep_blank_values=True)
+                timestamp = parse_timestamp(query.get("timestamp", [None])[0])
+                self.respond(spacecraft_payload(timestamp, query.get("key", [""])[0]))
+            except (QueryInputError, ValueError) as exc:
+                self.respond({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            except Exception:
+                self.log_internal_error("spacecraft catalog")
+                self.respond({"error": "spacecraft catalog unavailable"}, status=HTTPStatus.SERVICE_UNAVAILABLE)
+            return
+
         if parsed.path == "/api/ephemeris":
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
@@ -83,7 +96,10 @@ class Handler(BaseHTTPRequestHandler):
                 groups = parse_catalog_groups(query, STARTUP_CATALOG_GROUPS)
                 keys = parse_catalog_keys(query)
                 key = cache_key_payload("ephemeris", timestamp_utc=isoformat_utc(timestamp), groups=groups, keys=keys)
-                self.respond(cached_payload("api", key, lambda: ephemeris_payload(timestamp, groups, keys)))
+                if "spacecraft" in groups or any(key.startswith("spacecraft-") for key in keys):
+                    self.respond(ephemeris_payload(timestamp, groups, keys))
+                else:
+                    self.respond(cached_payload("api", key, lambda: ephemeris_payload(timestamp, groups, keys)))
             except QueryInputError as exc:
                 payload: dict[str, Any] = {"error": str(exc)}
                 if exc.details is not None:

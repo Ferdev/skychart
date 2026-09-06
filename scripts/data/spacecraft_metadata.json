@@ -1,0 +1,51 @@
+{
+  "-31": {
+    "launch_date": "1977-09-05",
+    "agency": "NASA",
+    "description": "Explored Jupiter and Saturn before entering interstellar space.",
+    "mission_url": "https://science.nasa.gov/mission/voyager/voyager-1/"
+  },
+  "-32": {
+    "launch_date": "1977-08-20",
+    "agency": "NASA",
+    "description": "Explored all four giant planets before entering interstellar space.",
+    "mission_url": "https://science.nasa.gov/mission/voyager/voyager-2/"
+  },
+  "-98": {
+    "launch_date": "2006-01-19",
+    "agency": "NASA",
+    "description": "Explored Pluto and Arrokoth in the Kuiper Belt.",
+    "mission_url": "https://science.nasa.gov/mission/new-horizons/"
+  },
+  "-170": {
+    "launch_date": "2021-12-25",
+    "agency": "NASA / ESA / CSA",
+    "description": "Infrared space observatory near the Sun\u2013Earth L2 point.",
+    "mission_url": "https://science.nasa.gov/mission/webb/"
+  },
+  "-82": {
+    "launch_date": "1997-10-15",
+    "agency": "NASA / ESA / ASI",
+    "description": "Studied Saturn, its rings and moons; ended with entry into Saturn on September 15, 2017.",
+    "mission_url": "https://science.nasa.gov/mission/cassini/",
+    "end_utc": "2017-09-15T10:31:00Z"
+  },
+  "-77": {
+    "end_utc": "2003-09-21T18:57:00Z"
+  },
+  "-226": {
+    "end_utc": "2016-09-30T10:39:00Z"
+  },
+  "-236": {
+    "end_utc": "2015-04-30T19:26:00Z"
+  },
+  "-135": {
+    "end_utc": "2022-09-26T23:14:00Z"
+  },
+  "-70": {
+    "end_utc": "2005-07-04T05:44:00Z"
+  },
+  "-93": {
+    "end_utc": "2001-02-12T20:01:52Z"
+  }
+}

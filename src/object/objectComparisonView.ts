@@ -1,3 +1,4 @@
+import { hasBodyPosition } from "../catalog/spacecraftCatalog";
 import { escapeHtml, formatNumber, formatRatio } from "../atlasFormatting";
 import type { Body } from "../atlas/contracts";
 import { classifyBody } from "../destinationPicker";
@@ -35,6 +36,11 @@ export class ObjectComparisonView {
     }
 
     this.options.heading.textContent = t("compare.compareObject", { name: selected.name });
+    if (!hasBodyPosition(selected) || (target && !hasBodyPosition(target))) {
+      this.options.panel.textContent = t("sky.positionUnavailable");
+      this.options.afterRender();
+      return;
+    }
     if (!target) {
       this.options.panel.innerHTML = `
         <section class="compare-card compare-card--empty">

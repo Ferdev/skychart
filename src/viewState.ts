@@ -10,7 +10,7 @@ export type ViewFilters = { primary: BodyFilter; compare: BodyFilter };
 export const SKY_SHARE_VERSION = 1;
 export const SKY_CAMERA_QUANTUM_DEG = 0.1;
 export const SKY_OBJECT_TYPES = [
-  "star", "planet", "moon", "dwarf_planet", "asteroid", "comet", "small_body",
+  "spacecraft", "star", "planet", "moon", "dwarf_planet", "asteroid", "comet", "small_body",
   "galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula",
   "star_cluster", "xray_source", "xray_extended", "asterism", "milky_way_patch", "unknown",
 ] as const;

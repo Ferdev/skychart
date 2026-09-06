@@ -1,3 +1,4 @@
+import { hasBodyPosition } from "../catalog/spacecraftCatalog";
 import { classifyBody, recordRecentDestination, type RecentDestination } from "../destinationPicker";
 import { trackAnalytics } from "../analytics";
 import type { CatalogObjectHydrator } from "../catalog/catalogObjectHydrator";
@@ -34,6 +35,17 @@ interface ObjectSelectionControllerOptions {
 }
 
 export class ObjectSelectionController {
+  private pendingCenter: { key: string; selection: SelectBodyOptions } | null = null;
+
+  positionsUpdated() {
+    const pending = this.pendingCenter;
+    if (!pending || pending.key !== this.options.state.selectedKey) return;
+    const body = this.options.bodyByKey().get(pending.key);
+    if (!body || !hasBodyPosition(body)) return;
+    this.pendingCenter = null;
+    this.options.centerOnBody(body, pending.selection.zoom === "local", pending.selection.animate ?? false);
+  }
+
   constructor(private readonly options: ObjectSelectionControllerOptions) {}
 
   selectedBody(): Body | null {
@@ -53,7 +65,7 @@ export class ObjectSelectionController {
 
   setCompareTarget(key: string): void {
     const body = this.options.bodyByKey().get(key);
-    if (!body || body.key === this.options.state.selectedKey) return;
+    if (!body || !hasBodyPosition(body) || body.key === this.options.state.selectedKey) return;
     this.options.state.compareTargetKey = body.key;
     trackAnalytics("compare", { object_type: classifyBody(body).type });
     this.options.compareSearch.value = body.name;
@@ -81,6 +93,7 @@ export class ObjectSelectionController {
   select(key: string, selection: SelectBodyOptions = {}): void {
     const body = this.options.bodyByKey().get(key);
     if (!body) return;
+    this.pendingCenter = selection.center && !hasBodyPosition(body) ? { key, selection } : null;
     const previousKey = this.options.state.selectedKey;
     const changed = previousKey !== body.key;
     const transient = selection.transient === true || body.key === this.options.transientKey();
@@ -107,6 +120,7 @@ export class ObjectSelectionController {
   }
 
   clear(clearOptions: { openSearch?: boolean; preserveMapDetailRequest?: boolean } = {}): void {
+    this.pendingCenter = null;
     if (!clearOptions.preserveMapDetailRequest) this.options.cancelMapSelection();
     this.options.cleanupTransient(this.options.state.selectedKey);
     this.options.state.selectedKey = "";

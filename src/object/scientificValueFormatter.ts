@@ -51,7 +51,7 @@ export class ScientificValueFormatter {
     const coordinates = eclipticCoordinates(body);
     return coordinates ? `${formatNumber(coordinates.radiusAu)} AU` : null;
   };
-  formatAuCoordinate = (value: number) => `${formatNumber(value)} AU`;
+  formatAuCoordinate = (value: number) => Number.isFinite(value) ? `${formatNumber(value)} AU` : t("value.unknown");
   readableOptionalModel = (value: string | null | undefined) => value ? readablePositionModel(value) : null;
   readableCatalogGroup = (value: string | null | undefined) => value ? readablePositionModel(value) : null;
   readablePositionModel = readablePositionModel;
