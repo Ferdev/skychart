@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openAtlas, selectCatalogObject, skyEphemerisFixture } from "./atlas-test-utils";
+import { openAtlas, openSearchWorkspace, selectCatalogObject, skyEphemerisFixture } from "./atlas-test-utils";
 import { spacecraftBodies } from "../src/catalog/spacecraftCatalog";
 
 for (const width of [1440, 390]) {
@@ -53,3 +53,43 @@ for (const width of [1440, 390]) {
     expect(errors).toEqual([]);
   });
 }
+
+test("spacecraft position refresh preserves keyboard navigation during catalog requests", async ({ page, context }) => {
+  const timestamp = "2026-09-06T00:00:00Z";
+  let searches = 0;
+  let completedSearches = 0;
+  let releaseSearch!: () => void;
+  const pendingSearch = new Promise<void>(resolve => { releaseSearch = resolve; });
+  await context.route("**/api/**", async route => {
+    const url = new URL(route.request().url());
+    let payload: unknown = {};
+    if (url.pathname === "/api/ephemeris") payload = skyEphemerisFixture(timestamp);
+    if (url.pathname === "/api/catalog") payload = { object_count: 0, group_counts: {}, type_counts: {} };
+    if (url.pathname === "/api/catalog/search") {
+      if (++searches > 1) await pendingSearch;
+      payload = { objects: [], total: 0, offset: 0, limit: 80, has_more: false };
+      completedSearches++;
+    }
+    if (url.pathname === "/api/spacecraft") payload = { timestamp_utc: timestamp, bodies: spacecraftBodies(timestamp) };
+    if (url.pathname === "/api/now") payload = { events: [], stale: false };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(payload) });
+  });
+  await context.route("**/catalog-tiles/**", route => route.fulfill({ status: 404, body: "" }));
+  await openAtlas(page);
+  await openSearchWorkspace(page);
+  const input = page.locator("#body-search");
+  await input.fill("Voyager");
+  await expect(page.locator('#body-picker [data-body-key="spacecraft-31"]')).toBeVisible();
+  await input.press("ArrowDown");
+  const activeId = await input.getAttribute("aria-activedescendant");
+  expect(activeId).toBeTruthy();
+  await expect.poll(() => searches).toBeGreaterThan(1);
+  await expect(input).toHaveAttribute("aria-activedescendant", activeId!);
+  await expect(page.locator('#body-picker [aria-selected="true"]')).toHaveAttribute("id", activeId!);
+  releaseSearch();
+  await expect.poll(() => completedSearches).toBeGreaterThan(1);
+  await expect(input).toHaveAttribute("aria-activedescendant", activeId!);
+  await expect(page.locator('#body-picker [aria-selected="true"]')).toHaveAttribute("id", activeId!);
+  await input.press("Enter");
+  await expect(page.locator("#selected-summary-name")).toContainText("Voyager");
+});

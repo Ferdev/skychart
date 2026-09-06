@@ -48,6 +48,12 @@ test("selected objects open and replay a shareable object-centered sky view", as
       body: JSON.stringify(skyEphemerisFixture(timestamp))
     });
   });
+  // Keep this synthetic sky independent of live Horizons positions and polling.
+  await context.route("**/api/spacecraft?**", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ bodies: [] })
+  }));
   await context.route("**/api/events", (route) => route.fulfill({ status: 202, contentType: "application/json", body: "{}" }));
   await context.route("**/api/now", (route) => route.fulfill({
     status: 200,

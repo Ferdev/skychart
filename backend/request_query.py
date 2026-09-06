@@ -103,8 +103,6 @@ def parse_catalog_keys(query: dict[str, list[str]]) -> list[str]:
             },
         )
 
-    if any(BODY_BY_KEY[key].get("source_type") == "spacecraft" for key in body_keys):
-        raise QueryInputError("Spacecraft trails are not supported")
     selected_keys: list[str] = []
     seen_keys: set[str] = set()
     for key in keys:
@@ -176,12 +174,14 @@ def parse_trail_body_keys(values: list[str] | None) -> list[str]:
             "Unknown body key",
             details={
                 "invalid_bodies": invalid_keys,
-                "valid_bodies": [item["key"] for item in BODIES],
+                "valid_bodies": list(BODY_BY_KEY),
             },
         )
 
     selected_keys: list[str] = []
     seen_keys: set[str] = set()
+    if any(BODY_BY_KEY[key].get("source_type") == "spacecraft" for key in body_keys):
+        raise QueryInputError("Spacecraft trails are not supported")
     for key in body_keys:
         if key not in seen_keys:
             selected_keys.append(key)
