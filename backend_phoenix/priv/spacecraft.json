@@ -1,0 +1,2449 @@
+{
+  "schema_version": 1,
+  "retrieved_at": "2026-09-06T23:08:32.939518+00:00",
+  "source_url": "https://ssd.jpl.nasa.gov/api/horizons_support.api?time-span=1&list=spacecraft",
+  "coverage_note": "TDB coverage envelopes only; internal gaps are checked at each requested epoch.",
+  "spacecraft": [
+    {
+      "key": "spacecraft-92",
+      "name": "ACE",
+      "horizons_id": "-92",
+      "aliases": [
+        "Advanced",
+        "Composition"
+      ],
+      "coverage_start_tdb": "2006-07-02 00:01:05.185",
+      "coverage_end_tdb": "2026-11-24 00:01:09.183",
+      "jd_start_tdb": 2453918.50075446,
+      "jd_end_tdb": 2461368.50080073,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-92%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "21ba882f720f4ad4a08802cb2e4a29ac8bd6e99e9aef6edee5c168a313ccc1be",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-1023",
+      "name": "Artemis 1",
+      "horizons_id": "-1023",
+      "aliases": [
+        "Orion",
+        "EM-1"
+      ],
+      "coverage_start_tdb": "2022-11-16 08:46:00.333",
+      "coverage_end_tdb": "2022-12-11 17:21:01.800",
+      "jd_start_tdb": 2459899.86528163,
+      "jd_end_tdb": 2459925.2229375,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-1023%27&MAKE_EPHEM=NO",
+      "source_revision": "Apr 07, 2026",
+      "source_sha256": "85e184d5077ff09443e8ff945f150ae03928e5c1da19f7134511561f988bafae",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-1024",
+      "name": "Artemis II",
+      "horizons_id": "-1024",
+      "aliases": [
+        "Integrity",
+        "Orion",
+        "EM-2"
+      ],
+      "coverage_start_tdb": "2026-04-02 01:58:32.305",
+      "coverage_end_tdb": "2026-04-10 23:54:22.858",
+      "jd_start_tdb": 2461132.58231835,
+      "jd_end_tdb": 2461141.49609789,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-1024%27&MAKE_EPHEM=NO",
+      "source_revision": "Apr 20, 2026",
+      "source_sha256": "249dba607fcbd669278d89de865d4832df4beb153997646bbdbf5d245a6df5b6",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-121",
+      "name": "BepiColombo",
+      "horizons_id": "-121",
+      "aliases": [
+        "MPO",
+        "MMO"
+      ],
+      "coverage_start_tdb": "2018-10-20 02:13:28.719",
+      "coverage_end_tdb": "2027-04-11 00:01:09.186",
+      "jd_start_tdb": 2458411.59269351,
+      "jd_end_tdb": 2461506.50080076,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-121%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "1bbd4ecbb86240b92817c7d8b91bb04f645972f60b65192d84c049ce8b200aad",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2018-10-20",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-70007",
+      "name": "BioSentinel",
+      "horizons_id": "-70007",
+      "aliases": [
+        "BIOS"
+      ],
+      "coverage_start_tdb": "2022-11-16 14:24:48.564",
+      "coverage_end_tdb": "2028-01-02 00:01:09.184",
+      "jd_start_tdb": 2459900.10056208,
+      "jd_end_tdb": 2461772.50080074,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-70007%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 05, 2026",
+      "source_sha256": "66036ed2f8c993842eac88b0dd356ef0482880d007c76576f675a2cabdf51514",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-1176",
+      "name": "CAPSTONE",
+      "horizons_id": "-1176",
+      "aliases": [],
+      "coverage_start_tdb": "2022-06-28 10:06:06.277",
+      "coverage_end_tdb": "2026-08-14 11:59:00.000",
+      "jd_start_tdb": 2459758.92090599,
+      "jd_end_tdb": 2461266.99930555,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-1176%27&MAKE_EPHEM=NO",
+      "source_revision": "Jul 20, 2026",
+      "source_sha256": "71cd0d141dd37ab43a8983d1760d5953da02b0ce29f423e24bf29c82ab884c61",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-171",
+      "name": "Carruthers Geocorona Observatory",
+      "horizons_id": "-171",
+      "aliases": [
+        "CGO"
+      ],
+      "coverage_start_tdb": "2025-09-24 13:09:09.182",
+      "coverage_end_tdb": "2028-03-19 03:53:37.592",
+      "jd_start_tdb": 2460943.04802294,
+      "jd_end_tdb": 2461849.66224065,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-171%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "2126697b8e1eae8fdb0aac9a11101e110d2a83f6aa2f913a7f76ac599b497dcc",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-82",
+      "name": "Cassini",
+      "horizons_id": "-82",
+      "aliases": [],
+      "coverage_start_tdb": "1997-10-15 09:27:11.572",
+      "coverage_end_tdb": "2017-09-15 11:58:00.000",
+      "jd_start_tdb": 2450736.89388394,
+      "jd_end_tdb": 2458011.99861111,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-82%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 28, 2018",
+      "source_sha256": "7e023ddcdf6981a1231bb70be78f7900c7f7cfc11aaf5363dbb0f33184ef37a1",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1997-10-15",
+      "agency": "NASA / ESA / ASI",
+      "description": "Studied Saturn, its rings and moons; ended with entry into Saturn on September 15, 2017.",
+      "mission_url": "https://science.nasa.gov/mission/cassini/",
+      "end_utc": "2017-09-15T10:31:00Z"
+    },
+    {
+      "key": "spacecraft-151",
+      "name": "Chandra Observatory",
+      "horizons_id": "-151",
+      "aliases": [],
+      "coverage_start_tdb": "1999-08-07 07:31:04.183",
+      "coverage_end_tdb": "2027-03-02 12:01:09.185",
+      "jd_start_tdb": 2451397.81324286,
+      "jd_end_tdb": 2461467.00080076,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-151%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 02, 2026",
+      "source_sha256": "c0f5a2cd58df89dfe6e47237258a790a32e246285cd7ac82b2a45d685f48e100",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-86",
+      "name": "Chandrayaan-1",
+      "horizons_id": "-86",
+      "aliases": [
+        "CH1",
+        "CH-1"
+      ],
+      "coverage_start_tdb": "2016-07-02 13:00:00.000",
+      "coverage_end_tdb": "2022-10-01 00:00:00.000",
+      "jd_start_tdb": 2457572.04166667,
+      "jd_end_tdb": 2459853.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-86%27&MAKE_EPHEM=NO",
+      "source_revision": "2016-Oct-10",
+      "source_sha256": "8f613819dca140be62b00fd297a18984acd86fd5ead383aff304f538b15f0efe",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-152",
+      "name": "Chandrayaan-2 (ORBITER)",
+      "horizons_id": "-152",
+      "aliases": [
+        "CH2",
+        "CH-2"
+      ],
+      "coverage_start_tdb": "2019-07-22 09:30:55.024",
+      "coverage_end_tdb": "2026-10-10 17:01:09.182",
+      "jd_start_tdb": 2458686.89647018,
+      "jd_end_tdb": 2461324.20913405,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-152%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "452d58a514cffea181179611fd9b5cb276184e0c2a41d52270d9d39e1aa59edc",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-169",
+      "name": "Chandrayaan-3P (ORBITER)",
+      "horizons_id": "-169",
+      "aliases": [
+        "CH-3P",
+        "CH3P"
+      ],
+      "coverage_start_tdb": "2023-07-14 09:22:25.620",
+      "coverage_end_tdb": "2023-11-10 07:00:39.182",
+      "jd_start_tdb": 2460139.8905743,
+      "jd_end_tdb": 2460258.79212016,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-169%27&MAKE_EPHEM=NO",
+      "source_revision": "2023-Oct-31",
+      "source_sha256": "c710fb6728e86eb1be924136987a6c1d16975ab1cc0befd1e922faf18ebc00d3",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-40",
+      "name": "Clementine",
+      "horizons_id": "-40",
+      "aliases": [
+        "DSPSE"
+      ],
+      "coverage_start_tdb": "1994-02-19 12:58:00.185",
+      "coverage_end_tdb": "1994-05-03 13:01:00.185",
+      "jd_start_tdb": 2449403.04027992,
+      "jd_end_tdb": 2449476.04236325,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-40%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 08, 2008",
+      "source_sha256": "7031114e8d329b5676d9608e46fd8c761c429ab672f86929d2fecf033794ea00",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-135",
+      "name": "DART",
+      "horizons_id": "-135",
+      "aliases": [],
+      "coverage_start_tdb": "2021-11-24 07:17:53.000",
+      "coverage_end_tdb": "2099-01-01 00:00:00.000",
+      "jd_start_tdb": 2459542.80408565,
+      "jd_end_tdb": 2487704.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-135%27&MAKE_EPHEM=NO",
+      "source_revision": "Mar 01, 2024",
+      "source_sha256": "d91449b0df072314fb9abf00fc0dbf3cef02efdc6dc6ea0303aa2f8bccbe9aa6",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null,
+      "end_utc": "2022-09-26T23:14:00Z"
+    },
+    {
+      "key": "spacecraft-78",
+      "name": "DSCOVR",
+      "horizons_id": "-78",
+      "aliases": [
+        "Triana"
+      ],
+      "coverage_start_tdb": "2015-02-11 23:45:07.185",
+      "coverage_end_tdb": "2026-09-21 00:01:09.182",
+      "jd_start_tdb": 2457065.48966649,
+      "jd_end_tdb": 2461304.50080072,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-78%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "79e96a1ffe12be9ad049b8663750483dcee4c41e0ad6307bedc5ac0175db8b4b",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-155",
+      "name": "Danuri",
+      "horizons_id": "-155",
+      "aliases": [
+        "KPLO"
+      ],
+      "coverage_start_tdb": "2022-08-04 23:51:09.500",
+      "coverage_end_tdb": "2027-03-02 18:25:50.326",
+      "jd_start_tdb": 2459796.49385996,
+      "jd_end_tdb": 2461467.26794359,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-155%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "be99ded9592814d1c34815dbc0a926ef7c0e56f0a3ff8898922712b3a3a8fab9",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-203",
+      "name": "Dawn",
+      "horizons_id": "-203",
+      "aliases": [],
+      "coverage_start_tdb": "2007-09-27 12:40:49.832",
+      "coverage_end_tdb": "2043-10-30 00:00:00.000",
+      "jd_start_tdb": 2454371.02835454,
+      "jd_end_tdb": 2467552.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-203%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 03, 2019",
+      "source_sha256": "30d63652d7d4ef34e3ad9b048db8d8e2806989a25688e5631f72e48d67329f3a",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2007-09-27",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-140",
+      "name": "Deep Impact Flyby - EPOXI",
+      "horizons_id": "-140",
+      "aliases": [],
+      "coverage_start_tdb": "2005-01-12 19:23:32.068",
+      "coverage_end_tdb": "2020-01-10 00:00:00.000",
+      "jd_start_tdb": 2453383.30801005,
+      "jd_end_tdb": 2458858.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-140%27&MAKE_EPHEM=NO",
+      "source_revision": "Oct 11, 2012",
+      "source_sha256": "f45fb14696631ec2b17bcc6a478f9a8fd1cbd436023c484114e5b9e30ce333e6",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2005-01-12",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-70",
+      "name": "Deep Impact IMPACTOR",
+      "horizons_id": "-70",
+      "aliases": [],
+      "coverage_start_tdb": "2005-01-12 19:23:32.068",
+      "coverage_end_tdb": "2005-07-04 05:46:38.184",
+      "jd_start_tdb": 2453383.30801005,
+      "jd_end_tdb": 2453555.74071972,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-70%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 03, 2010",
+      "source_sha256": "383ef132898a67da08c594988a36751aa7f033d2458827b1f3b46afc4e2535ce",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2005-01-12",
+      "agency": null,
+      "end_utc": "2005-07-04T05:44:00Z"
+    },
+    {
+      "key": "spacecraft-30",
+      "name": "Deep Space 1",
+      "horizons_id": "-30",
+      "aliases": [
+        "DS1",
+        "DS-1"
+      ],
+      "coverage_start_tdb": "1998-10-24 18:00",
+      "coverage_end_tdb": "2003-12-31 00:00",
+      "jd_start_tdb": 2451111.25,
+      "jd_end_tdb": 2453004.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-30%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 14, 2002",
+      "source_sha256": "9adbdcee1b81a668c01807723b71a593b1aa7e0ca0598654d971458d9090212d",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-62",
+      "name": "EMM",
+      "horizons_id": "-62",
+      "aliases": [
+        "Emirates",
+        "Hope"
+      ],
+      "coverage_start_tdb": "2020-07-19 23:06:35.485",
+      "coverage_end_tdb": "2026-11-26 00:02:00.000",
+      "jd_start_tdb": 2459050.4629107,
+      "jd_end_tdb": 2461370.50138889,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-62%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun, 03 2026",
+      "source_sha256": "70d0ce8f4b36e1792df53df61462ce24b75678777767df94d946e2582b028ee4",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-101",
+      "name": "EQUULEUS",
+      "horizons_id": "-101",
+      "aliases": [],
+      "coverage_start_tdb": "2022-11-16 09:48:45.002",
+      "coverage_end_tdb": "2023-12-31 00:00:00.000",
+      "jd_start_tdb": 2459899.90885419,
+      "jd_end_tdb": 2460309.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-101%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 05, 2023",
+      "source_sha256": "67f488b815ca0a8b1e95a7a2f66ab85078b63f2d2497add45be73594a74fddb5",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-9",
+      "name": "ESCAPADE-Blue",
+      "horizons_id": "-9",
+      "aliases": [],
+      "coverage_start_tdb": "2025-11-13 21:30:01.183",
+      "coverage_end_tdb": "2026-10-30 00:01:09.182",
+      "jd_start_tdb": 2460993.39584702,
+      "jd_end_tdb": 2461343.50080072,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-9%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "d3c9f7398cc60cfae23f0d8acfc0a939ee9dcfd50c57c7e148f07db653c1bfb9",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-10",
+      "name": "ESCAPADE-Gold",
+      "horizons_id": "-10",
+      "aliases": [],
+      "coverage_start_tdb": "2025-11-13 21:30:00.183",
+      "coverage_end_tdb": "2026-10-27 00:01:09.182",
+      "jd_start_tdb": 2460993.39583545,
+      "jd_end_tdb": 2461340.50080072,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-10%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "e52f76721378d150b631b11e3ddc8ec8c4294b92bb6eb88641d4af03b67483d7",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-680",
+      "name": "Euclid",
+      "horizons_id": "-680",
+      "aliases": [],
+      "coverage_start_tdb": "2023-07-01 15:53:08.239",
+      "coverage_end_tdb": "2031-10-05 00:00:00.000",
+      "jd_start_tdb": 2460127.16190092,
+      "jd_end_tdb": 2463144.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-680%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "83873486d1a89bad6036382af40dd2e9589d68b730f1644c9793fffa26c49060",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-159",
+      "name": "Europa Clipper",
+      "horizons_id": "-159",
+      "aliases": [],
+      "coverage_start_tdb": "2024-10-14 16:15:03.712",
+      "coverage_end_tdb": "2034-09-03 04:46:13.013",
+      "jd_start_tdb": 2460598.1771263,
+      "jd_end_tdb": 2464208.69876173,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-159%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 18, 2026",
+      "source_sha256": "96dd3a3483314a93f9de7aab85e64f8ba69893c730c2c19a0bce42206c712abf",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2024-10-14",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-143",
+      "name": "ExoMars16 TGO",
+      "horizons_id": "-143",
+      "aliases": [],
+      "coverage_start_tdb": "2016-03-14 08:14:09.000",
+      "coverage_end_tdb": "2039-01-04 06:31:39.184",
+      "jd_start_tdb": 2457461.84315972,
+      "jd_end_tdb": 2465792.7719813,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-143%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 13, 2026",
+      "source_sha256": "77507a3aa327b9095f5e676b611c030790a15dae4e419404960ed471e4300af7",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-177",
+      "name": "GRAIL-A",
+      "horizons_id": "-177",
+      "aliases": [
+        "Ebb"
+      ],
+      "coverage_start_tdb": "2011-09-10 13:09:58.182",
+      "coverage_end_tdb": "2012-12-17 22:29:54.431",
+      "jd_start_tdb": 2455815.04859008,
+      "jd_end_tdb": 2456279.43743554,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-177%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 20, 2013",
+      "source_sha256": "9744e2b7eb48597ec2b8a5cdb57b6521fc7d3315734ab6f2c796d0aac3647468",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-181",
+      "name": "GRAIL-B",
+      "horizons_id": "-181",
+      "aliases": [
+        "Flow"
+      ],
+      "coverage_start_tdb": "2011-09-10 13:09:58.182",
+      "coverage_end_tdb": "2012-12-17 22:30:23.085",
+      "jd_start_tdb": 2455815.04859008,
+      "jd_end_tdb": 2456279.43776719,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-181%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 20, 2013",
+      "source_sha256": "b285e9757b4cfa450db38d7e027fe271a03d7c5f0c0b3e2b3c2dc6fb69c70f54",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-77",
+      "name": "Galileo",
+      "horizons_id": "-77",
+      "aliases": [],
+      "coverage_start_tdb": "1989-10-19 01:29:33.260",
+      "coverage_end_tdb": "2003-09-30 12:00:00.000",
+      "jd_start_tdb": 2447818.56219051,
+      "jd_end_tdb": 2452913,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-77%27&MAKE_EPHEM=NO",
+      "source_revision": "Feb 23, 2008",
+      "source_sha256": "fe2c7d67f2ba865e4bbf2d7ea28456a082cd38f6aeec9b73a1b7081e1a38d880",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null,
+      "end_utc": "2003-09-21T18:57:00Z"
+    },
+    {
+      "key": "spacecraft-47900",
+      "name": "Genesis (SRC)",
+      "horizons_id": "-47900",
+      "aliases": [],
+      "coverage_start_tdb": "2004-08-09 15:10:00.000",
+      "coverage_end_tdb": "2004-09-08 16:01:00.000",
+      "jd_start_tdb": 2453227.13194444,
+      "jd_end_tdb": 2453257.16736111,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-47900%27&MAKE_EPHEM=NO",
+      "source_revision": "Nov 19, 2004",
+      "source_sha256": "d14df7833d256300def29e4b122d4518fa2a09cc790bb03bda00010098d3d36b",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2001-08-08",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-47",
+      "name": "Genesis (bus)",
+      "horizons_id": "-47",
+      "aliases": [],
+      "coverage_start_tdb": "2001-08-11 16:00:01.000",
+      "coverage_end_tdb": "2020-01-02 00:00:00.000",
+      "jd_start_tdb": 2452133.16667824,
+      "jd_end_tdb": 2458850.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-47%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 7, 2019",
+      "source_sha256": "d21693e8f086c9d08264a1a76994a9c8dff1e9a83d696a457c81a6e5c648eb30",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2001-08-08",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-130",
+      "name": "Hayabusa",
+      "horizons_id": "-130",
+      "aliases": [
+        "Muses-C"
+      ],
+      "coverage_start_tdb": "2009-01-26 04:20:48.185",
+      "coverage_end_tdb": "2010-06-13 13:52:17.444",
+      "jd_start_tdb": 2454857.68111325,
+      "jd_end_tdb": 2455361.07797968,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-130%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 12, 2010",
+      "source_sha256": "804db94c39cd41a8dadbbbd79640c74bc31261362ce84e37ac540ca1ff9525fc",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-37",
+      "name": "Hayabusa 2",
+      "horizons_id": "-37",
+      "aliases": [],
+      "coverage_start_tdb": "2014-12-03 06:14:53.183",
+      "coverage_end_tdb": "2026-11-27 00:00:00.000",
+      "jd_start_tdb": 2456994.76033777,
+      "jd_end_tdb": 2461371.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-37%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "a7cd74354cd9c79b59c910ce4d30e73328059a27d19d1982135f979fe7e9e1d5",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-91",
+      "name": "Hera",
+      "horizons_id": "-91",
+      "aliases": [],
+      "coverage_start_tdb": "2024-10-07 16:08:24.521",
+      "coverage_end_tdb": "2026-11-04 01:01:09.183",
+      "jd_start_tdb": 2460591.17250603,
+      "jd_end_tdb": 2461348.54246739,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-91%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "6a82e41db2d9eae5d7a3d7265816f0900a7a4e2606380f025ef8c63aa9d335e4",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2024-10-07",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-486",
+      "name": "Herschel Space Observatory",
+      "horizons_id": "-486",
+      "aliases": [],
+      "coverage_start_tdb": "2009-05-14 13:39:04.723",
+      "coverage_end_tdb": "2050-01-01 00:01:07.184",
+      "jd_start_tdb": 2454966.06880466,
+      "jd_end_tdb": 2469807.50077759,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-486%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 29, 2014",
+      "source_sha256": "b9cc89be58af790196e424146130a4a7ed21d1926d4b774cef590ff5218b93f0",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-48",
+      "name": "Hubble Space Telescope",
+      "horizons_id": "-48",
+      "aliases": [
+        "HST"
+      ],
+      "coverage_start_tdb": "1990-04-25 02:01:40.072",
+      "coverage_end_tdb": "2026-11-15 06:58:01.069",
+      "jd_start_tdb": 2448006.58449157,
+      "jd_end_tdb": 2461359.79029015,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-48%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 06, 2026",
+      "source_sha256": "0cebecc260742e32247ad31004a003937edc19ec7ae60736d720fb3b6415b229",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-111",
+      "name": "ICE",
+      "horizons_id": "-111",
+      "aliases": [
+        "ISEE-3"
+      ],
+      "coverage_start_tdb": "2014-01-01 00:00",
+      "coverage_end_tdb": "2016-01-01 00:00",
+      "jd_start_tdb": 2456658.5,
+      "jd_end_tdb": 2457388.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-111%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 19, 2014",
+      "source_sha256": "1569bb0c7c00ccc3c21f57257835c615b4cfce26d00fdf2430ca01b5b2465c63",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-43",
+      "name": "IMAP",
+      "horizons_id": "-43",
+      "aliases": [],
+      "coverage_start_tdb": "2025-09-24 13:01:09.182",
+      "coverage_end_tdb": "2026-10-12 00:01:09.182",
+      "jd_start_tdb": 2460943.04246739,
+      "jd_end_tdb": 2461325.50080072,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-43%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "97d8e832f27eac2059eccffa2b0e6a95de717614c876765f499dfd939aa636af",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-198",
+      "name": "INTEGRAL",
+      "horizons_id": "-198",
+      "aliases": [],
+      "coverage_start_tdb": "2002-10-17 16:11:58.364",
+      "coverage_end_tdb": "2026-10-05 06:54:33.604",
+      "jd_start_tdb": 2452565.17498107,
+      "jd_end_tdb": 2461318.78788893,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-198%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 06, 2026",
+      "source_sha256": "7bf4f859aedc46f58ee65483ac156f454fb4c5ae9fdd24d5de7350ef7a77aea0",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-640",
+      "name": "Infrared Space Observatory",
+      "horizons_id": "-640",
+      "aliases": [
+        "ISO"
+      ],
+      "coverage_start_tdb": "1995-11-17 00:37:45.160",
+      "coverage_end_tdb": "1998-07-16 03:01:03.184",
+      "jd_start_tdb": 2450038.52621713,
+      "jd_end_tdb": 2451010.62573129,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-640%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 14, 2000",
+      "source_sha256": "20d40fa4b77c3c293177140d572a2ba43da566cb1b9c62cfdd7b58e69ec0fb05",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-28",
+      "name": "JUICE",
+      "horizons_id": "-28",
+      "aliases": [],
+      "coverage_start_tdb": "2023-04-14 12:43:26.843",
+      "coverage_end_tdb": "2031-07-21 06:30:05.168",
+      "jd_start_tdb": 2460049.03017179,
+      "jd_end_tdb": 2463068.77089314,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-28%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "951865ca0181dcf1de531c82b95337fd2cafd7fec06ff6fec88eff022e63b1e6",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-170",
+      "name": "James Webb Space Telescope",
+      "horizons_id": "-170",
+      "aliases": [
+        "JWST"
+      ],
+      "coverage_start_tdb": "2021-12-25 13:01:09.184",
+      "coverage_end_tdb": "2031-08-31 00:01:09.183",
+      "jd_start_tdb": 2459574.0424674,
+      "jd_end_tdb": 2463109.50080073,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-170%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "e9ac17577c2b5dd53e7247ecea5e15ff4e534829ce8f54383b18e1d934f85c99",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2021-12-25",
+      "agency": "NASA / ESA / CSA",
+      "description": "Infrared space observatory near the Sun\u2013Earth L2 point.",
+      "mission_url": "https://science.nasa.gov/mission/webb/"
+    },
+    {
+      "key": "spacecraft-61",
+      "name": "Juno",
+      "horizons_id": "-61",
+      "aliases": [],
+      "coverage_start_tdb": "2011-08-05 17:19:12.183",
+      "coverage_end_tdb": "2028-10-01 00:00:00.000",
+      "jd_start_tdb": 2455779.22166879,
+      "jd_end_tdb": 2462045.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-61%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "b4dcb76876ccc2b85f8d15d76f62282b0fc56933f45086d5173ab99f631b2009",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2011-08-05",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-227",
+      "name": "Kepler",
+      "horizons_id": "-227",
+      "aliases": [],
+      "coverage_start_tdb": "2009-03-07 04:56:42.576",
+      "coverage_end_tdb": "2201-02-20 00:00:00.000",
+      "jd_start_tdb": 2454897.70604833,
+      "jd_end_tdb": 2525008.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-227%27&MAKE_EPHEM=NO",
+      "source_revision": "Feb 22, 2019",
+      "source_sha256": "c492b64ffa08a01e4cf5ecae20c36d6a90623568c1e398456776c1d4ffd69ee4",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2009-03-07",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-12",
+      "name": "LADEE",
+      "horizons_id": "-12",
+      "aliases": [],
+      "coverage_start_tdb": "2013-09-07 03:52:07.183",
+      "coverage_end_tdb": "2014-04-18 04:33:07.185",
+      "jd_start_tdb": 2456542.66119424,
+      "jd_end_tdb": 2456765.68966649,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-12%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 02, 2014",
+      "source_sha256": "d88515be91cc15c101ce4c6633472fcff6f65acedd60cd56ee05585517c90444",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2013-09-07",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-18",
+      "name": "LCROSS Shepherd",
+      "horizons_id": "-18",
+      "aliases": [
+        "SSC"
+      ],
+      "coverage_start_tdb": "2009-06-18 22:17:46.030",
+      "coverage_end_tdb": "2009-10-09 11:37:06.182",
+      "jd_start_tdb": 2455001.42900498,
+      "jd_end_tdb": 2455113.98409933,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-18%27&MAKE_EPHEM=NO",
+      "source_revision": "Jul 30, 2013",
+      "source_sha256": "aa2c5845e8176ea359c20d017fa3191231f5a776844754eb527b8694ba4cf5ab",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-210",
+      "name": "LICIACube",
+      "horizons_id": "-210",
+      "aliases": [],
+      "coverage_start_tdb": "2022-09-11 23:15:10.879",
+      "coverage_end_tdb": "2023-04-01 00:00:00.000",
+      "jd_start_tdb": 2459834.46887591,
+      "jd_end_tdb": 2460035.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-210%27&MAKE_EPHEM=NO",
+      "source_revision": "Mar 01, 2024",
+      "source_sha256": "08d796ed068274bc5749a06240475e705ab011112e91a43aec4ce4ce841660b2",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-85",
+      "name": "LRO",
+      "horizons_id": "-85",
+      "aliases": [],
+      "coverage_start_tdb": "2009-06-18 22:17:06.184",
+      "coverage_end_tdb": "2028-02-14 00:01:09.185",
+      "jd_start_tdb": 2455001.4285438,
+      "jd_end_tdb": 2461815.50080075,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-85%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 05, 2026",
+      "source_sha256": "4632e30ca9e1a0b2ac32e1150bb4da87292338459e7113a76e1272ac3f5123af",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-49",
+      "name": "Lucy",
+      "horizons_id": "-49",
+      "aliases": [],
+      "coverage_start_tdb": "2021-10-16 10:33:08.283",
+      "coverage_end_tdb": "2033-04-02 17:27:41.343",
+      "jd_start_tdb": 2459503.93967921,
+      "jd_end_tdb": 2463690.22756183,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-49%27&MAKE_EPHEM=NO",
+      "source_revision": "Oct 25, 2025",
+      "source_sha256": "fbb94d14250a6a21d1924eed4cb573568f995e45217580366cc150f32ece41e4",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-164",
+      "name": "Lunar Flashlight",
+      "horizons_id": "-164",
+      "aliases": [
+        "LFL"
+      ],
+      "coverage_start_tdb": "2022-12-11 08:32:33.584",
+      "coverage_end_tdb": "2038-01-01 00:00:00.000",
+      "jd_start_tdb": 2459924.85594426,
+      "jd_end_tdb": 2465424.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-164%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 27, 2023",
+      "source_sha256": "4a14b32db65ea1d486a55a3153e635425fc3696dd9b3de2623b865baebe7b10e",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-25",
+      "name": "Lunar Prospector (LP)",
+      "horizons_id": "-25",
+      "aliases": [],
+      "coverage_start_tdb": "1998-01-07 03:45:00.000",
+      "coverage_end_tdb": "1998-01-20 00:05:00.000",
+      "jd_start_tdb": 2450820.65625,
+      "jd_end_tdb": 2450833.50347222,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-25%27&MAKE_EPHEM=NO",
+      "source_revision": "Feb 23, 1998",
+      "source_sha256": "21e841a62c207fa8db6ca2d380d1d6d56af71cc4ede8ef82a9802d593eb8f417",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-242",
+      "name": "Lunar Trailblazer",
+      "horizons_id": "-242",
+      "aliases": [
+        "LTB"
+      ],
+      "coverage_start_tdb": "2025-02-27 01:05:28.495",
+      "coverage_end_tdb": "2051-01-01 00:01:09.184",
+      "jd_start_tdb": 2460733.5454687,
+      "jd_end_tdb": 2470172.50080074,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-242%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 10, 2025",
+      "source_sha256": "9de82347bdc3481dc099b8458040e425fa9db7315f2d56da6c7b8b039faa5c6e",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2025-02-27",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-202",
+      "name": "MAVEN",
+      "horizons_id": "-202",
+      "aliases": [],
+      "coverage_start_tdb": "2013-11-18 19:21:49.343",
+      "coverage_end_tdb": "2026-03-01 01:00:00.000",
+      "jd_start_tdb": 2456615.3068211,
+      "jd_end_tdb": 2461100.54166667,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-202%27&MAKE_EPHEM=NO",
+      "source_revision": "Feb 13, 2026",
+      "source_sha256": "4be243400366bec000480b78f6fa2c532036d298eb7466b26bf8322c11e6f237",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-236",
+      "name": "MESSENGER",
+      "horizons_id": "-236",
+      "aliases": [],
+      "coverage_start_tdb": "2004-08-03 07:14:39.393",
+      "coverage_end_tdb": "2015-05-01 18:49:57.185",
+      "jd_start_tdb": 2453220.80184483,
+      "jd_end_tdb": 2457144.28468964,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-236%27&MAKE_EPHEM=NO",
+      "source_revision": "Apr 03, 2015",
+      "source_sha256": "f1ff975d3ee90f1a8f149d5159e4773b826af2cc8d9c088c6daa2b692033cf44",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null,
+      "end_utc": "2015-04-30T19:26:00Z"
+    },
+    {
+      "key": "spacecraft-65",
+      "name": "MarCO-A",
+      "horizons_id": "-65",
+      "aliases": [
+        "Wall-E"
+      ],
+      "coverage_start_tdb": "2018-05-05 12:40:51.000",
+      "coverage_end_tdb": "2020-01-01 12:00:00.000",
+      "jd_start_tdb": 2458244.02836806,
+      "jd_end_tdb": 2458850,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-65%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 22, 2019",
+      "source_sha256": "27c728d7fa951cb08a4106d8bfe492dffc325c346b5a4009eb94fc90c999709d",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2018-05-05",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-66",
+      "name": "MarCO-B",
+      "horizons_id": "-66",
+      "aliases": [
+        "Eva"
+      ],
+      "coverage_start_tdb": "2018-05-05 12:40:51.000",
+      "coverage_end_tdb": "2020-01-01 12:00:00.000",
+      "jd_start_tdb": 2458244.02836806,
+      "jd_end_tdb": 2458850,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-66%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 22, 2019",
+      "source_sha256": "fdbeacd61021e6c5503962e3108b0dbba049866328e95b03ba396eeae586bff9",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2018-05-05",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-2",
+      "name": "Mariner 2",
+      "horizons_id": "-2",
+      "aliases": [],
+      "coverage_start_tdb": "1962-08-27 07:20:00.000",
+      "coverage_end_tdb": "1963-01-01 00:00:00.000",
+      "jd_start_tdb": 2437903.80555556,
+      "jd_end_tdb": 2438030.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-2%27&MAKE_EPHEM=NO",
+      "source_revision": null,
+      "source_sha256": "2093597db022e19f5da3ba7c1ea42b9eb45f52811357f9b861e6a21c63629c9b",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1962-08-27",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-41",
+      "name": "Mars Express",
+      "horizons_id": "-41",
+      "aliases": [
+        "MEX"
+      ],
+      "coverage_start_tdb": "2003-06-02 19:12:20.596",
+      "coverage_end_tdb": "2033-01-01 00:01:09.184",
+      "jd_start_tdb": 2452793.30023838,
+      "jd_end_tdb": 2463598.50080074,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-41%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "19655ba8d6216a700d199ac10679e6894d79669ac301f87fe87ea43e87ae480d",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-53",
+      "name": "Mars Odyssey",
+      "horizons_id": "-53",
+      "aliases": [],
+      "coverage_start_tdb": "2001-04-07 16:25:00.000",
+      "coverage_end_tdb": "2026-11-30 00:00:00.000",
+      "jd_start_tdb": 2452007.18402778,
+      "jd_end_tdb": 2461374.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-53%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "1037bb786205b51bf428dd6cd822dd61a0c2117001544d60d9984045da4b3e76",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-3",
+      "name": "Mars Orbiter Mission",
+      "horizons_id": "-3",
+      "aliases": [
+        "MOM",
+        "Mangalyaan"
+      ],
+      "coverage_start_tdb": "2013-11-05 09:53:49.596",
+      "coverage_end_tdb": "2022-11-26 00:01:09.183",
+      "jd_start_tdb": 2456601.91237958,
+      "jd_end_tdb": 2459909.50080073,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-3%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 11, 2022",
+      "source_sha256": "9a32fb0e29ae5a21b38672c21e0a516f3d977f2860b8b1f89603c6246bcdc73e",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-74",
+      "name": "Mars Reconnaissance Orbiter",
+      "horizons_id": "-74",
+      "aliases": [
+        "MRO"
+      ],
+      "coverage_start_tdb": "2005-08-12 12:41:56.000",
+      "coverage_end_tdb": "2026-09-28 07:32:00.000",
+      "jd_start_tdb": 2453595.02912037,
+      "jd_end_tdb": 2461311.81388889,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-74%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "c967527901d4254c4c8bb8d14dac33a3ba0c6aa50baf62844079d6baea863c95",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-93",
+      "name": "NEAR Shoemaker",
+      "horizons_id": "-93",
+      "aliases": [],
+      "coverage_start_tdb": "1996-02-19 02:00:00.000",
+      "coverage_end_tdb": "2010-01-01 00:00:00.000",
+      "jd_start_tdb": 2450132.58333333,
+      "jd_end_tdb": 2455197.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-93%27&MAKE_EPHEM=NO",
+      "source_revision": null,
+      "source_sha256": "ef68ab75fa1cc8873aa6f47ec8863c8e2a94cd5d03ab662d4899e112b8d945c4",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1996-02-17",
+      "agency": null,
+      "end_utc": "2001-02-12T20:01:52Z"
+    },
+    {
+      "key": "spacecraft-98",
+      "name": "New Horizons",
+      "horizons_id": "-98",
+      "aliases": [
+        "NH",
+        "New_Horizons"
+      ],
+      "coverage_start_tdb": "2006-01-19 19:51:18.330",
+      "coverage_end_tdb": "2050-01-01 00:00:00.000",
+      "jd_start_tdb": 2453755.32729549,
+      "jd_end_tdb": 2469807.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-98%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "a478186cd06e3899758e2bedc1b7df592da1b670ba98121b0be9d7876a8a0f5e",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2006-01-19",
+      "agency": "NASA",
+      "description": "Explored Pluto and Arrokoth in the Kuiper Belt.",
+      "mission_url": "https://science.nasa.gov/mission/new-horizons/"
+    },
+    {
+      "key": "spacecraft-178",
+      "name": "Nozomi",
+      "horizons_id": "-178",
+      "aliases": [
+        "Planet-B"
+      ],
+      "coverage_start_tdb": "1999-02-08 12:01:04.185",
+      "coverage_end_tdb": "2003-12-14 00:00:00.000",
+      "jd_start_tdb": 2451218.00074288,
+      "jd_end_tdb": 2452987.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-178%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 7, 2019",
+      "source_sha256": "5d23a3b0dfefd2d8f4b0aeacc0dff7bc37884c17c20f53a2490fbab95b3df53b",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-75",
+      "name": "OMOTENASHI",
+      "horizons_id": "-75",
+      "aliases": [],
+      "coverage_start_tdb": "2022-11-16 10:31:11.183",
+      "coverage_end_tdb": "2023-04-01 00:01:09.186",
+      "jd_start_tdb": 2459899.93832387,
+      "jd_end_tdb": 2460035.50080076,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-75%27&MAKE_EPHEM=NO",
+      "source_revision": "Dec 07, 2022",
+      "source_sha256": "9d1b88140033d8faaabdb625fab914971826793dcb42435df0c039f248fdaa2e",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-64",
+      "name": "OSIRIS-REx",
+      "horizons_id": "-64",
+      "aliases": [
+        "OSIRIS-APX",
+        "ORX",
+        "APEX"
+      ],
+      "coverage_start_tdb": "2016-09-08 23:06:08.282",
+      "coverage_end_tdb": "2030-03-22 20:00:00.000",
+      "jd_start_tdb": 2457640.46259586,
+      "jd_end_tdb": 2462583.33333333,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-64%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 18, 2025",
+      "source_sha256": "8493906c32f91a8a8fcec237b293fe76f617cb199fef8c7c1a884abce874e047",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-64090",
+      "name": "OSIRIS-REx SRC",
+      "horizons_id": "-64090",
+      "aliases": [],
+      "coverage_start_tdb": "2016-09-08 23:06:08.282",
+      "coverage_end_tdb": "2023-09-24 14:56:13.809",
+      "jd_start_tdb": 2457640.46259586,
+      "jd_end_tdb": 2460212.12238205,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-64090%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 01, 2023",
+      "source_sha256": "125403e8577e7b285b7d622aadc39f4f8f8c46ef80af655396a12fb69438e0c8",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-96",
+      "name": "Parker Solar Probe",
+      "horizons_id": "-96",
+      "aliases": [
+        "SPP",
+        "PSP"
+      ],
+      "coverage_start_tdb": "2018-08-12 08:16:23.343",
+      "coverage_end_tdb": "2030-01-01 00:01:09.184",
+      "jd_start_tdb": 2458342.84471462,
+      "jd_end_tdb": 2462502.50080074,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-96%27&MAKE_EPHEM=NO",
+      "source_revision": "Feb 14, 2026",
+      "source_sha256": "e17fcede429955eff67f0381779ebed86b0bce14ce19b6e1213128c1e8bdc690",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-23",
+      "name": "Pioneer 10",
+      "horizons_id": "-23",
+      "aliases": [],
+      "coverage_start_tdb": "1972-03-03 02:04:42.185",
+      "coverage_end_tdb": "2050-01-01 00:10:00.000",
+      "jd_start_tdb": 2441379.58659937,
+      "jd_end_tdb": 2469807.50694444,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-23%27&MAKE_EPHEM=NO",
+      "source_revision": "Jul 27, 2005",
+      "source_sha256": "4aadaacc1a1105cf695c81a9a7065a2f4cefeeea8bee4db8c76b9afd8a082257",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-24",
+      "name": "Pioneer 11",
+      "horizons_id": "-24",
+      "aliases": [],
+      "coverage_start_tdb": "1973-04-06 02:25:44.186",
+      "coverage_end_tdb": "2050-01-01 00:10:00.000",
+      "jd_start_tdb": 2441778.60120585,
+      "jd_end_tdb": 2469807.50694444,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-24%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 15, 2007",
+      "source_sha256": "41c1df6691df2516729d632f480376d0e2bfcff117c0802a664d668d55da37b0",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-6",
+      "name": "Pioneer 6",
+      "horizons_id": "-6",
+      "aliases": [],
+      "coverage_start_tdb": "1996-01-01 00:01:02.184",
+      "coverage_end_tdb": "1999-12-30 00:01:02.184",
+      "jd_start_tdb": 2450083.50071972,
+      "jd_end_tdb": 2451542.50071972,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-6%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 27, 2007",
+      "source_sha256": "9da2fa5ad8e26db89903c7d2ce92ec736744bb39edd80a65e231c2205fb6c7d1",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1965-12-16",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-20",
+      "name": "Pioneer 8",
+      "horizons_id": "-20",
+      "aliases": [],
+      "coverage_start_tdb": "1997-07-01 00:01:03.184",
+      "coverage_end_tdb": "1999-12-30 23:59:03.184",
+      "jd_start_tdb": 2450630.5007313,
+      "jd_end_tdb": 2451543.49934241,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-20%27&MAKE_EPHEM=NO",
+      "source_revision": "Jun 27, 2007",
+      "source_sha256": "cb506a30902c7892e64c3acf8a57f6968afa33994d1af18cd97ce20bac4cd6b9",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1967-12-13",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-489",
+      "name": "Planck Space Observatory",
+      "horizons_id": "-489",
+      "aliases": [],
+      "coverage_start_tdb": "2009-05-14 13:41:35.076",
+      "coverage_end_tdb": "2050-01-01 00:01:07.184",
+      "jd_start_tdb": 2454966.07054486,
+      "jd_end_tdb": 2469807.50077759,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-489%27&MAKE_EPHEM=NO",
+      "source_revision": "Oct 27, 2013",
+      "source_sha256": "30c4ac76638ba28baefbae3e2c81504b67fbe25f1d4128600e4395665d91fea2",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-5",
+      "name": "Planet-C",
+      "horizons_id": "-5",
+      "aliases": [
+        "VCO",
+        "Akatsuki"
+      ],
+      "coverage_start_tdb": "2010-05-21 00:52:06.185",
+      "coverage_end_tdb": "2025-08-24 00:00:00.000",
+      "jd_start_tdb": 2455337.5361827,
+      "jd_end_tdb": 2460911.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-5%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 06, 2025",
+      "source_sha256": "7cbd2c58c673fc2a4ef9d0916eb7f8f0162084cd9811ccbc98e1ba08c6460430",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-255",
+      "name": "Psyche",
+      "horizons_id": "-255",
+      "aliases": [],
+      "coverage_start_tdb": "2023-10-13 15:22:57.139",
+      "coverage_end_tdb": "2029-02-11 13:49:12.405",
+      "jd_start_tdb": 2460231.14093911,
+      "jd_end_tdb": 2462179.07583803,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-255%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "d56a6200d974f57d5ba7d37720862d5cb3bdcc8588aa31add40078fa9cafd654",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-226",
+      "name": "Rosetta",
+      "horizons_id": "-226",
+      "aliases": [],
+      "coverage_start_tdb": "2004-03-02 09:27:00.000",
+      "coverage_end_tdb": "2016-10-05 00:01:08.182",
+      "jd_start_tdb": 2453066.89375,
+      "jd_end_tdb": 2457666.50078914,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-226%27&MAKE_EPHEM=NO",
+      "source_revision": "Oct 24, 2016",
+      "source_sha256": "336963d724a95cfeebb52bd5443502708193d035d1dc2a70e6d41cbca078a7a9",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null,
+      "end_utc": "2016-09-30T10:39:00Z"
+    },
+    {
+      "key": "spacecraft-463",
+      "name": "SMILE",
+      "horizons_id": "-463",
+      "aliases": [],
+      "coverage_start_tdb": "2026-06-22 00:01:09.184",
+      "coverage_end_tdb": "2029-06-30 08:01:09.184",
+      "jd_start_tdb": 2461213.50080075,
+      "jd_end_tdb": 2462317.83413408,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-463%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 28, 2026",
+      "source_sha256": "1b519aadcaa1051984d2099d554d66a2bd23d3ff1fe0f290f0a201692d8f904a",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-21",
+      "name": "SOHO",
+      "horizons_id": "-21",
+      "aliases": [],
+      "coverage_start_tdb": "1995-12-02 00:01:01.183",
+      "coverage_end_tdb": "2026-11-02 23:51:09.183",
+      "jd_start_tdb": 2450053.50070814,
+      "jd_end_tdb": 2461347.49385628,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-21%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "ac74e719a032a616083fef6568763a9839ca1a0c83f5dd0a6bc918486ada3800",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-234",
+      "name": "STEREO-A",
+      "horizons_id": "-234",
+      "aliases": [
+        "AHEAD"
+      ],
+      "coverage_start_tdb": "2006-10-26 00:01:05.182",
+      "coverage_end_tdb": "2026-12-18 00:01:09.184",
+      "jd_start_tdb": 2454034.50075443,
+      "jd_end_tdb": 2461392.50080074,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-234%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "c1390e4735425784c458d25cd16528dad4c1f41b8248c5d565cc5534b55282fb",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-235",
+      "name": "STEREO-B",
+      "horizons_id": "-235",
+      "aliases": [
+        "BEHIND"
+      ],
+      "coverage_start_tdb": "2006-10-26 01:01:05.182",
+      "coverage_end_tdb": "2024-10-26 00:01:09.182",
+      "jd_start_tdb": 2454034.54242109,
+      "jd_end_tdb": 2460609.50080072,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-235%27&MAKE_EPHEM=NO",
+      "source_revision": "Feb 08, 2023",
+      "source_sha256": "b739bdd88743b4b077b62b02ce7efb3c5b178cf08ed85a34b69962e6623cb8dc",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-231",
+      "name": "SWFO-L1",
+      "horizons_id": "-231",
+      "aliases": [
+        "SOLAR-1"
+      ],
+      "coverage_start_tdb": "2025-09-24 13:03:09.182",
+      "coverage_end_tdb": "2028-02-25 00:01:09.184",
+      "jd_start_tdb": 2460943.04385628,
+      "jd_end_tdb": 2461826.50080074,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-231%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "82232f3b71b6bd16239a5b39412b7c09c49759a236c72a8296326ca4ef0bd19a",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2025-09-24",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-144",
+      "name": "Solar Orbiter",
+      "horizons_id": "-144",
+      "aliases": [
+        "Solo"
+      ],
+      "coverage_start_tdb": "2020-02-10 04:56:58.855",
+      "coverage_end_tdb": "2030-11-20 04:41:31.545",
+      "jd_start_tdb": 2458889.70623675,
+      "jd_end_tdb": 2462825.69550399,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-144%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "2de1f934cdf9112215abdd5f845c7a5b5b8479bc5be6be443dc4072a097e7367",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-557",
+      "name": "Spektr-R Observatory",
+      "horizons_id": "-557",
+      "aliases": [],
+      "coverage_start_tdb": "2011-06-18 06:08:05.183",
+      "coverage_end_tdb": "2026-09-14 10:30:36.943",
+      "jd_start_tdb": 2455730.75561554,
+      "jd_end_tdb": 2461297.93792758,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-557%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 26, 2026",
+      "source_sha256": "3f0a3969404b264ad0131245add4e43463d8fdae0e60a4d36c7e91bb4c4a29f0",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-79",
+      "name": "Spitzer Space Telescope",
+      "horizons_id": "-79",
+      "aliases": [
+        "SST",
+        "SIRTF"
+      ],
+      "coverage_start_tdb": "2003-08-25 06:26:43.183",
+      "coverage_end_tdb": "2120-01-01 00:05:00.000",
+      "jd_start_tdb": 2452876.76855536,
+      "jd_end_tdb": 2495373.50347222,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-79%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 13, 2021",
+      "source_sha256": "1bc2badf673f31aa9881687c58e23e503057f02d49e0883080ec8751370f0a0e",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2003-08-25",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-29900",
+      "name": "Stardust (SRC)",
+      "horizons_id": "-29900",
+      "aliases": [],
+      "coverage_start_tdb": "2005-12-28 00:00:00.000",
+      "coverage_end_tdb": "2006-01-15 10:05:00.000",
+      "jd_start_tdb": 2453732.5,
+      "jd_end_tdb": 2453750.92013889,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-29900%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 11, 2006",
+      "source_sha256": "53c91fee62709205a41c550c76da8cb504aa5577a65c1e03ed29ec9e65e14e33",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1999-02-07",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-29",
+      "name": "Stardust (bus)",
+      "horizons_id": "-29",
+      "aliases": [
+        "NExT"
+      ],
+      "coverage_start_tdb": "1999-02-07 21:32:10.700",
+      "coverage_end_tdb": "2011-03-13 00:00:00.000",
+      "jd_start_tdb": 2451217.39734606,
+      "jd_end_tdb": 2455633.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-29%27&MAKE_EPHEM=NO",
+      "source_revision": "Jan 31, 2011",
+      "source_sha256": "aaa2f59e7e741da41b3cb74dbd32d51c4ad022813a613b44639bca0718787983",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1999-02-07",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-95",
+      "name": "TESS",
+      "horizons_id": "-95",
+      "aliases": [],
+      "coverage_start_tdb": "2018-04-18 23:36:39.852",
+      "coverage_end_tdb": "2028-03-01 13:01:09.185",
+      "jd_start_tdb": 2458227.48379458,
+      "jd_end_tdb": 2461832.04246742,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-95%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "b97d493a3ea52e84b9f5c2a291997ffb624a46a093c6e383bed9523bc7acec68",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2018-04-18",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-192",
+      "name": "THEMIS-B",
+      "horizons_id": "-192",
+      "aliases": [
+        "ARTEMIS-P1"
+      ],
+      "coverage_start_tdb": "2007-02-18 00:15:05.185",
+      "coverage_end_tdb": "2026-10-01 00:01:09.182",
+      "jd_start_tdb": 2454149.51047668,
+      "jd_end_tdb": 2461314.50080072,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-192%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "b513941668a41e11be1f39ad9c2a4b5fd811b2bccdf77e052f2bde05c2e59144",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-193",
+      "name": "THEMIS-C",
+      "horizons_id": "-193",
+      "aliases": [
+        "ARTEMIS-P2"
+      ],
+      "coverage_start_tdb": "2007-02-18 00:15:05.185",
+      "coverage_end_tdb": "2026-10-01 00:01:09.182",
+      "jd_start_tdb": 2454149.51047668,
+      "jd_end_tdb": 2461314.50080072,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-193%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "78e74530a0f8eea08809e23203ae53721ecc4f1d7c737c8ce047cc9b8289523d",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-55",
+      "name": "Ulysses",
+      "horizons_id": "-55",
+      "aliases": [],
+      "coverage_start_tdb": "1990-10-06 19:05:00.000",
+      "coverage_end_tdb": "2050-01-01 12:00:00.000",
+      "jd_start_tdb": 2448171.29513889,
+      "jd_end_tdb": 2469808,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-55%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 13, 2009",
+      "source_sha256": "db7d213eface1ae15555defa2f27b4af445e4c2a5cb24a5e2307943f4f877ece",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1990-10-06",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-248",
+      "name": "Venus Express",
+      "horizons_id": "-248",
+      "aliases": [
+        "VEX"
+      ],
+      "coverage_start_tdb": "2005-11-09 05:05:01.549",
+      "coverage_end_tdb": "2014-12-31 23:40:01.824",
+      "jd_start_tdb": 2453683.71182348,
+      "jd_end_tdb": 2457023.48613222,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-248%27&MAKE_EPHEM=NO",
+      "source_revision": "Feb 13, 2015",
+      "source_sha256": "8eff0570ffa8f114c7f2b4c6d902e18eff151ec785b3b14a3c9617c9a20db502",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2005-11-09",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-31",
+      "name": "Voyager 1",
+      "horizons_id": "-31",
+      "aliases": [],
+      "coverage_start_tdb": "1977-09-05 13:59:24.383",
+      "coverage_end_tdb": "2100-01-01 00:00:00.000",
+      "jd_start_tdb": 2443392.0829211,
+      "jd_end_tdb": 2488069.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-31%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 19, 2022",
+      "source_sha256": "076b0f772ad37aeb8d24f977867a37b4b4e1171cf7dbc7019d4d0b9deddb73b8",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1977-09-05",
+      "agency": "NASA",
+      "description": "Explored Jupiter and Saturn before entering interstellar space.",
+      "mission_url": "https://science.nasa.gov/mission/voyager/voyager-1/"
+    },
+    {
+      "key": "spacecraft-32",
+      "name": "Voyager 2",
+      "horizons_id": "-32",
+      "aliases": [],
+      "coverage_start_tdb": "1977-08-20 15:32:32.183",
+      "coverage_end_tdb": "2100-01-01 00:00:00.000",
+      "jd_start_tdb": 2443376.14759471,
+      "jd_end_tdb": 2488069.5,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-32%27&MAKE_EPHEM=NO",
+      "source_revision": "Aug 19, 2022",
+      "source_sha256": "6bd16f2c79e46530a1d3a1f028d822a3bfd3888b1d26d55c1a6e1c99d5349858",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "1977-08-20",
+      "agency": "NASA",
+      "description": "Explored all four giant planets before entering interstellar space.",
+      "mission_url": "https://science.nasa.gov/mission/voyager/voyager-2/"
+    },
+    {
+      "key": "spacecraft-163",
+      "name": "WISE",
+      "horizons_id": "-163",
+      "aliases": [
+        "NEOWISE"
+      ],
+      "coverage_start_tdb": "2009-12-14 15:01:06.183",
+      "coverage_end_tdb": "2024-11-01 22:53:57.753",
+      "jd_start_tdb": 2455180.12576601,
+      "jd_end_tdb": 2460616.45414066,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-163%27&MAKE_EPHEM=NO",
+      "source_revision": "Nov 02, 2024",
+      "source_sha256": "fcdeb3e48f5368cf55186daf8f0fff491a13277d18a93fb269c797cf0876a740",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": "2009-12-14",
+      "agency": null
+    },
+    {
+      "key": "spacecraft-165",
+      "name": "WMAP",
+      "horizons_id": "-165",
+      "aliases": [],
+      "coverage_start_tdb": "2001-06-30 21:15:04.184",
+      "coverage_end_tdb": "2009-04-07 10:16:05.184",
+      "jd_start_tdb": 2452091.38546509,
+      "jd_end_tdb": 2454928.92783778,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-165%27&MAKE_EPHEM=NO",
+      "source_revision": "May 13, 2009",
+      "source_sha256": "101412d055cfe0b12cfac7f955e9726a9642bbb89e225097eaa6f64e3d40e77f",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    },
+    {
+      "key": "spacecraft-8",
+      "name": "Wind",
+      "horizons_id": "-8",
+      "aliases": [],
+      "coverage_start_tdb": "1994-11-01 10:48:19.183",
+      "coverage_end_tdb": "2026-11-24 00:01:09.183",
+      "jd_start_tdb": 2449657.95022202,
+      "jd_end_tdb": 2461368.50080073,
+      "source_url": "https://ssd.jpl.nasa.gov/api/horizons.api?format=text&COMMAND=%27-8%27&MAKE_EPHEM=NO",
+      "source_revision": "Sep 01, 2026",
+      "source_sha256": "dff08dafaece67cfb800aa26179a8a7718bd321a022c6c01f6886a0a44e60887",
+      "trajectory_kind": "Provider trajectory; may combine reconstructed and predicted segments",
+      "launch_date": null,
+      "agency": null
+    }
+  ],
+  "excluded": [
+    {
+      "horizons_id": "-159588",
+      "name": "ACS3",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-116908",
+      "name": "AJISAI",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126639",
+      "name": "AMC-8",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-123553",
+      "name": "AMSC-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-113901",
+      "name": "ASTRON",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-115993",
+      "name": "AUSSAT-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-116275",
+      "name": "AUSSAT-2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-122087",
+      "name": "AUSSAT-B1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-123227",
+      "name": "AUSSAT-B3",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-128868",
+      "name": "Anik-F1R",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-128378",
+      "name": "Anik-F2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-399101",
+      "name": "Apollo 10 LM",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-399100",
+      "name": "Apollo 10 S-IVB",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-399110",
+      "name": "Apollo 11 S-IVB",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-399120",
+      "name": "Apollo 12 S-IVB",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-399080",
+      "name": "Apollo 8 S-IVB",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-399090",
+      "name": "Apollo 9 S-IVB",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-127424",
+      "name": "Aqua",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-107964",
+      "name": "Atlas-Agena_RB",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-128376",
+      "name": "Aura",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-138250",
+      "name": "BEIDOU-M3",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126410",
+      "name": "CLUSTER II-FM7",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126464",
+      "name": "CLUSTER II-FM8",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-204",
+      "name": "CONTOUR-A (SPACECRAFT FRAGMENT) (2002-034A)",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-205",
+      "name": "CONTOUR-B (SPACECRAFT FRAGMENT) (2002-034A)",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-206",
+      "name": "CONTOUR-C (SPACECRAFT FRAGMENT) (2002-034A)",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-116292",
+      "name": "COSMOS 1704 RB",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-150",
+      "name": "Cassini Huygens",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-153",
+      "name": "Chandrayaan-2 (LANDER)",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-158",
+      "name": "Chandrayaan-3 (LANDER spacecraft) (2023-098A)",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-139459",
+      "name": "Chang'e_3_booster",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-143846",
+      "name": "Chang'e_4_booster",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-78000",
+      "name": "Chang'e_5-T1_booster",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-148274",
+      "name": "Chinese Space Station (CSS)",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-40000",
+      "name": "Clementine Extended",
+      "reason": "Alternate Clementine solution"
+    },
+    {
+      "horizons_id": "-129107",
+      "name": "Cloudsat",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-149498",
+      "name": "DART Falcon 9 Booster",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-140663",
+      "name": "DirecTV-15",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-129494",
+      "name": "DirecTV-9S",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126619",
+      "name": "EO-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-123754",
+      "name": "Echostar-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-133207",
+      "name": "Echostar-11",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-136499",
+      "name": "Echostar-14",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-138551",
+      "name": "Echostar-17",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-124313",
+      "name": "Echostar-2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126402",
+      "name": "Echostar-6",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-9901495",
+      "name": "EscaPADE STAGE",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-119751",
+      "name": "Etalon-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-120026",
+      "name": "Etalon-2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-111353",
+      "name": "FLTSATCOM 2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-127783",
+      "name": "GALEX",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-108366",
+      "name": "GOES-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-124786",
+      "name": "GOES-10",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126352",
+      "name": "GOES-11",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126871",
+      "name": "GOES-12",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-135491",
+      "name": "GOES-14",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-141866",
+      "name": "GOES-16",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-143226",
+      "name": "GOES-17",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-151850",
+      "name": "GOES-18",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-160133",
+      "name": "GOES-19",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-112472",
+      "name": "GOES-5",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-114050",
+      "name": "GOES-6",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-123051",
+      "name": "GOES-8",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-123581",
+      "name": "GOES-9",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-127391",
+      "name": "GRACE-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-176",
+      "name": "GRAIL-SS Second Stage",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-143241",
+      "name": "GSAT-6A",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-139479",
+      "name": "Gaia",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-128884",
+      "name": "Galaxy-15",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-344",
+      "name": "Galileo Probe",
+      "reason": "Atmospheric probe needs termination cutoff"
+    },
+    {
+      "horizons_id": "-124720",
+      "name": "HALCA",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-125126",
+      "name": "HGS-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-140267",
+      "name": "Himawari-8",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-141836",
+      "name": "Himawari-9",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-132763",
+      "name": "ICO_G-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-125",
+      "name": "ICPS",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-106197",
+      "name": "IMP-7",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-110637",
+      "name": "IUE",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-189",
+      "name": "InSight",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-141748",
+      "name": "Intelsat-33E",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126824",
+      "name": "Intelsat-901",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-125544",
+      "name": "International Space Station",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-133105",
+      "name": "Jason-2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-141240",
+      "name": "Jason-3",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-610",
+      "name": "Juno Centaur Stage",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-134381",
+      "name": "Kepler Booster (Third Stage)",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-108820",
+      "name": "LAGEOS-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-122195",
+      "name": "LAGEOS-2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-18900",
+      "name": "LCROSS Centaur Impactor",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-101361",
+      "name": "LCS-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-169792",
+      "name": "LINK",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-141043",
+      "name": "LISA Pathfinder",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-999742",
+      "name": "LISA Pathfinder Propulsion Module",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-490",
+      "name": "Lucy Centaur RB Booster",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-9901492",
+      "name": "Luna-25 STAGE",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-140947",
+      "name": "MEXSAT-2 Centaur RB",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-140482",
+      "name": "MMS-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-140483",
+      "name": "MMS-2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-140484",
+      "name": "MMS-3",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-140485",
+      "name": "MMS-4",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-74900",
+      "name": "MRO Centaur Stage",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-123846",
+      "name": "MSAT-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-760",
+      "name": "MSL Centaur Stage",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-530",
+      "name": "Mars Pathfinder",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-76",
+      "name": "Mars Science Laboratory",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-168",
+      "name": "Mars2020",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-138552",
+      "name": "Meteosat-10",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-140732",
+      "name": "Meteosat-11",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-127509",
+      "name": "Meteosat-8",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-128912",
+      "name": "Meteosat-9",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-116609",
+      "name": "Mir",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-120452",
+      "name": "NAVSTAR-18",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-126407",
+      "name": "NAVSTAR-48",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-138833",
+      "name": "NAVSTAR-67",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-139166",
+      "name": "NAVSTAR-68",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-182",
+      "name": "NEA Scout",
+      "reason": "No tracking since deployment; unvalidated nominal trajectory"
+    },
+    {
+      "horizons_id": "-33",
+      "name": "NEOS",
+      "reason": "Unflown mission design"
+    },
+    {
+      "horizons_id": "-139089",
+      "name": "NEOSsat",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-165053",
+      "name": "NISAR",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-136032",
+      "name": "NSS-12",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-138358",
+      "name": "NuSTAR",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-140059",
+      "name": "OCO-2",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-10001001",
+      "name": "Odin",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-253",
+      "name": "Opportunity",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-39",
+      "name": "Ouna",
+      "reason": "Provider labels trajectory obsolete and for testing only"
+    },
+    {
+      "horizons_id": "-84",
+      "name": "Phoenix",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-125789",
+      "name": "QuikSCAT",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-211",
+      "name": "Roman Space Telescope",
+      "reason": "Unflown mission design"
+    },
+    {
+      "horizons_id": "-113631",
+      "name": "SATCOM-C5",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-112065",
+      "name": "SBS-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-137218",
+      "name": "SKYTERRA-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-240",
+      "name": "SLIM",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-140376",
+      "name": "SMAP",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-163182",
+      "name": "SPHEREx",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-234900",
+      "name": "STEREO Third Stage",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-168540",
+      "name": "SWC-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-136395",
+      "name": "Solar Dynamics Observatory",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-122911",
+      "name": "Solidaridad-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-143205",
+      "name": "SpaceX Roadster",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-254",
+      "name": "Spirit",
+      "reason": "Surface mission needs landing cutoff"
+    },
+    {
+      "horizons_id": "-128485",
+      "name": "Swift Observatory",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-119548",
+      "name": "TDRS-3",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-125994",
+      "name": "TERRA",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-122927",
+      "name": "Telstar-401",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-132487",
+      "name": "Thor-5",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-137820",
+      "name": "Tiangong-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-9901491",
+      "name": "Tianwen-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-102770",
+      "name": "Titan-3C RB",
+      "reason": "Rocket stage, debris or simulated target"
+    },
+    {
+      "horizons_id": "-100836",
+      "name": "Vela-2A",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-113269",
+      "name": "WESTAR-5",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-129520",
+      "name": "XM-4",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-125989",
+      "name": "XMM-Newton",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    },
+    {
+      "horizons_id": "-148841",
+      "name": "Yangwang-1",
+      "reason": "Earth-satellite/TLE or special trajectory requires separate freshness review"
+    }
+  ]
+}

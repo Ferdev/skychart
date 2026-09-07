@@ -1,3 +1,4 @@
+import { SPACECRAFT_TRANSLATIONS } from "./catalog/spacecraftTranslations";
 import { LAUNCH_TRANSLATIONS } from "./launchTranslations";
 import { SKY_SHARE_TRANSLATIONS } from "./sky/skyShareTranslations";
 
@@ -829,15 +830,15 @@ const FILTER_COUNT_TRANSLATIONS: Record<Exclude<LocaleCode, "en">, Record<string
 };
 
 export const LOCALES: Record<LocaleCode, LocaleDefinition> = {
-  en: { label: "English", strings: en },
-  es: { label: PARTIAL_TRANSLATIONS.es.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.es.strings, ...FILTER_COUNT_TRANSLATIONS.es, ...LAUNCH_TRANSLATIONS.es, ...SKY_SHARE_TRANSLATIONS.es } },
-  fr: { label: PARTIAL_TRANSLATIONS.fr.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.fr.strings, ...FILTER_COUNT_TRANSLATIONS.fr, ...LAUNCH_TRANSLATIONS.fr, ...SKY_SHARE_TRANSLATIONS.fr } },
-  de: { label: PARTIAL_TRANSLATIONS.de.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.de.strings, ...FILTER_COUNT_TRANSLATIONS.de, ...LAUNCH_TRANSLATIONS.de, ...SKY_SHARE_TRANSLATIONS.de } },
-  "pt-BR": { label: PARTIAL_TRANSLATIONS["pt-BR"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["pt-BR"].strings, ...FILTER_COUNT_TRANSLATIONS["pt-BR"], ...LAUNCH_TRANSLATIONS["pt-BR"], ...SKY_SHARE_TRANSLATIONS["pt-BR"] } },
-  it: { label: PARTIAL_TRANSLATIONS.it.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.it.strings, ...FILTER_COUNT_TRANSLATIONS.it, ...LAUNCH_TRANSLATIONS.it, ...SKY_SHARE_TRANSLATIONS.it } },
-  "zh-Hans": { label: PARTIAL_TRANSLATIONS["zh-Hans"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["zh-Hans"].strings, ...FILTER_COUNT_TRANSLATIONS["zh-Hans"], ...LAUNCH_TRANSLATIONS["zh-Hans"], ...SKY_SHARE_TRANSLATIONS["zh-Hans"] } },
-  ja: { label: PARTIAL_TRANSLATIONS.ja.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ja.strings, ...FILTER_COUNT_TRANSLATIONS.ja, ...LAUNCH_TRANSLATIONS.ja, ...SKY_SHARE_TRANSLATIONS.ja } },
-  ko: { label: PARTIAL_TRANSLATIONS.ko.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ko.strings, ...FILTER_COUNT_TRANSLATIONS.ko, ...LAUNCH_TRANSLATIONS.ko, ...SKY_SHARE_TRANSLATIONS.ko } }
+  en: { label: "English", strings: { ...en, ...SPACECRAFT_TRANSLATIONS.en } },
+  es: { label: PARTIAL_TRANSLATIONS.es.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.es.strings, ...FILTER_COUNT_TRANSLATIONS.es, ...LAUNCH_TRANSLATIONS.es, ...SKY_SHARE_TRANSLATIONS.es, ...SPACECRAFT_TRANSLATIONS.es } },
+  fr: { label: PARTIAL_TRANSLATIONS.fr.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.fr.strings, ...FILTER_COUNT_TRANSLATIONS.fr, ...LAUNCH_TRANSLATIONS.fr, ...SKY_SHARE_TRANSLATIONS.fr, ...SPACECRAFT_TRANSLATIONS.fr } },
+  de: { label: PARTIAL_TRANSLATIONS.de.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.de.strings, ...FILTER_COUNT_TRANSLATIONS.de, ...LAUNCH_TRANSLATIONS.de, ...SKY_SHARE_TRANSLATIONS.de, ...SPACECRAFT_TRANSLATIONS.de } },
+  "pt-BR": { label: PARTIAL_TRANSLATIONS["pt-BR"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["pt-BR"].strings, ...FILTER_COUNT_TRANSLATIONS["pt-BR"], ...LAUNCH_TRANSLATIONS["pt-BR"], ...SKY_SHARE_TRANSLATIONS["pt-BR"], ...SPACECRAFT_TRANSLATIONS["pt-BR"] } },
+  it: { label: PARTIAL_TRANSLATIONS.it.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.it.strings, ...FILTER_COUNT_TRANSLATIONS.it, ...LAUNCH_TRANSLATIONS.it, ...SKY_SHARE_TRANSLATIONS.it, ...SPACECRAFT_TRANSLATIONS.it } },
+  "zh-Hans": { label: PARTIAL_TRANSLATIONS["zh-Hans"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["zh-Hans"].strings, ...FILTER_COUNT_TRANSLATIONS["zh-Hans"], ...LAUNCH_TRANSLATIONS["zh-Hans"], ...SKY_SHARE_TRANSLATIONS["zh-Hans"], ...SPACECRAFT_TRANSLATIONS["zh-Hans"] } },
+  ja: { label: PARTIAL_TRANSLATIONS.ja.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ja.strings, ...FILTER_COUNT_TRANSLATIONS.ja, ...LAUNCH_TRANSLATIONS.ja, ...SKY_SHARE_TRANSLATIONS.ja, ...SPACECRAFT_TRANSLATIONS.ja } },
+  ko: { label: PARTIAL_TRANSLATIONS.ko.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ko.strings, ...FILTER_COUNT_TRANSLATIONS.ko, ...LAUNCH_TRANSLATIONS.ko, ...SKY_SHARE_TRANSLATIONS.ko, ...SPACECRAFT_TRANSLATIONS.ko } }
 };
 
 let currentLocale = detectLocale();

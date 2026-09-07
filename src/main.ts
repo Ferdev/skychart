@@ -1,3 +1,5 @@
+import { SpacecraftLoader } from "./catalog/spacecraftCatalog";
+import { loadAtlasEphemeris } from "./atlas/atlasEphemerisLoader";
 import "./destinationPicker.css";
 import "./styles.css";
 import { readRecentDestinations, type RecentDestination } from "./destinationPicker";
@@ -14,7 +16,6 @@ import { CatalogPointDecoder } from "./catalog/catalogPointDecoder";
 import { CatalogPointManifestRepository } from "./catalog/catalogPointManifest";
 import { CatalogPointPlanner, type CatalogPointViewport } from "./catalog/catalogPointPlanner";
 import { CatalogObjectMapper } from "./catalog/catalogObjectMapper";
-import { resolveSmallBodyPosition } from "./catalog/smallBodyPropagation";
 import { smallBodyOrbitPathForBody } from "./catalog/smallBodyOrbit";
 import { CatalogPointStream } from "./catalog/catalogPointStream";
 import { CatalogPointSelector } from "./catalog/catalogPointSelector";
@@ -27,7 +28,7 @@ import { ObjectComparisonView } from "./object/objectComparisonView";
 import { AtlasOverlayRenderer } from "./rendering/atlasOverlayRenderer";
 import { AtlasVisibilityModel, isSolarSystemBody } from "./rendering/atlasVisibilityModel";
 import { atlasDom } from "./atlas/atlasDom";
-import { FEATURED_KEYS, STARTUP_EPHEMERIS_GROUPS, TIME_STEPS, universeShellForRadius, zoomPresetBodies } from "./atlas/atlasDefinitions";
+import { FEATURED_KEYS, TIME_STEPS, universeShellForRadius, zoomPresetBodies } from "./atlas/atlasDefinitions";
 import { CURATED_OBJECT_SUMMARIES } from "./object/curatedObjectSummaries";
 import { ScientificValueFormatter, formatFullDate, toDatetimeLocalValue } from "./object/scientificValueFormatter";
 import { ViewportCatalogLoader } from "./catalog/viewportCatalogLoader";
@@ -595,6 +596,16 @@ installAtlasDiagnostics({
   gestureState: () => mapInteraction.diagnostics(),
 });
 
+const spacecraftLoader = new SpacecraftLoader((bodies) => {
+  // Generic catalog merging retains already-hydrated records. Dated mission
+  // states must replace them, including transitions to an unavailable position.
+  if (ephemeris) ephemeris = { ...ephemeris, bodies: ephemeris.bodies.filter(body => body.object_type !== "spacecraft") };
+  mergeBodies(bodies);
+  objectSelection.positionsUpdated();
+  updateAllUi();
+  requestRender();
+}, () => selectedKey);
+
 if (bootViewState) applyDecodedViewStateFields(bootViewState);
 if (isEmbedMode) initializeEmbedMode();
 
@@ -610,6 +621,7 @@ requestRender({ data: true });
 async function loadAtlas(timestampIso?: string) {
   if (timestampIso) viewTime = new Date(timestampIso).toISOString();
   const loadId = ++loadSequence;
+  spacecraftLoader.stop();
   const showTimeBusy = loadingScreen.hidden;
   if (showTimeBusy) setTimeBusy(true);
   loadingView.begin();
@@ -618,26 +630,12 @@ async function loadAtlas(timestampIso?: string) {
   loadState.textContent = t("status.loading");
 
   try {
-    const query = new URLSearchParams();
-    query.set("groups", STARTUP_EPHEMERIS_GROUPS.join(","));
-    if (timestampIso) query.set("timestamp", timestampIso);
     const preservedBodies = [selectedKey ? bodyByKey.get(selectedKey) : null, compareTargetKey ? bodyByKey.get(compareTargetKey) : null, skyView?.observerBody()].filter(isPresent);
-    const url = `/api/ephemeris${query.toString() ? `?${query.toString()}` : ""}`;
     setLoading("download", 28, t("loading.corePayload"));
-    const response = await fetch(url);
-    if (!response.ok) {
-      const message = await response.text();
-      throw new Error(message || `API request failed with ${response.status}`);
-    }
-
-    setLoading("parse", 64, t("loading.indexing"));
-    const payload = (await response.json()) as Ephemeris;
-    const payloadEarth = payload.bodies.find((body) => body.key === "earth");
-    const propagatedPreservedBodies = await Promise.all(preservedBodies.map((body) => (
-      resolveSmallBodyPosition(body, payload.timestamp_utc, payload.au_km, payloadEarth)
-    )));
+    const { payload, bodies } = await loadAtlasEphemeris(timestampIso, preservedBodies, () => {
+      setLoading("parse", 64, t("loading.indexing"));
+    });
     if (loadId !== loadSequence) return; // A newer time change superseded this load.
-    const bodies = mergeBodyList(payload.bodies, propagatedPreservedBodies);
     ephemeris = { ...payload, bodies };
     catalogSummary = catalogSummaryFromEphemeris(payload);
     void refreshCatalogSummary();
@@ -666,6 +664,7 @@ async function loadAtlas(timestampIso?: string) {
     requestRender();
     scheduleViewStateReplace();
     startBootTour();
+    spacecraftLoader.start(payload.timestamp_utc);
   } catch (error) {
     if (loadId !== loadSequence) return; // A newer load owns the UI state now.
     loadState.textContent = t("status.error");

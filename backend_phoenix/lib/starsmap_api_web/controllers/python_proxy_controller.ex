@@ -7,6 +7,7 @@ defmodule StarsmapApiWeb.PythonProxyController do
   @minimum_request_timeout 5_000
   @maximum_request_timeout 180_000
 
+  def spacecraft(conn, _params), do: proxy(conn, "/api/spacecraft")
   def ephemeris(conn, _params), do: proxy(conn, "/api/ephemeris")
   def small_body_ephemeris(conn, _params), do: proxy(conn, "/api/small-body-ephemeris")
   def small_body_orbit(conn, _params), do: proxy(conn, "/api/small-body-orbit")

@@ -110,6 +110,7 @@ export type DestinationBodyType =
   | "milky_way_patch"
   | "asteroid"
   | "comet"
+  | "spacecraft"
   | "small_body"
   | "unknown";
 
@@ -273,6 +274,7 @@ const TYPE_LABEL_KEYS: Record<DestinationBodyType, string> = {
   milky_way_patch: "type.milkyWayPatch",
   asteroid: "type.asteroid",
   comet: "type.comet",
+  spacecraft: "type.spacecraft",
   small_body: "type.smallBody",
   unknown: "type.object"
 };
@@ -295,6 +297,7 @@ const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
   milky_way_patch: "cluster",
   asteroid: "asteroid",
   comet: "comet",
+  spacecraft: "target",
   small_body: "asteroid",
   unknown: "target"
 };
@@ -317,6 +320,7 @@ const TYPE_SORT_GROUPS: Record<DestinationBodyType, number> = {
   milky_way_patch: 8,
   asteroid: 9,
   comet: 10,
+  spacecraft: 3,
   small_body: 11,
   unknown: 12
 };
@@ -556,7 +560,8 @@ export function formatPickerDistance(
   auKm = DEFAULT_AU_KM,
   options: { preferCompact?: boolean } = {}
 ): string {
-  const value = finiteNumber(km, 0);
+  if (!Number.isFinite(km)) return t("value.unknown");
+  const value = km;
   const abs = Math.abs(value);
   const preferCompact = options.preferCompact ?? true;
 

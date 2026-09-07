@@ -136,7 +136,7 @@ export class CatalogLayerRenderer {
     const selected = this.options.selectedBody();
     const bodies = this.options.visibleBodies().filter((body) => {
       const selectedOrHover = body.key === selected?.key || body.key === this.options.hoverKey();
-      return !selectedOrHover && (!catalogLayerReady || !this.options.isDuplicateBody(body));
+      return body.object_type !== "spacecraft" && !selectedOrHover && (!catalogLayerReady || !this.options.isDuplicateBody(body));
     });
     if (bodies.length === 0) return null;
     const signature = `bodies:${this.options.ephemerisTimestamp()}:${this.options.selectedKey()}:${this.options.hoverKey()}:${bodies.map((body) => body.key).join("|")}`;

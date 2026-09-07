@@ -1,0 +1,33 @@
+import assert from "node:assert/strict";
+import { SpacecraftLoader, spacecraftBodies, hasBodyPosition, normalizeSpacecraftBody } from "../src/catalog/spacecraftCatalog.ts";
+import { SPACECRAFT_TRANSLATIONS } from "../src/catalog/spacecraftTranslations.ts";
+
+const oldEpoch = "2026-09-06T00:00:00Z";
+const newEpoch = "2010-01-01T00:00:00Z";
+const missions = spacecraftBodies(oldEpoch);
+assert.ok(missions.length >= 90);
+assert.equal(new Set(missions.map(b => b.key)).size, missions.length);
+assert.ok(missions.every(b => !hasBodyPosition(b)));
+assert.ok(missions.every(b => Number.isNaN(b.radius_km)));
+const mission = missions.find(b => b.key === "spacecraft-31")!;
+const missing = normalizeSpacecraftBody({ ...mission, position: null, distance_from_earth_km: null } as never);
+assert.equal(hasBodyPosition(missing), false);
+assert.ok(Number.isNaN(missing.distance_from_earth_km));
+for (const strings of Object.values(SPACECRAFT_TRANSLATIONS)) assert.deepEqual(Object.keys(strings), Object.keys(SPACECRAFT_TRANSLATIONS.en));
+
+const pending: { resolve: (r: Response) => void; url: string; signal?: AbortSignal | null }[] = [];
+const applied: unknown[] = [];
+const fetcher = ((url: string, options: RequestInit) => new Promise<Response>(resolve => pending.push({ resolve, url, signal: options.signal }))) as typeof fetch;
+const loader = new SpacecraftLoader(bodies => applied.push(bodies), () => mission.key, fetcher);
+loader.start(oldEpoch);
+loader.start(newEpoch);
+assert.equal(pending[0].signal?.aborted, true);
+assert.ok(pending[1].url.includes("key=spacecraft-31"));
+pending[0].resolve(new Response(JSON.stringify({ timestamp_utc: oldEpoch, bodies: [] })));
+await new Promise(resolve => setTimeout(resolve, 0));
+assert.equal(applied.length, 0, "late old epoch must not be merged");
+pending[1].resolve(new Response(JSON.stringify({ timestamp_utc: newEpoch, bodies: [] })));
+await new Promise(resolve => setTimeout(resolve, 0));
+assert.equal(applied.length, 1);
+loader.stop();
+console.log("Spacecraft metadata, missing positions, translations and obsolete responses passed.");

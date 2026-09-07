@@ -446,6 +446,12 @@ DEEP_SKY_CATALOG_OBJECTS = load_deep_sky_catalog_objects()
 EXOPLANET_SYSTEM_CATALOG_OBJECTS = load_exoplanet_system_catalog_objects()
 BRIGHT_STAR_CATALOG_OBJECTS = load_bright_star_catalog_objects([*CATALOG_OBJECTS, *EXOPLANET_SYSTEM_CATALOG_OBJECTS])
 BODIES = [*CATALOG_OBJECTS, *EXOPLANET_SYSTEM_CATALOG_OBJECTS, *BRIGHT_STAR_CATALOG_OBJECTS, *DEEP_SKY_CATALOG_OBJECTS]
+from backend.spacecraft import MISSIONS
+SPACECRAFT_OBJECTS = [{**mission, "object_type": "spacecraft", "source_type": "spacecraft",
+    "catalog_group": "spacecraft", "parent_key": "sun", "radius_km": None, "color": "#77d9d0"}
+    for mission in MISSIONS.values()]
+BODIES.extend(SPACECRAFT_OBJECTS)
+CATALOG_GROUPS["spacecraft"] = {"label": "Spacecraft", "description": "Reviewed NASA/JPL Horizons mission trajectories"}
 BODY_BY_KEY = {item["key"]: item for item in BODIES}
 DEFAULT_TRAIL_BODIES = ("earth", "mars", "jupiter")
 DEFAULT_TRAIL_DAYS = 365.0
@@ -477,10 +483,10 @@ def catalog_objects_for_selection(groups: list[str], keys: list[str] | None = No
 
 def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
     source_type = item.get("source_type") or "spk"
-    if source_type == "horizons":
+    if source_type in {"horizons", "spacecraft"}:
         ephemeris_kernel = "JPL Horizons vectors"
         ephemeris_source = "NASA/JPL Horizons API"
-        position_model = "horizons_vectors"
+        position_model = "jpl_spacecraft_vectors" if source_type == "spacecraft" else "horizons_vectors"
     elif source_type == "stellar_catalog":
         ephemeris_kernel = "NASA Exoplanet Archive"
         ephemeris_source = "NASA Exoplanet Archive confirmed planet host catalog"
@@ -512,7 +518,7 @@ def catalog_object_payload(item: dict[str, Any]) -> dict[str, Any]:
         "ephemeris_id": str(item.get("horizons_id") or item["ephemeris"]),
         "ephemeris_kernel": ephemeris_kernel,
         "ephemeris_source": ephemeris_source,
-        "ephemeris_center": horizons_center_for_item(item) if source_type == "horizons" else "Sun" if source_type in STATIC_CATALOG_SOURCE_TYPES else "solar-system barycenter",
+        "ephemeris_center": horizons_center_for_item(item) if source_type in {"horizons", "spacecraft"} else "Sun" if source_type in STATIC_CATALOG_SOURCE_TYPES else "solar-system barycenter",
         "position_model": position_model,
         "dynamic_position": source_type not in STATIC_CATALOG_SOURCE_TYPES,
         "aliases": item.get("aliases", []),
@@ -559,7 +565,7 @@ def catalog_summary_payload(groups: list[str], objects: list[dict[str, Any]], in
         item.get("kernel")
         or (
             "JPL Horizons vectors"
-            if item.get("source_type") == "horizons"
+            if item.get("source_type") in {"horizons", "spacecraft"}
             else "Messier deep-sky snapshot"
             if item.get("source_type") == "deep_sky_catalog"
             else "NASA Exoplanet Archive PSCompPars snapshot"
