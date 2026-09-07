@@ -1,3 +1,4 @@
+import { spacecraftBodies } from "./spacecraftCatalog";
 import type { DestinationBodyType } from "../destinationPicker";
 import type {
   Body,
@@ -20,6 +21,10 @@ export class CatalogObjectMapper {
 
   map(object: CatalogObjectPayload): Body {
     const context = this.context();
+    if (object.object_type === "spacecraft") {
+      const mission = spacecraftBodies(context.timestamp ?? new Date().toISOString()).find((body) => body.key === object.key);
+      if (mission) return mission;
+    }
     const facts = object.facts ?? {};
     const position = object.position ?? {};
     const propagated = object.catalog_group === "jpl_small_bodies" && object.parent_key === "sun" && context.timestamp
@@ -180,7 +185,7 @@ function normalizeDestinationType(type: string | null | undefined): DestinationB
     "star", "planet", "moon", "dwarf_planet", "galaxy", "quasar",
     "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster",
     "xray_source", "xray_extended",
-    "asterism", "milky_way_patch", "asteroid", "comet", "small_body", "unknown",
+    "spacecraft", "asterism", "milky_way_patch", "asteroid", "comet", "small_body", "unknown",
   ]);
   return allowed.has(type as DestinationBodyType) ? type as DestinationBodyType : "unknown";
 }

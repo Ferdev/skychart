@@ -130,7 +130,7 @@ export class AtlasOverlayRenderer {
     ctx.save();
     for (const body of frame.visibleBodies) {
       const selectedOrHover = body.key === frame.selected?.key || body.key === frame.hoverKey;
-      if (frame.pointRendererAvailable && !selectedOrHover) continue;
+      if (frame.pointRendererAvailable && !selectedOrHover && body.object_type !== "spacecraft") continue;
       this.drawBodyPoint(body, this.options.bodyToScreen(body), selectedOrHover, frame.selectedKey);
     }
     ctx.restore();
@@ -271,7 +271,13 @@ export class AtlasOverlayRenderer {
     ctx.globalAlpha = active ? 1 : POINT_ALPHA;
     ctx.fillStyle = body.color || "#d9b86f";
     ctx.beginPath();
-    ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+    if (body.object_type === "spacecraft") {
+      ctx.moveTo(screen.x, screen.y - radius);
+      ctx.lineTo(screen.x + radius, screen.y);
+      ctx.lineTo(screen.x, screen.y + radius);
+      ctx.lineTo(screen.x - radius, screen.y);
+      ctx.closePath();
+    } else ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
     ctx.fill();
     if (active) {
       ctx.globalAlpha = 1;

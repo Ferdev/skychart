@@ -88,6 +88,7 @@ def observe_payload(key: str, latitude: float, longitude: float, timestamp: date
     if not math.isfinite(longitude) or longitude < -180 or longitude > 180: raise QueryInputError("lon must be between -180 and 180")
     item = BODY_BY_KEY.get(key)
     if item is None: raise QueryInputError("unknown object key")
+    if item.get("source_type") == "spacecraft": raise QueryInputError("Spacecraft apparent visibility is not modeled")
     timescale, ephemeris = skyfield_context(); observer = ephemeris["earth"] + wgs84.latlon(latitude, longitude)
     target = Star(ra_hours=float(item["ra_deg"])/15.0, dec_degrees=float(item["dec_deg"])) if item.get("ra_deg") is not None and item.get("dec_deg") is not None else target_for_body(item, ephemeris)
     def horizontal(at: datetime) -> tuple[float,float]:
@@ -241,6 +242,9 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
     # ECLIPTIC output is fixed to J2000, so request ICRF vectors and rotate them
     # into the atlas frame below.
     coordinate_frame = "true_ecliptic_of_date_ut_v1"
+    if item.get("source_type") == "spacecraft":
+        # Refresh predictions daily, including the underlying vector cache.
+        coordinate_frame += ":" + item["source_sha256"] + ":" + datetime.now(timezone.utc).strftime("%Y-%m-%d")
     cache_key = (f"{horizons_id}@{center}:{coordinate_frame}", timestamp_key)
     cached = _horizons_vectors.get(cache_key)
     if cached is not None:
@@ -270,13 +274,14 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
             "TIME_TYPE": "UT",
             "OUT_UNITS": "KM-S",
             "VEC_TABLE": "2",
+            "VEC_CORR": "NONE",
             "START_TIME": f"'{horizons_timestamp(timestamp)}'",
             "STOP_TIME": f"'{horizons_timestamp(stop_timestamp)}'",
             "STEP_SIZE": "'1 d'",
         }
     )
     url = f"https://ssd.jpl.nasa.gov/api/horizons.api?{query}"
-    with urlopen(url, timeout=30) as response:
+    with urlopen(url, timeout=10 if item.get("source_type") == "spacecraft" else 30) as response:
         payload = json.loads(response.read().decode("utf-8"))
 
     if payload.get("error"):
@@ -556,7 +561,11 @@ def catalog_search_payload(
 ) -> dict[str, Any]:
     matches = filtered_catalog_objects(groups, object_types, query_text)
     page_objects = matches[offset : offset + limit]
-    bodies, earth_position = body_payloads(timestamp, page_objects)
+    # Search is a metadata operation; never fan out to mission ephemerides here.
+    from backend.spacecraft import metadata_body
+    positioned, earth_position = body_payloads(timestamp, [item for item in page_objects if item.get("source_type") != "spacecraft"])
+    by_key = {body["key"]: body for body in positioned}
+    bodies = [metadata_body(item, timestamp, "loading") if item.get("source_type") == "spacecraft" else by_key[item["key"]] for item in page_objects]
     return {
         "schema_version": 1,
         "timestamp_utc": isoformat_utc(timestamp),
@@ -892,6 +901,10 @@ def body_payloads(timestamp: datetime, catalog_objects: list[dict[str, Any]]) ->
     }
 
     for item in catalog_objects:
+        if item.get("source_type") == "spacecraft":
+            from backend.spacecraft import calculate
+            bodies.append(calculate(item, timestamp))
+            continue
         if item["key"] == "sun":
             position = {
                 "x_au": 0.0,
@@ -958,7 +971,11 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None, keys
     selected_groups = list(STARTUP_CATALOG_GROUPS) if groups is None else groups
     selected_keys = keys or []
     catalog_objects = catalog_objects_for_selection(selected_groups, selected_keys)
-    bodies, earth_position = body_payloads(timestamp, catalog_objects)
+    from backend.spacecraft import metadata_body
+    deferred = [item for item in catalog_objects if item.get("source_type") == "spacecraft" and item["key"] not in selected_keys]
+    deferred_keys = {item["key"] for item in deferred}
+    bodies, earth_position = body_payloads(timestamp, [item for item in catalog_objects if item["key"] not in deferred_keys])
+    bodies.extend(metadata_body(item, timestamp, "loading") for item in deferred)
 
     return {
         "timestamp_utc": isoformat_utc(timestamp),
@@ -987,6 +1004,7 @@ def orbits_payload(timestamp: datetime, groups: list[str] | None = None) -> dict
     bodies: list[dict[str, Any]] = []
 
     for item in catalog_objects:
+        if item.get("source_type") == "spacecraft": continue
         state_vector = None if item.get("source_type") in STATIC_CATALOG_SOURCE_TYPES else body_state_vector_payload(item, timestamp, state_cache)
         bodies.append(
             {

@@ -4,7 +4,7 @@ defmodule StarsmapApi.SkyShare.Context do
   alias StarsmapApi.Catalog.PublicObjects
   alias StarsmapApi.SkyShare.Ephemeris
 
-  @dynamic_groups ~w(core mars_moons jupiter_major_moons saturn_major_moons jpl_small_bodies)
+  @dynamic_groups ~w(spacecraft core mars_moons jupiter_major_moons saturn_major_moons jpl_small_bodies)
   @dynamic_core_keys ~w(sun mercury venus earth moon mars phobos deimos jupiter io europa ganymede callisto saturn titan rhea iapetus dione tethys enceladus mimas uranus neptune pluto)
   @au_km 149_597_870.7
   @field_atoms %{
