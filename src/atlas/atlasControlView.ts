@@ -1,3 +1,4 @@
+import { hasBodyPosition } from "../catalog/spacecraftCatalog";
 import { escapeHtml, formatCount, shortBodyName } from "../atlasFormatting";
 import type { ActiveAtlasTab, Body, BodyFilterDefinition, CatalogSummary, SizeMode, ZoomPreset } from "./contracts";
 import { BODY_FILTERS, EXPLORE_DOMAINS, FEATURED_KEYS, GUIDED_SETS, MAP_OBJECT_TYPE_FILTER_KEYS } from "./atlasDefinitions";
@@ -29,8 +30,8 @@ export class AtlasControlView {
     atlasDom.selectedSummaryName.textContent = body.name;
     atlasDom.selectedSummaryMeta.textContent = `${classifyBody(body).label} · ${formatDistance(body.distance_from_earth_km)} ${t("object.fromEarth")}`;
     atlasDom.selectedSummaryOrb.style.setProperty("--body-color", body.color || "#d8a23f");
-    atlasDom.centerSelected.disabled = false;
-    atlasDom.zoomSelected.disabled = false;
+    atlasDom.centerSelected.disabled = !hasBodyPosition(body);
+    atlasDom.zoomSelected.disabled = !hasBodyPosition(body);
     atlasDom.viewSkySelected.disabled = !canViewSky(body);
     if (atlasDom.viewSkySelected.disabled) atlasDom.viewSkySelected.title = t("sky.positionUnavailable");
     else atlasDom.viewSkySelected.removeAttribute("title");

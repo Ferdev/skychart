@@ -47,7 +47,7 @@ export function estimateMinorBodyApparentMagnitude(input: MinorBodyMagnitudeInpu
 export function skyPointAppearance(point: SkyPointAppearanceInput): SkyPointAppearance {
   const magnitude = point.apparent_magnitude;
   const objectType = point.object_type?.trim().toLowerCase() ?? "";
-  const isMinorBody = MINOR_BODY_TYPES.has(objectType);
+  const isMinorBody = MINOR_BODY_TYPES.has(objectType) || objectType === "spacecraft";
   const brightness = Number.isFinite(magnitude)
     ? clamp((7 - Number(magnitude)) / 9, 0, 1)
     : point.dynamic ? isMinorBody ? 0 : 0.7 : 0.2;

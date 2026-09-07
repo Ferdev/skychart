@@ -126,28 +126,30 @@ test.describe("compact and understandable atlas controls", () => {
     issues.assertClean();
   });
 
-  test("keeps footer links outside the scale panel at tablet and desktop widths", async ({ page }) => {
-    const issues = collectBrowserIssues(page);
-    await page.setViewportSize({ width: 1024, height: 680 });
-    const authorLink = page.getByRole("link", { name: "By Ferdev" });
-    await expect(authorLink).toBeVisible();
-    await expect(authorLink).toHaveAttribute("href", "https://ferdev.com/");
-    await expect(authorLink).toHaveAttribute("target", "_blank");
-    const section = page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"])');
-    await section.locator(".scale-collapse__toggle").click();
+  for (const width of [900, 1024, 1100, 1440]) {
+    test(`keeps footer links outside the scale panel at ${width}px`, async ({ page }) => {
+      const issues = collectBrowserIssues(page);
+      await page.setViewportSize({ width, height: 680 });
+      const authorLink = page.getByRole("link", { name: "By Ferdev" });
+      await expect(authorLink).toBeVisible();
+      await expect(authorLink).toHaveAttribute("href", "https://ferdev.com/");
+      await expect(authorLink).toHaveAttribute("target", "_blank");
+      const section = page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"])');
+      await section.locator(".scale-collapse__toggle").click();
 
-    const collisions = await page.evaluate(() => {
-      const footer = document.querySelector<HTMLElement>(".atlas-footer")?.getBoundingClientRect();
-      const protectedSurfaces = [".scale-rail", "#share-menu-button"]
-        .map((selector) => ({ selector, rect: document.querySelector<HTMLElement>(selector)?.getBoundingClientRect() }))
-        .filter((entry): entry is { selector: string; rect: DOMRect } => Boolean(entry.rect));
-      if (!footer) return ["missing footer"];
-      return protectedSurfaces
-        .filter(({ rect }) => footer.left < rect.right && footer.right > rect.left && footer.top < rect.bottom && footer.bottom > rect.top)
-        .map(({ selector }) => selector);
+      const collisions = await page.evaluate(() => {
+        const footer = document.querySelector<HTMLElement>(".atlas-footer")?.getBoundingClientRect();
+        const protectedSurfaces = [".scale-rail", "#share-menu-button"]
+          .map((selector) => ({ selector, rect: document.querySelector<HTMLElement>(selector)?.getBoundingClientRect() }))
+          .filter((entry): entry is { selector: string; rect: DOMRect } => Boolean(entry.rect));
+        if (!footer) return ["missing footer"];
+        return protectedSurfaces
+          .filter(({ rect }) => footer.left < rect.right && footer.right > rect.left && footer.top < rect.bottom && footer.bottom > rect.top)
+          .map(({ selector }) => selector);
+      });
+
+      expect(collisions, "footer must not intersect scale or share controls").toEqual([]);
+      issues.assertClean();
     });
-
-    expect(collisions, "footer must not intersect scale or share controls").toEqual([]);
-    issues.assertClean();
-  });
+  }
 });

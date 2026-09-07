@@ -279,3 +279,5 @@ Cosmic Atlas source code and original project materials are available under the
 [MIT License](LICENSE). Third-party scientific catalog records and ephemeris
 data are not relicensed under MIT; see the [scientific data notice](DATA-NOTICE.md)
 and the provenance embedded in each generated catalog.
+
+Spacecraft are searchable atlas objects with dated JPL Horizons positions. See [the spacecraft catalog and maintenance guide](docs/spacecraft.md) for coverage, exclusions, caching and validation.

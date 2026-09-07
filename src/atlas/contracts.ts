@@ -1,3 +1,4 @@
+import type { SpacecraftMetadata } from "../catalog/spacecraftCatalog";
 import type {
   DestinationBody,
   DestinationBodyType,
@@ -144,6 +145,7 @@ export type BodySmallBody = {
 };
 
 export type Body = DestinationBody & {
+  spacecraft?: SpacecraftMetadata;
   catalog?: BodyCatalog | null;
   state_vector?: BodyStateVector | null;
   orbit?: BodyOrbit | null;

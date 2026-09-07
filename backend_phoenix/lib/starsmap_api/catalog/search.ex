@@ -33,7 +33,29 @@ defmodule StarsmapApi.Catalog.Search do
         objects: []
       }
     else
-      search_source_objects(query_text, groups, types, offset, limit)
+      missions = StarsmapApi.Spacecraft.search(query_text, groups, types)
+      count = length(missions)
+      page = Enum.slice(missions, offset, limit)
+      remaining = limit - length(page)
+      missions_only = groups == ["spacecraft"] or types == ["spacecraft"]
+
+      result =
+        if remaining > 0 and not missions_only do
+          search_source_objects(query_text, groups, types, max(0, offset - count), remaining)
+        else
+          %{objects: [], total: 0, has_more: not missions_only}
+        end
+
+      Map.merge(result, %{
+        query: query_text,
+        groups: groups,
+        types: types,
+        offset: offset,
+        limit: limit,
+        objects: page ++ result.objects,
+        total: count + result.total,
+        has_more: offset + limit < count or result.has_more
+      })
     end
   end
 

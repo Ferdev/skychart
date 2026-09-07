@@ -1,3 +1,4 @@
+import { hasBodyPosition } from "../catalog/spacecraftCatalog";
 import type { Body, BodyHitEntry, Camera, CatalogPointHitEntry, Ephemeris } from "../atlas/contracts";
 import type { CatalogPointPlanner } from "../catalog/catalogPointPlanner";
 import type { CatalogPointStream } from "../catalog/catalogPointStream";
@@ -129,7 +130,7 @@ export class AtlasVisibilityModel {
   }
 
   bodyDisplayRadiusPx(body: Body) {
-    return Math.max(MAP_POINT_RADIUS_PX, this.bodyRadiusAu(body) * this.options.frame().camera.pxPerAu);
+    return Math.max(body.object_type === "spacecraft" ? 3.5 : MAP_POINT_RADIUS_PX, this.bodyRadiusAu(body) * this.options.frame().camera.pxPerAu);
   }
 
   bodyRadiusAu(body: Body) {
@@ -141,8 +142,10 @@ export class AtlasVisibilityModel {
   }
 
   private shouldRenderAtScale(body: Body, frame: VisibilityFrame) {
+    if (!hasBodyPosition(body)) return false;
     const width = frame.viewWidthLy;
     if (body.key === frame.selectedKey || body.key === frame.hoverKey || this.options.featuredKeys.includes(body.key)) return true;
+    if (body.object_type === "spacecraft") return width < 0.03;
     if (body.catalog_group === "jpl_small_bodies" && width > 2) return false;
     if (["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"].includes(body.catalog_group ?? "") && width >= 6_000) return false;
     if (body.catalog_group === "simbad_extragalactic" && width < 15_000) return false;

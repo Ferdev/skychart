@@ -89,12 +89,15 @@ export class DestinationSearchView {
     const guidedSet = config.guidedSet ?? null;
     const useCatalog = !guidedSet && (query.length >= 3 || (query.length === 0 && config.filter.key !== "all"));
     const signature = searchSignature(query, config.filter, config.excludeKeys);
-    if (!useCatalog || config.state.signature !== signature) this.clearResultPage(config.state);
+    const queryChanged = config.state.signature !== signature;
+    if (!useCatalog || queryChanged) this.clearResultPage(config.state);
     config.state.signature = useCatalog ? signature : undefined;
 
     const abortController = useCatalog ? new AbortController() : undefined;
     config.state.abortController = abortController;
-    if (useCatalog) {
+    // Background position updates refresh the same results. Keep the current
+    // options and keyboard focus available while that request is in flight.
+    if (useCatalog && queryChanged) {
       config.state.activeOptionKey = null;
       config.input.removeAttribute("aria-activedescendant");
       this.renderStatus(config.picker, config.loadingMessage, "loading");
