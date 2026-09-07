@@ -58,6 +58,7 @@ test("spacecraft position refresh preserves keyboard navigation during catalog r
   const timestamp = "2026-09-06T00:00:00Z";
   let searches = 0;
   let completedSearches = 0;
+  let holdSearch = false;
   let releaseSearch!: () => void;
   const pendingSearch = new Promise<void>(resolve => { releaseSearch = resolve; });
   await context.route("**/api/**", async route => {
@@ -66,7 +67,8 @@ test("spacecraft position refresh preserves keyboard navigation during catalog r
     if (url.pathname === "/api/ephemeris") payload = skyEphemerisFixture(timestamp);
     if (url.pathname === "/api/catalog") payload = { object_count: 0, group_counts: {}, type_counts: {} };
     if (url.pathname === "/api/catalog/search") {
-      if (++searches > 1) await pendingSearch;
+      searches++;
+      if (holdSearch) await pendingSearch;
       payload = { objects: [], total: 0, offset: 0, limit: 80, has_more: false };
       completedSearches++;
     }
@@ -83,11 +85,14 @@ test("spacecraft position refresh preserves keyboard navigation during catalog r
   await input.press("ArrowDown");
   const activeId = await input.getAttribute("aria-activedescendant");
   expect(activeId).toBeTruthy();
-  await expect.poll(() => searches).toBeGreaterThan(1);
+  const searchesBeforeRefresh = searches;
+  const completedBeforeRefresh = completedSearches;
+  holdSearch = true;
+  await expect.poll(() => searches).toBeGreaterThan(searchesBeforeRefresh);
   await expect(input).toHaveAttribute("aria-activedescendant", activeId!);
   await expect(page.locator('#body-picker [aria-selected="true"]')).toHaveAttribute("id", activeId!);
   releaseSearch();
-  await expect.poll(() => completedSearches).toBeGreaterThan(1);
+  await expect.poll(() => completedSearches).toBeGreaterThan(completedBeforeRefresh);
   await expect(input).toHaveAttribute("aria-activedescendant", activeId!);
   await expect(page.locator('#body-picker [aria-selected="true"]')).toHaveAttribute("id", activeId!);
   await input.press("Enter");

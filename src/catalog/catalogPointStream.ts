@@ -82,6 +82,10 @@ export class CatalogPointStream {
     }
 
     const signature = requests.map((request) => request.key).join("|");
+    if (signature !== this.signature) {
+      this.clearPrefetchTimer();
+      this.prefetchSignature = "";
+    }
     this.counters.pointsInViewport = null;
     this.viewportMeasurePending = true;
     const previousActiveKeys = this.activeKeys;
@@ -217,16 +221,27 @@ export class CatalogPointStream {
   }
 
   private schedulePrefetch(activeRequests: CatalogPointTileRequest[], activeSignature: string): void {
-    this.clearPrefetchTimer();
-    if (this.options.isEmbed() || this.options.manifest.state !== "ready" || activeRequests.length === 0 || activeSignature !== this.signature) return;
+    if (activeSignature !== this.signature) return;
+    if (this.options.isEmbed() || this.options.manifest.state !== "ready" || activeRequests.length === 0) {
+      this.clearPrefetchTimer();
+      this.prefetchSignature = "";
+      return;
+    }
     const now = performance.now();
     const requests = this.options.planner.prefetch(this.options.viewport(), activeRequests, (request) => {
       const tile = this.tiles.get(request.key);
       return !tile || (!tile.source && !tile.abortController && this.canRetry(tile, now));
     });
-    if (requests.length === 0) return;
+    if (requests.length === 0) {
+      // A cached wide view may start no new active fetches. Invalidate the old
+      // prefetch queue explicitly so it cannot continue after its fetch aborts.
+      this.clearPrefetchTimer();
+      this.prefetchSignature = "";
+      return;
+    }
     const signature = `${activeSignature}::prefetch::${requests.map((request) => request.key).join("|")}`;
     if (signature === this.prefetchSignature) return;
+    this.clearPrefetchTimer();
     this.prefetchSignature = signature;
     this.prefetchTimer = setTimeout(() => {
       this.prefetchTimer = null;
@@ -257,7 +272,7 @@ export class CatalogPointStream {
     this.counters.queued = queue.length;
     this.changed();
     const workers = Array.from({ length: Math.min(FETCH_CONCURRENCY, queue.length) }, async () => {
-      while (queue.length > 0 && requestId === this.requestId) {
+      while (queue.length > 0 && requestId === this.requestId && signature === this.signature) {
         const request = queue.shift();
         if (request) await this.loadTile(request, requestId);
       }

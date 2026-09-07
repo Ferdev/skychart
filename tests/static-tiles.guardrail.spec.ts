@@ -108,6 +108,14 @@ const EPHEMERIS_FIXTURE = {
 };
 
 test.describe("static catalog tile guardrails", () => {
+  test.beforeEach(async ({ page }) => {
+    // Tile fixtures define their own scene and exact visible-object counts.
+    // Live Horizons positions must not add spacecraft to that synthetic scene.
+    await page.route("**/api/spacecraft?**", route => route.fulfill({
+      contentType: "application/json", body: JSON.stringify({ bodies: [] }),
+    }));
+  });
+
   test("opens dense tile-point details immediately while the stable object hydrates", async ({ page }) => {
     const sourceId = 5_931_842_930_184_739_845n;
     const container = smp3ContainerFixture({ spanLog2: 8, tileX: 0, tileY: 0, qx: 128, qy: 128, sourceId });
@@ -554,10 +562,11 @@ test.describe("static catalog tile guardrails", () => {
     });
 
     await openAtlas(page);
+    await waitForCatalogRequestsToSettle(page);
     staticTileUrls.clear();
     await page.locator('[data-zoom-preset="galaxy"]').click();
     await expect.poll(() => staticTileUrls.size, { timeout: 10_000, message: "wide static tile requests" }).toBeGreaterThan(0);
-    await page.waitForTimeout(350);
+    await waitForCatalogRequestsToSettle(page);
 
     const urls = Array.from(staticTileUrls);
     expect(urls.length, "wide-view active static tile URLs should use one global cap, not per-layer caps").toBeLessThanOrEqual(8);
