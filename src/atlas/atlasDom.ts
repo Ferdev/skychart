@@ -94,7 +94,6 @@ export const atlasDom = {
   timeStepForward: requiredElement<HTMLButtonElement>("#time-step-forward"),
   timeBusy: requiredElement<HTMLElement>("#time-busy"),
   zoomPresets: requiredElement<HTMLElement>("#zoom-presets"),
-  mobileScaleToggle: document.querySelector<HTMLButtonElement>("#mobile-scale-toggle"),
   zoomOut: requiredElement<HTMLButtonElement>("#zoom-out"),
   zoomIn: requiredElement<HTMLButtonElement>("#zoom-in"),
   zoomScaleSlider: requiredElement<HTMLInputElement>("#zoom-scale-slider"),

@@ -62,7 +62,8 @@ test("heliocentric constellation lines toggle, retain missing-star gaps, and rep
   const toggle = page.locator('input[data-layer="constellations"]');
   await expect(toggle).not.toBeChecked();
   expect(constellationRequests).toBe(0);
-  await page.locator('[aria-controls="scale-map-overlays"]').click();
+  await expect(page.locator("#map-settings")).toBeHidden();
+  await expect(toggle).toBeVisible();
   await toggle.check();
   await expect.poll(async () => (await drawing()).segments).toBe(1);
   await expect.poll(async () => (await drawing()).labels).toContain("Orion");

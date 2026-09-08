@@ -1,3 +1,31 @@
+export function bindMapSettings() {
+  const toolbar = document.querySelector<HTMLElement>(".atlas-toolbar");
+  const settings = document.querySelector<HTMLElement>("#map-settings");
+  const toggle = document.querySelector<HTMLButtonElement>("#map-settings-toggle");
+  if (!toolbar || !settings || !toggle) return;
+  const position = () => {
+    const rect = toolbar.getBoundingClientRect();
+    const bottom = Math.max(12, window.innerHeight - rect.top + 10);
+    document.documentElement.style.setProperty("--atlas-toolbar-height", `${rect.height}px`);
+    settings.style.left = `${rect.left}px`;
+    settings.style.bottom = `${bottom}px`;
+    settings.style.maxHeight = `${Math.max(120, rect.top - 24)}px`;
+  };
+  new ResizeObserver(position).observe(toolbar);
+  window.addEventListener("resize", position);
+  settings.addEventListener("toggle", () => {
+    const open = settings.matches(":popover-open");
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open) position();
+  });
+  // Native popovers handle Escape, outside clicks, and keyboard focus return.
+  // Close the panel when switching away from the atlas into the sky view.
+  new MutationObserver(() => {
+    if (document.body.dataset.skyView === "true" && settings.matches(":popover-open")) settings.hidePopover();
+  }).observe(document.body, { attributes: true, attributeFilter: ["data-sky-view"] });
+  position();
+}
+
 export function bindScaleDisclosures(root: ParentNode = document) {
   const disclosures = Array.from(root.querySelectorAll<HTMLElement>("[data-scale-disclosure]"));
 
@@ -82,6 +110,7 @@ export function bindControlInfoTips(
   });
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || !tooltip.matches(":popover-open")) return;
+    event.preventDefault();
     pinnedButton = null;
     hide();
   });

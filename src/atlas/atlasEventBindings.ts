@@ -1,4 +1,4 @@
-import { bindControlInfoTips, bindScaleDisclosures } from "../controlPanelInteractions";
+import { bindControlInfoTips, bindScaleDisclosures, bindMapSettings } from "../controlPanelInteractions";
 import { decodeViewState, type DisplayLayer } from "../viewState";
 import type { MapInteractionController } from "../navigation/mapInteractionController";
 import type { SizeMode, ZoomPreset } from "./contracts";
@@ -45,6 +45,7 @@ interface AtlasEventBindingsOptions {
 export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
   const { dom, state } = options;
   bindScaleDisclosures();
+  bindMapSettings();
   bindControlInfoTips(dom.controlInfoTooltip);
   dom.sharePopover.addEventListener("toggle", () => {
     dom.shareMenuButton.setAttribute("aria-expanded", String(dom.sharePopover.matches(":popover-open")));
@@ -120,7 +121,7 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
     options.updateSizeModes();
     options.requestRender();
   });
-  dom.displayToggles.addEventListener("change", (event) => {
+  dom.mapHud.addEventListener("change", (event) => {
     const input = (event.target as HTMLElement).closest<HTMLInputElement>("input[data-layer]");
     if (!input) return;
     state.displayLayers = { ...state.displayLayers, [input.dataset.layer as DisplayLayer]: input.checked };

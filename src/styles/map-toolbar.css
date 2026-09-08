@@ -1,0 +1,267 @@
+/* Common map actions stay visible; detailed controls open above the toolbar. */
+.scale-rail.atlas-toolbar {
+  container-type: inline-size;
+  width: min(620px, calc(100vw - 32px));
+  padding: 10px 12px;
+  gap: 8px;
+  border-radius: 14px;
+  background: rgba(15, 19, 17, 0.95);
+  border-color: rgba(238, 230, 206, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  overflow: visible;
+}
+
+.toolbar-zoom {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.atlas-toolbar .icon-button {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 20px;
+}
+
+.atlas-toolbar .zoom-scale-control {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+}
+
+.toolbar-scale-summary {
+  color: var(--map-ink);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-toolbar .zoom-scale-control input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 24px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.toolbar-settings-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(238, 230, 206, 0.16);
+  border-radius: 8px;
+  color: var(--map-ink);
+  background: rgba(238, 230, 206, 0.05);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.toolbar-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid rgba(238, 230, 206, 0.1);
+  padding-top: 8px;
+}
+
+.toolbar-quick-layers {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.toolbar-quick-layers label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: rgba(238, 230, 206, 0.75);
+  background: rgba(238, 230, 206, 0.04);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.toolbar-quick-layers input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--accent-strong);
+  cursor: pointer;
+}
+
+.toolbar-quick-layers label:has(:checked),
+.toolbar-settings-button[aria-expanded="true"] {
+  color: #f6d58b;
+  border-color: rgba(239, 196, 104, 0.28);
+  background: rgba(239, 196, 104, 0.1);
+}
+
+.atlas-toolbar .zoom-presets {
+  display: flex;
+  flex: 1;
+  justify-content: flex-end;
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 0 8px;
+  border-left: 1px solid rgba(238, 230, 206, 0.14);
+  overflow: visible;
+}
+
+.atlas-toolbar .zoom-presets::before,
+.atlas-toolbar .zoom-presets button::before {
+  display: none;
+}
+
+.atlas-toolbar .zoom-presets button {
+  display: block;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(238, 230, 206, 0.65);
+  cursor: pointer;
+}
+
+.atlas-toolbar .zoom-presets button span {
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.atlas-toolbar .zoom-presets button.active {
+  background: rgba(238, 230, 206, 0.1);
+  color: var(--map-ink);
+}
+
+.atlas-toolbar button:hover,
+.toolbar-quick-layers label:hover {
+  background-color: rgba(238, 230, 206, 0.12);
+}
+
+.atlas-toolbar button:focus-visible,
+.toolbar-quick-layers label:has(:focus-visible),
+.atlas-toolbar input:focus-visible {
+  outline: 2px solid var(--spectral-teal);
+  outline-offset: 2px;
+}
+
+.map-settings {
+  position: fixed;
+  inset: auto;
+  width: min(420px, calc(100vw - 32px));
+  box-sizing: border-box;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid rgba(238, 230, 206, 0.22);
+  border-radius: 14px;
+  background: #141a16;
+  color: var(--map-ink);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  scrollbar-width: thin;
+}
+
+.map-settings-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.map-settings-heading h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.map-settings .map-frame-status {
+  border: 0;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.map-settings .scale-options {
+  display: grid;
+  height: auto;
+  overflow: visible;
+  padding: 0;
+  margin: 0;
+  scrollbar-gutter: auto;
+}
+
+.map-settings .scale-collapse__header {
+  padding: 5px 28px 5px 4px;
+}
+
+.map-settings .scale-collapse__toggle {
+  min-height: 36px;
+  font-size: 12px;
+  text-transform: none;
+  font-weight: 600;
+  color: var(--map-ink);
+}
+
+@media (max-width: 899px) {
+  .scale-rail.atlas-toolbar {
+    width: auto;
+    max-height: none;
+    padding: 8px 10px;
+    border-radius: 14px;
+    overflow: visible;
+  }
+
+  .toolbar-zoom { grid-template-columns: 36px minmax(0, 1fr) 36px auto; gap: 6px; }
+  .toolbar-settings-button { padding: 0 8px; min-height: 44px; }
+  .atlas-toolbar .icon-button { min-height: 44px; }
+  .toolbar-settings-button svg { display: none; }
+  .toolbar-bottom { flex-wrap: wrap; gap: 5px; padding-top: 6px; }
+  .toolbar-quick-layers { width: 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); }
+  .toolbar-quick-layers label { min-height: 44px; }
+  .atlas-toolbar .zoom-presets { width: 100%; flex: auto; border: 0; padding: 0; }
+  .atlas-toolbar .zoom-presets button { flex: 1; min-height: 44px; padding: 0 4px; }
+  .map-settings { width: calc(100vw - 20px); border-radius: 16px; padding: 12px; }
+  .map-settings .scale-collapse__toggle { min-height: 44px; }
+  .atlas-footer { bottom: calc(var(--atlas-toolbar-height, 150px) + max(10px, env(safe-area-inset-bottom)) + 10px); }
+}
+
+@media (min-width: 900px) {
+  .atlas-footer { left: 652px; }
+}
+
+@media (min-width: 900px) {
+  .map-hud[data-workspace-tab="object"] .atlas-toolbar {
+    max-width: calc(100vw - min(555px, calc(100vw - 420px)) - 48px);
+  }
+}
+
+@container (max-width: 550px) {
+  .toolbar-bottom { flex-wrap: wrap; }
+  .toolbar-quick-layers { width: 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); }
+  .toolbar-quick-layers label { min-width: 0; gap: 4px; padding: 0 4px; }
+  .toolbar-quick-layers span { min-width: 0; overflow-wrap: anywhere; }
+  .atlas-toolbar .zoom-presets { width: 100%; flex: auto; border: 0; padding: 0; }
+  .atlas-toolbar .zoom-presets button { flex: 1; padding: 0 4px; }
+  .atlas-toolbar .zoom-presets button span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+}
+
+@container (max-width: 300px) {
+  .atlas-toolbar .zoom-presets button span { font-size: 11px; white-space: nowrap; }
+}
