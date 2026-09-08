@@ -24,7 +24,7 @@ import { SelectionConnectorView } from "./object/selectionConnectorView";
 import { CatalogSearchGateway } from "./catalog/catalogSearchGateway";
 import { DestinationSearchView, type DestinationSearchConfig, type DestinationSearchState } from "./destination/destinationSearchView";
 import { MilkyWayRenderer } from "./rendering/milkyWayRenderer";
-import { ConstellationRenderer } from "./rendering/constellationRenderer";
+import { ConstellationOverlay } from "./atlas/constellationOverlay";
 import { ObjectComparisonView } from "./object/objectComparisonView";
 import { AtlasOverlayRenderer } from "./rendering/atlasOverlayRenderer";
 import { AtlasVisibilityModel, isSolarSystemBody } from "./rendering/atlasVisibilityModel";
@@ -374,7 +374,8 @@ const milkyWayRenderer = new MilkyWayRenderer({
   worldToScreen,
   drawLabel: atlasOverlay.drawLabel,
 });
-const constellationRenderer = new ConstellationRenderer({
+const constellationRenderer = new ConstellationOverlay({
+  stateChanged: scheduleViewStateReplace,
   context: ctx,
   bodyByKey: () => bodyByKey,
   worldToScreen,
@@ -529,6 +530,7 @@ const destinationController = new DestinationCatalogController({
   searchDebounceMs: SEARCH_INPUT_DEBOUNCE_MS,
 });
 const viewStateController = new AtlasViewStateController({
+  constellations: constellationRenderer,
   state: {
     get camera() { return camera; }, set camera(value) { camera = value; },
     get viewTime() { return viewTime; }, set viewTime(value) { viewTime = value; },

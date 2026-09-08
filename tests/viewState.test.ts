@@ -71,3 +71,8 @@ assert.equal(decodeSkyPermalink("/sky/not allowed", "", new Date("2042-04-05T00:
 assert.equal(decodeSkyPermalink("/sky/earth", `v=1&t=2042-04-05T00:00:00Z&sc=0,0,72&x=${"a".repeat(1_501)}`), null);
 assert.equal(decodeSkyPermalink("/sky/earth", "v=1&t=2042-04-05T00:00:00Z&sc=0,0,72&lang=invalid")?.locale, "en");
 console.log("viewState tests passed");
+
+const withHiddenFigures = { ...state, hiddenConstellations: ["orion", "aries", "orion", "unknown"] };
+assert.deepEqual(decodeViewState(encodeViewState(withHiddenFigures))?.hiddenConstellations, ["aries", "orion"]);
+assert.equal(new URLSearchParams(encodeViewState({ ...state, hiddenConstellations: [] })).has("hc"), false);
+assert.deepEqual(decodeViewState(encodeViewState(state) + "&hc=unknown,orion,orion")?.hiddenConstellations, ["orion"]);

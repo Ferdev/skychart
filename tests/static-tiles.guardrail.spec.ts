@@ -612,6 +612,8 @@ test.describe("static catalog tile guardrails", () => {
     expect(Array.from(tileUrls).filter((url) => url.includes("/layers/small_bodies/"))).toEqual([]);
 
     tileUrls.clear();
+    await expect(page.locator("#map-settings")).toBeHidden();
+    await page.locator("#map-settings-toggle").click();
     await page.locator('#map-filter-buttons [data-body-filter="dwarf_planet"]').click();
     await expect.poll(
       () => Array.from(viewportUrls).some((url) => url.includes("jpl_small_bodies") && url.includes("types=dwarf_planet")),

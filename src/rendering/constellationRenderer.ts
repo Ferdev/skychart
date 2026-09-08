@@ -1,17 +1,18 @@
 import type { Body, CatalogViewportPayload } from "../atlas/contracts";
 import { pointInRect, rectsOverlap, type Rect, type ScreenPoint } from "../geometry";
-import { CONSTELLATIONS } from "../sky/constellations";
+import { MAP_CONSTELLATIONS } from "../atlas/constellationStyles";
 
 type Position = { x_au: number; y_au: number };
-type Options = {
+export type ConstellationRendererOptions = {
   context: CanvasRenderingContext2D;
   bodyByKey: () => ReadonlyMap<string, Body>;
   worldToScreen: (xAu: number, yAu: number) => ScreenPoint;
   viewport: () => Rect;
   requestRender: () => void;
+  hiddenConstellations?: () => ReadonlySet<string>;
 };
 
-const ENDPOINT_KEYS = new Set(CONSTELLATIONS.flatMap((figure) => figure.polylines.flat()));
+const ENDPOINT_KEYS = new Set(MAP_CONSTELLATIONS.flatMap((figure) => figure.polylines.flat()));
 
 /** Connect catalog positions in the atlas plane, rather than sky directions. */
 export class ConstellationRenderer {
@@ -20,7 +21,7 @@ export class ConstellationRenderer {
   private loading = false;
   private retryAfter = 0;
 
-  constructor(private readonly options: Options) {}
+  constructor(private readonly options: ConstellationRendererOptions) {}
 
   draw(showLabels: boolean): void {
     void this.loadPositions();
@@ -39,15 +40,18 @@ export class ConstellationRenderer {
     ctx.beginPath();
     ctx.rect(viewport.left, viewport.top, viewport.width, viewport.height);
     ctx.clip();
-    ctx.strokeStyle = "rgba(248, 203, 101, 0.48)";
-    ctx.fillStyle = "rgba(248, 203, 101, 0.78)";
     ctx.lineWidth = 1.15;
     ctx.font = "700 10px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const occupied: Rect[] = [];
     const marked = new Set<string>();
-    for (const figure of CONSTELLATIONS) {
+    const hidden = this.options.hiddenConstellations?.();
+    for (const figure of MAP_CONSTELLATIONS) {
+      if (hidden?.has(figure.id)) continue;
+      ctx.strokeStyle = figure.color;
+      ctx.fillStyle = figure.color;
+      ctx.globalAlpha = 0.6;
       const endpoints = new Map<string, ScreenPoint>();
       ctx.beginPath();
       for (const polyline of figure.polylines) {
@@ -65,6 +69,7 @@ export class ConstellationRenderer {
         }
       }
       ctx.stroke();
+      ctx.globalAlpha = 0.9;
       // Keep endpoints visible even when the viewport's catalog sample omits them.
       for (const [key, point] of endpoints) {
         if (marked.has(key) || !pointInRect(point, viewport)) continue;

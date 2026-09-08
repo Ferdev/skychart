@@ -182,6 +182,27 @@
           <div class="scale-options">
             <section class="scale-collapse" data-scale-disclosure>
               <div class="scale-collapse__header">
+                <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-constellations">
+                  <span data-i18n="toolbar.constellations">Constellations</span>
+                  <span class="scale-collapse__indicator" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div id="scale-constellations" class="scale-collapse__content" hidden>
+                <p class="control-help" data-i18n="constellations.help">Choose figures by name. Colors match their lines on the map.</p>
+                <label class="constellation-master"><input type="checkbox" data-layer="constellations" /><span data-i18n="constellations.show">Show constellations on map</span></label>
+                <label for="constellation-search" data-i18n="constellations.search">Find a constellation</label>
+                <input id="constellation-search" type="search" autocomplete="off" />
+                <div class="constellation-actions">
+                  <button type="button" id="constellations-show-all" data-i18n="constellations.all">Show all</button>
+                  <button type="button" id="constellations-hide-all" data-i18n="constellations.none">Hide all</button>
+                  <span id="constellation-count" role="status"></span>
+                </div>
+                <div id="constellation-list" class="constellation-list" role="group" aria-label="Constellations" data-i18n-attrs="aria-label:toolbar.constellations"></div>
+                <p id="constellation-empty" class="control-help" hidden data-i18n="constellations.empty">No matching constellations.</p>
+              </div>
+            </section>
+            <section class="scale-collapse" data-scale-disclosure>
+              <div class="scale-collapse__header">
                 <button class="scale-collapse__toggle" type="button" aria-expanded="false" aria-controls="scale-object-display">
                   <span data-i18n="scale.objectDisplay">Object size</span>
                   <span class="scale-collapse__indicator" aria-hidden="true"></span>

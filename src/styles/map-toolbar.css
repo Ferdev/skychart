@@ -265,3 +265,52 @@
 @container (max-width: 300px) {
   .atlas-toolbar .zoom-presets button span { font-size: 11px; white-space: nowrap; }
 }
+
+#scale-constellations { font-size: 12px; }
+#scale-constellations input[type="checkbox"] { accent-color: var(--accent-strong); }
+
+.constellation-master,
+.constellation-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.constellation-list {
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 8px;
+  border-top: 1px solid rgba(238, 230, 206, 0.16);
+}
+
+.constellation-list label[hidden] { display: none; }
+.constellation-list label:hover { background: rgb(255 255 255 / 5%); }
+.constellation-list label:focus-within { outline: 1px solid #9bc9ff; outline-offset: -1px; }
+.constellation-swatch { width: 20px; height: 3px; border-radius: 2px; flex: none; }
+#constellation-search {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(238, 230, 206, 0.25);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--map-ink);
+}
+.constellation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.constellation-actions button {
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid rgba(238, 230, 206, 0.2);
+  border-radius: 8px;
+  background: rgba(238, 230, 206, 0.06);
+  color: var(--map-ink);
+}
+.constellation-actions button:hover { background: rgba(238, 230, 206, 0.14); }
+#constellation-search:focus-visible,
+.constellation-actions button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+#constellation-count { font-size: 11px; color: var(--map-muted); }

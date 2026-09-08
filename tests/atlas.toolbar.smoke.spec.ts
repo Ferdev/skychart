@@ -32,11 +32,11 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
       await page.screenshot({ path: testInfo.outputPath("toolbar.png") });
       await toolbar.screenshot({ path: testInfo.outputPath("toolbar-detail.png") });
       for (const layer of ["constellations", "labels", "grid"]) {
-        await expect(page.locator(`input[data-layer="${layer}"]`)).toBeVisible();
+        await expect(toolbar.locator(`.toolbar-quick-layers input[data-layer="${layer}"]`)).toBeVisible();
       }
       await expect(page.locator("#zoom-scale-slider")).toBeVisible();
       await expect(page.locator("#zoom-presets button")).toHaveCount(4);
-      await page.locator('input[data-layer="constellations"]').check();
+      await page.locator('.toolbar-quick-layers input[data-layer="constellations"]').check();
       await page.locator('input[data-layer="grid"]').uncheck();
       await expect(page).toHaveURL(/constellations.1/);
       await expect(page).toHaveURL(/grid.0/);
@@ -68,7 +68,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
       await page.locator("#zoom-out").click();
       await expect(settings).toBeHidden();
       await page.reload({ waitUntil: "domcontentloaded" });
-      await expect(page.locator('input[data-layer="constellations"]')).toBeChecked();
+      await expect(page.locator('.toolbar-quick-layers input[data-layer="constellations"]')).toBeChecked();
       await expect(page.locator('input[data-layer="grid"]')).not.toBeChecked();
       await settingsToggle.click();
       await page.locator('[aria-controls="scale-map-overlays"]').click();
@@ -83,6 +83,22 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
           return rect.left < 0 || rect.right > window.innerWidth;
         }));
       expect(overflow, "translated controls stay inside the viewport").toBe(false);
+      await settingsToggle.click();
+      await page.locator('[aria-controls="scale-constellations"]').click();
+      await page.locator("#constellations-hide-all").click();
+      await page.locator("#constellation-search").fill("orion");
+      const orion = page.locator('[data-constellation="orion"]');
+      await orion.check();
+      await expect(page.locator("#constellation-count")).toHaveText("1 von 87 ausgewählt");
+      await expect(page.locator("#constellation-list label:visible")).toHaveCount(1);
+      await expect(page.locator('#scale-constellations input[data-layer="constellations"]')).toBeChecked();
+      const row = await orion.locator("..").boundingBox();
+      const panel = await page.locator("#map-settings").boundingBox();
+      expect(row!.height).toBeGreaterThanOrEqual(44);
+      expect(row!.x).toBeGreaterThanOrEqual(panel!.x);
+      expect(row!.x + row!.width).toBeLessThanOrEqual(panel!.x + panel!.width);
+      expect(row!.y + row!.height).toBeLessThanOrEqual(panel!.y + panel!.height);
+      await page.screenshot({ path: testInfo.outputPath("constellation-settings.png") });
       expect(errors).toEqual([]);
     });
   });

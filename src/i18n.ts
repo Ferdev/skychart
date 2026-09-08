@@ -1,3 +1,4 @@
+import { CONSTELLATION_TRANSLATIONS } from "./atlas/constellationTranslations";
 import { SPACECRAFT_TRANSLATIONS } from "./catalog/spacecraftTranslations";
 import { LAUNCH_TRANSLATIONS } from "./launchTranslations";
 import { SKY_SHARE_TRANSLATIONS } from "./sky/skyShareTranslations";
@@ -15,6 +16,7 @@ export const SUPPORTED_LOCALES: LocaleCode[] = ["en", "es", "fr", "de", "pt-BR",
 const LOCALE_STORAGE_KEY = "cosmic-atlas:locale";
 
 const en: Record<string, string> = {
+  ...CONSTELLATION_TRANSLATIONS.en,
   "meta.description": "Cosmic Atlas is a scientific 2D map of Solar System, nearby-star, and Messier catalog objects using real ephemeris and catalog data.",
   "meta.ogDescription": "A scientifically grounded 2D celestial atlas for inspecting, measuring, and comparing loaded objects.",
   "app.skipControls": "Skip to controls",
@@ -834,14 +836,14 @@ const FILTER_COUNT_TRANSLATIONS: Record<Exclude<LocaleCode, "en">, Record<string
 };
 
 const TOOLBAR_TRANSLATIONS: Record<string, Record<string, string>> = {
-  es: { "toolbar.settings": "Ajustes", "toolbar.closeSettings": "Cerrar ajustes", "toolbar.constellations": "Constelaciones" },
-  fr: { "toolbar.settings": "Réglages", "toolbar.closeSettings": "Fermer les réglages", "toolbar.constellations": "Constellations" },
-  de: { "toolbar.settings": "Einstellungen", "toolbar.closeSettings": "Einstellungen schließen", "toolbar.constellations": "Sternbilder" },
-  "pt-BR": { "toolbar.settings": "Ajustes", "toolbar.closeSettings": "Fechar ajustes", "toolbar.constellations": "Constelações" },
-  it: { "toolbar.settings": "Impostazioni", "toolbar.closeSettings": "Chiudi impostazioni", "toolbar.constellations": "Costellazioni" },
-  "zh-Hans": { "toolbar.settings": "设置", "toolbar.closeSettings": "关闭设置", "toolbar.constellations": "星座" },
-  ja: { "toolbar.settings": "設定", "toolbar.closeSettings": "設定を閉じる", "toolbar.constellations": "星座" },
-  ko: { "toolbar.settings": "설정", "toolbar.closeSettings": "설정 닫기", "toolbar.constellations": "별자리" },
+  es: { ...CONSTELLATION_TRANSLATIONS["es"], "toolbar.settings": "Ajustes", "toolbar.closeSettings": "Cerrar ajustes", "toolbar.constellations": "Constelaciones" },
+  fr: { ...CONSTELLATION_TRANSLATIONS["fr"], "toolbar.settings": "Réglages", "toolbar.closeSettings": "Fermer les réglages", "toolbar.constellations": "Constellations" },
+  de: { ...CONSTELLATION_TRANSLATIONS["de"], "toolbar.settings": "Einstellungen", "toolbar.closeSettings": "Einstellungen schließen", "toolbar.constellations": "Sternbilder" },
+  "pt-BR": { ...CONSTELLATION_TRANSLATIONS["pt-BR"], "toolbar.settings": "Ajustes", "toolbar.closeSettings": "Fechar ajustes", "toolbar.constellations": "Constelações" },
+  it: { ...CONSTELLATION_TRANSLATIONS["it"], "toolbar.settings": "Impostazioni", "toolbar.closeSettings": "Chiudi impostazioni", "toolbar.constellations": "Costellazioni" },
+  "zh-Hans": { ...CONSTELLATION_TRANSLATIONS["zh-Hans"], "toolbar.settings": "设置", "toolbar.closeSettings": "关闭设置", "toolbar.constellations": "星座" },
+  ja: { ...CONSTELLATION_TRANSLATIONS["ja"], "toolbar.settings": "設定", "toolbar.closeSettings": "設定を閉じる", "toolbar.constellations": "星座" },
+  ko: { ...CONSTELLATION_TRANSLATIONS["ko"], "toolbar.settings": "설정", "toolbar.closeSettings": "설정 닫기", "toolbar.constellations": "별자리" },
 };
 
 export const LOCALES: Record<LocaleCode, LocaleDefinition> = {
