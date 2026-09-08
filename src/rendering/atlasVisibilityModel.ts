@@ -10,6 +10,7 @@ type VisibilityFrame = {
   ephemeris: Ephemeris | null;
   camera: Camera;
   viewport: Rect;
+  renderViewport: Rect;
   selectedKey: string;
   compareTargetKey: string | null;
   hoverKey: string | null;
@@ -52,7 +53,7 @@ export class AtlasVisibilityModel {
   visibleBodies() {
     if (this.visibleCache) return this.visibleCache;
     const frame = this.options.frame();
-    const rect = expandedRect(frame.viewport, 80);
+    const rect = expandedRect(frame.renderViewport, 80);
     this.visibleCache = (frame.ephemeris?.bodies ?? []).filter((body) => {
       const pinned = body.key === frame.selectedKey || body.key === frame.compareTargetKey || body.key === frame.hoverKey;
       if (!pinned && !this.options.matchesActiveFilter(body)) return false;
@@ -125,7 +126,7 @@ export class AtlasVisibilityModel {
         screen: this.bodyToScreen(body, frame),
         selectedDistanceKm: selected ? this.options.bodyDistanceKm(selected, body) : body.distance_from_earth_km,
       }))
-      .filter(({ screen }) => !pointInRect(screen, frame.viewport))
+      .filter(({ screen }) => !pointInRect(screen, frame.renderViewport))
       .sort((left, right) => left.selectedDistanceKm - right.selectedDistanceKm);
   }
 
@@ -178,7 +179,7 @@ export class AtlasVisibilityModel {
   private rebuildPointGrid() {
     this.pointGrid = new Map();
     const frame = this.options.frame();
-    const rect = expandedRect(frame.viewport, 12);
+    const rect = expandedRect(frame.renderViewport, 12);
     for (const tile of this.options.stream.activeTiles()) {
       const payload = tile.payload;
       if (!payload || payload.returned === 0) continue;

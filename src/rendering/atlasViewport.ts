@@ -27,6 +27,14 @@ export class AtlasViewport {
     return this.frameRect ?? this.computeRect();
   }
 
+  /** Rendering extends beside desktop controls; centering still uses rect(). */
+  renderRect(): Rect {
+    const rect = this.rect();
+    if (window.innerWidth < 900) return rect;
+    const bottom = Math.max(rect.bottom, window.innerHeight - 10);
+    return { ...rect, bottom, height: bottom - rect.top };
+  }
+
   worldToScreen(xAu: number, yAu: number): ScreenPoint {
     const rect = this.rect();
     const camera = this.options.camera();
@@ -43,6 +51,19 @@ export class AtlasViewport {
       xAu: camera.xAu + (x - (rect.left + rect.width / 2)) / camera.pxPerAu,
       yAu: camera.yAu - (y - (rect.top + rect.height / 2)) / camera.pxPerAu,
     };
+  }
+
+  worldBounds(paddingRatio: number) {
+    const rect = this.renderRect();
+    const leftTop = this.screenToWorld(rect.left, rect.top);
+    const rightBottom = this.screenToWorld(rect.right, rect.bottom);
+    const minXAu = Math.min(leftTop.xAu, rightBottom.xAu);
+    const maxXAu = Math.max(leftTop.xAu, rightBottom.xAu);
+    const minYAu = Math.min(leftTop.yAu, rightBottom.yAu);
+    const maxYAu = Math.max(leftTop.yAu, rightBottom.yAu);
+    const paddingXAu = (maxXAu - minXAu) * paddingRatio;
+    const paddingYAu = (maxYAu - minYAu) * paddingRatio;
+    return { minXAu: minXAu - paddingXAu, maxXAu: maxXAu + paddingXAu, minYAu: minYAu - paddingYAu, maxYAu: maxYAu + paddingYAu };
   }
 
   renderScale(): number {
