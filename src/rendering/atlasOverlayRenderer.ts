@@ -13,6 +13,7 @@ type OverlayFrame = {
   hoverKey: string | null;
   pointRendererAvailable: boolean;
   viewport: Rect;
+  renderViewport: Rect;
   visibleBodies: Body[];
   labelBodies: Body[];
   edgeBodies: EdgeBody[];
@@ -50,7 +51,7 @@ export class AtlasOverlayRenderer {
 
   drawGrid() {
     const frame = this.options.frame();
-    const rect = frame.viewport;
+    const rect = frame.renderViewport;
     const worldLeft = this.options.screenToWorld(rect.left, rect.top).xAu;
     const worldRight = this.options.screenToWorld(rect.right, rect.top).xAu;
     const worldTop = this.options.screenToWorld(rect.left, rect.top).yAu;
@@ -74,7 +75,7 @@ export class AtlasOverlayRenderer {
       ctx.lineTo(rect.right, screen.y);
       ctx.stroke();
     }
-    this.drawScaleBar(rect, step, frame.camera);
+    this.drawScaleBar(frame.viewport, step, frame.camera);
     ctx.restore();
   }
 
@@ -82,7 +83,7 @@ export class AtlasOverlayRenderer {
     const frame = this.options.frame();
     if (this.options.currentViewWidthAu() > 1_000) return;
     const bodies = (frame.ephemeris?.bodies ?? []).filter((body) => this.options.bodyMatchesActiveFilter(body) && body.orbit && body.parent_key && this.options.isSolarSystemBody(body));
-    const rect = expandedRect(frame.viewport, 160);
+    const rect = expandedRect(frame.renderViewport, 160);
     const ctx = this.options.context;
     ctx.save();
     for (const body of bodies) {
@@ -103,7 +104,7 @@ export class AtlasOverlayRenderer {
     const frame = this.options.frame();
     if (!frame.selected || !frame.compareTarget) return;
     const points = [frame.selected, frame.compareTarget].map(this.options.bodyToScreen);
-    if (points.some((point) => !pointInRect(point, expandedRect(frame.viewport, 80)))) return;
+    if (points.some((point) => !pointInRect(point, expandedRect(frame.renderViewport, 80)))) return;
     const ctx = this.options.context;
     ctx.save();
     ctx.strokeStyle = "rgba(236, 183, 89, 0.82)";
@@ -155,7 +156,7 @@ export class AtlasOverlayRenderer {
 
   drawEdgeReferences() {
     const frame = this.options.frame();
-    const rect = frame.viewport;
+    const rect = frame.renderViewport;
     const selectedScreen = frame.selected ? this.options.bodyToScreen(frame.selected) : null;
     const center = { x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 };
     const origin = selectedScreen && pointInRect(selectedScreen, rect) ? selectedScreen : center;

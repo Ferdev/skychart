@@ -27,6 +27,14 @@ export class AtlasViewport {
     return this.frameRect ?? this.computeRect();
   }
 
+  /** Rendering extends beside desktop controls; centering still uses rect(). */
+  renderRect(): Rect {
+    const rect = this.rect();
+    if (window.innerWidth < 900) return rect;
+    const bottom = Math.max(rect.bottom, window.innerHeight - 10);
+    return { ...rect, bottom, height: bottom - rect.top };
+  }
+
   worldToScreen(xAu: number, yAu: number): ScreenPoint {
     const rect = this.rect();
     const camera = this.options.camera();

@@ -20,6 +20,7 @@ interface CatalogLayerRendererOptions {
   planner: CatalogPointPlanner;
   viewport: () => CatalogPointViewport;
   viewportRect: () => Rect;
+  renderRect: () => Rect;
   renderScale: () => number;
   camera: () => Camera;
   ephemerisTimestamp: () => string;
@@ -73,6 +74,7 @@ export class CatalogLayerRenderer {
     }
 
     const rect = this.options.viewportRect();
+    const clip = this.options.renderRect();
     const bodyLayer = this.bodyPointLayer();
     const uploadStartedAt = performance.now();
     pointRenderer.setLayer("bodies", bodyLayer);
@@ -91,13 +93,13 @@ export class CatalogLayerRenderer {
       width: this.options.pointCanvas.width,
       height: this.options.pointCanvas.height,
       dpr: this.options.renderScale(),
-      clip: rect,
+      clip,
       measureViewport,
       measurePixels,
     });
     if (this.options.stream.needsViewportMeasurement()) {
       this.options.stream.recordViewportMeasurement(
-        pointRendererStats.pointsInViewport - this.richPointsInViewport(bodyLayer, rect),
+        pointRendererStats.pointsInViewport - this.richPointsInViewport(bodyLayer, rect, clip),
       );
     }
     if (!pointRenderer.available) {
@@ -116,7 +118,7 @@ export class CatalogLayerRenderer {
     };
   }
 
-  private richPointsInViewport(source: PointLayerSource | null, rect: Rect): number {
+  private richPointsInViewport(source: PointLayerSource | null, rect: Rect, clip: Rect): number {
     if (!source || source.kind !== "rich") return 0;
     const camera = this.options.camera();
     const centerX = rect.left + rect.width / 2;
@@ -126,7 +128,7 @@ export class CatalogLayerRenderer {
       const offset = index * 6;
       const x = centerX + ((source.vertices[offset] ?? 0) - camera.xAu) * camera.pxPerAu;
       const y = centerY - ((source.vertices[offset + 1] ?? 0) - camera.yAu) * camera.pxPerAu;
-      if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) visible += 1;
+      if (x >= clip.left && x < clip.right && y >= clip.top && y < clip.bottom) visible += 1;
     }
     return visible;
   }

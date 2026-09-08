@@ -216,7 +216,7 @@ const viewportCatalogLoader = new ViewportCatalogLoader({
   viewWidthLy: currentViewWidthLy,
   filter: activeBodyFilterDefinition,
   worldBounds: (paddingRatio) => {
-    const rect = usableViewportRect();
+    const rect = atlasViewport.renderRect();
     const leftTop = screenToWorld(rect.left, rect.top);
     const rightBottom = screenToWorld(rect.right, rect.bottom);
     const minXAu = Math.min(leftTop.xAu, rightBottom.xAu);
@@ -290,6 +290,7 @@ atlasVisibility = new AtlasVisibilityModel({
     ephemeris,
     camera,
     viewport: usableViewportRect(),
+    renderViewport: atlasViewport.renderRect(),
     selectedKey,
     compareTargetKey,
     hoverKey,
@@ -312,6 +313,7 @@ const catalogLayerRenderer = new CatalogLayerRenderer({
   planner: catalogPointPlanner,
   viewport: catalogPointViewport,
   viewportRect: usableViewportRect,
+  renderRect: () => atlasViewport.renderRect(),
   renderScale,
   camera: () => camera,
   ephemerisTimestamp: () => ephemeris?.timestamp_utc ?? "",
@@ -356,6 +358,7 @@ const atlasOverlay = new AtlasOverlayRenderer({
     hoverKey,
     pointRendererAvailable: pointRenderer.available,
     viewport: usableViewportRect(),
+    renderViewport: atlasViewport.renderRect(),
     visibleBodies: visibleBodies(),
     labelBodies: prioritizedLabelBodies(),
     edgeBodies: edgeReferenceBodies(),
@@ -906,7 +909,7 @@ async function loadCatalogTileManifest() {
 }
 
 function catalogPointViewport(): CatalogPointViewport {
-  const rect = usableViewportRect();
+  const rect = atlasViewport.renderRect();
   return {
     camera: { ...camera },
     viewportWidthPx: rect.width,
