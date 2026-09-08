@@ -116,6 +116,7 @@ const en: Record<string, string> = {
   "scale.labels": "Labels",
   "scale.orbits": "Orbits",
   "scale.grid": "Grid",
+  "scale.constellationsHelp": "Connect constellation stars at their catalog distances in the heliocentric plane.",
   "scale.milkyWay": "Milky Way",
   "scale.milkyWayArms": "MW arms",
   "scale.milkyWayDust": "MW dust",

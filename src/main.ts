@@ -24,6 +24,7 @@ import { SelectionConnectorView } from "./object/selectionConnectorView";
 import { CatalogSearchGateway } from "./catalog/catalogSearchGateway";
 import { DestinationSearchView, type DestinationSearchConfig, type DestinationSearchState } from "./destination/destinationSearchView";
 import { MilkyWayRenderer } from "./rendering/milkyWayRenderer";
+import { ConstellationRenderer } from "./rendering/constellationRenderer";
 import { ObjectComparisonView } from "./object/objectComparisonView";
 import { AtlasOverlayRenderer } from "./rendering/atlasOverlayRenderer";
 import { AtlasVisibilityModel, isSolarSystemBody } from "./rendering/atlasVisibilityModel";
@@ -176,6 +177,7 @@ let displayLayers: Record<DisplayLayer, boolean> = {
   labels: true,
   orbits: true,
   grid: true,
+  constellations: false,
   milkyWay: true,
   milkyWayArms: true,
   milkyWayDust: true,
@@ -381,6 +383,13 @@ const milkyWayRenderer = new MilkyWayRenderer({
   usableViewport: usableViewportRect,
   worldToScreen,
   drawLabel: atlasOverlay.drawLabel,
+});
+const constellationRenderer = new ConstellationRenderer({
+  context: ctx,
+  bodyByKey: () => bodyByKey,
+  worldToScreen,
+  viewport: usableViewportRect,
+  requestRender: () => requestRender(),
 });
 const objectComparison = new ObjectComparisonView({
   heading: compareHeading,
@@ -805,6 +814,7 @@ function render() {
       if (displayLayers.milkyWay) drawMilkyWayLayer();
       if (displayLayers.grid) atlasOverlay.drawGrid();
       if (displayLayers.orbits) atlasOverlay.drawOrbitGuides();
+      if (displayLayers.constellations) constellationRenderer.draw(displayLayers.labels);
       atlasOverlay.drawComparisonGuide();
       atlasOverlay.drawBodies();
       if (displayLayers.labels) atlasOverlay.drawLabels();

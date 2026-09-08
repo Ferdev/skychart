@@ -13,7 +13,7 @@ const state = {
   center: { x: -4.321987654321e20, y: 1.234567890123e-8 }, zoom: 1e-14,
   time: "2042-04-05T06:07:08.000Z" as const, objectKey: "gaia:123",
   compare: ["gaia:123", "mars"] as const, catalogRelease: "v9",
-  layers: { labels: true, grid: false, milkyWay: true }, filters: { primary: "galaxy", compare: "all" } as const,
+  layers: { labels: true, grid: false, milkyWay: true, constellations: true }, filters: { primary: "galaxy", compare: "all" } as const,
   sky: { observerKey: "earth", yawDeg: 182.5, pitchDeg: -12, fovDeg: 64, constellations: false, hiddenObjectTypes: ["asteroid", "comet"] },
   tour: "local-group", step: 3
 };
@@ -21,6 +21,7 @@ const encoded = encodeViewState(state);
 assert.deepEqual(decodeViewState(encoded), state);
 assert.equal(new URLSearchParams(encoded).get("F"), "galaxy.all");
 assert.equal(new URLSearchParams(encoded).get("sl"), "0");
+assert.equal(decodeViewState(encodeViewState({ ...state, layers: { constellations: false } }))?.layers.constellations, false);
 assert.equal(new URLSearchParams(encoded).get("sf"), "asteroid,comet");
 assert.equal(decodeViewState("?v=1&c=0,0&z=Infinity&t=now&L="), null);
 assert.equal(decodeViewState("?v=2&c=0,0&z=1&t=now&L="), null);
