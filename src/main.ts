@@ -52,7 +52,7 @@ import { installAtlasDiagnostics } from "./atlas/atlasDiagnostics";
 import { AtlasEmbedController } from "./atlas/atlasEmbedController";
 import { AtlasTimeController } from "./atlas/atlasTimeController";
 import { AtlasLoadingView } from "./atlas/atlasLoadingView";
-import { catalogSummaryFromEphemeris, mergeBodyList } from "./atlas/atlasState";
+import { catalogSummaryFromEphemeris, createDefaultDisplayLayers, mergeBodyList } from "./atlas/atlasState";
 import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController";
 import type {
   ActiveAtlasTab,
@@ -173,17 +173,7 @@ let activeCompareFilter: BodyFilter = "all";
 let activeGuidedSetId: string | null = null;
 let sizeMode: SizeMode = "hybrid";
 let activeZoomPreset: ZoomPreset | null = "solar";
-let displayLayers: Record<DisplayLayer, boolean> = {
-  labels: true,
-  orbits: true,
-  grid: true,
-  constellations: false,
-  milkyWay: true,
-  milkyWayArms: true,
-  milkyWayDust: true,
-  milkyWayGuides: true,
-  references: true,
-};
+let displayLayers: Record<DisplayLayer, boolean> = createDefaultDisplayLayers();
 let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
 let viewTime: "now" | string = "now";
 let loadSequence = 0;
