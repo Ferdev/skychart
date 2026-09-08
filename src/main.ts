@@ -215,18 +215,7 @@ const viewportCatalogLoader = new ViewportCatalogLoader({
   canLoad: () => Boolean(ephemeris),
   viewWidthLy: currentViewWidthLy,
   filter: activeBodyFilterDefinition,
-  worldBounds: (paddingRatio) => {
-    const rect = atlasViewport.renderRect();
-    const leftTop = screenToWorld(rect.left, rect.top);
-    const rightBottom = screenToWorld(rect.right, rect.bottom);
-    const minXAu = Math.min(leftTop.xAu, rightBottom.xAu);
-    const maxXAu = Math.max(leftTop.xAu, rightBottom.xAu);
-    const minYAu = Math.min(leftTop.yAu, rightBottom.yAu);
-    const maxYAu = Math.max(leftTop.yAu, rightBottom.yAu);
-    const paddingXAu = (maxXAu - minXAu) * paddingRatio;
-    const paddingYAu = (maxYAu - minYAu) * paddingRatio;
-    return { minXAu: minXAu - paddingXAu, maxXAu: maxXAu + paddingXAu, minYAu: minYAu - paddingYAu, maxYAu: maxYAu + paddingYAu };
-  },
+  worldBounds: (paddingRatio) => atlasViewport.worldBounds(paddingRatio),
   hasBody: (key) => bodyByKey.has(key),
   mergeBodies,
   afterMerge: () => {

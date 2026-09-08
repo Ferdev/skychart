@@ -53,6 +53,19 @@ export class AtlasViewport {
     };
   }
 
+  worldBounds(paddingRatio: number) {
+    const rect = this.renderRect();
+    const leftTop = this.screenToWorld(rect.left, rect.top);
+    const rightBottom = this.screenToWorld(rect.right, rect.bottom);
+    const minXAu = Math.min(leftTop.xAu, rightBottom.xAu);
+    const maxXAu = Math.max(leftTop.xAu, rightBottom.xAu);
+    const minYAu = Math.min(leftTop.yAu, rightBottom.yAu);
+    const maxYAu = Math.max(leftTop.yAu, rightBottom.yAu);
+    const paddingXAu = (maxXAu - minXAu) * paddingRatio;
+    const paddingYAu = (maxYAu - minYAu) * paddingRatio;
+    return { minXAu: minXAu - paddingXAu, maxXAu: maxXAu + paddingXAu, minYAu: minYAu - paddingYAu, maxYAu: maxYAu + paddingYAu };
+  }
+
   renderScale(): number {
     return Math.min(2, window.devicePixelRatio || 1);
   }
