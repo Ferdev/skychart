@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = (ROOT / "src" / "main.ts").read_text()
+STATE = (ROOT / "src" / "atlas" / "atlasState.ts").read_text()
 PLANNER = (ROOT / "src" / "catalog" / "catalogPointPlanner.ts").read_text()
 STREAM = (ROOT / "src" / "catalog" / "catalogPointStream.ts").read_text()
 STATS = (ROOT / "src" / "atlas" / "atlasStatsView.ts").read_text()
@@ -28,9 +29,10 @@ def test_context_and_diagnostics_controls_explain_rendering_modes():
     assert 'id="context-mode-status"' in INDEX
     for text in ["Gaia/catalog points", "Milky Way context", "Extragalactic catalog"]:
         assert text in INDEX
+    assert "displayLayers: Record<DisplayLayer, boolean> = createDefaultDisplayLayers()" in MAIN
     for layer in ["milkyWayArms", "milkyWayDust", "milkyWayGuides"]:
         assert f'data-layer="{layer}"' in INDEX
-        assert re.search(rf"\b{layer}:\s*true", MAIN)
+        assert re.search(rf"\b{layer}:\s*true", STATE)
 
 
 def test_milky_way_components_are_independently_gated():

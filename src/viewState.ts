@@ -1,6 +1,8 @@
+import { normalizeHiddenConstellations } from "./atlas/constellationStyles.ts";
+
 export const VIEW_STATE_VERSION = 1;
 
-export const DISPLAY_LAYERS = ["labels", "orbits", "grid", "milkyWay", "milkyWayArms", "milkyWayDust", "milkyWayGuides", "references"] as const;
+export const DISPLAY_LAYERS = ["labels", "orbits", "grid", "constellations", "milkyWay", "milkyWayArms", "milkyWayDust", "milkyWayGuides", "references"] as const;
 export type DisplayLayer = typeof DISPLAY_LAYERS[number];
 
 export const BODY_FILTERS = ["all", "solar_system", "planet", "moon", "star", "bright_star", "gaia_star", "exoplanet_system", "dwarf_planet", "small_body", "asteroid", "comet", "deep_sky", "galaxy", "quasar", "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster", "xray"] as const;
@@ -37,6 +39,7 @@ export type SkyPermalinkState = SkyViewState & {
 export type ViewState = {
   center: { x: number; y: number }; zoom: number; time: "now" | string;
   objectKey?: string; compare?: readonly [string, string]; catalogRelease?: string;
+  hiddenConstellations?: string[];
   layers: Partial<Record<DisplayLayer, boolean>>; filters?: ViewFilters; sky?: SkyViewState; tour?: string; step?: number;
 };
 
@@ -86,6 +89,8 @@ export function encodeViewState(state: ViewState): string {
   if (state.compare) params.set("cmp", `${state.compare[0]},${state.compare[1]}`);
   if (state.catalogRelease) params.set("r", state.catalogRelease);
   params.set("L", encodeLayerFlags(state.layers));
+  const hidden = normalizeHiddenConstellations(state.hiddenConstellations ?? []);
+  if (hidden.length) params.set("hc", hidden.join(","));
   if (state.filters) params.set("F", encodeFilters(state.filters));
   if (state.sky) {
     const sky = normalizeSkyViewState(state.sky);
@@ -118,6 +123,7 @@ export function decodeViewState(input: URLSearchParams | string): ViewState | nu
     objectKey: params.get("o") || undefined,
     compare: compare.length === 2 ? [compare[0]!, compare[1]!] : undefined,
     catalogRelease: params.get("r") || undefined, layers: decodeLayerFlags(params.get("L")),
+    ...(params.has("hc") ? { hiddenConstellations: normalizeHiddenConstellations(params.get("hc")!.split(",")) } : {}),
     filters: decodeFilters(params.get("F")), ...(sky ? { sky } : {}), tour: params.get("tour") || undefined, step
   };
 }

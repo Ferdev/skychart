@@ -1,3 +1,4 @@
+import { CONSTELLATION_TRANSLATIONS } from "./atlas/constellationTranslations";
 import { SPACECRAFT_TRANSLATIONS } from "./catalog/spacecraftTranslations";
 import { LAUNCH_TRANSLATIONS } from "./launchTranslations";
 import { SKY_SHARE_TRANSLATIONS } from "./sky/skyShareTranslations";
@@ -15,6 +16,7 @@ export const SUPPORTED_LOCALES: LocaleCode[] = ["en", "es", "fr", "de", "pt-BR",
 const LOCALE_STORAGE_KEY = "cosmic-atlas:locale";
 
 const en: Record<string, string> = {
+  ...CONSTELLATION_TRANSLATIONS.en,
   "meta.description": "Cosmic Atlas is a scientific 2D map of Solar System, nearby-star, and Messier catalog objects using real ephemeris and catalog data.",
   "meta.ogDescription": "A scientifically grounded 2D celestial atlas for inspecting, measuring, and comparing loaded objects.",
   "app.skipControls": "Skip to controls",
@@ -116,6 +118,10 @@ const en: Record<string, string> = {
   "scale.labels": "Labels",
   "scale.orbits": "Orbits",
   "scale.grid": "Grid",
+  "toolbar.settings": "Settings",
+  "toolbar.closeSettings": "Close settings",
+  "toolbar.constellations": "Constellations",
+  "scale.constellationsHelp": "Connect constellation stars at their catalog distances in the heliocentric plane.",
   "scale.milkyWay": "Milky Way",
   "scale.milkyWayArms": "MW arms",
   "scale.milkyWayDust": "MW dust",
@@ -829,16 +835,27 @@ const FILTER_COUNT_TRANSLATIONS: Record<Exclude<LocaleCode, "en">, Record<string
   }
 };
 
+const TOOLBAR_TRANSLATIONS: Record<string, Record<string, string>> = {
+  es: { ...CONSTELLATION_TRANSLATIONS["es"], "toolbar.settings": "Ajustes", "toolbar.closeSettings": "Cerrar ajustes", "toolbar.constellations": "Constelaciones" },
+  fr: { ...CONSTELLATION_TRANSLATIONS["fr"], "toolbar.settings": "Réglages", "toolbar.closeSettings": "Fermer les réglages", "toolbar.constellations": "Constellations" },
+  de: { ...CONSTELLATION_TRANSLATIONS["de"], "toolbar.settings": "Einstellungen", "toolbar.closeSettings": "Einstellungen schließen", "toolbar.constellations": "Sternbilder" },
+  "pt-BR": { ...CONSTELLATION_TRANSLATIONS["pt-BR"], "toolbar.settings": "Ajustes", "toolbar.closeSettings": "Fechar ajustes", "toolbar.constellations": "Constelações" },
+  it: { ...CONSTELLATION_TRANSLATIONS["it"], "toolbar.settings": "Impostazioni", "toolbar.closeSettings": "Chiudi impostazioni", "toolbar.constellations": "Costellazioni" },
+  "zh-Hans": { ...CONSTELLATION_TRANSLATIONS["zh-Hans"], "toolbar.settings": "设置", "toolbar.closeSettings": "关闭设置", "toolbar.constellations": "星座" },
+  ja: { ...CONSTELLATION_TRANSLATIONS["ja"], "toolbar.settings": "設定", "toolbar.closeSettings": "設定を閉じる", "toolbar.constellations": "星座" },
+  ko: { ...CONSTELLATION_TRANSLATIONS["ko"], "toolbar.settings": "설정", "toolbar.closeSettings": "설정 닫기", "toolbar.constellations": "별자리" },
+};
+
 export const LOCALES: Record<LocaleCode, LocaleDefinition> = {
   en: { label: "English", strings: { ...en, ...SPACECRAFT_TRANSLATIONS.en } },
-  es: { label: PARTIAL_TRANSLATIONS.es.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.es.strings, ...FILTER_COUNT_TRANSLATIONS.es, ...LAUNCH_TRANSLATIONS.es, ...SKY_SHARE_TRANSLATIONS.es, ...SPACECRAFT_TRANSLATIONS.es } },
-  fr: { label: PARTIAL_TRANSLATIONS.fr.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.fr.strings, ...FILTER_COUNT_TRANSLATIONS.fr, ...LAUNCH_TRANSLATIONS.fr, ...SKY_SHARE_TRANSLATIONS.fr, ...SPACECRAFT_TRANSLATIONS.fr } },
-  de: { label: PARTIAL_TRANSLATIONS.de.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.de.strings, ...FILTER_COUNT_TRANSLATIONS.de, ...LAUNCH_TRANSLATIONS.de, ...SKY_SHARE_TRANSLATIONS.de, ...SPACECRAFT_TRANSLATIONS.de } },
-  "pt-BR": { label: PARTIAL_TRANSLATIONS["pt-BR"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["pt-BR"].strings, ...FILTER_COUNT_TRANSLATIONS["pt-BR"], ...LAUNCH_TRANSLATIONS["pt-BR"], ...SKY_SHARE_TRANSLATIONS["pt-BR"], ...SPACECRAFT_TRANSLATIONS["pt-BR"] } },
-  it: { label: PARTIAL_TRANSLATIONS.it.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.it.strings, ...FILTER_COUNT_TRANSLATIONS.it, ...LAUNCH_TRANSLATIONS.it, ...SKY_SHARE_TRANSLATIONS.it, ...SPACECRAFT_TRANSLATIONS.it } },
-  "zh-Hans": { label: PARTIAL_TRANSLATIONS["zh-Hans"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["zh-Hans"].strings, ...FILTER_COUNT_TRANSLATIONS["zh-Hans"], ...LAUNCH_TRANSLATIONS["zh-Hans"], ...SKY_SHARE_TRANSLATIONS["zh-Hans"], ...SPACECRAFT_TRANSLATIONS["zh-Hans"] } },
-  ja: { label: PARTIAL_TRANSLATIONS.ja.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ja.strings, ...FILTER_COUNT_TRANSLATIONS.ja, ...LAUNCH_TRANSLATIONS.ja, ...SKY_SHARE_TRANSLATIONS.ja, ...SPACECRAFT_TRANSLATIONS.ja } },
-  ko: { label: PARTIAL_TRANSLATIONS.ko.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ko.strings, ...FILTER_COUNT_TRANSLATIONS.ko, ...LAUNCH_TRANSLATIONS.ko, ...SKY_SHARE_TRANSLATIONS.ko, ...SPACECRAFT_TRANSLATIONS.ko } }
+  es: { label: PARTIAL_TRANSLATIONS.es.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.es.strings, ...FILTER_COUNT_TRANSLATIONS.es, ...LAUNCH_TRANSLATIONS.es, ...SKY_SHARE_TRANSLATIONS.es, ...SPACECRAFT_TRANSLATIONS.es, ...TOOLBAR_TRANSLATIONS.es } },
+  fr: { label: PARTIAL_TRANSLATIONS.fr.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.fr.strings, ...FILTER_COUNT_TRANSLATIONS.fr, ...LAUNCH_TRANSLATIONS.fr, ...SKY_SHARE_TRANSLATIONS.fr, ...SPACECRAFT_TRANSLATIONS.fr, ...TOOLBAR_TRANSLATIONS.fr } },
+  de: { label: PARTIAL_TRANSLATIONS.de.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.de.strings, ...FILTER_COUNT_TRANSLATIONS.de, ...LAUNCH_TRANSLATIONS.de, ...SKY_SHARE_TRANSLATIONS.de, ...SPACECRAFT_TRANSLATIONS.de, ...TOOLBAR_TRANSLATIONS.de } },
+  "pt-BR": { label: PARTIAL_TRANSLATIONS["pt-BR"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["pt-BR"].strings, ...FILTER_COUNT_TRANSLATIONS["pt-BR"], ...LAUNCH_TRANSLATIONS["pt-BR"], ...SKY_SHARE_TRANSLATIONS["pt-BR"], ...SPACECRAFT_TRANSLATIONS["pt-BR"], ...TOOLBAR_TRANSLATIONS["pt-BR"] } },
+  it: { label: PARTIAL_TRANSLATIONS.it.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.it.strings, ...FILTER_COUNT_TRANSLATIONS.it, ...LAUNCH_TRANSLATIONS.it, ...SKY_SHARE_TRANSLATIONS.it, ...SPACECRAFT_TRANSLATIONS.it, ...TOOLBAR_TRANSLATIONS.it } },
+  "zh-Hans": { label: PARTIAL_TRANSLATIONS["zh-Hans"].label, strings: { ...en, ...PARTIAL_TRANSLATIONS["zh-Hans"].strings, ...FILTER_COUNT_TRANSLATIONS["zh-Hans"], ...LAUNCH_TRANSLATIONS["zh-Hans"], ...SKY_SHARE_TRANSLATIONS["zh-Hans"], ...SPACECRAFT_TRANSLATIONS["zh-Hans"], ...TOOLBAR_TRANSLATIONS["zh-Hans"] } },
+  ja: { label: PARTIAL_TRANSLATIONS.ja.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ja.strings, ...FILTER_COUNT_TRANSLATIONS.ja, ...LAUNCH_TRANSLATIONS.ja, ...SKY_SHARE_TRANSLATIONS.ja, ...SPACECRAFT_TRANSLATIONS.ja, ...TOOLBAR_TRANSLATIONS.ja } },
+  ko: { label: PARTIAL_TRANSLATIONS.ko.label, strings: { ...en, ...PARTIAL_TRANSLATIONS.ko.strings, ...FILTER_COUNT_TRANSLATIONS.ko, ...LAUNCH_TRANSLATIONS.ko, ...SKY_SHARE_TRANSLATIONS.ko, ...SPACECRAFT_TRANSLATIONS.ko, ...TOOLBAR_TRANSLATIONS.ko } }
 };
 
 let currentLocale = detectLocale();

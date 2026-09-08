@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { MAP_CONSTELLATIONS, normalizeHiddenConstellations } from "../src/atlas/constellationStyles.ts";
 import { CONSTELLATIONS } from "../src/sky/constellations.ts";
 
 assert.equal(CONSTELLATIONS.length, 87, "all line-bearing IAU figures are represented, including both parts of Serpens");
@@ -14,3 +15,7 @@ assert.ok(endpoints.size >= 700, "the figures should retain their full Hipparcos
 assert.ok([...endpoints].every((key) => /^hip-\d+$/.test(key)));
 
 console.log("constellation topology tests passed");
+
+assert.equal(new Set(MAP_CONSTELLATIONS.map(figure => figure.id)).size, 87);
+assert.equal(new Set(MAP_CONSTELLATIONS.map(figure => figure.color)).size, 87);
+assert.deepEqual(normalizeHiddenConstellations(["orion", "bogus", "aries", "orion"]), ["aries", "orion"]);
