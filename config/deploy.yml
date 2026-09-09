@@ -38,6 +38,10 @@ env:
     - ANALYTICS_HASH_SALT
 
 proxy:
+  run:
+    bind_ips:
+      - 95.216.18.168
+      - 2a01:4f9:2a:12c9::2
   app_port: 4000
   ssl: true
   forward_headers: true
