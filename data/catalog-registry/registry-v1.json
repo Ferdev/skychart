@@ -1,0 +1,1147 @@
+{
+  "schema_version": 1,
+  "registry_version": "2026-09-08.1",
+  "discovered_at": "2026-09-08",
+  "first_release_set": [
+    "simbad-basic",
+    "gaia-dr3",
+    "2mass-psc",
+    "2mass-xsc",
+    "allwise"
+  ],
+  "first_manageable_fallback": "2mass-xsc",
+  "admitted_releases": [],
+  "policies": {
+    "unknown": "null means not verified, never zero or complete",
+    "identity": "source rows, detections and aliases do not establish unique physical objects",
+    "placement": "retain all valid rows; apply distance quality cuts only to physical placement",
+    "admission": "pin release/schema/files/reuse; reconcile fetched=accepted+quarantined; pass C02-C07 and obtain capacity approval before full-volume jobs",
+    "retention": "retain previous admitted releases and associations until explicit authorized retention decision",
+    "interface": "owned native SkyChart search, inspection and rendering; no external UI"
+  },
+  "catalogs": [
+    {
+      "id": "simbad-basic",
+      "provider": "CDS",
+      "catalog": "basic + ident",
+      "release": null,
+      "product_kind": "object_database",
+      "population": "Broad astronomical objects and their identifiers",
+      "documentation": [
+        "https://simbad.cds.unistra.fr/guide/sim-tap",
+        "https://simbad.unistra.fr/simbad/"
+      ],
+      "identifiers": [
+        "oid (text)",
+        "ident.id (alias, not unique physical identity)"
+      ],
+      "upstream_rows": null,
+      "columns_documentation": "https://simbad.cds.unistra.fr/guide/sim-tap",
+      "coordinate_frame": "ICRS",
+      "source_epoch": "retain source astrometric epoch; no blanket epoch assumption",
+      "distance_fields": [
+        "plx_value [mas]",
+        "rvz_redshift [dimensionless]"
+      ],
+      "quality_fields": [
+        "otype",
+        "candidate classification",
+        "measurement bibliography"
+      ],
+      "selection": null,
+      "download": {
+        "method": "TAP advertised; consistent full basic+ident export not verified",
+        "url": "https://simbad.cds.unistra.fr/simbad/sim-tap",
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://simbad.cds.unistra.fr/guide/sim-tap"
+      },
+      "refresh": "mutable database; pin consistent export and discovery timestamp",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Existing TOP 5000 object-type/redshift slices are not full SIMBAD. Full consistent export and identifier acquisition path unverified; use 2MASS XSC as first-release fallback.",
+      "rollout_order": 1,
+      "local_snapshots": [
+        "simbad_extragalactic.json",
+        "simbad_compact_objects.json"
+      ],
+      "verification": "candidate; not admitted"
+    },
+    {
+      "id": "2mass-xsc",
+      "provider": "NASA/IPAC IRSA",
+      "catalog": "fp_xsc",
+      "release": "All-Sky 2003",
+      "product_kind": "source_catalog",
+      "population": "extended detections; mostly galaxies",
+      "documentation": [
+        "https://irsa.ipac.caltech.edu/2MASS/download/allsky/README_ftp.html",
+        "https://irsa.ipac.caltech.edu/2MASS/download/allsky/format_xsc.html"
+      ],
+      "identifiers": [
+        "ext_key (text)",
+        "designation (alias)"
+      ],
+      "upstream_rows": 1647599,
+      "columns_documentation": "https://irsa.ipac.caltech.edu/2MASS/download/allsky/format_xsc.html",
+      "coordinate_frame": "equatorial J2000; preserve release astrometry",
+      "source_epoch": "per-source observing epoch; not equinox",
+      "distance_fields": [],
+      "quality_fields": [
+        "band-specific photometric errors",
+        "contamination/confusion",
+        "extended-source flags"
+      ],
+      "selection": null,
+      "download": {
+        "method": "gzip pipe-delimited bulk files; null token \\N",
+        "url": "https://irsa.ipac.caltech.edu/2MASS/download/allsky/",
+        "checksums": "provider verification sums; compute SHA-256 of all acquired files"
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://irsa.ipac.caltech.edu/2MASS/download/allsky/README_ftp.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Complete public bulk path verified. XSC is first-release fallback; scientific schema, reuse acknowledgement and C06 capacity gate remain.",
+      "rollout_order": 2,
+      "local_snapshots": [],
+      "verification": "IRSA README and VizieR II/246 metadata reviewed 2026-09-08"
+    },
+    {
+      "id": "2mass-psc",
+      "provider": "NASA/IPAC IRSA",
+      "catalog": "fp_psc",
+      "release": "All-Sky 2003",
+      "product_kind": "source_catalog",
+      "population": "point-source detections",
+      "documentation": [
+        "https://irsa.ipac.caltech.edu/2MASS/download/allsky/README_ftp.html",
+        "https://irsa.ipac.caltech.edu/2MASS/download/allsky/format_psc.html"
+      ],
+      "identifiers": [
+        "pts_key (text)",
+        "designation (alias)"
+      ],
+      "upstream_rows": 470992970,
+      "columns_documentation": "https://irsa.ipac.caltech.edu/2MASS/download/allsky/format_psc.html",
+      "coordinate_frame": "equatorial J2000; preserve release astrometry",
+      "source_epoch": "per-source observing epoch; not equinox",
+      "distance_fields": [],
+      "quality_fields": [
+        "band-specific photometric errors",
+        "contamination/confusion",
+        "ph_qual, rd_flg, bl_flg, cc_flg"
+      ],
+      "selection": null,
+      "download": {
+        "method": "gzip pipe-delimited bulk files; null token \\N",
+        "url": "https://irsa.ipac.caltech.edu/2MASS/download/allsky/",
+        "checksums": "provider verification sums; compute SHA-256 of all acquired files"
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://irsa.ipac.caltech.edu/2MASS/download/allsky/README_ftp.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": {
+        "compressed": 43000000000,
+        "basis": "IRSA historical approximate PSC download size; excludes indexes, staging and release coexistence"
+      },
+      "coverage": "deferred",
+      "reason": "Complete public bulk path verified; C06 capacity gate remains.",
+      "rollout_order": 3,
+      "local_snapshots": [],
+      "verification": "IRSA README and VizieR II/246 metadata reviewed 2026-09-08"
+    },
+    {
+      "id": "gaia-dr3",
+      "provider": "ESA/DPAC",
+      "catalog": "gaiadr3.gaia_source",
+      "release": "DR3",
+      "product_kind": "source_catalog",
+      "population": "all source records, independent of physical placement",
+      "documentation": [
+        "https://www.cosmos.esa.int/web/gaia/data-release-3",
+        "https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_main_source_catalogue/ssec_dm_gaia_source.html"
+      ],
+      "identifiers": [
+        "source_id (lossless unsigned 64-bit text)"
+      ],
+      "upstream_rows": 1811709771,
+      "columns_documentation": "https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_main_source_catalogue/ssec_dm_gaia_source.html",
+      "coordinate_frame": "ICRS",
+      "source_epoch": "ref_epoch [Julian year], normally 2016.0; preserve per row",
+      "distance_fields": [
+        "parallax [mas]",
+        "parallax_error [mas]"
+      ],
+      "quality_fields": [
+        "astrometric_params_solved",
+        "ruwe",
+        "parallax_over_error",
+        "astrometric_excess_noise",
+        "duplicated_source",
+        "astrometric covariance/correlations"
+      ],
+      "selection": null,
+      "download": {
+        "method": "official gzip ECSV bulk archive; reuse download_gaia_dr3.py",
+        "url": "https://cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/",
+        "checksums": "_MD5SUM.txt; retain manifest and local SHA-256"
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://www.cosmos.esa.int/web/gaia/data-release-3"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Local snapshot and physical pipeline impose parallax/photometry cuts. Current nine-column downloader loses scientific fields; full record retention and capacity required.",
+      "rollout_order": 4,
+      "local_snapshots": [
+        "gaia_local_stars.json"
+      ],
+      "verification": "ESA release publication search reviewed; bulk manifest must be pinned at acquisition"
+    },
+    {
+      "id": "allwise",
+      "provider": "NASA/IPAC IRSA",
+      "catalog": "allwise_p3as_psd",
+      "release": "AllWISE 2013",
+      "product_kind": "source_catalog",
+      "population": "mid-infrared source detections",
+      "documentation": [
+        "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html",
+        "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_5.html"
+      ],
+      "identifiers": [
+        "cntr (text)",
+        "designation (alias)"
+      ],
+      "upstream_rows": 747634026,
+      "columns_documentation": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec2_1a.html",
+      "coordinate_frame": "ICRS; retain release coordinate conventions",
+      "source_epoch": "retain per-band observing epochs and motion-fit epoch",
+      "distance_fields": [],
+      "quality_fields": [
+        "ph_qual",
+        "cc_flags",
+        "ext_flg",
+        "var_flg",
+        "band errors",
+        "published 2MASS associations"
+      ],
+      "selection": null,
+      "download": {
+        "method": "official bulk catalog download documented in I.5; file manifest not acquired",
+        "url": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_5.html",
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Full source catalog targeted; excludes separate multi-epoch measurement, reject and image products. Requires file/schema and capacity audit.",
+      "rollout_order": 5,
+      "local_snapshots": [],
+      "verification": "IRSA release content and access documentation reviewed 2026-09-08"
+    },
+    {
+      "id": "hipparcos",
+      "provider": "CDS/ESA",
+      "catalog": "I/239/hip_main",
+      "release": "1997",
+      "product_kind": "source_catalog",
+      "population": "bright stars",
+      "documentation": [
+        "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=I/239"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=I/239",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=I/239"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 6,
+      "local_snapshots": [
+        "bright_stars.json"
+      ],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "openngc",
+      "provider": "OpenNGC",
+      "catalog": "database_files/NGC.csv",
+      "release": "36cb178a0f69dba8bfc03a99c10512831edf1c6b",
+      "product_kind": "source_catalog",
+      "population": "NGC/IC objects, duplicates and historical entries",
+      "documentation": [
+        "https://github.com/mattiaverga/OpenNGC"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://github.com/mattiaverga/OpenNGC",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://github.com/mattiaverga/OpenNGC"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 7,
+      "local_snapshots": [
+        "ngc_ic_deep_sky.json"
+      ],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "desi-dr1",
+      "provider": "DESI",
+      "catalog": "zall-pix-iron.fits",
+      "release": "DR1 iron zcatalog v1",
+      "product_kind": "source_catalog",
+      "population": "spectroscopic sources",
+      "documentation": [
+        "https://data.desi.lbl.gov/public/dr1/spectro/redux/iron/zcatalog/v1/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://data.desi.lbl.gov/public/dr1/spectro/redux/iron/zcatalog/v1/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://data.desi.lbl.gov/public/dr1/spectro/redux/iron/zcatalog/v1/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 8,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "quaia",
+      "provider": "Quaia collaboration",
+      "catalog": "quaia_G20.0.fits",
+      "release": "Zenodo 10403370",
+      "product_kind": "source_catalog",
+      "population": "quasar candidates",
+      "documentation": [
+        "https://zenodo.org/records/10403370"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://zenodo.org/records/10403370",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://zenodo.org/records/10403370"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 9,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "erosita-dr2",
+      "provider": "MPE",
+      "catalog": "eRASS3_Main_v1.3.fits",
+      "release": "DE DR2 v1.3",
+      "product_kind": "source_catalog",
+      "population": "X-ray detections",
+      "documentation": [
+        "https://erosita.mpe.mpg.de/dr2/AllSkySurveyData_dr2/Catalogues_dr2/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://erosita.mpe.mpg.de/dr2/AllSkySurveyData_dr2/Catalogues_dr2/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://erosita.mpe.mpg.de/dr2/AllSkySurveyData_dr2/Catalogues_dr2/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 10,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "spiders-dr20",
+      "provider": "SDSS",
+      "catalog": "DL1_spec_SDSSV_eROSITA_eRASS3_allepoch-v1_1_0.fits",
+      "release": "DR20 DL1 v1_1_0",
+      "product_kind": "observation_table",
+      "population": "spectroscopic observations and counterparts",
+      "documentation": [
+        "https://www.sdss.org/dr20/data_access/value-added-catalogs/?vac_id=10033"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://www.sdss.org/dr20/data_access/value-added-catalogs/?vac_id=10033",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://www.sdss.org/dr20/data_access/value-added-catalogs/?vac_id=10033"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 11,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "bass-dr2",
+      "provider": "BASS/CDS",
+      "catalog": "J/ApJS/261/2/table9",
+      "release": "DR2",
+      "product_kind": "source_catalog",
+      "population": "AGN black-hole mass measurements",
+      "documentation": [
+        "https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 12,
+      "local_snapshots": [
+        "bass_dr2_black_holes.json"
+      ],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "exoplanets",
+      "provider": "NASA Exoplanet Archive",
+      "catalog": "pscomppars",
+      "release": null,
+      "product_kind": "source_catalog",
+      "population": "confirmed planetary systems",
+      "documentation": [
+        "https://exoplanetarchive.ipac.caltech.edu/docs/pscp_about.html"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://exoplanetarchive.ipac.caltech.edu/docs/pscp_about.html",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://exoplanetarchive.ipac.caltech.edu/docs/pscp_about.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 13,
+      "local_snapshots": [
+        "exoplanet_systems.json"
+      ],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "small-bodies",
+      "provider": "NASA/JPL",
+      "catalog": "SBDB Query",
+      "release": null,
+      "product_kind": "source_catalog",
+      "population": "small-body orbit solutions",
+      "documentation": [
+        "https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html",
+      "coordinate_frame": null,
+      "source_epoch": "per-orbit solution JD; dynamic dated ephemeris required",
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 14,
+      "local_snapshots": [
+        "small_bodies.json"
+      ],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "panstarrs",
+      "provider": "STScI/MAST",
+      "catalog": "ObjectThin",
+      "release": "DR2",
+      "product_kind": "source_catalog",
+      "population": "optical imaging source detections",
+      "documentation": [
+        "https://catalogs.mast.stsci.edu/docs/panstarrs.html"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://catalogs.mast.stsci.edu/docs/panstarrs.html",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://catalogs.mast.stsci.edu/docs/panstarrs.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 15,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "legacy-surveys",
+      "provider": "DESI Legacy Surveys",
+      "catalog": "sweep",
+      "release": "DR10",
+      "product_kind": "source_catalog",
+      "population": "optical/infrared fitted sources",
+      "documentation": [
+        "https://www.legacysurvey.org/dr10/catalogs/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://www.legacysurvey.org/dr10/catalogs/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://www.legacysurvey.org/dr10/catalogs/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 16,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "sdss",
+      "provider": "SDSS",
+      "catalog": "PhotoObjAll",
+      "release": "DR18",
+      "product_kind": "source_catalog",
+      "population": "optical detections including repeated imaging",
+      "documentation": [
+        "https://www.sdss.org/dr18/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://www.sdss.org/dr18/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://www.sdss.org/dr18/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 17,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "nvss",
+      "provider": "NRAO/CDS",
+      "catalog": "VIII/65/nvss",
+      "release": "1998",
+      "product_kind": "source_catalog",
+      "population": "radio components",
+      "documentation": [
+        "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=VIII/65"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=VIII/65",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=VIII/65"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 18,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "pulsars",
+      "provider": "ATNF",
+      "catalog": "psrcat",
+      "release": null,
+      "product_kind": "source_catalog",
+      "population": "pulsars",
+      "documentation": [
+        "https://www.atnf.csiro.au/research/pulsar/psrcat/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://www.atnf.csiro.au/research/pulsar/psrcat/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://www.atnf.csiro.au/research/pulsar/psrcat/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 19,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "variables",
+      "provider": "AAVSO",
+      "catalog": "VSX",
+      "release": null,
+      "product_kind": "source_catalog",
+      "population": "variable stars and candidates",
+      "documentation": [
+        "https://www.aavso.org/vsx/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://www.aavso.org/vsx/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://www.aavso.org/vsx/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 20,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "clusters",
+      "provider": "CDS",
+      "catalog": "VII/202",
+      "release": "1996",
+      "product_kind": "source_catalog",
+      "population": "globular clusters",
+      "documentation": [
+        "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=VII/202"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=VII/202",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=VII/202"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 21,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "nebulae",
+      "provider": "CDS",
+      "catalog": "V/84",
+      "release": "1992",
+      "product_kind": "source_catalog",
+      "population": "planetary nebulae",
+      "documentation": [
+        "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=V/84"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=V/84",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=V/84"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 22,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "transients",
+      "provider": "IAU/TNS",
+      "catalog": "objects",
+      "release": null,
+      "product_kind": "source_catalog",
+      "population": "transient discoveries and classifications",
+      "documentation": [
+        "https://www.wis-tns.org/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://www.wis-tns.org/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://www.wis-tns.org/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 23,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "supernova-remnants",
+      "provider": "Cambridge",
+      "catalog": "Galactic SNR catalogue",
+      "release": null,
+      "product_kind": "source_catalog",
+      "population": "supernova remnants",
+      "documentation": [
+        "https://www.mrao.cam.ac.uk/surveys/snrs/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://www.mrao.cam.ac.uk/surveys/snrs/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://www.mrao.cam.ac.uk/surveys/snrs/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 24,
+      "local_snapshots": [],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "messier",
+      "provider": "SkyChart curated compilation",
+      "catalog": "Messier",
+      "release": null,
+      "product_kind": "source_catalog",
+      "population": "historical deep-sky entries",
+      "documentation": [
+        "https://github.com/Ferdev/skychart"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://github.com/Ferdev/skychart",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://github.com/Ferdev/skychart"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 25,
+      "local_snapshots": [
+        "deep_sky_catalog.json"
+      ],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "curated-landmarks",
+      "provider": "SkyChart curated compilation",
+      "catalog": "curated_extragalactic_survey",
+      "release": null,
+      "product_kind": "source_catalog",
+      "population": "navigation landmarks from overlapping source catalogs",
+      "documentation": [
+        "https://github.com/Ferdev/skychart"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://github.com/Ferdev/skychart",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://github.com/Ferdev/skychart"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "partial",
+      "reason": "Source metadata, schema, reuse and capacity audit required before admission.",
+      "rollout_order": 26,
+      "local_snapshots": [
+        "curated_extragalactic_survey.json"
+      ],
+      "verification": "repository source target or discovery candidate; upstream release not yet audited"
+    },
+    {
+      "id": "allwise-mep",
+      "provider": "NASA/IPAC IRSA",
+      "catalog": "allwise_p3as_mep",
+      "release": "AllWISE 2013",
+      "product_kind": "observation_table",
+      "population": "supporting product; not independent established objects",
+      "documentation": [
+        "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html"
+      ],
+      "identifiers": [],
+      "upstream_rows": 42759337365,
+      "columns_documentation": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Deferred supporting product; never add these counts to unique object or source-catalog coverage.",
+      "rollout_order": 27,
+      "local_snapshots": [],
+      "verification": "candidate; not admitted"
+    },
+    {
+      "id": "allwise-reject",
+      "provider": "NASA/IPAC IRSA",
+      "catalog": "allwise_p3as_psr",
+      "release": "AllWISE 2013",
+      "product_kind": "detection_table",
+      "population": "supporting product; not independent established objects",
+      "documentation": [
+        "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html"
+      ],
+      "identifiers": [],
+      "upstream_rows": 428787253,
+      "columns_documentation": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Deferred supporting product; never add these counts to unique object or source-catalog coverage.",
+      "rollout_order": 28,
+      "local_snapshots": [],
+      "verification": "candidate; not admitted"
+    },
+    {
+      "id": "allwise-images",
+      "provider": "NASA/IPAC IRSA",
+      "catalog": "AllWISE Image Atlas",
+      "release": "AllWISE 2013",
+      "product_kind": "images",
+      "population": "supporting product; not independent established objects",
+      "documentation": [
+        "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html"
+      ],
+      "identifiers": [],
+      "upstream_rows": 18240,
+      "columns_documentation": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Deferred supporting product; never add these counts to unique object or source-catalog coverage.",
+      "rollout_order": 29,
+      "local_snapshots": [],
+      "verification": "candidate; not admitted"
+    },
+    {
+      "id": "erosita-ls10",
+      "provider": "MPE",
+      "catalog": "eRASSc3_Main_LS10_Public_27Jul2026.fits.gz",
+      "release": "DE DR2 2026-07-27",
+      "product_kind": "crossmatch_table",
+      "population": "supporting product; not independent established objects",
+      "documentation": [
+        "https://erosita.mpe.mpg.de/dr2/AllSkySurveyData_dr2/Catalogues_dr2/"
+      ],
+      "identifiers": [],
+      "upstream_rows": null,
+      "columns_documentation": "https://erosita.mpe.mpg.de/dr2/AllSkySurveyData_dr2/Catalogues_dr2/",
+      "coordinate_frame": null,
+      "source_epoch": null,
+      "distance_fields": [],
+      "quality_fields": [],
+      "selection": null,
+      "download": {
+        "method": null,
+        "url": null,
+        "checksums": null
+      },
+      "attribution": {
+        "status": "review_required",
+        "documentation": "https://erosita.mpe.mpg.de/dr2/AllSkySurveyData_dr2/Catalogues_dr2/"
+      },
+      "refresh": "pinned release; check metadata manually",
+      "estimated_bytes": null,
+      "coverage": "deferred",
+      "reason": "Deferred supporting product; never add these counts to unique object or source-catalog coverage.",
+      "rollout_order": 30,
+      "local_snapshots": [],
+      "verification": "candidate; not admitted"
+    }
+  ]
+}

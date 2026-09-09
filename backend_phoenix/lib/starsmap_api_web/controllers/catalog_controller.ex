@@ -6,6 +6,21 @@ defmodule StarsmapApiWeb.CatalogController do
   alias StarsmapApi.Catalog.Search
   alias StarsmapApi.Catalog.SnapshotStore
 
+  def source_record(conn, %{"record_key" => key}) do
+    case StarsmapApi.Catalog.RecordStore.get_record(key) do
+      nil -> conn |> put_status(:not_found) |> json(%{error: "not_found"})
+      record -> json(conn, %{record_key: key, record: record})
+    end
+  end
+
+  def identifications(conn, %{"public_key" => key}) when byte_size(key) <= 180 do
+    json(conn, StarsmapApi.Catalog.RecordStore.evidence_for(key))
+  end
+
+  def identifications(conn, _params) do
+    conn |> put_status(:bad_request) |> json(%{error: "invalid_key"})
+  end
+
   def summary(conn, _params) do
     json(conn, SnapshotStore.summary())
   end

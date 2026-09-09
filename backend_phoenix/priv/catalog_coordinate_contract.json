@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "frame": "heliocentric-ecliptic-J2000-v1",
+  "origin": "Sun center; parent-relative vectors identify their parent separately",
+  "equinox": "J2000 mean ecliptic",
+  "obliquity_deg": 23.4392911,
+  "angular_input_frame": "ICRS catalog axes treated as J2000 equatorial at atlas precision",
+  "icrs_frame_bias_note": "Sub-arcsecond ICRS/J2000 frame bias is not modeled; this is an atlas projection, not apparent astrometry.",
+  "position_unit": "au",
+  "au_km": 149597870.7,
+  "parsec_au": 206264.80624709636,
+  "gaia_source_epoch": 2016.0,
+  "gaia_bulk_display_epoch": 2016.0,
+  "snapshot_default_display_epoch": 2026.0,
+  "proper_motion_model": "normalized tangent vector at fixed distance; no radial perspective acceleration",
+  "missing_motion": "retain catalog direction and source epoch; never impute zero proper motion",
+  "distance_models": ["unavailable", "parallax_estimate", "literature", "cosmological_comoving"],
+  "legacy": "Existing immutable releases retain their declared frame and epoch. Never relabel or overwrite a legacy artifact; rebuild into a distinct release before publication."
+}

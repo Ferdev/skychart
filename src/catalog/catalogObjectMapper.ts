@@ -1,4 +1,4 @@
-import { spacecraftBodies } from "./spacecraftCatalog";
+import { spacecraftBodies } from "./spacecraftCatalog.ts";
 import type { DestinationBodyType } from "../destinationPicker";
 import type {
   Body,
@@ -6,7 +6,7 @@ import type {
   CatalogObjectPayload,
   ExternalLink,
 } from "../atlas/contracts";
-import { smallBodyPositionAt } from "./smallBodyPropagation";
+import { smallBodyPositionAt } from "./smallBodyPropagation.ts";
 
 export type CatalogMappingContext = {
   auKm: number;
@@ -26,13 +26,16 @@ export class CatalogObjectMapper {
       if (mission) return mission;
     }
     const facts = object.facts ?? {};
-    const position = object.position ?? {};
+    // As with spacecraft, absent wire coordinates become NaN internally, never
+    // zero. Reference shells are display conventions, not physical positions.
+    const position = object.position_model === "catalog_sky_position_reference_shell"
+      ? {} : object.position ?? {};
     const propagated = object.catalog_group === "jpl_small_bodies" && object.parent_key === "sun" && context.timestamp
       ? smallBodyPositionAt(facts, context.timestamp)
       : null;
-    const xAu = propagated?.xAu ?? finiteNumber(position.x_au, 0);
-    const yAu = propagated?.yAu ?? finiteNumber(position.y_au, 0);
-    const zAu = propagated?.zAu ?? finiteNumber(position.z_au, 0);
+    const xAu = propagated?.xAu ?? finiteNumber(position.x_au, NaN);
+    const yAu = propagated?.yAu ?? finiteNumber(position.y_au, NaN);
+    const zAu = propagated?.zAu ?? finiteNumber(position.z_au, NaN);
     const xKm = propagated ? xAu * context.auKm : finiteNumber(position.x_km, xAu * context.auKm);
     const yKm = propagated ? yAu * context.auKm : finiteNumber(position.y_km, yAu * context.auKm);
     const zKm = propagated ? zAu * context.auKm : finiteNumber(position.z_km, zAu * context.auKm);
@@ -65,7 +68,7 @@ export class CatalogObjectMapper {
     return {
       key: object.key,
       name: object.name,
-      radius_km: finiteNumber(object.radius_km, 0),
+      radius_km: finiteNumber(object.radius_km, NaN),
       color: object.color || "#d9b86f",
       object_type: objectType,
       parent_key: object.parent_key ?? undefined,

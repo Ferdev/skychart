@@ -18,6 +18,8 @@ backend_phoenix/priv/static/.vite/
 __pycache__/
 *.pyc
 data/*
+!data/catalog-registry/
+!data/catalog-registry/*.json
 !data/catalogs/
 !data/catalogs/**
 !data/sources/
