@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "catalog": "quaia",
+  "release": "1.0.0",
+  "documentation": "https://zenodo.org/records/10403370",
+  "metadata_kind": "provider release listing; not measured byte totals",
+  "relationship": "G20.0 is a subset of G20.5; synthetic random catalogs are not celestial source records",
+  "status": "INCOMPLETE_acquisition",
+  "files": [
+    {
+      "name": "quaia_G20.0.fits",
+      "provider_md5": "72531bc67bde1b08a69d5aeae03fb26e",
+      "kind": "source_subset",
+      "provider_rows": 755850,
+      "url": "https://zenodo.org/records/10403370/files/quaia_G20.0.fits?download=1",
+      "measured_bytes": null
+    },
+    {
+      "name": "quaia_G20.5.fits",
+      "provider_md5": "98659ac4bd8a09da2c4ce653690d53df",
+      "kind": "full_source",
+      "provider_rows": 1295502,
+      "url": "https://zenodo.org/records/10403370/files/quaia_G20.5.fits?download=1",
+      "measured_bytes": null
+    },
+    {
+      "name": "random_G20.0_10x.fits",
+      "provider_md5": "e89dc31635d4688c8f3861dfb8a7e546",
+      "kind": "synthetic_random",
+      "provider_rows": null,
+      "url": "https://zenodo.org/records/10403370/files/random_G20.0_10x.fits?download=1",
+      "measured_bytes": null
+    },
+    {
+      "name": "random_G20.5_10x.fits",
+      "provider_md5": "45e5d5e76b2349899a504b49a5a7f13b",
+      "kind": "synthetic_random",
+      "provider_rows": null,
+      "url": "https://zenodo.org/records/10403370/files/random_G20.5_10x.fits?download=1",
+      "measured_bytes": null
+    },
+    {
+      "name": "selection_function_NSIDE64_G20.0.fits",
+      "provider_md5": "9bec5ff5d2bda8f283fd99d6db6621df",
+      "kind": "selection_map",
+      "provider_rows": null,
+      "url": "https://zenodo.org/records/10403370/files/selection_function_NSIDE64_G20.0.fits?download=1",
+      "measured_bytes": null
+    },
+    {
+      "name": "selection_function_NSIDE64_G20.5.fits",
+      "provider_md5": "0aec3460d2e1152afe700d77554341d3",
+      "kind": "selection_map",
+      "provider_rows": null,
+      "url": "https://zenodo.org/records/10403370/files/selection_function_NSIDE64_G20.5.fits?download=1",
+      "measured_bytes": null
+    },
+    {
+      "name": "selection_function_template_maps.zip",
+      "provider_md5": "5a887fcdbcb2bb3f2bc4b9de58cd9c67",
+      "kind": "systematics_templates",
+      "provider_rows": null,
+      "url": "https://zenodo.org/records/10403370/files/selection_function_template_maps.zip?download=1",
+      "measured_bytes": null
+    }
+  ]
+}

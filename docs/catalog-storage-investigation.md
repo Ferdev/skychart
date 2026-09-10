@@ -1,6 +1,9 @@
 # SkyChart storage investigation
 
-The focused investigation is complete. A complete XSC detail-and-lookup component
+**Superseded completion claim:** the user rejected this result as insufficient.
+The exhaustive investigation is INCOMPLETE; follow
+[catalog-storage-exhaustive-checklist.md](catalog-storage-exhaustive-checklist.md).
+The measurements below remain valid component evidence. A complete XSC detail-and-lookup component
 was measured at 1.453 GB; the exact total for the full requested catalog scope
 remains unknown. No additional infrastructure spending, production writes or
 deployment occurred. Measured artifacts, provider-reported metadata and remaining
