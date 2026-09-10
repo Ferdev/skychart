@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "complete_main_table_source_only",
+  "release": "CDS B/vsx main table 2026-08-23",
+  "serving_total": null,
+  "files": [
+    {
+      "id": "variables--vsx.dat",
+      "catalog": "B/vsx",
+      "table": "vsx.dat",
+      "rows": 10304679,
+      "record_width": 209,
+      "schema_sha256": "9a3d396726eeabb1f8fb5290048951cd8c96d90e70a06838d6ec20d0f9b96a84",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/B/vsx/vsx.dat"
+      ],
+      "max_source_bytes": 2163982590
+    }
+  ]
+}

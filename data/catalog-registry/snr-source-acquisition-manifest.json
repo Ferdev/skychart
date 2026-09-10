@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "complete_summary_source_only",
+  "serving_total": null,
+  "files": [
+    {
+      "id": "supernova-remnants--snrs.dat",
+      "catalog": "VII/297",
+      "table": "snrs.dat",
+      "rows": 310,
+      "record_width": 88,
+      "schema_sha256": "17eaa89a2f0acdb37fa05903a64289bf90f75a291b2a007f962228aa13e87faf",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/297/snrs.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/297/snrs.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    }
+  ]
+}

@@ -10,7 +10,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
   @light_year_km 9_460_730_472_580.8
   @solar_radius_km 695_700.0
   @earth_radius_km 6_371.0
-  @obliquity_deg 23.4392911
+  alias StarsmapApi.Catalog.Astrometry
   @gaia_dr3_epoch 2016.0
   @hipparcos_epoch 1991.25
   @default_stellar_position_epoch 2026.0
@@ -96,7 +96,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
       catalog_group: "bright_stars",
       source_type: "bright_star_catalog",
       position_model: stellar_position_model("hipparcos", entry),
-      radius_km: number(entry["radius_km"], 0.0),
+      radius_km: number(entry["radius_km"]),
       aliases: list(entry["aliases"]),
       external_ids: %{
         "hip" => prefixed_id("HIP", entry["hip"]),
@@ -237,7 +237,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
       source_type: entry["source_type"] || "jpl_sbdb_query",
       position_model: entry["position_model"] || "jpl_sbdb_two_body_osculating_elements",
       parent_key: entry["parent_key"] || "sun",
-      radius_km: number(entry["radius_km"], 0.0),
+      radius_km: number(entry["radius_km"]),
       aliases: list(entry["aliases"]),
       external_ids: entry["external_ids"] || %{},
       facts:
@@ -264,7 +264,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
       catalog_group: "gaia_local_stars",
       source_type: "gaia_dr3",
       position_model: stellar_position_model("gaia_dr3", entry),
-      radius_km: number(entry["radius_km"], 0.0),
+      radius_km: number(entry["radius_km"]),
       aliases: list(entry["aliases"]),
       external_ids: %{"gaia_dr3_source_id" => entry["source_id"]},
       facts:
@@ -303,7 +303,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
       catalog_group: "simbad_extragalactic",
       source_type: "simbad_tap",
       position_model: "simbad_redshift_distance_coordinates",
-      radius_km: number(entry["radius_km"], 0.0),
+      radius_km: number(entry["radius_km"]),
       aliases: list(entry["aliases"]),
       external_ids: entry["external_ids"] || %{},
       facts:
@@ -328,7 +328,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
       catalog_group: "simbad_compact_objects",
       source_type: "simbad_tap",
       position_model: entry["position_model"] || "simbad_compact_object_coordinates",
-      radius_km: number(entry["radius_km"], 0.0),
+      radius_km: number(entry["radius_km"]),
       aliases: list(entry["aliases"]),
       external_ids: entry["external_ids"] || %{},
       facts:
@@ -353,7 +353,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
       catalog_group: "bass_dr2_black_holes",
       source_type: "bass_dr2_black_hole_mass",
       position_model: entry["position_model"] || "bass_dr2_catalog_distance_coordinates",
-      radius_km: number(entry["radius_km"], 0.0),
+      radius_km: number(entry["radius_km"]),
       aliases: list(entry["aliases"]),
       external_ids: entry["external_ids"] || %{},
       facts:
@@ -379,7 +379,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
       catalog_group: "curated_extragalactic_survey",
       source_type: entry["source_type"] || "curated_extragalactic_survey",
       position_model: entry["position_model"] || "survey_ra_dec_distance_coordinates",
-      radius_km: number(entry["radius_km"], 0.0),
+      radius_km: number(entry["radius_km"]),
       aliases: list(entry["aliases"]),
       external_ids: entry["external_ids"] || %{},
       facts:
@@ -467,25 +467,28 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
     dec_deg = number(entry["dec_deg"])
     distance_pc = number(entry["distance_pc"]) || distance_ly_to_pc(number(entry["distance_ly"]))
 
-    if is_nil(ra_deg) or is_nil(dec_deg) or is_nil(distance_pc) do
-      raise ArgumentError,
-            "catalog entry #{inspect(entry["key"] || entry["name"])} is missing RA, Dec, or distance"
+    if (is_number(ra_deg) and (ra_deg < 0 or ra_deg >= 360)) or
+         (is_number(dec_deg) and (dec_deg < -90 or dec_deg > 90)) do
+      raise ArgumentError, "catalog coordinates out of range"
     end
 
+    cond do
+      is_nil(distance_pc) or distance_pc < 0 ->
+        empty_position()
+
+      is_nil(ra_deg) or is_nil(dec_deg) ->
+        # Distance evidence can exist without a direction. Retain the
+        # measurement independently, while leaving spatial coordinates absent.
+        %{empty_position() | distance_pc: distance_pc, distance_ly: distance_pc * 3.261563777}
+
+      true ->
+        project_position(ra_deg, dec_deg, distance_pc)
+    end
+  end
+
+  defp project_position(ra_deg, dec_deg, distance_pc) do
     distance_au = distance_pc * @parsec_au
-    ra_rad = radians(ra_deg)
-    dec_rad = radians(dec_deg)
-
-    equatorial_x_au = distance_au * :math.cos(dec_rad) * :math.cos(ra_rad)
-    equatorial_y_au = distance_au * :math.cos(dec_rad) * :math.sin(ra_rad)
-    equatorial_z_au = distance_au * :math.sin(dec_rad)
-
-    obliquity_rad = radians(@obliquity_deg)
-    x_au = equatorial_x_au
-    y_au = equatorial_y_au * :math.cos(obliquity_rad) + equatorial_z_au * :math.sin(obliquity_rad)
-
-    z_au =
-      -equatorial_y_au * :math.sin(obliquity_rad) + equatorial_z_au * :math.cos(obliquity_rad)
+    %{x: x_au, y: y_au, z: z_au} = Astrometry.project(ra_deg, dec_deg, distance_au)
 
     %{
       distance_pc: distance_pc,
@@ -499,20 +502,19 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
     }
   end
 
-  defp projected_position_optional(entry) do
-    projected_position(entry)
-  rescue
-    ArgumentError ->
-      %{
-        distance_pc: nil,
-        distance_ly: nil,
-        x_au: nil,
-        y_au: nil,
-        z_au: nil,
-        x_km: nil,
-        y_km: nil,
-        z_km: nil
-      }
+  defp projected_position_optional(entry), do: projected_position(entry)
+
+  defp empty_position do
+    %{
+      distance_pc: nil,
+      distance_ly: nil,
+      x_au: nil,
+      y_au: nil,
+      z_au: nil,
+      x_km: nil,
+      y_km: nil,
+      z_km: nil
+    }
   end
 
   defp cartesian_position(entry) do
@@ -538,6 +540,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
   end
 
   defp propagate_stellar_position(entry, source_epoch) do
+    source_epoch = number(entry["source_epoch"]) || source_epoch
     target_epoch = stellar_position_epoch()
     ra_deg = number(entry["ra_deg"])
     dec_deg = number(entry["dec_deg"])
@@ -563,11 +566,15 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
         )
 
       true ->
-        years = target_epoch - source_epoch
-        dec_rad = radians(dec_deg)
-        cos_dec = max(:math.cos(dec_rad), 1.0e-8)
-        propagated_ra = normalize_degrees(ra_deg + pmra_mas_yr * years / (3_600_000.0 * cos_dec))
-        propagated_dec = max(-90.0, min(90.0, dec_deg + pmdec_mas_yr * years / 3_600_000.0))
+        {propagated_ra, propagated_dec, _epoch} =
+          Astrometry.propagate(
+            ra_deg,
+            dec_deg,
+            pmra_mas_yr,
+            pmdec_mas_yr,
+            source_epoch,
+            target_epoch
+          )
 
         base
         |> Map.put("ra_deg", propagated_ra)
@@ -577,7 +584,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
         |> Map.put("position_epoch", target_epoch)
         |> Map.put(
           "proper_motion_note",
-          "RA/Dec propagated from source epoch using catalog proper motion."
+          "RA/Dec propagated using normalized tangent motion at fixed distance; radial perspective acceleration is not modeled."
         )
     end
   end
@@ -603,28 +610,26 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
     end
   end
 
-  defp normalize_degrees(value) do
-    normalized = value - :math.floor(value / 360.0) * 360.0
-    if normalized < 0.0, do: normalized + 360.0, else: normalized
-  end
-
   defp deep_sky_radius_km(entry) do
     case number(entry["physical_diameter_ly"]) || angular_diameter_ly(entry) do
-      nil -> 0.0
+      nil -> nil
       diameter_ly -> diameter_ly * @light_year_km / 2.0
     end
   end
 
-  defp solar_radius_to_km(nil), do: 0.0
-  defp solar_radius_to_km(value), do: number(value, 0.0) * @solar_radius_km
+  defp solar_radius_to_km(nil), do: nil
+  defp solar_radius_to_km(value), do: scale_radius(number(value), @solar_radius_km)
 
-  defp earth_radius_to_km(nil), do: 0.0
-  defp earth_radius_to_km(value), do: number(value, 0.0) * @earth_radius_km
+  defp earth_radius_to_km(nil), do: nil
+  defp earth_radius_to_km(value), do: scale_radius(number(value), @earth_radius_km)
+
+  defp scale_radius(nil, _), do: nil
+  defp scale_radius(radius, unit), do: radius * unit
+
+  defp radians(degrees), do: degrees * :math.pi() / 180.0
 
   defp distance_ly_to_pc(nil), do: nil
   defp distance_ly_to_pc(value), do: value / 3.261563777
-
-  defp radians(degrees), do: degrees * :math.pi() / 180.0
 
   defp search_text(values) do
     values

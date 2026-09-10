@@ -65,6 +65,8 @@ defmodule StarsmapApiWeb.Router do
     post "/events", EventController, :create
     get "/catalog", CatalogController, :summary
     get "/catalog/search", CatalogController, :search
+    get "/catalog/records/:record_key", CatalogController, :source_record
+    get "/catalog/identifications/:public_key", CatalogController, :identifications
     get "/catalog/density", CatalogController, :density
     get "/catalog/nearest", CatalogController, :nearest
     get "/objects/gaia/:source_id", CatalogController, :gaia

@@ -4,7 +4,7 @@ import type { Body } from "../atlas/contracts";
 import { classifyBody } from "../destinationPicker";
 import { t } from "../i18n";
 import { educationalComparisons } from "../navigationMetrics";
-import { uncertaintySummary } from "../scienceSemantics";
+import { scienceSemanticsFor, uncertaintySummary } from "../scienceSemantics";
 
 type SizeVisual = {
   diameterPx: number;
@@ -61,8 +61,12 @@ export class ObjectComparisonView {
     }
 
     const distanceKm = this.options.distanceKm(selected, target);
-    const comparisons = educationalComparisons(distanceKm, { auKm: this.options.auKm(), includeMissionComparisons: false }).slice(0, 4);
-    const sizeComparison = this.sizeModel(selected, target);
+    const cosmological = [selected, target].some(body => scienceSemanticsFor(body.catalog?.position_model)?.distance_kind?.includes("comoving"));
+    const comparisons = educationalComparisons(distanceKm, { auKm: this.options.auKm(), includeMissionComparisons: false })
+      .filter(comparison => !cosmological || comparison.key !== "light_time").slice(0, 4);
+    const sizeComparison = selected.radius_km > 0 && target.radius_km > 0
+      && Number.isFinite(selected.radius_km) && Number.isFinite(target.radius_km)
+      ? this.sizeModel(selected, target) : null;
     this.options.panel.innerHTML = `
       <section class="compare-card">
         <div class="compare-distance compare-distance--hero">
@@ -79,7 +83,7 @@ export class ObjectComparisonView {
         </dl>
         <a href="/methodology" data-analytics-event="methodology">${escapeHtml(t("launch.distanceMethodology"))}</a>
       </section>
-      <section class="size-compare-card">
+      ${sizeComparison ? `<section class="size-compare-card">
         <div class="panel-head compact">
           <div>
             <p class="eyebrow">${escapeHtml(t("compare.trueDiameterRatio"))}</p>
@@ -91,14 +95,14 @@ export class ObjectComparisonView {
           ${this.renderSizeDisk(selected, sizeComparison.a)}
           ${this.renderSizeDisk(target, sizeComparison.b)}
         </div>
-      </section>
+      </section>` : ""}
     `;
     this.options.afterRender();
   }
 
   private renderObject(body: Body, label: string) {
     const classification = classifyBody(body);
-    const radiusLabel = body.radius_km > 0 ? `${this.options.formatDistance(body.radius_km)} ${t("picker.radius")}` : t("compare.radiusUnknown");
+    const radiusLabel = Number.isFinite(body.radius_km) && body.radius_km >= 0 ? `${this.options.formatDistance(body.radius_km)} ${t("picker.radius")}` : t("compare.radiusUnknown");
     return `
       <article class="compare-object" style="--body-color: ${escapeHtml(body.color)}">
         <span>${label}</span>
@@ -135,10 +139,10 @@ export class ObjectComparisonView {
       const diameterPx = (diameterKm / maxDiameter) * MAX_DIAMETER_PX;
       return { diameterPx, isSubpixel: diameterKm > 0 && diameterPx < 1, visualType: classifyBody(body).type };
     };
-    const ratio = diameterB / Math.max(diameterA, 1);
+    const ratio = diameterB / diameterA;
     const ratioLabel = ratio >= 1
       ? `${right.name} is ${formatRatio(ratio)}x ${left.name}`
-      : `${left.name} is ${formatRatio(1 / Math.max(ratio, 1e-9))}x ${right.name}`;
+      : `${left.name} is ${formatRatio(1 / ratio)}x ${right.name}`;
     return {
       a: visual(left, diameterA),
       b: visual(right, diameterB),

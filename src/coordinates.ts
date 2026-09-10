@@ -1,10 +1,11 @@
+import contract from "../backend_phoenix/priv/catalog_coordinate_contract.json" with { type: "json" };
 const DEG_PER_HOUR = 15;
 const RA_HOURS_PER_CIRCLE = 24;
 const FULL_CIRCLE_DEG = 360;
 const J2000_NORTH_GALACTIC_POLE_RA_DEG = 192.85948;
 const J2000_NORTH_GALACTIC_POLE_DEC_DEG = 27.12825;
 const J2000_GALACTIC_ASCENDING_NODE_DEG = 32.93192;
-const J2000_MEAN_OBLIQUITY_DEG = 23.4392911;
+const J2000_MEAN_OBLIQUITY_DEG = contract.obliquity_deg;
 
 export type EquatorialCoordinates = {
   raDeg: number;
@@ -21,6 +22,17 @@ export type EclipticSphericalCoordinates = {
   latitudeDeg: number;
   radiusAu: number;
 };
+
+/** Unit direction only: this vector has no physical distance or parallax. */
+export function equatorialToEclipticDirection(raDeg: number | null | undefined, decDeg: number | null | undefined) {
+  if (typeof raDeg !== "number" || typeof decDeg !== "number"
+    || !Number.isFinite(raDeg) || !Number.isFinite(decDeg)
+    || raDeg < 0 || raDeg >= 360 || decDeg < -90 || decDeg > 90) return null;
+  const ra = toRadians(raDeg), dec = toRadians(decDeg);
+  const e = toRadians(J2000_MEAN_OBLIQUITY_DEG);
+  const y = Math.cos(dec) * Math.sin(ra), z = Math.sin(dec);
+  return { x: Math.cos(dec) * Math.cos(ra), y: y * Math.cos(e) + z * Math.sin(e), z: -y * Math.sin(e) + z * Math.cos(e) };
+}
 
 export function formatRightAscension(raDeg: number): string {
   if (!Number.isFinite(raDeg)) return "";

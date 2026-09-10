@@ -1,0 +1,703 @@
+{
+  "plans": [
+    {
+      "id": 6,
+      "status": "ready",
+      "description": "Correct the eight scientific findings in docs/astronomer-review-task-1267.md while preserving SkyChart's existing native interface and atlas functionality. Planning only is requested now: create a durable execution plan, not code, imports, background work or a deployment. Prioritize false physical measurements, incompatible coordinate frames and cosmological light-time semantics; then correct size estimates, incomplete uncertainty summaries, stellar epochs, observing time/target coverage and release/export provenance. Acceptance must use executable behavior and independently checked numerical references. Do not treat historical probe output as proof that the current branch still has every defect, or claim that passing the previous suite means a defect was fixed.\n\nThis is a correctness plan, not a professional subscription product: no classroom features, new analysis workbench, external UI/Aladin Lite, full observation scheduler or research workspace. Source uncertainty and current scientific limitations must be represented honestly; formal covariance/posterior inference is not required merely to remove misleading values. All users receive the same corrections.\n\nCoordination: catalog-import plan #5 is already in progress. Its C02-C04 overlap this plan's measurement/position/epoch foundation; C13 overlaps historical releases. Inspect its latest outputs in S01. Implement shared fixes once and use their acceptance evidence in both plans. This plan can close an overlapping item when the required implementation and tests already exist; it must not create incompatible second schemas or re-projections. The scientific fixes do not depend on importing the expanded catalog inventory. Leave plan #5 and the existing spacecraft plan #4 intact.",
+      "metadata": {
+        "acceptance_criteria": [
+          "Missing positions and display-shell radii never become measured positions, distances or light times.",
+          "Coordinate transformations and position epochs agree across static/dynamic records, import, tile, hydration, sky and inverse paths within declared tolerances.",
+          "Projected, 3D, angular and cosmological quantities are distinguished; distance/c is not misrepresented as cosmological lookback time.",
+          "Unknown radii cannot produce size ratios; catalog extent and proper/comoving size definitions remain explicit.",
+          "SPIDERS and all other supported source summaries retain correctly typed redshift and uncertainty evidence.",
+          "Observing results use an explicit requested time, correct supported target resolution and dated availability/accuracy information.",
+          "Shared releases restore compatible historical data or clearly report unavailable reproducibility; exports describe actual source epochs and conventions.",
+          "All eight report findings have verified current-status and before/after evidence; necessary derived-data/cache revisions are versioned."
+        ],
+        "execution_order": "Reconfirm/reconcile → shared contracts → P0 containment and frame/distance fixes → stellar epochs, sizes, uncertainty and observing → release/export correctness → integrated verification and documentation. S06 is P0 and should precede optional P1 work once its dependencies pass.",
+        "overlap_map": [
+          {
+            "catalog_plan_items": [
+              "C02"
+            ],
+            "contract": "Shared scientific position/measurement capabilities",
+            "scientific_plan_items": [
+              "S02"
+            ]
+          },
+          {
+            "catalog_plan_items": [
+              "C03"
+            ],
+            "contract": "Missing positions and invalid size ratios",
+            "scientific_plan_items": [
+              "S03",
+              "S07"
+            ]
+          },
+          {
+            "catalog_plan_items": [
+              "C04",
+              "C09"
+            ],
+            "contract": "Frame/epoch/distance/uncertainty normalization",
+            "scientific_plan_items": [
+              "S04",
+              "S05",
+              "S06",
+              "S08"
+            ]
+          },
+          {
+            "catalog_plan_items": [
+              "C13"
+            ],
+            "contract": "Retained release and provenance resolution",
+            "scientific_plan_items": [
+              "S10"
+            ]
+          },
+          {
+            "catalog_plan_items": [
+              "C14"
+            ],
+            "contract": "Reusable scientific validation evidence",
+            "scientific_plan_items": [
+              "S11"
+            ]
+          }
+        ],
+        "planning_checkout_commit": "3e1bde8a6c00579ab5c947d078047b4310391aa3",
+        "primary_references": [
+          "https://ssd.jpl.nasa.gov/horizons/manual.html",
+          "https://docs.astropy.org/en/stable/api/astropy.cosmology.FlatLambdaCDM.html",
+          "https://www.cosmos.esa.int/web/gaia/dr3",
+          "https://astroplan.readthedocs.io/en/latest/"
+        ],
+        "project_id": 19,
+        "related_plans": [
+          {
+            "id": 5,
+            "relationship": "Reuse and reconcile overlapping implementations; do not require completion of its broad imports.",
+            "status_at_planning": "in_progress"
+          },
+          {
+            "id": 4,
+            "relationship": "Preserve spacecraft behavior and reuse applicable frame/availability corrections."
+          }
+        ],
+        "reviewed_commit": "390217134a9054ff8d4aaf9d23d95ca6b5c0911c",
+        "scope_exclusions": [
+          "Catalog acquisition expansion",
+          "Paid tiers and product repositioning",
+          "External viewer integration",
+          "General statistical/posterior analysis engine",
+          "Full observing campaign scheduler",
+          "Unrelated infrastructure changes"
+        ],
+        "source_report": "docs/astronomer-review-task-1267.md",
+        "verification_strategy": "Read back saved plan; verify ordered dependency graph, all eight report findings covered, no dependency on completing broad catalog imports, and scope/overlap constraints preserved."
+      },
+      "title": "Resolve SkyChart scientific correctness and reproducibility issues",
+      "items": [
+        {
+          "id": 101,
+          "position": 0,
+          "status": "pending",
+          "description": "Reproduce the eight findings from docs/astronomer-review-task-1267.md against the current implementation branch and available artifacts. Record fixed/still-present/not-reproduced status with evidence; the original audit was at 390217134a9054ff8d4aaf9d23d95ca6b5c0911c and this planning checkout is 3e1bde8a6c00579ab5c947d078047b4310391aa3. Catalog-import plan #5 is already in progress: inspect its current C02/C03/C04/C13/C14 outputs and reuse compatible implementations before editing overlapping modules. Add failing behavioral fixtures for the null-to-zero mapper, reference-shell comparison, cosmological light time, zero-radius ratio, SPIDERS summary and release selection. Retain the 1351.478 arcsecond frame probe as evidence of mismatched orientations, not as a universal object-error estimate. Establish independent reference fixtures and numerical tolerances for transformations, epoch propagation and observing, distinct from source uncertainty and tile quantization. Do not repeat completed fixes or block small correctness fixes on full catalog imports.",
+          "metadata": {
+            "code": "S01",
+            "depends_on": [],
+            "priority": "P0",
+            "report_findings": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
+          },
+          "title": "Reconfirm findings and reconcile work with catalog plan #5"
+        },
+        {
+          "id": 102,
+          "position": 1,
+          "status": "pending",
+          "description": "Create shared, runtime-validated contracts for coordinate orientation, origin, equinox, position/source epochs, time scale, distance kind, cosmology, uncertainty and availability. Cover measured/estimated 3D positions, angular-only records, missing positions and display/reference-shell coordinates without treating all finite vectors as measurable. Audit every existing registry position model and generated epoch variant; remove unsafe type assertions that conceal JSON/TypeScript mismatches. Preserve original astrometry and stable object keys. Add common eligibility functions for angular separation, physical comparison, projected-map ruler, cosmological quantities and size comparison, returning reasons when unsupported. Align with catalog plan #5 C02-C04. Acceptance: all current source models validate; unknown/unrecognized metadata cannot silently enable a physical calculation; serialized APIs and native UI preserve legitimate zero values separately from missing values.",
+          "metadata": {
+            "code": "S02",
+            "depends_on": [
+              "S01"
+            ],
+            "priority": "P0",
+            "report_findings": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ]
+          },
+          "title": "Make scientific position and measurement capabilities explicit"
+        },
+        {
+          "id": 103,
+          "position": 2,
+          "status": "pending",
+          "description": "Fix catalogObjectMapper.ts, importer validation, Phoenix payload assembly, hasBodyPosition consumers and native inspection/comparison/related-object ordering so absent catalog coordinates do not become the Sun. Reference-shell coordinates must not produce Earth/Sun distance, physical nearest-neighbor results, pair separation or light time. Keep angular-only records searchable, inspectable and visible through the existing SkyChart sky view when valid angular positions exist. Preserve spacecraft missing/out-of-coverage semantics. Any display shell retained for compatibility must remain explicitly a display convention and be excluded from scientific measurements; do not remove the underlying catalog record. Acceptance: OpenNGC null-coordinate and eROSITA unknown-distance cases expose no fabricated physical values, a true origin remains valid, and valid angular operations continue. Reuse catalog plan #5 C03 rather than implement a second null-position policy.",
+          "metadata": {
+            "code": "S03",
+            "depends_on": [
+              "S02"
+            ],
+            "priority": "P0",
+            "report_findings": [
+              2
+            ]
+          },
+          "title": "Preserve unknown positions and block false physical measurements"
+        },
+        {
+          "id": 104,
+          "position": 3,
+          "status": "pending",
+          "description": "Resolve the fixed-J2000 versus true-ecliptic-of-date mismatch across scientific_calculation.py, spacecraft/Horizons adapters, small-body fallback propagation, Phoenix catalog projection, offline tile builders, coordinates.ts, sky/share paths and cached payloads. Choose one documented canonical orientation and origin after auditing source conventions; transform vectors into it before subtraction or projection. Keep reference-frame rotation distinct from motion and apparent-position corrections. Audit UTC/TT/TDB boundaries and retain source frames and epochs. Use established astrometry calculations and independent golden fixtures; do not rewrite ephemeris solvers unnecessarily. Version cache keys, projection models and tile manifests so new code never silently combines old and new orientations. Acceptance: identical source directions agree through all paths across supported representative dates, round trips pass near poles/RA wrap, and a release migration/rebuild strategy preserves existing links or explicitly reports incompatibility. Coordinate with plan #5 C04.",
+          "metadata": {
+            "code": "S04",
+            "depends_on": [
+              "S02"
+            ],
+            "priority": "P0",
+            "report_findings": [
+              1
+            ]
+          },
+          "title": "Unify static, dynamic and inverse coordinate transformations"
+        },
+        {
+          "id": 105,
+          "position": 4,
+          "status": "pending",
+          "description": "Align snapshot importer, Gaia local/bulk builders, live/cached Gaia hydration, sky rendering and source metadata around one displayed-epoch policy. Immutable tiles may use a fixed documented epoch; the atlas time control must not imply that static stars follow the selected Solar System date. Hydration must use the same supported position model as the tile it represents, avoiding selection jumps. Retain original coordinates/epoch; attach explicit model and actual displayed epoch even when proper motion is absent. Replace unsafe linear RA/Dec offsets near poles with a validated spherical/space-motion calculation where propagation is supported; use radial velocity only when available and appropriate, and disclose incomplete motion/covariance. Do not invent radial velocity, parallax or propagated precision. Acceptance: an identified high-proper-motion source agrees through snapshot/tile/detail paths within declared precision; missing-motion and epoch-boundary fixtures remain honest. Reuse plan #5 C04/C09 outputs.",
+          "metadata": {
+            "code": "S05",
+            "depends_on": [
+              "S04"
+            ],
+            "priority": "P1",
+            "report_findings": [
+              6
+            ]
+          },
+          "title": "Make stellar epoch propagation consistent across all loading paths"
+        },
+        {
+          "id": 106,
+          "position": 5,
+          "status": "pending",
+          "description": "Update ObjectComparisonView, navigationMetrics, inspector and other distance consumers to respect the S02 capability contract. Distinguish x/y projected ruler values from compatible 3D distances and angular separations. Remove unconditional distance/c light-time rows for cosmological or unknown-distance positions. Keep distance/c for suitable local geometric states explicitly an estimated one-way time, not observed signal timing. Label cosmological separations as model-dependent comoving quantities where valid; mixed distance conventions or epochs must be reconciled explicitly or disallowed. If existing displays need lookback, luminosity or angular-diameter distance, compute them from redshift and the pinned cosmology using separate validated functions; do not add a general cosmology workbench. Acceptance: a reference redshift grid agrees with an independently configured calculation; shell, mixed-kind and different-epoch fixtures cannot receive unsupported labels or values; local Solar System comparisons remain correct.",
+          "metadata": {
+            "code": "S06",
+            "depends_on": [
+              "S03",
+              "S04"
+            ],
+            "priority": "P0",
+            "report_findings": [
+              3
+            ]
+          },
+          "title": "Apply distance conventions to comparisons and light-time displays"
+        },
+        {
+          "id": 107,
+          "position": 6,
+          "status": "pending",
+          "description": "Fix ObjectComparisonView.sizeModel and size presentations so missing, non-finite, zero/invalid denominators never generate a fabricated ratio; show comparison unavailable when either physical radius is unsupported. Retain subpixel rendering for known small objects and distinguish visual marker size from physical size. Audit eROSITA extent_ly and every consumer: retain comoving extent only with that explicit label, or use angular-diameter distance for a proper transverse extent; preserve the upstream extent/profile definition and do not relabel a fitted extent as a physical diameter without justification. Identify estimated stellar radii as estimates in comparison and exports. Version/recompute affected derived fields rather than merely relabeling persisted numbers incorrectly. Acceptance: missing/NaN radius fixtures suppress ratios; known ratios remain correct; a known-redshift angular-extent fixture verifies units and the expected proper/comoving relationship.",
+          "metadata": {
+            "code": "S07",
+            "depends_on": [
+              "S02",
+              "S06"
+            ],
+            "priority": "P1",
+            "report_findings": [
+              4
+            ]
+          },
+          "title": "Correct unknown-radius ratios and source-defined size estimates"
+        },
+        {
+          "id": 108,
+          "position": 7,
+          "status": "pending",
+          "description": "Normalize known uncertainty fields using source-specific semantics, including SPIDERS redshift_err, catalog spectroscopic/compiled/inferred redshift kinds and the complete registry. Do not label a compiled redshift as spectroscopy solely because it has an error field. Ensure measuredRedshift or its replacement displays the actual supported source value and method; retain quality cuts and flags separately. Keep null, zero, asymmetric intervals, confidence levels, upper limits and unavailable uncertainties distinct; parallax signal-to-noise and orbital condition codes are not standard errors. Show per-record provenance rather than a misleading generic model source. Document current parallax estimator and applicable systematic limitations; do not silently replace catalog distances with an unvalidated correction or invent covariance. Acceptance: the report's SPIDERS z=0.5, error=0.001 fixture displays both correctly; compiled/inferred, unavailable, zero-error and model-coverage cases pass behavioral tests. Advanced posterior analysis is outside this corrective plan.",
+          "metadata": {
+            "code": "S08",
+            "depends_on": [
+              "S02"
+            ],
+            "priority": "P1",
+            "report_findings": [
+              5
+            ]
+          },
+          "title": "Restore complete source uncertainty and redshift disclosure"
+        },
+        {
+          "id": 109,
+          "position": 8,
+          "status": "pending",
+          "description": "Make requestObservation pass an explicit atlas timestamp and display the actual calculation time. Permit valid user-selected dates through the normal API within supported ephemeris ranges rather than restricting fixed timestamps to test mode; retain input validation and clear coverage errors. Resolve supported Phoenix/catalog targets through a trusted internal object contract, preserving angular reference epoch and motion semantics, instead of assuming every key exists in Python BODY_BY_KEY. Dynamic targets require an appropriate supported apparent-position model; unsupported targets return an explicit unavailable result. Preserve the compact existing UI; label horizonless geometric sky separately from topocentric predictions. Expose dated rise/transit/set values and accurate current-time/circumpolar/never-rises wording, with five-minute sampling, refraction and local-obstruction limitations. Acceptance: selected-date and midnight cases, circumpolar/never-rising stars, a supported Phoenix-only target and an unsupported spacecraft work predictably against independent fixtures. Full campaign scheduling, weather and exposure planning are outside scope.",
+          "metadata": {
+            "code": "S09",
+            "depends_on": [
+              "S03",
+              "S04",
+              "S05"
+            ],
+            "priority": "P1",
+            "report_findings": [
+              7
+            ]
+          },
+          "title": "Align observing calculations with the selected time and available targets"
+        },
+        {
+          "id": 110,
+          "position": 9,
+          "status": "pending",
+          "description": "Resolve the catalog-release parameter to an immutable retained manifest instead of silently loading the current release and overwriting requested state. Apply version compatibility across tiles, hydrated records, coordinate model, cosmology and epoch metadata; scope caches accordingly. If historical source details cannot be recovered, report that limitation and offer an explicit current-data path without claiming frozen reproducibility. Export provenance from the actual loaded sources: distinguish selected Solar System time from static position epochs, include projection/frame, distance conventions, release identifiers, sampling and unavailable details. Add a compact machine-readable sidecar or equivalent provenance representation for existing exports if the visible footer cannot hold this information. Do not build paid workspaces, notebook authoring or a new analysis product. Acceptance: advance the current manifest and reopen an older link; it either restores its compatible release or reports unavailable/incomplete reproducibility explicitly. Reuse catalog plan #5 C13 release infrastructure.",
+          "metadata": {
+            "code": "S10",
+            "depends_on": [
+              "S04",
+              "S05",
+              "S06",
+              "S07",
+              "S08"
+            ],
+            "priority": "P1",
+            "report_findings": [
+              8
+            ]
+          },
+          "title": "Make shared releases and exported scientific provenance truthful"
+        },
+        {
+          "id": 111,
+          "position": 10,
+          "status": "pending",
+          "description": "Run the relevant Python, TypeScript, Phoenix and native desktop/mobile browser tests plus required frontend builds, adding independent numerical checks instead of relying only on source-text guards. Required browser-service unavailability must fail the release validation rather than count skipped suites as success. Exercise end-to-end representative Solar System, spacecraft, Gaia, OpenNGC, DESI, Quaia, eROSITA and SPIDERS records across import/detail/measurement/sky/export, including provider outages and cached data. Rebuild/version affected local derived snapshots, caches and tile candidates; audit source counts and stable keys against previous releases before authorized publication. Update README, docs/scientific-methodology.md, served methodology content, registry explanations and supported translations to describe actual frames/epochs, uncertainties, ruler/light-time semantics and observing limits. Preserve SkyChart's design and normal navigation performance. Deliver before/after evidence mapped to all eight findings and release/rollback instructions. No unrelated Docker/CI churn; deployment, new spend and production data mutations retain their separate approval requirements.",
+          "metadata": {
+            "code": "S11",
+            "depends_on": [
+              "S03",
+              "S04",
+              "S05",
+              "S06",
+              "S07",
+              "S08",
+              "S09",
+              "S10"
+            ],
+            "priority": "P1",
+            "report_findings": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8
+            ]
+          },
+          "title": "Verify scientific regressions, refresh derived artifacts and update documentation"
+        }
+      ],
+      "inserted_at": "2026-09-08T14:44:08Z",
+      "updated_at": "2026-09-08T14:44:08Z",
+      "project": {
+        "id": 19,
+        "name": "skychart"
+      },
+      "created_by": "devops",
+      "source_session_id": 1267
+    },
+    {
+      "id": 5,
+      "status": "in_progress",
+      "description": "Build toward the user's ambition of including every catalogued celestial object by progressively importing auditable public source releases into SkyChart-controlled storage and rendering them entirely through SkyChart's existing interface. This is a native database-ingestion program: do not embed Aladin Lite or substitute remote archive views for local imported records. Preserve SkyChart's visual design, heliocentric physical map, native sky view, search, selection and object inspection. All valid records remain available even when distance or coordinates are unknown; physical placement requires defensible evidence. Keep source records distinct from established object identities, preserve ambiguous matches and provenance, and measure completeness against specific releases rather than promise every object ever known to humanity.\n\nPlanning only is authorized in this session. This plan creates no application change, bulk import, deployment, new spend or background job. Future implementation must independently obtain any required authorization for spend/production mutations while proceeding with ordinary authorized reversible development.\n\nRepository baseline: source-specific Postgres tables and catalog_source_objects union; Python source import helpers; resumable Gaia download into Parquet; snapshot importer; immutable SMP3/SMPK1 point containers; Phoenix native search/detail and TypeScript sky/map UI. Reuse these. Current snapshot validation requires physical coordinates; CatalogObjectMapper defaults absent coordinates to zero; physical Gaia pipelines use positive-parallax quality cuts; Gaia detail can require live TAP; current search ordering and per-record storage/index shape need benchmarked scaling. Those constraints prevent simply switching on arbitrary full catalogs. Resolve them as part of the import program. Do not infer production catalog coverage from checked-in scripts or configured names.\n\nInitial delivery sequence: inventory and scientific contracts → unknown-distance support and robust import framework → measured storage/search capacity → identity evidence → first complete manageable catalog release → full Gaia and infrared releases → broader optical/specialist catalogs → native rendering/performance and operational release validation. Dependencies identify parallelizable engineering once prerequisites are met, without authorizing additional agents. Full source releases are the goal; pilot samples are validation fixtures, never the final catalog coverage claim. Existing spacecraft functionality is reused and its separate plan is not replaced.",
+      "metadata": {
+        "acceptance_criteria": [
+          "Every accepted source record is stored in SkyChart-controlled infrastructure and retrievable independently of live upstream availability.",
+          "Admitted releases reconcile upstream rows with accepted/quarantined records and disclose selection, coverage and any partial imports.",
+          "Unknown distance/position never becomes zero, a measured shell radius or an import-wide rejection.",
+          "Source records, confirmed identities and ambiguous associations remain distinct, versioned and traceable.",
+          "Coordinate frames, epochs, distance models and uncertainty agree across import, hydration, rendering and comparisons.",
+          "SkyChart retains its own interface and native rendering; new records work in search, inspection, shared links and applicable sky/physical views.",
+          "Scale and operating cost are measured before full-volume runs; jobs resume and releases can roll back without losing other catalogs.",
+          "No claim of 'every object ever catalogued' is made without an auditable universe of supported source releases."
+        ],
+        "milestones": [
+          {
+            "items": [
+              "C01",
+              "C02",
+              "C03",
+              "C04",
+              "C05",
+              "C06",
+              "C07"
+            ],
+            "name": "Foundation"
+          },
+          {
+            "items": [
+              "C08",
+              "C12"
+            ],
+            "name": "First complete native catalog"
+          },
+          {
+            "items": [
+              "C09",
+              "C10"
+            ],
+            "name": "Broad stellar and infrared coverage"
+          },
+          {
+            "items": [
+              "C11"
+            ],
+            "name": "Rolling public-catalog expansion"
+          },
+          {
+            "items": [
+              "C13",
+              "C14"
+            ],
+            "name": "Maintainable verified releases"
+          }
+        ],
+        "primary_references": [
+          "https://vizier.cds.unistra.fr/",
+          "https://vizier.cds.unistra.fr/vizier/doc/catstd.htx",
+          "https://simbad.unistra.fr/simbad/",
+          "https://www.cosmos.esa.int/web/gaia/dr3",
+          "https://irsa.ipac.caltech.edu/data/WISE/docs/release/AllWISE/expsup/sec1_3.html",
+          "https://irsa.ipac.caltech.edu/onlinehelp/catalogs/help.pdf"
+        ],
+        "project_id": 19,
+        "risks": [
+          "Billions of rows, duplicated detections and large indexes can dominate storage and import cost.",
+          "Many sources lack distances, stable classification or unambiguous counterpart associations.",
+          "Public discovery does not guarantee a complete bulk export or identical reuse terms for every catalog.",
+          "Catalog additions can silently alter scientific semantics, object identities or saved releases unless versioned.",
+          "The broad source backlog is ongoing; exact release order and resource estimates depend on C01/C06 audits."
+        ],
+        "scope": "Durable implementation plan only; native catalog imports, no embedded third-party interface.",
+        "verification_strategy": "Read back the created Rondar plan and confirm all 14 ordered items, dependencies, native UI constraints, source coverage goals and release acceptance gates are persisted."
+      },
+      "title": "Expand SkyChart's owned celestial-object database through comprehensive catalog imports",
+      "items": [
+        {
+          "id": 87,
+          "position": 0,
+          "status": "pending",
+          "description": "Audit the checked-out code, available imported manifests and database counts without assuming configured catalogs are fully loaded. Create a versioned catalog registry with upstream provider, catalog/table ID, release, documentation, identifiers, object populations, row counts, columns/units, coordinate frame/epochs, distance fields, selection/quality flags, download method, checksums where supplied, attribution/reuse terms, refresh cadence and estimated bytes. Compare current slices against upstream releases. Discover public catalogs through VizieR metadata and official archives; distinguish source catalogs, observation tables, cross-match tables and images. Define the first release set as broad SIMBAD object/identifier coverage, complete Gaia DR3 source records, and 2MASS PSC/XSC plus AllWISE source catalogs, subject to verified access and feasibility. Queue major optical/galaxy, radio and specialist catalogs plus existing-source expansion in the same registry. Deliver an inclusion/deferment ledger with reasons and a source-by-source rollout order; never describe a sample or selected subset as a complete release.",
+          "metadata": {
+            "code": "C01",
+            "depends_on": []
+          },
+          "title": "Inventory catalog coverage and define auditable release targets"
+        },
+        {
+          "id": 88,
+          "position": 1,
+          "status": "pending",
+          "description": "Extend the existing source-specific Postgres tables and catalog_source_objects union contract incrementally. Distinguish immutable/versioned catalog records keyed by provider+catalog+release+source ID from SkyChart object identities and many-to-many identification evidence. Preserve names/aliases, 64-bit IDs losslessly, original measurements/units, classifications/candidate flags, component/system relationships, uncertainty, provenance and source documentation. Retain observations and unresolved detections without asserting unique physical identities. Define independent capabilities for searchable metadata, angular sky position, measured/estimated spatial position and dynamic ephemeris availability. Support records with no coordinates as searchable metadata where meaningful. Specify compatibility for existing object keys, links, APIs and source-record access; do not replace existing public keys during migration. Acceptance: representative same-object, blend, binary-component, moving-body and coordinate-missing fixtures round-trip without information or identity loss.",
+          "metadata": {
+            "code": "C02",
+            "depends_on": [
+              "C01"
+            ]
+          },
+          "title": "Define source records, object identities and position capabilities"
+        },
+        {
+          "id": 89,
+          "position": 2,
+          "status": "pending",
+          "description": "Update importer validation, Phoenix payloads, TypeScript contracts, CatalogObjectMapper, selection, comparison, object inspection and sky-view loading so lack of distance is not an import failure. Preserve absent coordinates rather than converting them to zero. Separate reference-shell/display coordinates from measured positions; retain underlying records and valid RA/Dec. Keep angular-only objects searchable and inspectable in SkyChart's own UI and own sky renderer. Disable unsupported centering/physical distance/light-time/size calculations, while retaining valid angular operations. Distinguish unknown radius from a real zero, and omit unsupported size ratios. Do not add Aladin Lite, external application embeds, arbitrary depth or invented object properties. Acceptance: OpenNGC unknown-distance and X-ray shell cases retain metadata and sky position without numerical physical claims; valid objects at the Sun and existing spacecraft availability behavior remain correct; desktop/mobile selection and old shared links work.",
+          "metadata": {
+            "code": "C03",
+            "depends_on": [
+              "C02"
+            ]
+          },
+          "title": "Support unknown distances throughout SkyChart's existing interface"
+        },
+        {
+          "id": 90,
+          "position": 3,
+          "status": "pending",
+          "description": "Define and implement one explicit internal frame/origin/equinox contract for combining source coordinates, retaining original astrometry and per-record source/display epochs. Resolve fixed J2000 versus ecliptic-of-date inconsistency across Python, Phoenix and TypeScript without invalidating old persisted releases silently. Standardize Gaia tile/import/hydration propagation semantics. Normalize source-specific distance and uncertainty fields, distinguish parallax estimates, literature distances, spectroscopic/inferred redshifts and unavailable distances, and retain source quality flags. Do not demand positive parallax to store a source; only apply documented quality/estimator requirements to physical placement. Preserve cosmology and gate unsupported light-time/size derivations. Dynamic Solar System records retain dated ephemeris models rather than static stellar transformations. Acceptance: independent reference fixtures at multiple epochs, high proper motion, missing motion, low/negative parallax, and cosmological cases agree with declared tolerances and preserve uncertainty.",
+          "metadata": {
+            "code": "C04",
+            "depends_on": [
+              "C02"
+            ]
+          },
+          "title": "Establish consistent coordinate, epoch and distance normalization"
+        },
+        {
+          "id": 91,
+          "position": 4,
+          "status": "pending",
+          "description": "Reuse scripts/download_gaia_dr3.py, catalog_pg_import.py, existing source importers and release tools. Add shared source adapters for documented bulk files (CSV/ECSV, FITS, VOTable and CDS-described tables as appropriate), compressed streams and supported asynchronous archive exports. Use provider-approved bulk methods rather than scraping Aladin or mass-paging interactive endpoints. Stage locally owned source data and normalized batches with checksums, checkpoints, deterministic keys, release manifests, rejected-row reasons, row accounting and schema-drift detection. Bound memory/concurrency, retry safely and support cancellation/resume and dry-run estimates. Preserve scientific fields and source schemas; avoid blindly retaining redundant full JSON payloads for billions of rows. Snapshot changes must stage independently and become visible only after validation; preserve rollback and previous source releases according to an explicit retention policy. Acceptance: interrupted/retried/reordered imports yield identical records; malformed/truncated inputs cannot replace a valid release.",
+          "metadata": {
+            "code": "C05",
+            "depends_on": [
+              "C01",
+              "C02"
+            ]
+          },
+          "title": "Build resumable, validated catalog ingestion and staging"
+        },
+        {
+          "id": 92,
+          "position": 5,
+          "status": "pending",
+          "description": "Measure representative batches from the first release set at increasing scales. Record ingestion throughput, normalized/source bytes per row, table/index amplification, temporary disk, release coexistence, cross-identification cost, tile build time, search and hydration latency, and ongoing refresh cost. Design an owned-data solution in which every admitted record remains locally retrievable/searchable without live upstream hydration. Retain Postgres for identities/metadata and suitable indexed catalog partitions; choose partitioning, compact columnar storage and routing based on benchmarks rather than putting all fields in a single heavily indexed union. Establish explicit ID/alias, text, angular and physical lookup strategies with bounded paging and truthful result counts. Define measurable browser/server budgets from the baseline and document capacity/cost estimates per release. Reversible code/fixture work proceeds normally; new spend, production imports, deletion, deployment or permission changes require their separately authorized execution. Acceptance: an approved capacity envelope and repeatable performance script exist before billion-row jobs.",
+          "metadata": {
+            "code": "C06",
+            "depends_on": [
+              "C02",
+              "C05"
+            ]
+          },
+          "title": "Benchmark owned storage, indexing and search before full-volume ingestion"
+        },
+        {
+          "id": 93,
+          "position": 6,
+          "status": "pending",
+          "description": "Ingest published cross-identifications and aliases with source/release provenance first. Use exact identifiers where valid; apply epoch-aware, uncertainty-aware positional matching only with a documented source-specific policy. Preserve multiple counterpart candidates, match scores/methods, unmatched records and blend/component relationships instead of merging nearest points automatically. Maintain versioned/reversible associations and stable public keys across catalog refreshes and splits/merges. Assemble source-attributed facts without silently overwriting conflicting measurements; keep original source-record detail accessible. Report raw rows, accepted records, established identities and unresolved associations separately. Acceptance: fixtures with a known cross-catalog star, high-proper-motion source, binary, low-resolution blend and duplicate release preserve expected identities; ambiguous records remain available.",
+          "metadata": {
+            "code": "C07",
+            "depends_on": [
+              "C02",
+              "C04",
+              "C05"
+            ]
+          },
+          "title": "Implement conservative cross-identification and stable object assembly"
+        },
+        {
+          "id": 94,
+          "position": 7,
+          "status": "pending",
+          "description": "Implement the registry-selected first manageable complete source release, prioritizing broad SIMBAD objects plus identifiers if a supported complete acquisition path is available; otherwise record the access constraint and use the next auditable source release rather than silently truncating. Import into owned storage, build indexes, expose native search/inspection/sky positions and physical placement where justified, and reconcile every upstream row. This is the first end-to-end production candidate for the framework, not the final scope of catalog expansion. Existing sparse SIMBAD imports and aliases must migrate compatibly. Acceptance: full admitted release accounted for, all records locally retrievable when upstream is unavailable, known and unknown-distance examples usable, and no loss of existing catalog groups. Publish only after the normal authorized release process.",
+          "metadata": {
+            "code": "C08",
+            "depends_on": [
+              "C03",
+              "C04",
+              "C05",
+              "C06",
+              "C07"
+            ]
+          },
+          "title": "Deliver the first complete source release through the native SkyChart flow"
+        },
+        {
+          "id": 95,
+          "position": 8,
+          "status": "pending",
+          "description": "Ingest the complete audited Gaia DR3 gaia_source release using the resumable archive downloader, extending its retained field set to the agreed scientific contract. Keep all valid source records, including missing/negative/low-significance parallaxes and missing photometry; physical placement remains a separately documented subset. Retain precise IDs and per-source astrometric solution/quality and epoch information. Add associations to existing Hipparcos, local Gaia and exoplanet-host records using verified evidence. Replace live-only Gaia detail dependence for imported records with the owned store, retaining explicit availability semantics. Acceptance: source-manifest counts reconcile to ingested/quarantined records, all valid IDs resolve locally, selected angular-only sources remain discoverable, and full-record coverage is not confused with rendered physical-point counts.",
+          "metadata": {
+            "code": "C09",
+            "depends_on": [
+              "C08"
+            ]
+          },
+          "title": "Expand Gaia from physical-map subsets to complete source coverage"
+        },
+        {
+          "id": 96,
+          "position": 9,
+          "status": "pending",
+          "description": "Add source-specific bulk adapters and normalized schemas for 2MASS Point Source Catalog, 2MASS Extended Source Catalog and AllWISE Source Catalog after verifying their release docs, access methods and capacity estimates. Preserve band-specific photometry, errors, quality flags, positions and published associations; do not convert infrared fluxes or magnitudes into unlabelled optical brightness. Distinguish point/extended detections, rejected detections and repeated observation products. Use catalog-provided associations as evidence rather than treating all matches as a unique identity. Acceptance: each admitted complete release has audited row accounting, native search/detail, typed photometric facts, locally available records, and angular/physical visibility consistent with distance evidence.",
+          "metadata": {
+            "code": "C10",
+            "depends_on": [
+              "C08"
+            ]
+          },
+          "title": "Import complete 2MASS and AllWISE source releases"
+        },
+        {
+          "id": 97,
+          "position": 10,
+          "status": "pending",
+          "description": "Continue the C01 backlog through the same adapters, audits and owned storage: expand current DESI, Quaia, eROSITA, SPIDERS, BASS, Hipparcos, OpenNGC, exoplanet and small-body holdings where selected slices omit valid catalog records; evaluate major additional optical imaging/galaxy releases such as Pan-STARRS, Legacy Surveys and SDSS from their official archives; then radio and specialist populations such as pulsars, variables, clusters, nebulae, transients, supernova remnants and historical catalogs. Pin exact catalog/table/releases during the inventory instead of assuming all similarly named products are independent objects. Respect existing spacecraft maintenance scope and avoid rebuilding its workflow. Each catalog ships with a documented full/partial/deferred status, unique contribution/overlap analysis and all preceding validation gates. This is a rolling expansion program, not a claim that all public/private/historical human catalogs can be exhausted in one release.",
+          "metadata": {
+            "code": "C11",
+            "depends_on": [
+              "C08"
+            ]
+          },
+          "title": "Expand remaining public catalog populations through the registry"
+        },
+        {
+          "id": 98,
+          "position": 11,
+          "status": "pending",
+          "description": "Extend existing catalog search, hydration, point planner/decoder/selection and owned sky renderer to handle the admitted catalogs without adopting an external UI. Preserve SkyChart's design, progressive loading and mobile controls; add only concise source/coverage/distance availability presentation within existing flows. Use deterministic immutable SMP3/SMPK1 physical layers where appropriate and a separately validated angular indexing/tiling strategy for angular-only records; never reuse physical reference-shell coordinates as true depth. Extend numeric source-ID encoding with stable mappings or a versioned format for nonnumeric IDs as needed, keeping ID collisions impossible. Separate full catalog availability from zoom-dependent drawing; every admitted record must be retrievable even if omitted from the current LOD. Acceptance: frozen search, pan/zoom, hydration and mobile budgets pass on representative full-size releases; unsupported data remains inspectable; no giant browser payload or synchronous DB scan is introduced.",
+          "metadata": {
+            "code": "C12",
+            "depends_on": [
+              "C03",
+              "C04",
+              "C06",
+              "C08"
+            ]
+          },
+          "title": "Scale native search and angular/physical rendering to the expanded catalog"
+        },
+        {
+          "id": 99,
+          "position": 12,
+          "status": "pending",
+          "description": "Add per-catalog import/refresh commands, manifests and reports with pinned source versions, discovery time, checksums, fetched/accepted/quarantined counts, match counts, known/unknown distance counts, rendered LOD counts and deferred sources. Distinguish catalog records from established physical objects in UI and diagnostics. Detect updated upstream releases and produce add/change/withdrawal diffs; preserve historical records and associations while exposing current status. Compose new tiles/indexes/manifests atomically, preserve unrelated existing layers, resolve saved release IDs to retained artifacts or fail explicitly, and maintain rollback. Reuse existing CI/deployment scripts; avoid unrelated Docker/config churn. Scheduled refreshes and production publication are implemented with explicit resource limits and executed only under their required authorization. Acceptance: interrupted refresh and rollback tests preserve the previous valid release, source outages do not remove imported objects, and updates have auditable provenance.",
+          "metadata": {
+            "code": "C13",
+            "depends_on": [
+              "C05",
+              "C07",
+              "C08",
+              "C12"
+            ]
+          },
+          "title": "Make refreshes, completeness and scientific releases observable"
+        },
+        {
+          "id": 100,
+          "position": 13,
+          "status": "pending",
+          "description": "Run required frontend build, focused Python/TypeScript/Phoenix tests and native desktop/mobile browser checks against a running full application; unavailable required services must not count as successful browser validation. Extend existing scientific-trust, OpenNGC, bulk-pipeline, codec, release-composition and catalog API tests with record accounting, null/unknown data, lossless IDs, reversible matching, frames/epochs, sampled rendering versus full lookup, release pinning and failure recovery. Validate small fixed reference samples against primary archives independently of normal CI. Benchmark admitted full release volumes against C06 budgets and verify locally served detail with upstream connectivity disabled. Document registry extension, adapter creation, import/resume/audit, refresh/rollback, capacity estimates and exact release coverage. Completion is source-by-source: each targeted release meets its recorded criteria; the rolling inventory may continue. No unsupported claim of universal completeness.",
+          "metadata": {
+            "code": "C14",
+            "depends_on": [
+              "C09",
+              "C10",
+              "C11",
+              "C12",
+              "C13"
+            ]
+          },
+          "title": "Verify complete catalog releases and document operating procedures"
+        }
+      ],
+      "inserted_at": "2026-09-08T10:05:05Z",
+      "updated_at": "2026-09-08T14:15:36Z",
+      "project": {
+        "id": 19,
+        "name": "skychart"
+      },
+      "created_by": "devops",
+      "source_session_id": 1267
+    },
+    {
+      "id": 4,
+      "status": "ready",
+      "description": "Implement one new object type, Spacecraft, with the broadest maintainable catalog of physical mission vehicles supported by verified dated positions. Reuse existing search, selection, centering, date controls, comparison and object inspection. User-approved scope explicitly avoids extra UI complexity: no dedicated mission layer toggle, Explore card, zoom preset, panel tabs, countdown, or trajectory controls. Each physical craft has one stable identity; related craft share mission metadata. Include active and historical missions across agencies wherever usable data exists, rather than shipping only the Voyagers. Only render positions valid for the selected atlas date; historical or temporarily unavailable objects remain searchable with honest availability information. This plan is for later execution; no application implementation or PR is part of the planning task.\n\nRepository findings: Python backend/scientific_calculation.py already requests and caches JPL Horizons ICRF vectors and rotates them into the atlas true ecliptic/equinox of date. backend/http_transport.py serves ephemerides through Phoenix proxy routes. Frontend contracts, destination types, catalog mappers and view-state allowlists require explicit spacecraft support; Phoenix catalog/search and Sky share resolution also need integration. Existing navigation metrics and object inspection can supply distances and estimated one-way light time.\n\nPrimary references: https://ssd.jpl.nasa.gov/horizons/manual.html#spacecraft-trajectories-in-horizons and https://ssd-api.jpl.nasa.gov/doc/horizons.html. Horizons spacecraft data can include historical and predicted segments, stale solutions and limited coverage, so provider availability alone is not a guarantee of a usable current position. Mission count and inclusion list will be established by the audit, not promised in advance.",
+      "metadata": {
+        "acceptance_criteria": [
+          "Every audited and admitted craft has one stable searchable entry; actual catalog size and exclusions are documented.",
+          "Valid selected-date positions render in the atlas coordinate system; unavailable positions never masquerade as current.",
+          "Historical missions stay searchable and expose coverage using the existing object panel.",
+          "Earth/Sun distances and estimated one-way light time use full 3D positions at a common epoch.",
+          "No new dedicated toggle, Explore card, preset, tab, countdown or trajectory controls.",
+          "Broad catalog loading and provider outages do not block existing Solar System behavior.",
+          "Relevant build, scientific regression and UI tests pass."
+        ],
+        "delivery_order": "Coverage audit → contracts → backend positions → search/render/share → inspection → validation and full catalog release.",
+        "risks": [
+          "Uneven or stale provider trajectory coverage limits the current-date catalog.",
+          "Low-Earth-orbit trajectories require stricter freshness handling.",
+          "Mission-scale fetch volume requires caching and progressive loading.",
+          "Type allowlists and shared-state resolution span Python, Phoenix and TypeScript."
+        ],
+        "scope": "Planning only; implementation remains for later execution.",
+        "ui_constraint": "One new object type within existing UI; no dedicated mission controls."
+      },
+      "title": "Add a broad spacecraft catalog using Skychart’s existing object UI",
+      "items": [
+        {
+          "id": 81,
+          "position": 0,
+          "status": "pending",
+          "description": "Build a reproducible discovery/audit script and checked-in manifest of candidate spacecraft from Horizons, using official mission sources for metadata. Audit the complete available spacecraft inventory, including the Voyagers, Pioneers, New Horizons, planetary orbiters/probes, small-body missions, observatories, solar missions and historical craft; these examples are candidates, not assumed supported. Record stable provider IDs, aliases, physical-craft/mission relationships, source revision and retrieval dates, usable coverage intervals and gaps, predicted/reconstructed status where supplied, and inclusion/exclusion reasons. Distinguish actual flown vehicles from proposed trajectories, duplicate solutions, rocket stages and non-spacecraft targets. Intersect trajectory availability with supported atlas dates. Audit freshness especially for low-Earth orbiters. Accept landers/rovers only where a valid trajectory or explicitly supported surface-position model exists. Deliver an actual included/excluded inventory and counts. Additional SPICE/TLE ingestion is a follow-up if needed; do not silently substitute an unvalidated propagator.",
+          "metadata": {},
+          "title": "Audit mission identities, trajectory coverage and data freshness"
+        },
+        {
+          "id": 82,
+          "position": 1,
+          "status": "pending",
+          "description": "Add spacecraft as an explicit object type across Python metadata/payloads, Phoenix catalog import/search and frontend src/atlas/contracts.ts, src/destinationPicker.ts, src/catalog/catalogObjectMapper.ts and relevant type/filter allowlists. Store stable key, name, aliases, mission/agency, launch date, sourced description and links, optional dated mission status, provider identifier and coverage/provenance. Keep searchable metadata independent from the presence of a position. Define available, out-of-coverage and temporarily-unavailable states, with optional prediction/freshness information; unavailable coordinates must be absent rather than zero or a last-known position. Preserve stable identities across refreshes and old shared URLs. Unknown dimensions must remain unknown; marker size is symbolic.",
+          "metadata": {},
+          "title": "Define spacecraft metadata and position-availability contracts"
+        },
+        {
+          "id": 83,
+          "position": 2,
+          "status": "pending",
+          "description": "Extend the Python Horizons path and Phoenix proxy contracts to supply spacecraft positions at the selected UTC time without blocking normal planet ephemerides on the entire mission catalog. Use allowlisted manifest IDs, Sun-centered geometric ICRF vectors and the existing true-ecliptic-of-date transformation; retain all three coordinates and explicit units/epochs. Respect coverage gaps, mission termination constraints and source freshness, and never extrapolate beyond validated intervals. Reuse persistent caching with source/epoch/frame-aware keys, expiry appropriate to prediction freshness, request deduplication, provider-compliant request scheduling, bounded timeouts and retry/backoff. Serve mission metadata independently; load cached eligible mission positions progressively and prioritize a selected craft so broad coverage does not require hundreds of synchronous external requests per date change. Suppress obsolete responses after date changes and isolate single-craft failures. Avoid generic Kepler orbit generation for maneuvering spacecraft. Deliver actionable per-object availability without breaking other atlas objects.",
+          "metadata": {},
+          "title": "Implement cached spacecraft positions through the existing backend"
+        },
+        {
+          "id": 84,
+          "position": 3,
+          "status": "pending",
+          "description": "Make included craft discoverable by names, aliases and mission names through existing destination search and catalog hydration, even outside coverage. Reuse current selection, center, compare/measure, date and share workflows. Support the new type in existing classification/filter infrastructure without adding a dedicated visibility control. Render a small distinct spacecraft symbol with existing hit testing and label-collision rules at appropriate scales; selecting a craft uses existing selection emphasis. Keep markers near planets discoverable through search when visually overlapping. Only enable centering and spatial comparisons when a valid position exists; otherwise retain the metadata panel and show available dates without silently changing time. Ensure changing time removes stale markers and distances. Audit Sky-mode classification and server share resolution so spacecraft are neither treated as stars nor presented with invented visibility/magnitude data.",
+          "metadata": {},
+          "title": "Integrate spacecraft with search, map interaction and shared state"
+        },
+        {
+          "id": 85,
+          "position": 4,
+          "status": "pending",
+          "description": "Use src/object/objectInspectionView.ts and existing sections/tabs for Spacecraft type, a brief mission description, agency, launch date, Earth and Sun distances, estimated one-way light time, and optional heliocentric speed when available. Calculate separation using simultaneous full 3D positions in a common frame and label distance/c as estimated light time, not a live communications reading. Show position epoch, coverage and source/prediction information through existing source/science semantics presentation. Out-of-coverage objects retain their description and available date ranges with spatial values unavailable. Add Voyager 1’s one-light-day milestone as a short sourced note after checking the current official prediction during implementation; do not hard-code that prediction into position calculations. Update all supported translations and accessibility labels. Keep the existing panel compact and omit mission-specific controls.",
+          "metadata": {},
+          "title": "Add concise mission information to the existing object panel"
+        },
+        {
+          "id": 86,
+          "position": 5,
+          "status": "pending",
+          "description": "Add meaningful fixture-based tests for IDs/aliases, duplicate rejection, coverage boundaries and gaps, unavailable/stale provider results, coordinate/frame/unit conversion, 3D distance and light time, and obsolete responses after date changes. Cover one distant probe, one planet orbiter, one observatory, one historical mission and a failure case. Validate search and shared-link restoration with and without valid positions, mission metadata, selected markers, historical date changes and mobile overlap behavior. Run the frontend build and relevant existing Python, TypeScript, Phoenix and Playwright suites, with live Horizons checks limited to a small reproducible validation sample rather than required in normal CI. Measure cold/warm load and date-change behavior with the full admitted catalog, ensuring planets remain responsive and external calls stay bounded. Document the catalog rebuild/review command, freshness policy, source provenance, actual inclusion/exclusion counts and how to add a spacecraft by data entry. Ship the broad audited catalog with this implementation; the Voyagers are initial end-to-end validation examples, not the final catalog limit.",
+          "metadata": {},
+          "title": "Validate scientific behavior, full-catalog performance and maintenance"
+        }
+      ],
+      "inserted_at": "2026-09-06T22:14:52Z",
+      "updated_at": "2026-09-06T22:14:52Z",
+      "project": {
+        "id": 19,
+        "name": "skychart"
+      },
+      "created_by": "codex",
+      "source_session_id": 1260
+    }
+  ]
+}

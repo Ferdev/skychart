@@ -1,4 +1,5 @@
 import type { Body, Ephemeris } from "../atlas/contracts";
+import { equatorialToEclipticDirection } from "../coordinates";
 import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
 import {
@@ -608,8 +609,9 @@ export class SkyViewController {
     const merged = new Map<string, SkyPoint>();
     for (const point of this.catalogPoints) merged.set(point.key, { ...point, dynamic: false });
     for (const body of this.options.bodyByKey().values()) {
-      if (body.key === observer.key || !bodyCanObserveSky(body)) continue;
-      const direction = relativeDirection(bodyVector(observer), bodyVector(body));
+      if (body.key === observer.key) continue;
+      const direction = relativeDirection(bodyVector(observer), bodyVector(body))
+        ?? equatorialToEclipticDirection(body.catalog?.ra_deg, body.catalog?.dec_deg);
       if (!direction) continue;
       merged.set(body.key, {
         key: body.key,

@@ -105,13 +105,13 @@ update() {
   const parentBody = body.parent_key ? this.context.bodyByKey().get(body.parent_key) ?? null : null;
   const overviewRows = [
     [t("field.type"), classification.label],
-    [t("field.radius"), body.radius_km > 0 ? this.context.formatDistance(body.radius_km) : t("value.unknown")],
+    [t("field.radius"), Number.isFinite(body.radius_km) && body.radius_km >= 0 ? this.context.formatDistance(body.radius_km) : t("value.unknown")],
     [t("field.parent"), parentBody?.name ?? body.parent_key ?? null],
     [t("field.catalogGroup"), this.context.readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)]
   ];
   const primaryStats = [
     [t("field.earthDistance"), this.context.formatDistance(body.distance_from_earth_km)],
-    [t("field.diameter"), body.radius_km > 0 ? this.context.formatDistance(body.radius_km * 2) : t("value.unknown")],
+    [t("field.diameter"), Number.isFinite(body.radius_km) && body.radius_km >= 0 ? this.context.formatDistance(body.radius_km * 2) : t("value.unknown")],
     [t("field.heliocentric"), this.context.formatDistance(body.position.heliocentric_distance_km)]
   ];
 
