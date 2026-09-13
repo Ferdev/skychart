@@ -1,0 +1,23 @@
+[Unit]
+Description=SkyChart 1271 full AllWISE MEP sequential measurement
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=1h
+StartLimitBurst=3
+
+[Service]
+User=deploy
+Group=deploy
+WorkingDirectory=/tmp/skychart-storage-1271-psc-index
+CPUQuota=60%
+MemoryHigh=1610612736
+MemoryMax=2147483648
+MemorySwapMax=0
+Nice=19
+IOWeight=1
+Restart=on-failure
+RestartSec=15s
+ExecStart=/tmp/skychart-storage-1271-psc-index/venv/bin/python -u scripts/measure_irsa_bzip_partitions.py --root data/storage-exhaustive-1271/allwise-mep-full --inventory-root data/storage-exhaustive-1271/allwise-mep-provider-inventory --catalog-id allwise-mep --base-url https://irsa.ipac.caltech.edu/data/download/wise-allwise-mep/ --expected-parts 792 --expected-rows 42759337365 --projection-columns SOURCE_ID_MF,RA,DEC,CNTR_MF,CAT,QI_FACT,MOON_MASKED,LOAD_ID,CNTR,FRAME_ID,MJD --free-floor-gib 60 --max-files 0 --trailing-delimiter
+
+[Install]
+WantedBy=multi-user.target

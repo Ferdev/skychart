@@ -1,0 +1,21 @@
+[Unit]
+Description=SkyChart 1271 Legacy Tractor measurement dependency supervisor
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+CPUQuota=50%
+MemoryMax=1073741824
+MemorySwapMax=0
+Nice=19
+IOWeight=1
+RemainAfterExit=yes
+WorkingDirectory=/tmp/skychart-storage-1271-psc-index
+StandardOutput=append:/tmp/skychart-storage-1271-psc-index/legacy-tractor-full.log
+StandardError=append:/tmp/skychart-storage-1271-psc-index/legacy-tractor-full.log
+User=1000
+Group=1000
+ExecStart=/tmp/skychart-storage-1271-psc-index/venv/bin/python -u data/storage-exhaustive-1271/run-legacy-tractor-after-allwise.py
+
+[Install]
+WantedBy=multi-user.target

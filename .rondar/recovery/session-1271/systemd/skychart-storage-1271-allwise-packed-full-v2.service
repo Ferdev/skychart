@@ -1,0 +1,21 @@
+[Unit]
+Description=SkyChart 1271 full AllWISE packed ID measurement with explicit 60 GiB floor
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+CPUQuota=50%
+MemoryMax=1073741824
+MemorySwapMax=0
+Nice=19
+IOWeight=1
+StandardOutput=append:/tmp/skychart-storage-1271-psc-index/allwise-packed-full-v2.log
+StandardError=append:/tmp/skychart-storage-1271-psc-index/allwise-packed-full-v2.log
+RemainAfterExit=yes
+User=deploy
+Group=deploy
+WorkingDirectory=/tmp/skychart-storage-1271-psc-index
+ExecStart=/tmp/skychart-storage-1271-psc-index/venv/bin/python -u scripts/build_allwise_packed_full.py data/storage-exhaustive-1271/allwise-full data/storage-exhaustive-1271/allwise-packed-full data/storage-exhaustive-1271/allwise-manifests/allwise-parquet-row-counts.csv --trial-root data/storage-exhaustive-1271/allwise-packed-trial --free-floor-gib 60
+
+[Install]
+WantedBy=multi-user.target

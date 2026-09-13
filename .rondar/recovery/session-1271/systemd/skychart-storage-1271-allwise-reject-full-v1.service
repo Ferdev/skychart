@@ -1,0 +1,23 @@
+[Unit]
+Description=SkyChart 1271 full AllWISE Reject sequential measurement
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=1h
+StartLimitBurst=3
+
+[Service]
+User=deploy
+Group=deploy
+WorkingDirectory=/tmp/skychart-storage-1271-psc-index
+CPUQuota=60%
+MemoryHigh=1610612736
+MemoryMax=2147483648
+MemorySwapMax=0
+Nice=19
+IOWeight=1
+Restart=on-failure
+RestartSec=15s
+ExecStart=/tmp/skychart-storage-1271-psc-index/venv/bin/python -u scripts/measure_irsa_bzip_partitions.py --root data/storage-exhaustive-1271/allwise-reject-full --inventory-root data/storage-exhaustive-1271/allwise-reject-provider-inventory --catalog-id allwise-reject --base-url https://irsa.ipac.caltech.edu/data/download/wise-allwise/reject/ --expected-parts 48 --expected-rows 428787253 --projection-columns cntr,designation,ra,dec,source_id,use_src,best_use_cntr,cc_flags,rel,ph_qual,ext_flg,n_2mass,tmass_key --free-floor-gib 60 --max-files 0 --trailing-delimiter
+
+[Install]
+WantedBy=multi-user.target

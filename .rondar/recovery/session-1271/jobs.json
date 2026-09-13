@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-13T09:45:00Z",
+  "scope": "exhaustive SkyChart storage audit; 52 inventory entries",
+  "session": {
+    "task_id": 1271,
+    "agent_id": 667,
+    "workspace_volume": "rondar-production-task-1271-workspace",
+    "checkpoint_commit": "2d948fca1c263be4278577e14e5229799ff1195a",
+    "checkpoint_branch": "checkpoint/session-1271-20260913"
+  },
+  "jobs": [
+    {
+      "id": "gaia-full",
+      "owner": "Rondar task container 1271",
+      "data_root": "data/storage-exhaustive-1271/gaia-full",
+      "command": ".venv/bin/python -u scripts/measure_gaia_full_partitions.py --root data/storage-exhaustive-1271/gaia-full --manifest data/storage-investigation-1271/gaia-source-md5.txt --existing-source data/storage-exhaustive-1271/GaiaSource_000000-003111.csv.gz --free-floor-gib 60",
+      "checkpoint": {"verified_receipts": 1283, "expected_receipts": 3386},
+      "phase": "running",
+      "dependencies": [],
+      "resource_limits": {"cpu": "0.5 CPU", "memory_bytes": 805306368, "memory_swap_bytes": 1610612736},
+      "restart_contract": "manual receipt-validated resume after confirming the exclusive lock has no live owner",
+      "remaining_risk": "container restart does not independently relaunch this writer"
+    },
+    {
+      "id": "allwise-full",
+      "owner": "skychart-storage-1271-allwise-full-v2.service",
+      "data_root": "/tmp/skychart-storage-1271-psc-index/data/storage-exhaustive-1271/allwise-full",
+      "checkpoint": {"verified_receipts": 11868, "expected_receipts": 12288},
+      "phase": "running",
+      "dependencies": [],
+      "resource_limits": {"cpu": "1 CPU", "memory_bytes": 1073741824, "free_floor_gib": 60}
+    },
+    {
+      "id": "allwise-packed-id",
+      "owner": "skychart-storage-1271-allwise-packed-full-v2.service",
+      "data_root": "/tmp/skychart-storage-1271-psc-index/data/storage-exhaustive-1271/allwise-packed-full",
+      "checkpoint": {"verified_source_receipts": 11868, "expected_source_receipts": 12288},
+      "phase": "running",
+      "dependencies": ["allwise-full"],
+      "resource_limits": {"cpu": "0.5 CPU", "memory_bytes": 1073741824, "free_floor_gib": 60}
+    },
+    {
+      "id": "allwise-mep-full",
+      "owner": "skychart-storage-1271-allwise-mep-full-v1.service",
+      "data_root": "/tmp/skychart-storage-1271-psc-index/data/storage-exhaustive-1271/allwise-mep-full",
+      "checkpoint": {"verified_receipts": 10, "expected_receipts": 792},
+      "phase": "running",
+      "dependencies": [],
+      "resource_limits": {"cpu": "0.6 CPU", "memory_bytes": 2147483648, "free_floor_gib": 60},
+      "retry_policy": "15 second delay, at most 3 starts per hour"
+    },
+    {
+      "id": "allwise-reject-full",
+      "owner": "skychart-storage-1271-allwise-reject-full-v1.service",
+      "data_root": "/tmp/skychart-storage-1271-psc-index/data/storage-exhaustive-1271/allwise-reject-full",
+      "checkpoint": {"verified_receipts": 12, "expected_receipts": 48},
+      "phase": "running",
+      "dependencies": [],
+      "resource_limits": {"cpu": "0.6 CPU", "memory_bytes": 2147483648, "free_floor_gib": 60},
+      "retry_policy": "15 second delay, at most 3 starts per hour"
+    },
+    {
+      "id": "legacy-tractor-full",
+      "owner": "skychart-storage-1271-legacy-tractor-full.service",
+      "data_root": "/tmp/skychart-storage-1271-psc-index/data/storage-exhaustive-1271/legacy-tractor-full",
+      "checkpoint": {"verified_receipts": 0, "expected_receipts": 366912},
+      "phase": "waiting_for_dependencies",
+      "dependencies": ["allwise-full", "allwise-packed-id"],
+      "resource_limits": {"cpu": "0.5 CPU", "memory_bytes": 1073741824, "free_floor_gib": 60}
+    }
+  ]
+}
