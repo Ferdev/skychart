@@ -9,22 +9,22 @@ The JSON ledger retains allocated bytes, checksums and individual file evidence.
 
 | Catalog | Measured source evidence | Full-schema detail | Built lookup component | Complete serving total |
 |---|---|---|---|---|
-| simbad-basic | Unknown | Unknown | Unbuilt/unmeasured | Unknown |
+| simbad-basic | Unknown; provider reports 22,153,861 basic and 72,905,435 identifier rows in a mutable live database | Unknown | Unbuilt/unmeasured | Unknown |
 | 2mass-xsc | 813,426,110 (measured) | 1,200,092,947 | 252,555,264 (combined component; see ledger) | Unknown |
-| 2mass-psc | 42,672,321,835; all 92 files, 470,992,970 rows | 48,263,451,660 (complete 60-field candidate; serving incomplete) | 51,185,664,000; 59/92 committed files (global build in progress) | Unknown |
-| gaia-dr3 | 90,769,659,917; 401/3386 files, 207,191,966 rows | 136,708,859,553 (partial release) | 7,364,608; 365/3386 files | Unknown |
-| allwise | 73,990,590,165; 2706/12288 files, 152,871,924 rows | 84,868,814,280 (partial candidate layout) | 4,349,952; 1/12288 files (ID/name trial) | Unknown |
+| 2mass-psc | 42,672,321,835; all 92 files, 470,992,970 rows | 48,263,451,660 (complete 60-field candidate; serving incomplete) | 80,174,878,720; all 92/92 files, 470,992,970 rows | Unknown |
+| gaia-dr3 | 279,195,607,614; 1231/3386 files, 673,724,818 rows | 418,276,964,073 (partial release) | 11,030,528; 546/3386 files | Unknown |
+| allwise | 349,376,133,545; 11788/12288 files, 715,997,120 rows | 402,053,204,314 (partial candidate layout) | 4,349,952; 1/12288 files (ID/name trial) | Unknown |
 | hipparcos | 53,316,318 (measured_full_main_table_all_fields_audited) | 12,940,412 | 10,039,296 (combined component; see ledger) | Unknown |
 | openngc | 3,876,288 (measured_full_NGC_table) | 957,791 | 270,336 (combined component; see ledger); 5,009,408 additional published-name/angular component | Unknown |
-| desi-dr1 | Unknown | Unknown | Unbuilt/unmeasured | Unknown |
+| desi-dr1 | 22,371,272,640 (measured_complete_source_and_all_136_fields_audited) | 10,533,500,019 | 2,743,621,202 (combined component; see ledger); angular 2,557,296,640 (28,425,963 exact positions plus R-tree candidates) | Unknown |
 | quaia | 1,060,370,592 (measured_full_IRSA_table_export_original_distribution_equivalence_pending) | 190,836,606 | 210,702,336 (combined component; see ledger) | Unknown |
 | erosita-dr2 | 2,139,595,200 (full_file_all_FITS_table_fields_audited) | 1,429,300,866 | 279,613,440 (combined component; see ledger) | Unknown |
 | spiders-dr20 | 107,196,480 (measured_full_source_all_fields_read) | 34,369,481 | 39,976,960 (combined component; see ledger) | Unknown |
 | bass-dr2 | 558,410 across 3 complete files; release coverage pending | 278,403 | 126,976 (combined component; see ledger) | Unknown |
 | exoplanets | 169,497,514 (complete_TABLEDATA_source_audited) | 14,906,263 | 1,708,032 (combined component; see ledger) | Unknown |
 | small-bodies | 1,213,485,351; all four category exports, atomic snapshot unproven | 308,114,014 (all category records) | 134,393,856 (ID/name/routing component) | Unknown |
-| panstarrs | Unknown | Unknown | Unbuilt/unmeasured | Unknown |
-| legacy-surveys | Unknown | Unknown | Unbuilt/unmeasured | Unknown |
+| panstarrs | Unknown; provider reports nearly 150 TB for the catalog database | Unknown | Unbuilt/unmeasured | Unknown |
+| legacy-surveys | 22,213,440 for 1/366912 Tractor files; provider estimate 6.6 TB for the directory | 13,975,470 (one-file full-field probe) | Unbuilt/unmeasured | Unknown |
 | sdss | Unknown; provider lists 3,736,373,967,360 bytes in 938,046 PhotoObj files | Unknown | Unbuilt/unmeasured | Unknown |
 | nvss | 77,687,389 (measured_full_source_all29_fields_audited) | 71,494,180 | 265,703,424 (combined component; see ledger) | Unknown |
 | pulsars | 1,427,033 (measured_full_distribution_package) | 1,096,007 | 258,048 (combined component; see ledger) | Unknown |
@@ -35,9 +35,9 @@ The JSON ledger retains allocated bytes, checksums and individual file evidence.
 | supernova-remnants | 19,799 (measured_full_summary_table) | 38,075 | 28,672 (combined component; see ledger) | Unknown |
 | messier | 98,411 (measured_owned_compilation_same_JSON_artifact_count_once) | 98,411 | Unbuilt/unmeasured | Unknown |
 | curated-landmarks | 1,169,351 (measured_owned_compilation_same_JSON_artifact_count_once) | 1,169,351 | Unbuilt/unmeasured | Unknown |
-| allwise-mep | Unknown | Unknown | Unbuilt/unmeasured | Unknown |
-| allwise-reject | Unknown | Unknown | Unbuilt/unmeasured | Unknown |
-| allwise-images | Unknown | Unknown | Unbuilt/unmeasured | Unknown |
+| allwise-mep | 39,706,399,021 actual verified bytes in 10/792 parts; provider full manifest 3,419,775,536,324 compressed bytes and reports 16,948,242,777,472 uncompressed bytes | 46,891,724,048 | Unbuilt/unmeasured | Unknown |
+| allwise-reject | 50,719,983,548 actual verified bytes in 12/48 parts; provider full manifest 201,724,592,177 compressed bytes and reports 684,294,996,583 uncompressed bytes (official README instead reports 685,294,996,583) | 56,871,517,339 | Unbuilt/unmeasured | Unknown |
+| allwise-images | Unknown; provider S3 inventory 18,240/18,240 image sets, 1,075,986 objects, 13,453,873,801,224 listed bytes; polar provider metadata 30,341,738,652 bytes; gzip-intensity product selection 8,559,434,500,104 provider bytes; 24,103,882 live ancillary-table rows | Unknown | Unbuilt/unmeasured | Unknown |
 | erosita-ls10 | 1,053,710,795 (full_crossmatch_source_all_FITS_fields_audited) | 1,016,307,291 | 393,670,656 (combined component; see ledger) | Unknown |
 | heasarc-neargalcat | 68,385 (measured_full_TDAT_table) | 115,004 | 81,920 (combined component; see ledger) | Unknown |
 | ned | Unknown | Unknown | Unbuilt/unmeasured | Unknown |

@@ -51,8 +51,12 @@ def progress_table(ledger):
                 detail=f"{complete['candidate_data_bytes']:,} (complete 60-field candidate; serving incomplete)"
             trial=ledger.get('psc_index_trial_measurement')
             if trial:lookup=f"{trial['logical_bytes']:,}; {trial['files']}/92 files (trial)"
+            measured=ledger.get('psc_global_index_measurement')
             running=ledger.get('psc_global_index_progress')
-            if running:lookup=f"{running['logical_bytes']:,}; {running['committed_files']}/92 committed files (global build in progress)"
+            if measured:
+                lookup=f"{measured['logical_bytes']:,}; all {measured['files']}/92 files, {measured['rows']:,} rows"
+            elif running and running.get('logical_bytes') is not None:
+                lookup=f"{running['logical_bytes']:,}; {running['committed_files']}/92 committed files (global build in progress)"
         if key=='small-bodies' and 'sbdb_category_measurements' in ledger:
             r=ledger['sbdb_category_measurements']
             src=f"{r['measured_category_source_bytes']:,}; all four category exports, atomic snapshot unproven"
@@ -74,6 +78,60 @@ def progress_table(ledger):
             detail=f"{r['candidate_detail_bytes']:,} (partial candidate layout)"
             trial=ledger.get('allwise_lookup_trial')
             if trial:lookup=f"{trial['logical_bytes']:,}; {trial['files']}/12288 files (ID/name trial)"
+        if key in {'allwise-mep','allwise-reject'}:
+            receipt=ledger.get(key.replace('-', '_')+'_provider_inventory')
+            if receipt:
+                measured_summary=ledger.get(key.replace('-', '_')+'_measurement_summary')
+                if measured_summary and measured_summary.get('files',0):
+                    src=(f"{measured_summary['source_bytes']:,} actual verified bytes in "
+                         f"{measured_summary['files']}/{receipt['parts']} parts; provider full manifest "
+                         f"{receipt['provider_manifest_compressed_bytes']:,} compressed bytes and reports "
+                         f"{receipt['provider_reported_uncompressed_bytes']:,} uncompressed bytes")
+                else:
+                    src=(f"Unknown; provider manifests {receipt['provider_manifest_compressed_bytes']:,} "
+                         f"compressed bytes in {receipt['parts']} parts and reports "
+                         f"{receipt['provider_reported_uncompressed_bytes']:,} uncompressed bytes")
+                alternate=receipt.get('readme_provider_reported_uncompressed_bytes')
+                if alternate is not None and alternate!=receipt['provider_reported_uncompressed_bytes']:
+                    src+=f" (official README instead reports {alternate:,})"
+        if key=='allwise-images':
+            image=ledger.get('allwise_images_s3_inventory') or ledger.get('allwise_images_s3_progress')
+            polar=ledger.get('allwise_polar_inventory') or ledger.get('allwise_polar_progress')
+            if image:
+                image_bytes=image.get('provider_object_bytes',image.get('bytes'))
+                src=(f"Unknown; provider S3 inventory {image.get('coadd_ids',0):,}/18,240 image sets, "
+                     f"{image.get('objects',0):,} objects, {image_bytes:,} listed bytes")
+                if polar and polar.get('provider_total_bytes') is not None:
+                    src+=f"; polar provider metadata {polar['provider_total_bytes']:,} bytes"
+                product=ledger.get('allwise_images_product_bytes')
+                if product:
+                    src+=f"; gzip-intensity product selection {product['provider_compact_product_bytes']:,} provider bytes"
+                ancillary=ledger.get('allwise_ancillary_scope')
+                if ancillary:
+                    src+=f"; {sum(r['observed_rows'] for r in ancillary['tables'].values()):,} live ancillary-table rows"
+        if key=='desi-dr1' and 'desi_angular_measurement' in ledger:
+            r=ledger['desi_angular_measurement']
+            lookup += (
+                f"; angular {r['logical_bytes']:,} "
+                f"({r['angular_rows']:,} exact positions plus R-tree candidates)"
+            )
+        if key=='simbad-basic' and 'simbad_scope_metadata' in ledger:
+            r=ledger['simbad_scope_metadata']['provider_metadata_counts']
+            src=(
+                f"Unknown; provider reports {r['basic_rows']:,} basic and "
+                f"{r['identifier_rows']:,} identifier rows in a mutable live database"
+            )
+        if key=='legacy-surveys' and 'legacy_tractor_full_probe_receipt' in ledger:
+            r=ledger['legacy_tractor_full_probe_receipt']
+            estimate=ledger.get('legacy_dr10_provider_estimates', {}).get(
+                'provider_estimates', {}).get('tractor_directory', 'Unknown')
+            src=(f"{r['source_bytes']:,} for 1/366912 Tractor files; "
+                 f"provider estimate {estimate} for the directory")
+            detail=f"{r['detail_bytes']:,} (one-file full-field probe)"
+        if key=='panstarrs' and 'ps1_current_access' in ledger:
+            src=("Unknown; provider reports "
+                 f"{ledger['ps1_current_access']['provider_catalog_database_size']} "
+                 "for the catalog database")
         if key=='openngc' and 'openngc_evidence_index' in ledger:
             r=ledger['openngc_evidence_index']
             lookup+=f"; {r['bytes']:,} additional published-name/angular component"
@@ -86,14 +144,14 @@ def progress_table(ledger):
 def main():
     ledger=read(LEDGER)
     receipts=[read(p) for p in sorted((WORK/'gaia-full/receipts').glob('*.json'))]
-    measured={'status':'INCOMPLETE','verified_files':len(receipts),'expected_files':3386,
+    gaia_measured={'status':'INCOMPLETE','verified_files':len(receipts),'expected_files':3386,
               'verified_rows':sum(r['rows'] for r in receipts),
               'measured_source_bytes_for_verified_files':sum(r['source_bytes'] for r in receipts),
               'measured_detail_bytes_for_verified_files':sum(r['parquet_bytes'] for r in receipts),
               'complete_serving_bytes':None,'source_schema_columns':152,
               'retained_build_projection_files':sum('build_projection' in r for r in receipts),
               'retained_build_projection_bytes':sum(r.get('build_projection',{}).get('bytes',0) for r in receipts)}
-    ledger['active_run']['progress_at_checkpoint']=measured
+    ledger['active_run']['progress_at_checkpoint']=gaia_measured
     ledger['active_run']['runtime_estimate_hours']=[70,80]
     ledger['active_run']['build_projection_precision']='Original ECSV declared types; full detail still preserves decimal-to-f64 source values'
     for key,path in {
@@ -131,6 +189,7 @@ def main():
         'erosita_ls10_exact_lookup':'erosita-ls10-owned-evidence/exact-lookup.json',
         'erosita_ls10_exact_lookup_progress':'erosita-ls10-owned-evidence/exact-lookup-progress.json',
         'simbad_basic_provider_count':'access-followup/simbad-basic-count-v2.json',
+        'simbad_scope_metadata':'simbad-scope/scope.receipt.json',
         'vsx_archived_versions_metadata':'access-followup/vsx-versions-receipt.json',
         'quaia_acquisition_retry':'access-followup/quaia-zenodo-api-receipt.json',
         'quaia_irsa_export_job':'quaia-irsa-source/job.json',
@@ -179,6 +238,11 @@ def main():
         'desi_conversion_worker_progress':'desi-conversion-worker-progress.json',
         'desi_owned_partition_progress':'desi-owned-partitions/progress.json',
         'desi_owned_partition_measurement':'desi-owned-partitions/measurement.json',
+        'desi_exact_lookup_progress':'desi-exact-lookup-full/progress.json',
+        'desi_exact_lookup_measurement':'desi-exact-lookup-full/measurement.json',
+        'desi_angular_worker_progress':'desi-angular-worker-progress.json',
+        'desi_angular_progress':'desi-angular-index-full/progress.json',
+        'desi_angular_measurement':'desi-angular-index-full/measurement.json',
         'desi_header_schema':'desi-source/header-schema.json',
         'desi_conversion_diagnostic_sample':'desi-conversion-probe/probe.json',
         'desi_lookup_diagnostic_sample':'desi-conversion-probe/lookup-probe.json',
@@ -190,9 +254,16 @@ def main():
         'legacy_first_file_measurement':'legacy-tractor-first/measurement-scope.json',
         'legacy_first_file_semantics':'legacy-tractor-first/source-semantics.json',
         'legacy_known_issues':'optical-access/legacy-known-issues.receipt.json',
+        'legacy_dr10_provider_estimates':'optical-access/legacy-dr10-provider-estimates.receipt.json',
+        'legacy_tractor_full_probe_receipt':'legacy-tractor-full-probe/receipts/000000.json',
+        'legacy_tractor_full_probe_progress':'legacy-tractor-full-probe/progress.json',
+        'legacy_tractor_worker_progress':'legacy-tractor-worker-progress.json',
+        'legacy_tractor_full_progress':'legacy-tractor-full/progress.json',
+        'legacy_tractor_full_measurement':'legacy-tractor-full/measurement.json',
         'ps1_new_tap_access_gap':'optical-access/ps1-access-gap.json',
         'ps1_new_tap_table_list':'optical-access/ps1-table-list.receipt.json',
         'ps1_corrected_schema_inventory':'optical-access/ps1-schema-inventory.json',
+        'ps1_current_access':'optical-access/ps1-current-access.receipt.json',
         'sdss_acquisition_status':'sdss-access/acquisition-status.json',
         'sdss_run_listing_progress':'sdss-run-inventory/progress.json',
         'sdss_run_listing_inventory':'sdss-run-inventory/inventory.json',
@@ -202,6 +273,22 @@ def main():
         'sdss_checksum_metadata_verification':'sdss-checksum-inventory/verification.json',
         'allwise_angular_feasibility':'allwise-angular-feasibility/feasibility.json',
         'allwise_angular_provider_documentation':'allwise-angular-feasibility/documentation-receipt.json',
+        'allwise_mep_provider_inventory':'allwise-mep-provider-inventory/inventory.receipt.json',
+        'allwise_reject_provider_inventory':'allwise-reject-provider-inventory/inventory.receipt.json',
+        'allwise_images_s3_progress':'allwise-images-provider-evidence/s3-progress.json',
+        'allwise_images_s3_inventory':'allwise-images-provider-evidence/s3-inventory.json',
+        'allwise_images_product_bytes':'allwise-images-provider-evidence/product-bytes.json',
+        'allwise_polar_progress':'allwise-images-provider-evidence/polar-progress.json',
+        'allwise_polar_inventory':'allwise-images-provider-evidence/polar-inventory.json',
+        'allwise_ancillary_scope':'allwise-ancillary-scope/scope.receipt.json',
+        'allwise_reject_measurement_progress':'allwise-reject-evidence/progress.json',
+        'allwise_reject_measurement_summary':'allwise-reject-evidence/summary.json',
+        'allwise_reject_first_measurement':'allwise-reject-evidence/first-receipt.json',
+        'allwise_reject_feasibility':'allwise-reject-evidence/feasibility.json',
+        'allwise_mep_measurement_progress':'allwise-mep-evidence/progress.json',
+        'allwise_mep_measurement_summary':'allwise-mep-evidence/summary.json',
+        'allwise_mep_first_measurement':'allwise-mep-evidence/first-receipt.json',
+        'allwise_mep_feasibility':'allwise-mep-evidence/feasibility.json',
         'sdss_first_file_measurement':'sdss-first-source/measurement-scope.json',
         'repository_compilations':'repository-compilation-measurements.json',
         'static_compilations':'static-compilation-measurements.json',
@@ -249,6 +336,8 @@ def main():
         'allwise_packed_full_workspace':'allwise-remote-evidence/packed-full-workspace.json',
         'allwise_packed_full_measurement':'allwise-remote-evidence/packed-full-measurement.json',
         'psc_global_index_progress':'psc-remote-evidence/full-build-progress.json',
+        'psc_global_index_measurement':'psc-remote-evidence/full-build-measurement.json',
+        'psc_global_query_benchmark':'psc-remote-evidence/full-query-benchmark.json',
         'psc_global_index_workspace':'psc-remote-evidence/full-build-workspace.json',
         'sbdb_owned_measurement':'sbdb-owned-evidence/measurement.json',
         'vsx_field_audit':'vsx-source/fields.receipt.json',
@@ -360,6 +449,76 @@ def main():
         'atnf_package':read(WORK/'small-releases/receipts.json'),
         'atnf_content':read(WORK/'small-releases/psrcat-content.json')}
     for entry in ledger['catalogs']:
+        if entry['id'] in {'allwise-mep','allwise-reject'}:
+            receipt=ledger.get(entry['id'].replace('-', '_')+'_provider_inventory')
+            if receipt:
+                entry['status']='provider_manifest_bytes_and_schema_pinned_owned_measurement_pending'
+                entry['resolved_release']='AllWISE 2013 official bzip2 bulk release'
+                entry['provider_release_inventory']=receipt
+                entry['acquisition_scope']=(
+                    f"All {receipt['parts']} official bulk parts reconcile across the download script, "
+                    "size manifest and per-part MD5 manifest. Listed compressed and uncompressed bytes "
+                    "are provider metadata; no data part or owned/native serving representation was "
+                    "measured by this inventory."
+                )
+                entry['artifacts']['complete_source'].update(
+                    status='provider_manifest_pinned_not_downloaded_or_measured',
+                    provider_manifest_bytes=receipt['provider_manifest_compressed_bytes'],
+                    provider_reported_uncompressed_bytes=receipt['provider_reported_uncompressed_bytes'],
+                    readme_provider_reported_uncompressed_bytes=receipt.get('readme_provider_reported_uncompressed_bytes'),
+                    provider_reported_rows=receipt['provider_reported_rows'],
+                    parts=receipt['parts'])
+                entry['provider_schema']={
+                    'columns':receipt['schema']['columns'],
+                    'sha256':receipt['schema']['sha256']}
+                prefix=entry['id'].replace('-', '_')
+                if prefix+'_measurement_progress' in ledger:
+                    entry['measurement_progress']=ledger[prefix+'_measurement_progress']
+                measured=ledger.get(prefix+'_measurement_summary', entry.get('measurement_progress', {}))
+                if measured:
+                    entry['measured_receipt_summary']=measured
+                    if measured.get('files',0):
+                        entry['status']='sequential_owned_measurement_running_serving_incomplete'
+                        entry['artifacts']['complete_source'].update(
+                            status='partial_verified_source_files',logical_bytes=measured['source_bytes'],
+                            rows=measured['rows'],files=measured['files'])
+                        entry['artifacts']['full_schema_detail'].update(
+                            status='partial_candidate_all_field_measurement',
+                            logical_bytes=measured['candidate_detail_bytes'],
+                            rows=measured['rows'],files=measured['files'])
+                if prefix+'_first_measurement' in ledger:
+                    entry['first_complete_partition']=ledger[prefix+'_first_measurement']
+                if prefix+'_feasibility' in ledger:
+                    entry['full_measurement_feasibility']=ledger[prefix+'_feasibility']
+        if entry['id']=='allwise-images':
+            image=ledger.get('allwise_images_s3_inventory') or ledger.get('allwise_images_s3_progress')
+            polar=ledger.get('allwise_polar_inventory') or ledger.get('allwise_polar_progress')
+            if image:
+                entry['status']='provider_image_inventory_running_owned_measurement_pending'
+                entry['standard_atlas_provider_inventory']=image
+                entry['acquisition_scope']=(
+                    "Complete public S3 prefix listing is being retained page by page with exact object "
+                    "sizes and ETags. Image products are not downloaded, so provider bytes are not owned "
+                    "source or native serving bytes. The 73 full-depth polar sets are inventoried separately."
+                )
+                if image.get('status')=='COMPLETE_PROVIDER_S3_PREFIX_INVENTORY':
+                    entry['status']='provider_image_inventories_measured_owned_measurement_pending'
+                if 'allwise_images_product_bytes' in ledger:
+                    entry['standard_atlas_product_byte_derivation']=ledger['allwise_images_product_bytes']
+                if polar:
+                    entry['polar_atlas_provider_inventory']=polar
+                if 'allwise_ancillary_scope' in ledger:
+                    entry['ancillary_table_provider_scope']=ledger['allwise_ancillary_scope']
+        if entry['id']=='simbad-basic' and 'simbad_scope_metadata' in ledger:
+            r=ledger['simbad_scope_metadata']
+            entry['status']='provider_metadata_counts_measured_full_export_unresolved'
+            entry['resolved_release']=r['release']+' live database observed at '+str(r['observed_unix'])
+            entry['provider_metadata']=r
+            entry['acquisition_scope']=(
+                'Live basic and ident aggregate counts plus complete advertised schemas only. '
+                'No source rows were exported; the mutable service and 2,000,000-row hard '
+                'output limit do not establish a consistent complete release.'
+            )
         if entry['id']=='2mass-psc' and 'psc_completion_audit' in ledger:
             r=ledger['psc_completion_audit']
             if r['files']!=92 or r['rows']!=470992970 or not r['all_92_projection_sha256_and_parquet_counts_reverified']:
@@ -373,6 +532,14 @@ def main():
                 logical_bytes=r['candidate_data_bytes'],
                 allocated_bytes=r['candidate_data_allocated_bytes_sum'],
                 evidence='psc-full/completion-audit.json')
+            if 'psc_global_index_measurement' in ledger:
+                lookup=ledger['psc_global_index_measurement']
+                entry['artifacts']['id_routing'].update(
+                    status='measured_complete_ID_designation_and_angular_component',
+                    logical_bytes=lookup['logical_bytes'],allocated_bytes=lookup['allocated_bytes'],
+                    rows=lookup['rows'],sha256=lookup['sha256'])
+            if 'psc_global_query_benchmark' in ledger:
+                entry['full_index_query_benchmark']=ledger['psc_global_query_benchmark']
         if entry['id'] in specialist_specs:
             components=ledger['specialist_table_measurements'][entry['id']]
             if len(components)==len(specialist_specs[entry['id']][1]):
@@ -535,7 +702,42 @@ def main():
         if entry['id']=='desi-dr1' and 'desi_source_progress' in ledger:
             entry['resolved_release']='DESI DR1 iron zcatalog v1 zall-pix-iron.fits; HTTP validators pinned'
             entry['source_acquisition_progress']=ledger['desi_source_progress']
-            entry['acquisition_scope']='Full redshift summary file; other DESI source products and all serving artifacts remain unmeasured. Downloaded ranges are not validated catalog rows.'
+            entry['acquisition_scope']='Complete DR1 iron zcatalog v1 redshift-summary file. Other DESI products, cross-identification, rendering and native serving remain separate.'
+            if 'desi_complete_source_receipt' in ledger and 'desi_full_source_audit' in ledger:
+                source=ledger['desi_complete_source_receipt'];audit=ledger['desi_full_source_audit']
+                if source['sha256']!=audit['source_sha256'] or source['bytes']!=audit['source_bytes']:
+                    raise ValueError('DESI source receipt and full audit disagree')
+                entry['artifacts']['complete_source'].update(
+                    status='measured_complete_source_and_all_136_fields_audited',
+                    logical_bytes=source['bytes'],allocated_bytes=source['allocated_bytes'],
+                    sha256=source['sha256'])
+            if 'desi_owned_partition_measurement' in ledger:
+                stored=ledger['desi_owned_partition_measurement']
+                entry['artifacts']['full_schema_detail'].update(
+                    status='measured_all_136_fields_candidate_not_admitted_native_storage',
+                    logical_bytes=stored['detail_bytes'],allocated_bytes=stored['detail_allocated_bytes'],
+                    rows=stored['rows'],columns=136,source_sha256=stored['source_sha256'])
+            if 'desi_exact_lookup_progress' in ledger:
+                entry['exact_lookup_progress']=ledger['desi_exact_lookup_progress']
+            if 'desi_exact_lookup_measurement' in ledger:
+                lookup=ledger['desi_exact_lookup_measurement']
+                entry['artifacts']['id_routing'].update(
+                    status='measured_field_scoped_TARGETID_DESINAME_exact_lookup',
+                    logical_bytes=lookup['index_and_routing_bytes'],
+                    allocated_bytes=lookup['allocated_bytes']+lookup['routing_allocated_bytes'],
+                    rows=lookup['rows'],entries=lookup['entries'],fields=lookup['fields'],
+                    sha256=lookup['sha256'])
+            if 'desi_angular_worker_progress' in ledger:
+                entry['angular_worker_progress']=ledger['desi_angular_worker_progress']
+            if 'desi_angular_progress' in ledger:
+                entry['angular_index_progress']=ledger['desi_angular_progress']
+            if 'desi_angular_measurement' in ledger:
+                angular=ledger['desi_angular_measurement']
+                entry['status']='source_data_exact_and_angular_components_measured_serving_incomplete'
+                entry['artifacts']['angular_index'].update(
+                    status='measured_exact_coordinate_and_RTree_candidate_component',
+                    logical_bytes=angular['logical_bytes'],allocated_bytes=angular['allocated_bytes'],
+                    rows=angular['rows'],angular_rows=angular['angular_rows'],sha256=angular['sha256'])
         if entry['id']=='legacy-surveys' and 'legacy_sweep_manifest_inventory' in ledger:
             entry['resolved_release']='DR10 south Tractor; DR10.1 corrected standard/extra/light-curve/photo-z sweeps; checksums being pinned'
             entry['acquisition_scope']='Sweep families share records, not independent populations. Standard sweep omits columns and selects BRICK_PRIMARY; retain extra/light-curve fields and inventory all Tractor rows separately. Source bytes and row alignment remain unmeasured.'
@@ -543,8 +745,35 @@ def main():
             if 'legacy_tractor_manifest_inventory' in ledger:
                 entry['provider_tractor_files']=ledger['legacy_tractor_manifest_inventory']['provider_file_count']
                 entry['provider_tractor_inventory_status']=ledger['legacy_tractor_manifest_inventory']['status']
+            if 'legacy_dr10_provider_estimates' in ledger:
+                entry['provider_estimates']=ledger['legacy_dr10_provider_estimates']
+            if 'legacy_tractor_full_probe_receipt' in ledger:
+                entry['status']='full_manifest_pinned_full_tractor_measurement_queued'
+                entry['full_tractor_probe']=ledger['legacy_tractor_full_probe_receipt']
+            if 'legacy_tractor_worker_progress' in ledger:
+                entry['full_tractor_worker_progress']=ledger['legacy_tractor_worker_progress']
+            if 'legacy_tractor_full_progress' in ledger:
+                entry['full_tractor_progress']=ledger['legacy_tractor_full_progress']
+            if 'legacy_tractor_full_measurement' in ledger:
+                measured=ledger['legacy_tractor_full_measurement']
+                entry['artifacts']['complete_source'].update(
+                    status='measured_all_pinned_Tractor_source_files',
+                    logical_bytes=measured['source_bytes'],rows=measured['rows'])
+                entry['artifacts']['full_schema_detail'].update(
+                    status='measured_all_Tractor_fields_candidate_not_admitted_native_storage',
+                    logical_bytes=measured['candidate_detail_bytes'],rows=measured['rows'])
         if entry['id']=='panstarrs' and 'ps1_new_tap_access_gap' in ledger:
-            entry['acquisition_gap']='New official PS1 DR2 TAP advertises hard 100000-row output cap; full bulk acquisition remains unresolved. CasJobs alternative remains to be investigated; no full bytes inferred from provider database-size metadata.'
+            entry['acquisition_gap']='New official PS1 DR2 TAP advertises a hard 100000-row output cap; full bulk acquisition remains unresolved. No full bytes are inferred from provider database-size metadata.'
+            if 'ps1_current_access' in ledger:
+                entry['status']='schema_and_provider_size_metadata_measured_complete_export_blocked'
+                entry['current_access_evidence']=ledger['ps1_current_access']
+                entry['acquisition_gap']=(
+                    'Official documentation names CasJobs as the primary catalog access and '
+                    'requires registration/login; extracts must be materialized in account MyDB. '
+                    'No anonymous complete versioned export is documented. Required action: obtain '
+                    'authorized MAST credentials and confirm a provider-supported complete export '
+                    'whose quota can cover every required table, or obtain a provider bulk release.'
+                )
         if entry['id'] in {'messier','curated-landmarks'} and 'repository_compilations' in ledger:
             r=next(r for r in ledger['repository_compilations'] if r['catalog']==entry['id'])
             entry['resolved_release']='Owned compilation at git '+r['revision']
@@ -757,6 +986,6 @@ def main():
     temporary.replace(LEDGER)
     table=ROOT/'docs/catalog-storage-measured-progress.md'
     temporary=table.with_suffix('.md.tmp');temporary.write_text(progress_table(ledger));temporary.replace(table)
-    print(json.dumps({'gaia':measured,'additional_verified_source_files':sum(r['status']=='full_source_measured' for r in additional),'additional_failed_source_files':sum(r['status']!='full_source_measured' for r in additional)}))
+    print(json.dumps({'gaia':gaia_measured,'additional_verified_source_files':sum(r['status']=='full_source_measured' for r in additional),'additional_failed_source_files':sum(r['status']!='full_source_measured' for r in additional)}))
 
 if __name__=='__main__':main()

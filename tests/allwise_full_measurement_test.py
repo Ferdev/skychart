@@ -1,11 +1,12 @@
 from pathlib import Path
+import subprocess
 import sys
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from measure_allwise_full_partitions import measure,COLUMNS
+from measure_allwise_full_partitions import measure,COLUMNS,main
 
 
 def test_all_columns_null_nan_flags_and_lossless_ids(tmp_path):
@@ -21,3 +22,14 @@ def test_all_columns_null_nan_flags_and_lossless_ids(tmp_path):
     assert pq.read_table(projection)['cntr'].to_pylist()==[2**53+1,None,0]
     assert pq.read_table(detail)['scientific_284'].to_pylist()==['1.00000000000000000001',None,'0']
     with pytest.raises(ValueError,match='drift'):measure(source,detail,projection,4)
+
+
+def test_full_measurement_floor_is_explicit_and_defaults_conservatively():
+    import inspect
+    assert inspect.signature(main).parameters['free_floor_gib'].default == 100
+    result = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve().parents[1] / 'scripts' /
+                             'measure_allwise_full_partitions.py'), '--help'],
+        check=True, capture_output=True, text=True,
+    )
+    assert '--free-floor-gib' in result.stdout

@@ -45,7 +45,7 @@ def measure(source, detail, projection, expected_rows):
     return schema
 
 
-def main(root, rows_manifest, md5_manifest, max_files=0):
+def main(root, rows_manifest, md5_manifest, max_files=0, free_floor_gib=100):
     root.mkdir(parents=True,exist_ok=True)
     lock=(root/'.lock').open('w');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     owner=root/'OWNER';marker='SkyChart isolated full AllWISE measurement 1271\n'
@@ -62,6 +62,7 @@ def main(root, rows_manifest, md5_manifest, max_files=0):
     if len(rows)!=12288 or len({r['path'] for r in rows})!=12288 or sum(int(r['nrows']) for r in rows)!=747634026:raise ValueError('full release manifest mismatch')
     for folder in ['receipts','build-projections']:(root/folder).mkdir(exist_ok=True)
     added=0
+    floor=free_floor_gib*(1<<30)
     for index,r in enumerate(rows):
         if max_files and added>=max_files:break
         name=f'{index:05d}';receipt=root/'receipts'/(name+'.json')
@@ -73,13 +74,13 @@ def main(root, rows_manifest, md5_manifest, max_files=0):
             if sha(projection)!=prior['build_projection']['sha256']:raise ValueError('checkpoint projection changed')
             continue
         if '..' in Path(r['path']).parts or r['path'].startswith('/') or r['path'] not in md5s:raise ValueError('unsafe/unpinned source path')
-        guard(root,100*(1<<30));started=time.time();source=root/'source.tmp.parquet';detail=root/'detail.tmp.parquet'
+        guard(root,floor);started=time.time();source=root/'source.tmp.parquet';detail=root/'detail.tmp.parquet'
         projection=root/'build-projections'/(name+'.parquet')
         save(root/'progress.json',{'status':'ACQUIRING','index':index,'path':r['path'],'started_unix':started})
         h=hashlib.md5()
         with urllib.request.urlopen(BASE+r['path'],timeout=120) as response,source.open('wb') as f:
             while block:=response.read(1<<20):
-                guard(root,100*(1<<30));f.write(block);h.update(block)
+                guard(root,floor);f.write(block);h.update(block)
             f.flush();os.fsync(f.fileno())
         if h.hexdigest()!=md5s[r['path']]:raise ValueError('provider MD5 mismatch')
         save(root/'progress.json',{'status':'MEASURING','index':index,'path':r['path']})
@@ -107,5 +108,5 @@ def main(root, rows_manifest, md5_manifest, max_files=0):
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('root',type=Path);p.add_argument('rows_manifest',type=Path);p.add_argument('md5_manifest',type=Path);p.add_argument('--max-files',type=int,default=0)
-    a=p.parse_args();main(a.root,a.rows_manifest,a.md5_manifest,a.max_files)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('root',type=Path);p.add_argument('rows_manifest',type=Path);p.add_argument('md5_manifest',type=Path);p.add_argument('--max-files',type=int,default=0);p.add_argument('--free-floor-gib',type=int,default=100)
+    a=p.parse_args();main(a.root,a.rows_manifest,a.md5_manifest,a.max_files,a.free_floor_gib)

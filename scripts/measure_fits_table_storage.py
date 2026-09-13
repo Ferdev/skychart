@@ -42,8 +42,8 @@ def verify_batch(batch,table):
             raise ValueError('stored scientific field differs: '+name)
 
 
-def measure(source,audit_path,output,batch_rows=1024):
-    if batch_rows<1:raise ValueError('invalid batch size')
+def measure(source,audit_path,output,batch_rows=1024,free_floor=100<<30):
+    if batch_rows<1 or free_floor<0:raise ValueError('invalid measurement limit')
     audited=json.loads(audit_path.read_text())
     if audited['status']!='COMPLETE_SOURCE_READ' or sha(source)!=audited['source_sha256']:
         raise ValueError('complete source audit and unchanged source required')
@@ -81,7 +81,7 @@ def measure(source,audit_path,output,batch_rows=1024):
                 first=hdu[0:min(batch_rows,count)];schema=arrow_table(first,metadata).schema
                 with pq.ParquetWriter(part,schema,compression='zstd',compression_level=3,use_dictionary=False) as writer:
                     for start in range(0,count,batch_rows):
-                        guard(output,100<<30);batch=hdu[start:min(start+batch_rows,count)]
+                        guard(output,free_floor);batch=hdu[start:min(start+batch_rows,count)]
                         table=arrow_table(batch,metadata)
                         if not table.schema.equals(schema,check_metadata=True):raise ValueError('field type/shape drift')
                         writer.write_table(table,row_group_size=batch_rows);rows+=len(batch)
@@ -109,5 +109,5 @@ def measure(source,audit_path,output,batch_rows=1024):
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('source',type=Path);p.add_argument('audit',type=Path);p.add_argument('output',type=Path);a=p.parse_args()
-    print(json.dumps(measure(a.source,a.audit,a.output)))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('source',type=Path);p.add_argument('audit',type=Path);p.add_argument('output',type=Path);p.add_argument('--free-floor-gib',type=int,default=100);a=p.parse_args()
+    print(json.dumps(measure(a.source,a.audit,a.output,free_floor=a.free_floor_gib<<30)))

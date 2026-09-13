@@ -16,7 +16,9 @@ def watch(pid, root, output, interval=.1, max_seconds=1300):
     if interval<=0 or max_seconds<0:raise ValueError('invalid observation interval/duration')
     proc=Path('/proc')/str(pid)
     command=(proc/'cmdline').read_bytes()
-    if not any(name in command for name in (b'measure_xsc_partitions.py',b'measure_gaia_full_partitions.py')):
+    if not any(name in command for name in (
+            b'measure_xsc_partitions.py', b'measure_gaia_full_partitions.py',
+            b'measure_irsa_bzip_partitions.py')):
         raise ValueError('only investigation-owned catalog measurement processes may be observed')
     started=time.monotonic();samples=0
     peak={'logical_bytes':0,'allocated_bytes':0,'open_unlinked_bytes':0}

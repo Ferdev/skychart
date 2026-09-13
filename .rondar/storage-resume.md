@@ -1197,3 +1197,494 @@ All 765 published SDSS checksum files acquired: 69,771,129 actual metadata bytes
 AllWISE angular feasibility: authoritative https://irsa.ipac.caltech.edu/docs/parquet_catalogs/ confirms healpix_k5 products use nested orders 0/5. Raw documentation 12,689 B SHA085dff51de3b91b48f3c3e0e10716641294261113b1f0a8960ea486ebb839507 retained in allwise-angular-feasibility/. Feasibility JSON lists required per-record membership, cone-boundary reference checks, routing builds, dense-field latency and native rendering measurements. No angular implementation or saving claimed; angular/full serving bytes null. Reporter includes this evidence.
 
 Active Gaia 1418, DESI download 61580, queued DESI full audit/conversion 83278. Three remote units confirmed active: PSC index, AllWISE source, AllWISE packed-ID. Latest collected PSC 59/92 committed files,303436074 rows,51185664000 logical index bytes (partial). AllWISE 2706/12288 verified files,152871924 rows,73990590165 source and84868814280 candidate bytes (partial). Remote free disk159420473344 B, availableRAM58775904256 B; local171.9 GB free at check. DESI still waiting complete checksum before conversion; do not call queued conversion running. All large exhaustive totals INCOMPLETE. No shared DB, spend, infrastructure, deployment or handoff.
+## 2026-09-12T11:05:00+00:00 — resumed workers; DESI data and PSC index complete
+
+Reconciled all durable workers after the session pause. DESI DR1 iron zcatalog
+v1 download is complete: 22,371,272,640 source bytes, official SHA-256
+2d95ad99361039b556c402b49e0e7c84df5f00106dc5731d44476a58b128b49b.
+The complete FITS audit read all 28,425,963 rows and all 136 fields. The verified
+full-field candidate data component is complete in 285 partitions:
+10,533,500,019 logical / 10,534,264,832 allocated bytes. Full global serving is
+still null. Started resumable field-scoped TARGETID/DESINAME lookup PID 1913;
+it reached 1,066,560 verified rows while this note was updated. Added and tested
+scripts/measure_desi_angular_index.py, which stores exact double coordinates and
+an R-tree candidate index while counting invalid/missing coordinates without
+changing the source records. Waiter PID 3377 will start it only after the exact
+lookup completes, avoiding two simultaneous large local index builds.
+Rendering/cross-identification/native API artifacts remain separate.
+
+The complete PSC SQLite ID/designation/angular component finished successfully:
+470,992,970 rows, 80,174,878,720 logical / 80,174,960,640 allocated bytes,
+SHA-256 0932d44f76eb8fa6705aee256aa298fe37b658c230ef3ce33427d4aa3e8d9d7e,
+101,026.444 seconds. Observed owned-root peak was 104,157,208,068 logical /
+104,158,097,408 allocated bytes, with an 8,159,074,072-byte journal observed.
+This remains a component measurement: rendering tiles, crossmatches, native API
+and end-to-end budgets are unmeasured.
+
+Ran the completed PSC index's read-only full-index benchmark from three source
+files (beginning/middle/end), 27 exact locator samples and 270 queries of each
+type. Warm local p95: ID 0.341911 ms, designation 0.228653 ms, bounded angular
+1.224221 ms; maxima 0.725276/0.529445/6.311541 ms. This verifies sampled full-
+index lookup behavior only, not cold cache, full-detail hydration, Phoenix or
+browser budgets. Evidence psc-remote-evidence/full-query-benchmark.json; the
+collector and reporter now retain it.
+
+Gaia had stopped without an OOM or accepted-file failure at 441/3,386 files,
+227,748,787 rows. Resumed from immutable receipts as PID 1778 with 60 GiB local
+headroom. It completed the next 522,694-row file with full detail and projection
+round-trip verification. Local memory is capped at 768 MiB; max-pressure events
+are file-cache reclaim, with zero OOM and zero OOM kills. A task-owned workspace
+observer is PID 1953.
+
+AllWISE stopped after a truncated download for source index 6038. The rejected
+temporary was 12,812,104 bytes with MD5 590229734b59bbd7be62ac39bd7da4ee;
+the provider reported 33,957,635 bytes and the pinned release MD5 is
+65d4e688f21bba2b3534837fcf364071. No receipt was admitted. Preserved the failure
+facts locally, verified the remote owner marker and recycled only that exact
+investigation-owned source.tmp.parquet. Recreated the same transient worker after
+reset-failed removed it. The retry passed partition 6038 and advanced through
+6045; packed-ID followed through 6045. Both workers remain active. Raised only
+their runtime MemoryMax from 512 MiB to 1 GiB; CPU remains one and one-half core
+respectively. Host had 58.15 GB available RAM and 129.83 GB free disk.
+
+SDSS checksum metadata was already complete and remains metadata-only: 765 files,
+943,401 referenced checksums and 69,771,129 measured bytes. Scientific source,
+row, data and serving totals remain unmeasured; the 3.74 TB value is provider
+metadata. Updated reporter hooks and the public checklist for current PSC, Gaia,
+AllWISE, DESI and SDSS states. 23 focused FITS lookup and SDSS inventory tests
+passed. Shared application databases, deployment, spend and production imports
+remain untouched. Exhaustive source and native serving totals remain INCOMPLETE.
+
+## 2026-09-12T13:57:52Z — Gaia routing refreshed; large workers continue
+
+Gaia full detail/projection measurement is active as PID 1778 and reached
+547/3,386 accepted source files after this checkpoint. Reused the incremental
+Gaia ID-range routing builder at the 546-file durable boundary: 281,790,931
+rows, 11,030,528 logical / 11,034,624 allocated bytes, SHA-256
+9ab56c63154fa79c7b2f6aa3e020c34fad6fc06e00394cca6188b51707e42075,
+19.702 seconds. Row accounting, global non-overlap and SQLite integrity passed.
+This is still partial candidate-row-group routing; exact membership, aliases,
+angular/physical search, crossmatches, rendering and native APIs remain
+unmeasured. The prior sampled projection verification covers only the earlier
+365-file index hash and must be repeated at a later expanded/final boundary.
+
+DESI TARGETID/DESINAME exact lookup remains active as PID 1913 and reached
+26,701,024 verified rows; angular indexing waiter PID 3377 remains queued until
+the exact lookup completes. AllWISE remote receipts were collected at a new
+durable boundary: 6,584 receipt files, 380,926,423 rows, 185,199,784,073 source
+bytes, 212,622,423,557 candidate detail bytes and 13,875,268,419 retained
+projection bytes. The AllWISE source and packed workers remain active; this is
+partial coverage against 12,288 files / 747,634,026 provider rows. Local and
+remote headroom remained above investigation guards; local OOM/OOM-kill counts
+remained zero. Exhaustive full source and native serving totals remain
+INCOMPLETE; no handoff.
+
+## 2026-09-12T14:22:27Z — DESI exact lookup complete; angular component started
+
+DESI TARGETID/DESINAME field-scoped lookup completed successfully over all
+28,425,963 full-detail rows and 56,851,926 entries. SQLite lookup bytes are
+2,743,545,856 logical / allocated, SHA-256
+feda2ca58515c7540f4ad25018154d663a4115e6b30fb4496e5e316db0340e50.
+The immutable 285-slot partition-routing map is 75,346 logical / 77,824
+allocated bytes, SHA-256
+fc2712dd19fd0df6d8d23bccae5298124c51c800fc8cc39b668029325c297f47.
+Combined logical bytes for this exact component are 2,743,621,202. Every
+locator, global entry count and SQLite integrity passed; current invocation
+time was 12,116.708 seconds. TARGETID and DESINAME entries are source-record
+locators, not cross-catalogue identity claims.
+
+Exact worker PID 1913 exited after writing the final receipt. The queued
+orchestrator PID 3377 correctly observed that receipt and launched angular
+child PID 31547 using scripts/measure_desi_angular_index.py with the 60 GiB
+free-space guard. It stores exact double TARGET_RA/TARGET_DEC positions plus
+R-tree candidates, counts unsupported coordinates and commits each verified
+partition atomically. Native render tiles, identity evidence, API integration
+and full latency budgets remain unmeasured. Gaia and AllWISE remain active;
+exhaustive full source and serving totals remain INCOMPLETE; no handoff.
+
+## 2026-09-12T15:07:52Z — DESI angular index and global validation complete
+
+The DESI exact-coordinate/R-tree worker completed all 285 verified Parquet
+partitions and all 28,425,963 rows. Every row in this pinned release has a valid
+TARGET_RA/TARGET_DEC position. `angular.sqlite` is 2,557,296,640 logical bytes
+(2,557,304,832 allocated), SHA-256
+869592045b70e6529fe32d23bd71ad4a3a97cf47c390ece266a2a5c6a550a30a.
+The exact-position count, R-tree count, `rtreecheck`, SQLite integrity check and
+final checksum all passed. The current invocation took 7,484.393 seconds.
+Combined DESI exact lookup/routing plus angular bytes are 5,300,917,842 logical
+bytes; full 136-field detail remains a separate measured candidate component.
+
+The completed component remains source-record routing, not identity assembly
+or admitted native storage. Native render tiles, cross-identification evidence,
+API integration and full latency budgets remain unmeasured, so DESI and the
+exhaustive serving total remain incomplete. Angular child PID 31547 and waiter
+PID 3377 exited after writing durable receipts. Gaia PID 1778 remained active
+at 628/3,386 files. One local cgroup OOM-kill event was observed while both
+large jobs and the session runtime shared the 768 MiB cgroup, but neither Gaia
+nor DESI worker was killed; their durable receipts advanced afterward. No
+additional OOM-kill was observed before DESI completed.
+
+## 2026-09-12T15:12:09Z — AllWISE receipts collected after 7,000-file boundary
+
+Collected and revalidated remote AllWISE receipts at 7,111/12,288 files:
+405,567,747 rows, 197,000,462,082 measured source bytes,
+225,964,391,609 candidate all-298-field detail bytes and 14,748,876,091
+retained projection bytes. The source/detail files are investigation-owned
+temporary files recycled only after the durable receipt and projection are
+fsynced; these measured byte sums therefore do not need to coexist. The packed
+ID builder had 7,108 durable sorted runs, with 4,905,406,464 observed peak
+allocated bytes for its own named workspace. Both remote workers remain active.
+These are partial measured components; AllWISE full source and serving totals
+remain null.
+
+An independent local read rehashed the completed DESI angular artifact to
+869592045b70e6529fe32d23bd71ad4a3a97cf47c390ece266a2a5c6a550a30a and
+confirmed 2,557,296,640 logical / 2,557,304,832 allocated bytes. Fifteen focused
+DESI angular, exact-lookup and report tests passed. Reporter regeneration,
+Python compilation and git diff validation passed. Gaia advanced to 631/3,386
+files while these checks ran. The cgroup OOM-kill counter remained at one;
+neither active measurement worker failed. Exhaustive source and native serving
+totals remain INCOMPLETE; no handoff.
+
+## 2026-09-12T16:34:28Z — SIMBAD live scope refreshed; complete export remains unresolved
+
+Captured contemporaneous official SIMBAD metadata for `SIMBAD4 1.8 - 2026-07`.
+Read-only aggregate TAP queries returned 22,153,861 `basic` rows and 72,905,435
+`ident` rows; both reference object-key bounds 1–31,450,642. The captured TAP
+table metadata describes all 67 `basic` and two `ident` columns. Response,
+header, homepage and schema hashes are in `simbad-scope/scope.receipt.json`.
+The homepage states ODbL licensing.
+
+These are provider metadata counts from a mutable live database, not source
+bytes or an atomic release. Captured capabilities still impose a 2,000,000-row
+hard output limit, and the inspected official routes do not document a complete
+dump. Segmented live TAP queries cannot prove one consistent snapshot while the
+database changes. The ledger therefore keeps SIMBAD source/data/index/serving
+bytes null and records the full-export acquisition gap explicitly. No provider
+contact or external message was sent.
+
+Sixteen focused report, DESI angular and exact-lookup tests passed. Reporter
+regeneration, Python compilation and git diff validation passed. Gaia advanced
+to 633/3,386 files, and the cgroup OOM-kill counter remained at one. Exhaustive
+source and native serving totals remain INCOMPLETE; no handoff.
+
+## 2026-09-12T16:42:38Z — Full Legacy Tractor worker validated and queued
+
+Pinned full scope remains all 360 DR10 south Tractor checksum manifests and
+366,912 files. Captured the official DR10 description with response hashes:
+the provider estimates about 2.8 billion unique sources / 366,898 unique bricks,
+6.6 TB for `south/tractor/` and 6.4 TB for `south/sweep/`. The page explicitly
+warns that directory sizes are estimates affected by recompression, so ledger
+source/storage totals remain null. Receipt:
+`optical-access/legacy-dr10-provider-estimates.receipt.json`.
+
+Implemented `scripts/measure_legacy_tractor_full.py` and made the generic FITS
+table measurement free-space floor explicit. The worker downloads one pinned
+file at a time, verifies its provider SHA-256 and FITS structure, reads all
+fields, writes and independently compares the candidate Parquet, commits a
+durable receipt, then recycles only its owned source/audit/detail temporaries.
+The real Apps Server probe measured the first file as 22,213,440 source bytes,
+9,051 rows, 207 fields and 13,975,470 candidate-detail bytes in 7.223 seconds.
+The earlier same-file transfer/audit/conversion evidence totaled 14.798 seconds;
+naively multiplied across all files these observations are about 31 and 63
+days, not a distribution-backed runtime promise.
+
+Seeded the verified first receipt into the full output and started transient
+unit `skychart-storage-1271-legacy-tractor-full.service`. It is durably waiting
+for both AllWISE source/detail and packed-ID completion receipts, then will run
+at 50% CPU, 1 GiB MemoryMax, no swap, nice 19, IOWeight 1 and a 60 GiB disk
+floor. Last waiter state: both prerequisites false, about 25 MB current memory;
+Apps Server free bytes 126,957,465,600. AllWISE was at source partition 7,173
+and packed run 7,172. Corrected sweep families and all Legacy global serving
+artifacts remain separate unfinished requirements.
+
+Twenty-one focused Legacy resume/scientific-roundtrip, FITS table, report,
+DESI angular and exact-lookup tests passed. Reporter regeneration, Python
+compilation and git diff validation passed. Gaia advanced to 640/3,386 files.
+Exhaustive source and native serving totals remain INCOMPLETE; no handoff.
+
+## 2026-09-12T16:45:56Z — Pan-STARRS provider size pinned; complete export blocked
+
+Captured current official MAST PS1 retrieval and CasJobs guide pages with
+response hashes in `optical-access/ps1-current-access.receipt.json`. MAST calls
+CasJobs the primary catalog access and reports the DR2 catalog database as
+nearly 150 TB. This is provider metadata, not downloaded source, SkyChart
+storage or a serving total. The previously pinned corrected TAP schema remains
+69 tables / 5,602 columns with a 100,000-row hard output cap.
+
+The official CasJobs guide requires account registration/login and says output
+tables must first be materialized in the account MyDB. No anonymous complete
+versioned dump is documented, and paging TAP/API queries cannot prove an atomic
+full snapshot. Pan-STARRS source/data/index/serving bytes therefore remain null.
+Required action is authorized MAST credentials plus confirmation that the
+account quota/export can cover every required table, or a provider-supported
+bulk release. No account creation, credential request or provider message was
+performed.
+
+Twenty-two focused report, Legacy resume/scientific-roundtrip, FITS table,
+DESI angular and exact-lookup tests passed. Reporter regeneration, compilation
+and git diff validation passed. Gaia advanced to 642/3,386 files. Exhaustive
+source and native serving totals remain INCOMPLETE; no handoff.
+
+## 2026-09-12T17:01:00Z — AllWISE companion release manifests reconciled
+
+Official IRSA bulk metadata now pins every AllWISE companion table part.
+Multiepoch: 792/792 parts, 42,759,337,365 provider-reported observations,
+3,419,775,536,324 exact manifest compressed bytes, 16,948,242,777,472
+provider-reported uncompressed bytes, 48 schema columns and 792 MD5 entries.
+Reject: 48/48 parts, 428,787,253 provider-reported detections,
+201,724,592,177 exact manifest compressed bytes, 684,294,996,583
+download-page-reported uncompressed bytes, 685,294,996,583 README-reported
+uncompressed bytes, 299 schema columns and 48 MD5 entries. The one-billion-byte
+official discrepancy is retained and remains unresolved until full sequential
+decompression measures it.
+Both download scripts, size manifests and MD5 manifests name exactly the same
+parts. Evidence is under `allwise-{mep,reject}-provider-inventory/` and is
+regenerated by `scripts/inventory_irsa_bulk_release.py`. These are provider
+metadata totals; no data part or owned/native artifact was measured.
+
+The 73 full-depth polar Atlas image tars and 73 frame cross-reference tables
+were all HEAD-verified from the official page. They total 30,341,738,652
+provider-listed bytes (30,323,875,840 tars plus 17,862,812 tables); no response
+checksum was available and no product was downloaded. The standard Atlas S3
+prefix inventory runs as unit
+`skychart-storage-1271-allwise-images-inventory.service` at 20% CPU and 160 MiB
+MemoryMax, retaining raw XML pages and validated continuation receipts. Latest
+completion: 1,076 pages, 1,075,986 objects, all 18,240 coadds and
+13,453,873,801,224 listed bytes. A fresh independent raw-XML scan reproduced
+the object count and total. Choosing gzip intensity alternatives produces an
+8,559,434,500,104-byte provider product selection, excluding
+4,894,439,301,120 bytes of paired uncompressed intensity objects and sidecars.
+No image was downloaded; content equivalence and owned/native storage remain
+unmeasured. Inventory and analysis tests plus report tests passed; reporter
+regeneration, compilation and diff validation passed.
+Gaia reached 651/3,386 files. The local OOM-kill counter remained one.
+Exhaustive source and native serving totals remain INCOMPLETE; no handoff.
+
+Current TAP metadata also pins five AllWISE ancillary table scopes: 18,240
+Atlas metadata rows/344 columns; 21,208,389 frame cross-references/6; 18,240
+Atlas inventory/7; 72,960 image inventory/66; and 2,786,053 refined pointing
+rows/23. Receipt: `allwise-ancillary-scope/scope.receipt.json`. These are live
+provider counts and schemas, not exports or owned bytes; do not add their
+24,103,882 rows to object populations.
+
+## 2026-09-12 — AllWISE Reject full measurement launched after measured gate
+
+Reject part 01 completed on Apps Server and has a durable receipt: 8,933,028
+rows, 299 columns, 4,107,828,834 source bytes, 14,452,530,341 decompressed
+bytes, 4,581,058,137 candidate-detail bytes and 347,844,213 projection bytes.
+Both full source passes, all-field equality, bzip CRC, provider size/MD5 and
+the empty trailing terminator passed. Sampled coexisting workspace peaked at
+9,036,763,136 allocated bytes; peak RSS was 1,423,339,520 bytes. Temporaries
+were recycled only after the receipt. Evidence and an independent manifest
+reconciliation are under `allwise-reject-evidence/`.
+
+The capacity gate measured 55,761,432,576 bytes of headroom above the 60 GiB
+floor against 11,295,913,980 required from the probe, and passed under the
+2 GiB hard memory limit. Linear timing projection is 55.05–55.13 hours for all
+48 parts, sensitivity 41.29–82.69 hours; this is not a full measured total.
+The remaining 47 parts are ACTIVE in
+`skychart-storage-1271-allwise-reject-full-v1.service`, PID 3437305 at launch,
+60% CPU, 1.5 GiB MemoryHigh, 2 GiB MemoryMax, no swap, Nice 19, IOWeight 1,
+60 GiB disk floor. Observer
+`skychart-storage-1271-allwise-reject-full-observer-v1.service` writes
+`workspace-observed-peak-full-continuation.json`. Latest initial state was
+ACQUIRING part 02; no OOM/failure. The downloader now resumes validated HTTP
+Ranges and safely restarts from zero if the provider ignores Range; 9 focused
+IRSA tests passed. Collector saves every immutable Reject receipt and a partial
+summary locally. Full Reject source/data and all global/native artifacts remain
+INCOMPLETE.
+
+## 2026-09-13 — disconnected-session recovery and incremental receipt collection
+
+Remote workers survived the session disconnect. The latest collected AllWISE
+checkpoint is 9,807/12,288 source receipts, 583,804,297 rows,
+284,538,810,298 source bytes, 327,017,792,344 candidate-detail bytes and
+21,299,973,601 retained projection bytes. Packed-ID progress was 9,805 runs.
+
+MEP reached 3/792 complete parts: 149,545,295 observations,
+11,912,129,277 source bytes, 59,232,601,480 decompressed bytes,
+14,067,283,993 candidate-detail bytes and 1,984,849,951 projection bytes.
+Reject reached 5/48 complete parts: 44,665,452 rows, 21,111,396,119 source
+bytes, 72,072,651,810 decompressed bytes, 23,845,812,121 candidate-detail
+bytes and 1,773,651,557 projection bytes. MEP part 4 and Reject part 6 are
+active. These are partial component totals; serving totals remain unknown.
+
+The local Gaia process ended during the disconnected interval after a clean
+878th receipt. Its log had no exception and the reset cgroup reported no OOM.
+The worker resumed from immutable receipts as detached PID 1493 with observer
+PID 1533 and committed the next 737,532-row file. No accepted artifact was
+removed; only the interrupted fixed-name temporary output was replaced.
+
+The remote collector now validates contiguous local and remote receipt
+sequences, asks the remote host for full aggregate accounting, and transfers
+only receipts newer than the local checkpoint. This reduced the reconnect
+batch from all 9,807 AllWISE receipts to the missing suffix while preserving
+full row and byte reconciliation. The continuity test, report tests,
+compilation and diff validation passed. Exhaustive source and native serving
+totals remain INCOMPLETE.
+
+MEP first-complete-part probe finished successfully. Exact full scope is 792 parts,
+42,759,337,365 provider-reported observations, 3,419,775,536,324 manifest
+compressed bytes and 16,948,242,777,472 provider-reported uncompressed bytes.
+Projection fields are SOURCE_ID_MF, RA/DEC, CNTR_MF, CAT, QI_FACT,
+MOON_MASKED, LOAD_ID, CNTR, FRAME_ID and MJD; all 48 fields remain in detail.
+The first receipt has 49,848,831 rows, 3,970,442,451 source bytes,
+19,745,151,397 decompressed bytes, 4,689,220,167 candidate-detail bytes and
+661,425,159 projection bytes. All fields, both source passes, bzip CRC, MD5 and
+the trailing delimiter passed. Observed workspace was 9,321,089,012 logical
+bytes and peak RSS was 1,094,123,520 bytes. The capacity assessment passed with
+51,537,002,496 bytes above the 60 GiB floor against 11,651,359,722 required.
+Its single-part linear timing projection is 1,201.19 hours, sensitivity
+900.89–1,801.79 hours; this is not a measured full duration. Remaining parts
+resumed in `skychart-storage-1271-allwise-mep-full-v1.service`, PID 3496585 at
+launch, with 60% CPU, 1.5 GiB MemoryHigh, 2 GiB MemoryMax, no swap, Nice 19 and
+IOWeight 1. Observer `skychart-storage-1271-allwise-mep-full-observer-v1.service`
+writes `workspace-observed-peak-full-continuation.json`; part 2 acquisition is
+active. Full MEP source/data/native artifacts remain INCOMPLETE.
+
+The main AllWISE source and packed-ID workers stopped safely when their former
+100 GiB guard was crossed. Their 8,323 source receipts and 8,322 sorted runs
+were preserved. Both scripts now expose a conservative 100 GiB default through
+`--free-floor-gib`; this investigation resumes them at 60 GiB, the same
+measured floor used by Reject and MEP. V2 units use 1 GiB MemoryMax, no swap,
+Nice 19 and IOWeight 1; source uses 100% CPU and packed uses 50%. The source
+worker truncates only its uncommitted investigation-owned `source.tmp.parquet`;
+all durable receipts and projections remain intact. Tests, compilation and
+diff checks passed before replacing the remote scripts. Full AllWISE and its
+native serving artifacts remain INCOMPLETE.
+
+Reject part 03 subsequently completed and passed both source passes, all-field
+comparison, bzip CRC, provider MD5, size and trailing-delimiter checks. Its
+receipt records 8,933,134 rows, 4,263,255,516 source bytes, 14,418,399,014
+decompressed bytes, 4,853,483,046 candidate-detail bytes and 356,948,063
+projection bytes. Across three complete parts the measured totals are
+26,799,292 rows, 12,592,154,540 source bytes, 43,310,126,685 decompressed bytes,
+14,199,871,360 candidate-detail bytes and 1,060,513,110 projection bytes. Part
+04 acquisition is active. Full Reject storage and serving totals remain
+INCOMPLETE.
+
+## 2026-09-13 — Reject part 10 receipt and current collected checkpoints
+
+Reject part 10 completed and passed both source passes, all-field comparison,
+bzip CRC, provider MD5, exact size and trailing-delimiter validation. Its
+immutable receipt records 8,932,966 rows, 4,223,507,466 source bytes,
+14,277,483,934 decompressed bytes, 4,694,681,733 candidate-detail bytes and
+350,627,918 projection bytes. Across 10 complete parts the collected measured
+totals are 89,330,682 rows, 42,279,545,631 source bytes, 143,647,180,191
+decompressed bytes, 47,502,306,193 candidate-detail bytes and 3,536,901,243
+projection bytes. Part 11 continues under the same resource guards. Full
+Reject storage and native serving totals remain INCOMPLETE.
+
+The same receipt collection recorded AllWISE at 11,282/12,288 files and
+687,641,515 rows: 335,782,486,151 source bytes, 386,446,633,794 candidate-detail
+bytes and 25,169,448,479 retained projection bytes. Gaia reporting recorded
+1,074/3,386 files and 583,401,486 rows: 244,547,332,350 source bytes,
+366,750,105,007 candidate-detail bytes and 31,858,388,494 retained build
+projection bytes. These are partial measured components; complete serving
+totals remain unknown.
+
+After the collection/reporting and inspection batch, the local cgroup memory
+events counter changed to `oom=2`, `oom_kill=1`. The counter does not identify
+the killed process. Gaia PID 1493 and observer PID 1533 remained alive and Gaia
+subsequently committed another receipt. The measurement has not lost a durable
+checkpoint. Subsequent probes remain narrow; the cause of the killed process
+is unproven.
+
+MEP part 08 completed and passed both source passes, all-field comparison, bzip
+CRC, provider MD5, exact size and trailing-delimiter validation. Its immutable
+receipt records 49,848,204 observations, 3,970,599,984 source bytes,
+19,744,431,300 decompressed bytes, 4,689,264,887 candidate-detail bytes and
+661,591,126 projection bytes. Across eight complete parts the collected totals
+are 398,786,343 observations, 31,765,589,182 source bytes, 157,955,529,736
+decompressed bytes, 37,513,946,910 candidate-detail bytes and 5,292,928,592
+projection bytes. Part 09 continues under the same guards. MEP observations are
+not unique objects, and complete source/native serving totals remain INCOMPLETE.
+
+
+Reject part 11 completed and passed both source passes, all-field comparison,
+bzip CRC, provider MD5, exact size and trailing-delimiter validation. Its
+receipt records 8,933,069 rows, 4,214,713,548 source bytes, 14,252,919,523
+decompressed bytes, 4,681,057,940 candidate-detail bytes and 350,322,958
+projection bytes. Across 11 complete parts the collected totals are 98,263,751
+rows, 46,494,259,179 source bytes, 157,900,099,714 decompressed bytes,
+52,183,364,133 candidate-detail bytes and 3,887,224,201 projection bytes. Part
+12 continues under the same guards. Complete Reject and native serving totals
+remain INCOMPLETE.
+
+Reject part 12 acquisition received a truncated provider response after
+1,088,047,982 of 4,225,724,369 pinned bytes. The worker rejected the file
+before conversion and exited with `ValueError: truncated or changed provider
+source`; no receipt was written and the 11 verified receipts remained intact.
+The same system service was recreated on existing Apps Server resources as PID
+3796754 with its original 60% CPU, 1.5 GiB MemoryHigh, 2 GiB MemoryMax, zero
+swap, Nice 19, IOWeight 1 and 60 GiB free-space floor. Its durable progress
+changed to `RESUMING_SOURCE` at exactly 1,088,047,982 bytes and the partial file
+then advanced. This is a retried acquisition failure, not accepted source data.
+
+MEP part 09 completed and passed both source passes, all-field comparison, bzip
+CRC, provider MD5, exact size and trailing-delimiter validation. Its receipt
+records 49,848,204 observations, 3,970,838,678 source bytes, 19,744,463,720
+decompressed bytes, 4,689,227,589 candidate-detail bytes and 661,587,901
+projection bytes. Across nine complete parts the collected totals are
+448,634,547 observations, 35,736,427,860 source bytes, 177,699,993,456
+decompressed bytes, 42,203,174,499 candidate-detail bytes and 5,954,516,493
+projection bytes. Part 10 continues under the same guards. Complete MEP and
+native serving totals remain INCOMPLETE.
+
+Reject part 12 completed after safely resuming a 1,088,047,982-byte partial
+source. The receipt reconciles 3,137,676,387 newly downloaded bytes with the
+4,225,724,369-byte pinned source, provider MD5 and local SHA-256. Both source
+passes, all 299 fields, bzip CRC and trailing delimiter passed. It records
+8,933,126 rows, 14,250,381,634 decompressed bytes, 4,688,153,206
+candidate-detail bytes and 350,131,997 projection bytes. Across 12 parts the
+collected totals are 107,196,877 rows, 50,719,983,548 source bytes,
+172,150,481,348 decompressed bytes, 56,871,517,339 candidate-detail bytes and
+4,237,356,198 projection bytes. Part 13 continues under the same guards.
+Complete Reject and native serving totals remain INCOMPLETE.
+
+Reject part 13 then received a truncated provider response after
+1,089,591,982 of 4,220,935,934 pinned bytes. No receipt was written and the
+existing 12 receipts were unchanged. The same guarded transient service was
+recreated after `reset-failed`; it resumed from the preserved partial source
+as PID 3855988 with the original CPU, memory, swap, I/O and free-space limits.
+The source grew after restart. Acceptance still requires exact size, provider
+MD5, local SHA-256, both source passes, bzip CRC and all-field reconciliation.
+
+MEP part 10 completed and passed both source passes, all-field comparison,
+bzip CRC, provider MD5, exact size and trailing-delimiter validation. Its
+receipt records 49,848,204 observations, 3,969,971,161 source bytes,
+19,744,026,271 decompressed bytes, 4,688,549,549 candidate-detail bytes and
+661,386,199 projection bytes. Across 10 parts the collected totals are
+498,482,751 observations, 39,706,399,021 source bytes, 197,444,019,727
+decompressed bytes, 46,891,724,048 candidate-detail bytes and 6,615,902,692
+projection bytes. Part 11 continues under the same guards. Complete MEP and
+native serving totals remain INCOMPLETE.
+
+Reject part 13's resumed HTTP stream later timed out after preserving
+2,179,062,446 bytes. Again no receipt was written and the first 12 receipts
+were unchanged. The guarded transient service was recreated with the same
+limits plus `Restart=on-failure` and a 15-second restart delay, so subsequent
+network interruptions resume automatically. PID 3880013 resumed from the
+preserved offset and the source grew; `NRestarts` was zero at the first check.
+
+MEP part 11 acquisition received a truncated provider response after preserving
+1,093,519,982 of 3,971,001,751 pinned bytes. The worker rejected the incomplete
+source before conversion, wrote no receipt and left the first 10 receipts
+unchanged. The transient service was recreated with its original 60% CPU,
+1.5 GiB MemoryHigh, 2 GiB MemoryMax, zero swap, Nice 19, IOWeight 1 and 60 GiB
+free-space floor, plus `Restart=on-failure` and a 15-second restart delay. PID
+3889059 resumed from the preserved offset and the source grew beyond 1.9 GB.
+Workspace observer v2 is active as PID 3889260 and writes a separate continuation
+checkpoint, preserving the earlier observer result.
+
+Reject part 13 then received another truncated provider response after preserving
+3,265,342,360 of 4,220,935,934 pinned bytes. The service auto-restarted once as
+PID 3889537, resumed from that exact offset and advanced beyond 3.47 GB. No part
+13 receipt exists and the 12 immutable verified receipts remain unchanged.
+
+MEP part 11 then received a second truncated provider response after preserving
+2,183,615,896 bytes. The service auto-restarted once as PID 3895223 and resumed
+from that exact offset; no part 11 receipt was written and the first 10 verified
+receipts remain unchanged. Workspace observer v3 follows the replacement PID
+and writes a separate continuation checkpoint.

@@ -63,7 +63,7 @@ def merge_stage(root,inputs,stage,checkpoint,fan_in=64):
     return outputs
 
 
-def build(source_root,root,rows_manifest,trial_root=None):
+def build(source_root,root,rows_manifest,trial_root=None,free_floor_gib=100):
     if (source_root/'OWNER').read_text()!='SkyChart isolated full AllWISE measurement 1271\n':raise ValueError('unowned source')
     root.mkdir(parents=True,exist_ok=True)
     lock=(root/'.lock').open('w');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -78,10 +78,11 @@ def build(source_root,root,rows_manifest,trial_root=None):
     if json.loads((source_root/'manifest.json').read_text())['rows_sha256']!=pin['rows_manifest_sha256']:raise ValueError('wrong source manifest')
     durable(root/'manifest.json',pin);started=time.time()
     observed_at=0
+    floor=free_floor_gib*(1<<30)
     workspace=json.loads((root/'workspace.json').read_text()) if (root/'workspace.json').exists() else {'peak_logical_bytes':0,'peak_allocated_bytes':0}
     def checkpoint():
         nonlocal observed_at
-        guard(root,100*(1<<30))
+        guard(root,floor)
         if time.monotonic()-observed_at>=10:
             observed_at=time.monotonic();sizes=[p.stat() for p in root.iterdir() if p.is_file()]
             workspace['peak_logical_bytes']=max(workspace['peak_logical_bytes'],sum(s.st_size for s in sizes))
@@ -157,5 +158,5 @@ def build(source_root,root,rows_manifest,trial_root=None):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('source_root',type=Path);p.add_argument('root',type=Path);p.add_argument('rows_manifest',type=Path);p.add_argument('--trial-root',type=Path)
-    a=p.parse_args();print(json.dumps(build(a.source_root,a.root,a.rows_manifest,a.trial_root)))
+    p.add_argument('source_root',type=Path);p.add_argument('root',type=Path);p.add_argument('rows_manifest',type=Path);p.add_argument('--trial-root',type=Path);p.add_argument('--free-floor-gib',type=int,default=100)
+    a=p.parse_args();print(json.dumps(build(a.source_root,a.root,a.rows_manifest,a.trial_root,a.free_floor_gib)))

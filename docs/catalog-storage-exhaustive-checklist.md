@@ -12,21 +12,21 @@ This checklist includes supporting images, observations and crossmatches separat
 |---|---|---|---|---|
 | simbad-basic | basic + ident | unresolved | registry-v1.json; saved plan 5 | pending |
 | 2mass-xsc | fp_xsc | All-Sky 2003 | registry-v1.json; saved plan 5 | full_detail_and_lookup_component_measured_other_artifacts_pending |
-| 2mass-psc | fp_psc, all 60 fields | All-Sky 2003 | registry-v1.json; saved plan 5 | all 92 source/data partitions measured; global index building, other serving artifacts incomplete |
-| gaia-dr3 | gaiadr3.gaia_source | DR3 | registry-v1.json; saved plan 5 | pending |
-| allwise | allwise_p3as_psd | AllWISE 2013 | registry-v1.json; saved plan 5 | pending |
+| 2mass-psc | fp_psc, all 60 fields | All-Sky 2003 | registry-v1.json; saved plan 5 | all 92 source/data partitions and the complete ID/designation/angular index measured; other serving artifacts incomplete |
+| gaia-dr3 | gaiadr3.gaia_source | DR3 | registry-v1.json; saved plan 5 | 1,231 of 3,386 files measured at the latest collected checkpoint; resumable full measurement active; generated table has the current checkpoint |
+| allwise | allwise_p3as_psd | AllWISE 2013 | registry-v1.json; saved plan 5 | 11,788 of 12,288 source files and 11,788 packed-ID runs measured at the latest collected checkpoint; both workers remain active under an explicit 60 GiB floor |
 | hipparcos | I/239/hip_main | 1997 | registry-v1.json; saved plan 5 | pending |
 | openngc | database_files/NGC.csv | 36cb178a0f69dba8bfc03a99c10512831edf1c6b | registry-v1.json; saved plan 5 | pending |
-| desi-dr1 | zall-pix-iron.fits | DR1 iron zcatalog v1 | registry-v1.json; saved plan 5 | full resumable download running; 136-field header pinned; row count remains metadata until complete audit |
+| desi-dr1 | zall-pix-iron.fits | DR1 iron zcatalog v1 | registry-v1.json; saved plan 5 | complete source, 28,425,963 rows and all 136 fields measured; exact ID/name and angular/R-tree components complete; other serving artifacts incomplete |
 | quaia | G20.5 full source; G20.0 overlapping subset; associated maps/randoms distinct | Zenodo 10403370 v1.0.0 | registry-v1.json; saved plan 5 | source acquisition pending; seven products pinned |
 | erosita-dr2 | eRASS3_Main_v1.3.fits | DE DR2 v1.3 | registry-v1.json; saved plan 5 | pending |
 | spiders-dr20 | DL1_spec_SDSSV_eROSITA_eRASS3_allepoch-v1_1_0.fits | DR20 DL1 v1_1_0 | registry-v1.json; saved plan 5 | pending |
 | bass-dr2 | J/ApJS/261/2/table9 | DR2 | registry-v1.json; saved plan 5 | pending |
 | exoplanets | pscomppars, all 703 fields | Full-query snapshot 2026-09-09; SHA pinned | registry-v1.json; saved plan 5 | complete source measured; normalized/serving pending |
 | small-bodies | SBDB Query | unresolved | registry-v1.json; saved plan 5 | pending |
-| panstarrs | ObjectThin plus associated scientific products, views and metadata kept distinct | DR2 | registry-v1.json; saved plan 5 | corrected official TAP path verified; 69 table definitions and 5,602 column definitions pinned; full acquisition unresolved under 100,000-row TAP cap |
-| legacy-surveys | full Tractor rows plus standard/extra/light-curve/photo-z sweep products | DR10 south; corrected DR10.1 sweeps | registry-v1.json; saved plan 5 | four sweep checksum manifests: 5,744 files; all 360 Tractor manifests: 366,912 files; one Tractor file measured; full source bytes, rows and serving artifacts unmeasured |
-| sdss | PhotoObjAll | DR18 | registry-v1.json; saved plan 5 | pending |
+| panstarrs | ObjectThin plus associated scientific products, views and metadata kept distinct | DR2 | registry-v1.json; saved plan 5 | corrected official TAP path verified; 69 table definitions and 5,602 column definitions pinned; provider reports nearly 150 TB catalog database; complete export blocked on authorized CasJobs/provider bulk path |
+| legacy-surveys | full Tractor rows plus standard/extra/light-curve/photo-z sweep products | DR10 south; corrected DR10.1 sweeps | registry-v1.json; saved plan 5 | four sweep checksum manifests: 5,744 files; all 360 Tractor manifests: 366,912 files; full Tractor worker validated and queued behind AllWISE; full source bytes, rows and serving artifacts unmeasured |
+| sdss | PhotoObjAll | DR18 inherited DR17 imaging | registry-v1.json; saved plan 5 | all 765 file listings and 943,401 published checksums measured; 3.74 TB science volume remains provider-listed, not fully measured |
 | nvss | VIII/65/nvss | 1998 | registry-v1.json; saved plan 5 | pending |
 | pulsars | psrcat | unresolved | registry-v1.json; saved plan 5 | pending |
 | variables | VSX | unresolved | registry-v1.json; saved plan 5 | pending |
@@ -36,9 +36,9 @@ This checklist includes supporting images, observations and crossmatches separat
 | supernova-remnants | Galactic SNR catalogue, summary and detailed/candidate documents | Green 2024 October; CDS VII/297 | registry-v1.json; saved plan 5 | full 310-row, 18-field summary data and exact lookup measured; detailed/candidate documents retained; their normalization and remaining serving artifacts pending |
 | messier | Messier owned compilation | git 3ac7cf6f4358f990c46eb95fd826465d6147fa0c | registry-v1.json; saved plan 5 | complete 110-entry JSON measured: 98,411 bytes; serving artifacts pending; not an upstream archive measurement |
 | curated-landmarks | curated_extragalactic_survey owned compilation | git 3ac7cf6f4358f990c46eb95fd826465d6147fa0c | registry-v1.json; saved plan 5 | complete 891-entry JSON measured: 1,169,351 bytes; overlaps upstream entries; serving artifacts pending |
-| allwise-mep | allwise_p3as_mep | AllWISE 2013 | registry-v1.json; saved plan 5 | pending |
-| allwise-reject | allwise_p3as_psr | AllWISE 2013 | registry-v1.json; saved plan 5 | pending |
-| allwise-images | AllWISE Image Atlas | AllWISE 2013 | registry-v1.json; saved plan 5 | pending |
+| allwise-mep | allwise_p3as_mep | AllWISE 2013 | registry-v1.json; saved plan 5 | official 792-part size/MD5/download manifests and 48-column schema reconcile; 10 complete parts measured after the capacity gate; part 11 active; global/native serving pending |
+| allwise-reject | allwise_p3as_psr | AllWISE 2013 | registry-v1.json; saved plan 5 | official 48-part size/MD5/download manifests and 299-column schema reconcile; sequential owned measurement active with 12/48 complete parts and part 13 active; global/native serving remains pending |
+| allwise-images | AllWISE Image Atlas plus 73 full-depth polar sets | AllWISE 2013 | registry-v1.json; saved plan 5 | exact standard prefix inventory: 1,075,986 objects/13,453,873,801,224 provider bytes; compressed unique-product selection 8,559,434,500,104 provider bytes; polar links 30,341,738,652; products not downloaded and native serving unmeasured |
 | erosita-ls10 | eRASSc3_Main_LS10_Public_27Jul2026.fits.gz | DE DR2 2026-07-27 | registry-v1.json; saved plan 5 | pending |
 | heasarc-neargalcat | NEARGALCAT full 40-field TDAT | HEASARC export 2020-09-30; 2013 publication | scripts/build_heasarc_nearby_galaxy_source.py | full source measured; Local Volume overlap verified for names/positions/distances |
 | ned | NED object database | unresolved | scripts/build_curated_extragalactic_survey_catalog.py | pending_release_resolution |
@@ -206,11 +206,19 @@ Resume command:
 .venv/bin/python scripts/measure_psc_full_partitions.py --root data/storage-exhaustive-1271/psc-full --manifest data/storage-exhaustive-1271/acquisition/psc-complete-file-inventory.json --schema data/storage-exhaustive-1271/acquisition/psc-schema --existing-source data/storage-exhaustive-1271/acquisition/psc_aaa.gz --max-files 0
 ```
 
-SIMBAD's live COUNT query reports 22,152,883 basic rows. Its advertised TAP
-hard output limit is 2,000,000 rows. A single ordinary TAP result therefore
-cannot deliver the full database; a consistent supported acquisition path is
-still being investigated. Neither segmented mutable queries nor a selected
-subset have been counted as a complete SIMBAD release.
+Contemporaneous live SIMBAD aggregate queries report 22,153,861 `basic` rows
+and 72,905,435 `ident` rows, with object-key bounds 1–31,450,642. These are
+provider metadata counts from the mutable database, not exported source bytes.
+The captured homepage identifies `SIMBAD4 1.8 - 2026-07` and ODbL licensing;
+the advertised schemas contain 67 `basic` and two `ident` columns. Its TAP
+capabilities impose a hard 2,000,000-row output limit. A single ordinary TAP
+result therefore cannot deliver either table, and disjoint queries would not
+provide an atomic snapshot of a changing database. No documented complete
+dump was found on the inspected official access routes. A provider-supported
+consistent full export remains unresolved; segmented mutable queries and the
+existing selected slices are not counted as a complete SIMBAD release. Exact
+queries, response hashes and captured official metadata are recorded in
+`simbad-scope/scope.receipt.json`.
 
 
 Additional acquisition checkpoint: the complete SPIDERS DR20 v1_1_0 FITS file
@@ -1313,15 +1321,29 @@ completion audit rehashed all 92 projections and checked their Parquet row
 counts and columns. See `psc-full/completion-audit.json` and reproducible
 `data/storage-exhaustive-1271/audit-psc-completion.py`.
 
-PSC source and transfer workers finished. The remote global index remains
-in progress; cross-identification, native rendering, full serving totals and
+PSC source and transfer workers finished. The complete ID/designation/angular
+SQLite component covers all 470,992,970 records and measures 80,174,878,720
+logical bytes (80,174,960,640 allocated), SHA-256
+`0932d44f76eb8fa6705aee256aa298fe37b658c230ef3ce33427d4aa3e8d9d7e`.
+Build and final validation took 101,026.44 seconds. The observed owned-root peak
+was 104,157,208,068 logical bytes with an 8,159,074,072-byte journal; sampling
+cannot capture unlinked or between-sample peaks.
+
+A full-index read-only benchmark checked 27 locators from the beginning, middle
+and end source files and ran 270 queries of each type. Warm local p95 latency
+was 0.342 ms for ID, 0.229 ms for designation and 1.224 ms for bounded angular
+queries; maxima were 0.725, 0.529 and 6.312 ms respectively. This is SQLite on
+the investigation host, not an API/browser or cold-cache budget, and full-detail
+hydration was not tested because candidate detail files were recycled after
+measurement. Cross-identification, native rendering, full serving totals and
 exact peak workspace remain incomplete. This milestone does not admit a
 production release or establish SkyChart's final storage requirement.
 
 SDSS DR18 imaging inherits DR17 with no new imaging population. The full
 PhotoObjAll contract cannot be replaced by filtered PhotoObj or reduced
-PhotoTag. Official rsync module access succeeded; a read-only full rerun301
-file listing is running. Its listed bytes will be provider metadata only.
+PhotoTag. Official rsync module access succeeded; all 765 rerun301 listings and
+their published checksum files are now acquired and verified. Listed scientific
+bytes remain provider metadata until the scientific files themselves are read.
 The official bulk guide asks users to arrange transfers over 1 TB through
 the help desk; no external contact or large transfer has been initiated.
 Evidence and pinned documentation are under `sdss-access/`.
@@ -1330,12 +1352,11 @@ Evidence and pinned documentation are under `sdss-access/`.
 ## SDSS resumable metadata inventory and first-file verification
 
 The initial whole-tree rsync listing ended without a recorded successful exit;
-it is retained as incomplete evidence. `scripts/inventory_sdss_photoobj.py` now
-checks and checkpoints each of 765 observing-run listings independently. Accepted
-listings require successful rsync exit, validated unique paths and a pinned SHA-256;
-resume verifies and reuses them. Directory sizes remain provider metadata. Initial
-throughput suggests roughly an hour for this metadata inventory, with substantial
-run-to-run variation; it does not predict full data acquisition time.
+it is retained as incomplete evidence. `scripts/inventory_sdss_photoobj.py`
+instead checked and checkpointed each of 765 observing-run listings
+independently. Accepted listings required successful rsync exit, validated unique
+paths and a pinned SHA-256; offline replay verifies and reuses them. Directory
+sizes remain provider metadata and do not predict full data acquisition time.
 
 One complete DR18 inherited PhotoObj file passed the provider SHA-1 and full
 139-field audit: 2,186 records, 6,612,480 source bytes and 4,466,225 candidate
@@ -1347,18 +1368,42 @@ calibration correspondence, all other files and global serving artifacts remain
 unverified. Evidence: `sdss-first-source/measurement-scope.json`.
 
 
-## DESI full conversion queued
+## DESI full source and data components measured
 
-The full 28,425,963-row, 136-field redshift-summary conversion is queued behind
-the ongoing download. It requires the complete 22,371,272,640-byte source to
-match the official SHA-256, then a full FITS audit before conversion. It writes
-100,000-row partitions with bounded 1,024-row batches and verifies every field
-against a second source read. The earlier 10,000-row diagnostic suggests a
-provisional 2–5 hour conversion allowance and roughly 10 GB of candidate data;
-neither is a measured full result. Startup requires 140 GiB free and conversion
-checks a 100 GiB free-space guard. These are adjustable live-workload margins,
-not user-imposed storage limits. No source deletion or application import is
-part of this worker. Global serving structures remain separate unfinished work.
+The complete DR1 iron zcatalog v1 source measures 22,371,272,640 bytes and
+matches the official SHA-256
+`2d95ad99361039b556c402b49e0e7c84df5f00106dc5731d44476a58b128b49b`.
+The full FITS audit read all 28,425,963 rows and all 136 fields. A second,
+independently read conversion produced 285 Parquet partitions totaling
+10,533,500,019 logical bytes (10,534,264,832 allocated bytes), with every field
+verified against its source record. These are measured source and candidate
+data components; they are not yet admitted application storage.
+
+A resumable exact lookup over `TARGETID` and `DESINAME` completed all
+28,425,963 rows and 56,851,926 field-scoped entries. The SQLite lookup measures
+2,743,545,856 logical and allocated bytes, with SHA-256
+`feda2ca58515c7540f4ad25018154d663a4115e6b30fb4496e5e316db0340e50`.
+Its partition-routing map measures 75,346 logical / 77,824 allocated bytes,
+for 2,743,621,202 logical bytes across this exact lookup component. Every
+locator, the global entry count and SQLite integrity were verified in
+12,116.71 seconds. These field values remain source-record locators, not
+asserted physical identities.
+
+The separate exact-coordinate/R-tree component completed all 285 partitions
+and 28,425,963 rows. Every row has a valid `TARGET_RA`/`TARGET_DEC` position in
+this release. The SQLite index measures 2,557,296,640 logical bytes
+(2,557,304,832 allocated bytes), with SHA-256
+`869592045b70e6529fe32d23bd71ad4a3a97cf47c390ece266a2a5c6a550a30a`.
+Its exact-position count, R-tree count, R-tree integrity and SQLite integrity
+all passed before the receipt was committed; final validation took 7,484.39
+seconds. Queries must still filter R-tree candidates against the exact double
+coordinates stored beside them.
+
+The exact lookup plus routing and angular components total 5,300,917,842
+logical bytes. This subtotal deliberately excludes full detail, and it is not
+a complete serving total. Rendering tiles, cross-identification, native API
+integration and full latency budgets remain unfinished. No source deletion or
+application import is part of this work.
 
 Reproducible orchestration and state: `run-desi-full-conversion.py`,
 `desi-conversion-feasibility.json`, `desi-conversion-worker-progress.json` under
@@ -1449,13 +1494,14 @@ The worker is finished. See `spacecraft-source/target-metadata/verification-comp
 
 ## Gaia routing artifact expanded
 
-The existing global ID-to-candidate-row-group SQLite index was extended from
-61 to 365 verified source files, accounting for 188,594,888 rows. It measures
-7,364,608 logical bytes (7,368,704 allocated), with SHA-256
-`ecb26f58f3834c7b2f3050cb06cd2b0665909c3db0a59d8e64a160ffa000eb59`.
-The build took 22.70 seconds and passed row accounting, non-overlapping global
-ranges and SQLite integrity checks. It remains a partial-release routing
-component, not full exact membership, science hydration or rendering storage.
+The existing global ID-to-candidate-row-group SQLite index was extended to
+546 verified source files, accounting for 281,790,931 rows. It measures
+11,030,528 logical bytes (11,034,624 allocated), with SHA-256
+`9ab56c63154fa79c7b2f6aa3e020c34fad6fc06e00394cca6188b51707e42075`.
+This incremental pass took 19.70 seconds and passed row accounting,
+non-overlapping global ranges and SQLite integrity checks. It remains a
+partial-release routing component, not full exact membership, science
+hydration or rendering storage.
 
 A read-only verification checks every retained projection checksum and every
 row-group footer count/minimum/maximum against this index. Exact membership is
@@ -1465,10 +1511,60 @@ group; it never proves an object exists. This does not benchmark full scientific
 record hydration or the native APIs. See `gaia-full/routing-projection-verification*`
 and task-owned `verify-gaia-routing-projections.py`.
 
-Routing verification finished successfully in 119.50 seconds: all 365 projection
+The earlier routing verification finished successfully in 119.50 seconds: all 365 projection
 checksums and 229,418 group boundaries matched. All 3,285 sampled present IDs
 and 1,095 sampled within-range missing IDs behaved correctly. The index hash
-was unchanged throughout verification. This is still partial Gaia coverage.
+was unchanged throughout that verification. It applies to the prior 365-file
+index hash; the same projection and sampled-membership verification must be
+rerun against a later expanded or final index. This is still partial Gaia coverage.
+
+
+## Legacy DR10 full Tractor measurement queued
+
+All 360 DR10 south Tractor checksum manifests are pinned and contain 366,912
+files. The official release page describes about 2.8 billion unique sources in
+366,898 unique bricks. It labels `south/tractor/` as about 6.6 TB and all
+`south/sweep/` products as about 6.4 TB, while warning that these directory
+sizes are estimates which can change with recompression. They remain provider
+metadata, not measured source or final storage bytes.
+
+The sequential full worker was verified against the first pinned Tractor file:
+22,213,440 source bytes, 9,051 rows, all 207 fields round-tripped, and
+13,975,470 candidate-detail bytes. That invocation took 7.22 seconds. Combined
+with the earlier 10.23-second transfer plus 4.57-second audit/conversion, the
+two same-file observations give naive sequential durations of roughly 31 and
+63 days for 366,912 files. They do not establish a population-wide throughput
+distribution; the durable worker records actual per-file times.
+
+The Apps Server waiter is constrained to 50% CPU, 1 GiB memory and a 60 GiB
+free-space floor. It will start only after both full AllWISE source/detail and
+packed-ID receipts exist. Each Legacy provider file and all decoded table
+fields are verified before its receipt is committed; only that worker's source,
+audit and detail temporaries are then recycled. Corrected standard, extra,
+light-curve and photo-z sweeps remain separate required measurements, as do
+global exact/angular indexes, cross-identification, rendering and native API
+budgets. Full Legacy source and serving totals remain null.
+
+
+## Pan-STARRS DR2 complete export remains blocked
+
+The corrected official PS1 DR2 TAP endpoint exposes 69 table definitions and
+5,602 column definitions. The current MAST documentation calls CasJobs the
+primary catalog access method and reports that the DR2 catalog database is
+nearly 150 TB. That figure describes the provider database and is not a
+measured bulk source, SkyChart schema or serving total.
+
+The official CasJobs guide requires registration and login before querying.
+Extractable tables must first be materialized in the account's MyDB. No
+anonymous complete, versioned database export is documented. The corrected TAP
+route retains its 100,000-row output cap, while the web/catalog APIs are query
+interfaces rather than atomic full releases. Mass paging them would not prove a
+consistent complete snapshot. The exact remaining action is authorized MAST
+CasJobs credentials plus provider confirmation that quota/export can cover all
+required source and observation tables, or a provider-supported bulk release.
+No account was created and no provider contact was sent. Evidence and response
+hashes are in `optical-access/ps1-current-access.receipt.json`; all Pan-STARRS
+source, stored and serving byte totals remain null.
 
 
 ## APM parent catalogue acquisition remains unresolved
@@ -1519,3 +1615,79 @@ metadata measurements, not evidence that the referenced scientific files have
 been downloaded or verified. Accepted metadata files are hashed and resumable.
 Evidence: `sdss-run-inventory/verification.json`,
 `sdss-run-inventory/checksum-file-inventory.json`, and `sdss-checksum-inventory/`.
+
+## AllWISE companion products pinned and being inventoried
+
+The complete AllWISE release scope now explicitly separates the Source Catalog
+objects from the Reject detections, Multiepoch observations, standard Atlas
+products and full-depth polar products. IRSA's official bulk manifests
+reconcile without missing or duplicate parts:
+
+| Product | Kind | Provider rows | Parts | Provider compressed bytes | Provider uncompressed bytes | Schema |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Multiepoch Photometry Database | observations | 42,759,337,365 | 792 | 3,419,775,536,324 | 16,948,242,777,472 | 48 columns |
+| Reject Table | rejected detections | 428,787,253 | 48 | 201,724,592,177 | 684,294,996,583 page / 685,294,996,583 README | 299 columns |
+
+Every part is present in the official wget script, exact-byte size manifest and
+per-part MD5 manifest. The manifest and schema files are retained with SHA-256
+receipts. The guarded MEP first-complete-part measurement finished under
+60 GiB free-space and 2 GiB memory limits. Its two-pass receipt reconciles
+49,848,831 rows and all 48 fields from 3,970,442,451 compressed bytes and
+19,745,151,397 decompressed bytes. Candidate detail is 4,689,220,167 bytes and
+the 11-column projection is 661,425,159 bytes. The capacity gate passed with
+51,537,002,496 bytes above the floor versus 11,651,359,722 required and
+1,094,123,520 bytes peak RSS. The remaining 791 parts are active. The
+single-part linear timing projection is 1,201.19 hours, with a
+900.89–1,801.79-hour sensitivity range; it is not a measured full duration.
+Reject is now in a sequential full measurement: the first complete part reconciles 8,933,028 rows
+and all 299 fields from 4,107,828,834 compressed bytes and 14,452,530,341
+decompressed bytes. Its verified candidate detail is 4,581,058,137 bytes and
+its 13-column build projection is 347,844,213 bytes. Both full source passes,
+bzip CRC, provider MD5, empty record terminator and every stored field passed.
+The 9,036,763,136-byte sampled allocated workspace peak excludes missed
+between-sample transients. Three Reject parts now have durable receipts totalling
+26,799,292 rows, 12,592,154,540 source bytes, 43,310,126,685 decompressed bytes,
+14,199,871,360 candidate-detail bytes and 1,060,513,110 projection bytes. The
+remaining 45 parts are active under a 60 GiB
+free-space floor and recycle only their own temporaries after durable receipts.
+Lookup, angular, cross-identification, rendering, native serving and rollback
+sizes remain unknown. MEP rows are time-tagged measurements linked to
+Source/Reject records, so they must not be added to the unique-object count.
+
+The current Reject download page and its linked README disagree by exactly
+1,000,000,000 uncompressed bytes. Both claims and their response hashes are
+retained. Neither is treated as a measured full-source total; the active
+sequential decompression and row accounting must finish all 48 parts to resolve
+the actual byte count. The first part is measured evidence only.
+
+The 73 official full-depth polar rows link 73 image tar files and 73 frame
+cross-reference tables. Exact current HTTP Content-Length values total
+30,323,875,840 bytes for the image tars and 17,862,812 bytes for the tables,
+or 30,341,738,652 bytes combined. No checksum is advertised by those HEAD
+responses; the products were not downloaded, so this remains provider metadata.
+
+Five supporting tables are also explicitly retained in scope rather than
+hidden inside the image label. Current live IRSA TAP counts and advertised
+schemas are: Atlas metadata 18,240 rows/344 columns, Atlas/frame cross-reference
+21,208,389/6, Atlas inventory 18,240/7, Atlas image inventory 72,960/66, and
+refined single-exposure pointing 2,786,053/23. These 24,103,882 rows are
+metadata, cross-references and pointing records, not additional celestial
+objects. They are mutable live counts; full exports and owned byte totals are
+still required.
+
+The standard public AllWISE Atlas prefix is fully inventoried: 1,075,986 S3
+objects across all 18,240 coadd IDs and 1,076 retained ListObjectsV2 pages.
+The exact provider prefix total is 13,453,873,801,224 bytes, including
+13,453,856,357,535 product bytes and 17,443,689 checksum-sidecar bytes. Page
+continuations, non-overlap, lexical order and the final manifest chain passed.
+S3 ETags are retained but are not assumed to be MD5 for multipart products.
+
+Each coadd/band has both an uncompressed `-int-3.fits` object and a gzip
+`-int-3.fits.gz` alternative. An independent raw-page scan reconciled all bytes
+and counts. Selecting the gzip intensity encoding while retaining coverage,
+uncertainty, multiframe-flag and artifact tables plus their sidecars gives
+8,559,434,500,104 provider-listed bytes. This excludes 4,894,439,301,120 bytes
+for the uncompressed intensity alternatives and their sidecars. The official
+filenames document the encoding relationship; decompressed byte equivalence
+has not been independently measured. No image was downloaded, so both figures
+remain provider metadata rather than owned source or native-serving totals.
