@@ -17,6 +17,7 @@ export interface AtlasViewStateAccess {
 
 interface AtlasViewStateControllerOptions {
   state: AtlasViewStateAccess;
+  constellations: { hidden: string[] };
   manifest: CatalogPointManifestRepository;
   pointStream: CatalogPointStream;
   minimumZoom: number;
@@ -77,6 +78,7 @@ export class AtlasViewStateController {
       pxPerAu: clamp(view.zoom, this.options.minimumZoom, this.options.maximumZoom),
     };
     state.viewTime = view.time;
+    this.options.constellations.hidden = view.hiddenConstellations ?? [];
     this.requestedCatalogRelease = view.catalogRelease;
     state.activeZoomPreset = null;
     for (const layer of DISPLAY_LAYERS) {
@@ -106,6 +108,7 @@ export class AtlasViewStateController {
         : undefined,
       catalogRelease: this.options.manifest.value?.version ?? this.requestedCatalogRelease,
       layers: { ...state.displayLayers },
+      hiddenConstellations: this.options.constellations.hidden,
       filters: { primary: state.activeFilter, compare: state.activeCompareFilter },
       ...(sky ? { sky } : {}),
     };

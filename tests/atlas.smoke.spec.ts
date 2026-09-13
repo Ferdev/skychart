@@ -62,6 +62,7 @@ test("time changes remain responsive while positions update", async ({ page, req
   });
 
   await openAtlas(page);
+  await page.locator("#map-settings-toggle").click();
   const timeToggle = page.locator('[aria-controls="scale-time-controls"]');
   if (await timeToggle.getAttribute("aria-expanded") !== "true") await timeToggle.click();
 
