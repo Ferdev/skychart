@@ -1,0 +1,5 @@
+id,name,ra,dec,parallax,error
+9007199254740993,Measured fixture,10,20,10,1
+18446744073709551615,Negative parallax fixture,30,40,-1,1
+metadata,Position unknown fixture,,,,
+bad,Malformed declination fixture,0,100,,

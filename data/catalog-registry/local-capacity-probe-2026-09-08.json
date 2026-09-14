@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "sample_sha256": "dcb9b1a73fe39eccd130ca76f1bbac8eb1bd6670985635dfc84a183ca10107be",
+  "scope": "local prototype with repeated sampled rows and synthetic IDs; not full-volume validation",
+  "capacity_approved": false,
+  "measurements": [
+    {
+      "rows": 1000,
+      "table_bytes": 1187840,
+      "index_bytes": 229376,
+      "total_bytes": 1417216,
+      "copy_ms": 22.845,
+      "warm_exact_lookup_p95_ms": 0.011,
+      "wall_seconds": 0.1169947381131351,
+      "serialized_source_bytes": 861529,
+      "bytes_per_record": 1417.216,
+      "records_per_second": 43773.254541475166
+    },
+    {
+      "rows": 10000,
+      "table_bytes": 12197888,
+      "index_bytes": 2195456,
+      "total_bytes": 14393344,
+      "copy_ms": 465.146,
+      "warm_exact_lookup_p95_ms": 0.011,
+      "wall_seconds": 0.6154546677134931,
+      "serialized_source_bytes": 8652698,
+      "bytes_per_record": 1439.3344,
+      "records_per_second": 21498.626237783406
+    }
+  ],
+  "unmeasured": [
+    "full scientific schema",
+    "all first-set source populations",
+    "angular and physical index costs",
+    "alias/text search",
+    "cross-identification",
+    "tile build",
+    "browser/server API latency",
+    "temporary full-volume disk",
+    "refresh cost",
+    "actual release coexistence"
+  ]
+}

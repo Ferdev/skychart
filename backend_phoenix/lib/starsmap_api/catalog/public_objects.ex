@@ -158,8 +158,11 @@ defmodule StarsmapApi.Catalog.PublicObjects do
   def gaia_object(source_id) when is_binary(source_id) do
     with {parsed, ""} when parsed > 0 <- Integer.parse(source_id) do
       case Repo.get(GaiaObjectCache, parsed) do
-        %GaiaObjectCache{payload: payload} -> {:ok, payload}
-        nil -> fetch_and_cache_gaia_object(parsed)
+        %GaiaObjectCache{payload: payload} ->
+          {:ok, Map.put_new(payload, "frame_contract", "legacy-gaia-23.43928-2016")}
+
+        nil ->
+          fetch_and_cache_gaia_object(parsed)
       end
     else
       _ -> {:error, :invalid_source_id}
@@ -206,20 +209,25 @@ defmodule StarsmapApi.Catalog.PublicObjects do
     end
   end
 
-  defp gaia_payload([source_id, ra, dec, parallax, parallax_error, magnitude, bp_rp, pmra, pmdec])
-       when is_number(ra) and is_number(dec) and is_number(parallax) and parallax > 0 do
-    distance_pc = 1_000.0 / parallax
-    distance_ly = distance_pc * 3.26156
-    distance_au = distance_pc * 206_264.80624709636
-    ra_rad = ra * :math.pi() / 180.0
-    dec_rad = dec * :math.pi() / 180.0
-    obliquity = 23.43928 * :math.pi() / 180.0
-    equatorial_x = distance_au * :math.cos(dec_rad) * :math.cos(ra_rad)
-    equatorial_y = distance_au * :math.cos(dec_rad) * :math.sin(ra_rad)
-    equatorial_z = distance_au * :math.sin(dec_rad)
-    x_au = equatorial_x
-    y_au = :math.cos(obliquity) * equatorial_y + :math.sin(obliquity) * equatorial_z
-    z_au = -:math.sin(obliquity) * equatorial_y + :math.cos(obliquity) * equatorial_z
+  defp gaia_payload([source_id, ra, dec, parallax, parallax_snr, magnitude, bp_rp, pmra, pmdec])
+       when is_number(ra) and is_number(dec) do
+    distance_pc =
+      if is_number(parallax) and parallax > 0 and is_number(parallax_snr) and
+           parallax_snr >= 3,
+         do: 1_000.0 / parallax,
+         else: nil
+
+    distance_ly = if distance_pc, do: distance_pc * 3.261563777, else: nil
+
+    position =
+      if distance_pc do
+        %{x: x, y: y, z: z} =
+          StarsmapApi.Catalog.Astrometry.project(ra, dec, distance_pc * 206_264.80624709636)
+
+        %{x_au: x, y_au: y, z_au: z}
+      else
+        %{x_au: nil, y_au: nil, z_au: nil}
+      end
 
     {:ok,
      %{
@@ -228,6 +236,8 @@ defmodule StarsmapApi.Catalog.PublicObjects do
        object_type: "star",
        catalog_group: "gaia_dr3_bulk",
        source_type: "gaia_dr3_tap",
+       position_model: "gaia_dr3_epoch_2016_00_catalog_coordinates",
+       frame_contract: StarsmapApi.Catalog.Astrometry.contract()["frame"],
        aliases: [],
        external_ids: %{gaia_dr3_source_id: to_string(source_id)},
        astrometry: %{
@@ -237,10 +247,12 @@ defmodule StarsmapApi.Catalog.PublicObjects do
          distance_ly: distance_ly,
          apparent_magnitude: magnitude
        },
-       position: %{x_au: x_au, y_au: y_au, z_au: z_au},
+       position: position,
        facts: %{
+         source_epoch: 2016.0,
+         position_epoch: 2016.0,
          parallax_mas: parallax,
-         parallax_over_error: parallax_error,
+         parallax_over_error: parallax_snr,
          bp_rp: bp_rp,
          pmra_mas_yr: pmra,
          pmdec_mas_yr: pmdec
@@ -276,6 +288,12 @@ defmodule StarsmapApi.Catalog.PublicObjects do
       parent_key: object.parent_key,
       color: object.color,
       radius_km: object.radius_km,
+      capabilities: %{
+        searchable_metadata: true,
+        angular_position: is_number(object.ra_deg) and is_number(object.dec_deg),
+        spatial_position: Enum.all?([position.x_au, position.y_au, position.z_au], &is_number/1),
+        dynamic_ephemeris: object.source_type in ["jpl_sbdb_query", "jpl_sb_sat"]
+      },
       aliases: object.aliases || [],
       external_ids: object.external_ids || %{},
       external_links: external_links(object),
@@ -307,6 +325,9 @@ defmodule StarsmapApi.Catalog.PublicObjects do
       {nil, nil, empty_position(), Map.put(facts, "distance_quality", "not_available")}
     end
   end
+
+  defp public_spatial_fields(%{position_model: "catalog_sky_position_reference_shell"} = object),
+    do: {nil, nil, empty_position(), object.facts || %{}}
 
   defp public_spatial_fields(object), do: spatial_fields(object, object.facts || %{})
 

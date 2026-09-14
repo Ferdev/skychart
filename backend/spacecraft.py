@@ -112,7 +112,7 @@ def spacecraft_payload(timestamp, selected_key=''):
         if not in_coverage(mission, timestamp):
             bodies.append(metadata_body(mission,timestamp,'out_of_coverage')); continue
         key = (mission['key'], stamp)
-        disk_key = cache_key_payload('spacecraft', key=key, revision=mission['source_sha256'], frame='true_ecliptic_of_date_ut_v1')
+        disk_key = cache_key_payload('spacecraft', key=key, revision=mission['source_sha256'], frame='heliocentric-ecliptic-J2000-v1')
         with _lock: result = _results.get(key)
         if result is None: result = read_cache('spacecraft', disk_key)
         if result and result.get('expires_at',0) > time.time():

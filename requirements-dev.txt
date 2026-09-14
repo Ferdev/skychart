@@ -1,2 +1,4 @@
 -r requirements.txt
+ijson==3.4.0.post0
+pyarrow==20.0.0
 pytest==9.1.1

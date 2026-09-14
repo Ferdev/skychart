@@ -1,0 +1,917 @@
+{
+  "schema_version": 1,
+  "kind": "complete_source_files_only",
+  "serving_total": null,
+  "files": [
+    {
+      "id": "abell--docu.txt",
+      "catalog": "VII/110A",
+      "table": "docu.txt",
+      "rows": 165,
+      "record_width": 80,
+      "schema_sha256": "8065ba8f51c4f26ed0813bef593acf1bdedca54fdf8e824ab56a0c42f855bc60",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/docu.txt",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/docu.txt.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "abell--table3.dat",
+      "catalog": "VII/110A",
+      "table": "table3.dat",
+      "rows": 2712,
+      "record_width": 148,
+      "schema_sha256": "8065ba8f51c4f26ed0813bef593acf1bdedca54fdf8e824ab56a0c42f855bc60",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/table3.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/table3.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "abell--table4.dat",
+      "catalog": "VII/110A",
+      "table": "table4.dat",
+      "rows": 1364,
+      "record_width": 158,
+      "schema_sha256": "8065ba8f51c4f26ed0813bef593acf1bdedca54fdf8e824ab56a0c42f855bc60",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/table4.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/table4.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "abell--table5.dat",
+      "catalog": "VII/110A",
+      "table": "table5.dat",
+      "rows": 1174,
+      "record_width": 155,
+      "schema_sha256": "8065ba8f51c4f26ed0813bef593acf1bdedca54fdf8e824ab56a0c42f855bc60",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/table5.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/table5.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "abell--table6.dat",
+      "catalog": "VII/110A",
+      "table": "table6.dat",
+      "rows": 274,
+      "record_width": 155,
+      "schema_sha256": "8065ba8f51c4f26ed0813bef593acf1bdedca54fdf8e824ab56a0c42f855bc60",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/table6.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/table6.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "abell--notes.dat",
+      "catalog": "VII/110A",
+      "table": "notes.dat",
+      "rows": 3316,
+      "record_width": 79,
+      "schema_sha256": "8065ba8f51c4f26ed0813bef593acf1bdedca54fdf8e824ab56a0c42f855bc60",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/notes.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/110A/notes.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table3.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table3.dat",
+      "rows": 44599,
+      "record_width": 233,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table3.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table3.dat.gz"
+      ],
+      "max_source_bytes": 20961530
+    },
+    {
+      "id": "2mrs--table4.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table4.dat",
+      "rows": 590,
+      "record_width": 73,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table4.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table4.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table6.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table6.dat",
+      "rows": 4291,
+      "record_width": 68,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table6.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table6.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table7.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table7.dat",
+      "rows": 14,
+      "record_width": 68,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table7.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table7.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table8.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table8.dat",
+      "rows": 324,
+      "record_width": 53,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table8.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table8.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table9.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table9.dat",
+      "rows": 74,
+      "record_width": 71,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table9.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table9.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table10.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table10.dat",
+      "rows": 87,
+      "record_width": 16,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table10.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table10.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table11.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table11.dat",
+      "rows": 155,
+      "record_width": 16,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table11.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table11.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table12.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table12.dat",
+      "rows": 334,
+      "record_width": 166,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table12.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table12.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2mrs--table13.dat",
+      "catalog": "J/ApJS/199/26",
+      "table": "table13.dat",
+      "rows": 4857,
+      "record_width": 48,
+      "schema_sha256": "b4fc43f8e6c91c835c68f02a98255cbd0ea7ef570edd1094bf12d28057d54590",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table13.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/199/26/table13.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "6df--6dfgs.dat",
+      "catalog": "VII/259",
+      "table": "6dfgs.dat",
+      "rows": 124647,
+      "record_width": 178,
+      "schema_sha256": "59ab49eb12ef2db602881f6c2495d3e746d032576e399f9e62b8221b0fdf7114",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/259/6dfgs.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/259/6dfgs.dat.gz"
+      ],
+      "max_source_bytes": 44872920
+    },
+    {
+      "id": "6df--spectra.dat",
+      "catalog": "VII/259",
+      "table": "spectra.dat",
+      "rows": 136304,
+      "record_width": 148,
+      "schema_sha256": "59ab49eb12ef2db602881f6c2495d3e746d032576e399f9e62b8221b0fdf7114",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/259/spectra.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/259/spectra.dat.gz"
+      ],
+      "max_source_bytes": 40891200
+    },
+    {
+      "id": "3c--3c.dat",
+      "catalog": "VIII/1A",
+      "table": "3c.dat",
+      "rows": 471,
+      "record_width": 128,
+      "schema_sha256": "197865434e43fc63eae2529ea459093be3ece56b45d950b15bc8a22fbce84d8d",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VIII/1A/3c.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VIII/1A/3c.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "3c--3cr.dat",
+      "catalog": "VIII/1A",
+      "table": "3cr.dat",
+      "rows": 328,
+      "record_width": 208,
+      "schema_sha256": "197865434e43fc63eae2529ea459093be3ece56b45d950b15bc8a22fbce84d8d",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VIII/1A/3cr.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VIII/1A/3cr.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "4c--radio4c.dat",
+      "catalog": "VIII/4",
+      "table": "radio4c.dat",
+      "rows": 4844,
+      "record_width": 72,
+      "schema_sha256": "07fde7158de5869c13bf7aa2f043873585dfe60939e29f6dae0100093f6fe268",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VIII/4/radio4c.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VIII/4/radio4c.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2qz--2qz.dat",
+      "catalog": "VII/241",
+      "table": "2qz.dat",
+      "rows": 49425,
+      "record_width": 354,
+      "schema_sha256": "729b5756f2993720823dc8ac3cec1f4038af4faf0d658387c8156fa90febfee3",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/241/2qz.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/241/2qz.dat.gz"
+      ],
+      "max_source_bytes": 35190600
+    },
+    {
+      "id": "2qz--ngp_rep.dat",
+      "catalog": "VII/241",
+      "table": "ngp_rep.dat",
+      "rows": 926,
+      "record_width": 144,
+      "schema_sha256": "729b5756f2993720823dc8ac3cec1f4038af4faf0d658387c8156fa90febfee3",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/241/ngp_rep.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/241/ngp_rep.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2qz--sgp_rep.dat",
+      "catalog": "VII/241",
+      "table": "sgp_rep.dat",
+      "rows": 1047,
+      "record_width": 145,
+      "schema_sha256": "729b5756f2993720823dc8ac3cec1f4038af4faf0d658387c8156fa90febfee3",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/241/sgp_rep.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/241/sgp_rep.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "2qz--6qz_rep.dat",
+      "catalog": "VII/241",
+      "table": "6qz_rep.dat",
+      "rows": 87,
+      "record_width": 145,
+      "schema_sha256": "729b5756f2993720823dc8ac3cec1f4038af4faf0d658387c8156fa90febfee3",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/241/6qz_rep.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/241/6qz_rep.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "fornax-cluster--p2tbl2.dat",
+      "catalog": "VII/180",
+      "table": "p2tbl2.dat",
+      "rows": 340,
+      "record_width": 132,
+      "schema_sha256": "3d31a42f423b958f846e51f4ae6985d7b27b4d857b20ade8b7af660116218966",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p2tbl2.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p2tbl2.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "fornax-cluster--p2tbl3.dat",
+      "catalog": "VII/180",
+      "table": "p2tbl3.dat",
+      "rows": 2338,
+      "record_width": 79,
+      "schema_sha256": "3d31a42f423b958f846e51f4ae6985d7b27b4d857b20ade8b7af660116218966",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p2tbl3.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p2tbl3.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "fornax-cluster--notes.dat",
+      "catalog": "VII/180",
+      "table": "notes.dat",
+      "rows": 122,
+      "record_width": 35,
+      "schema_sha256": "3d31a42f423b958f846e51f4ae6985d7b27b4d857b20ade8b7af660116218966",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/notes.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/notes.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "fornax-cluster--p3tbl2.dat",
+      "catalog": "VII/180",
+      "table": "p3tbl2.dat",
+      "rows": 52,
+      "record_width": 148,
+      "schema_sha256": "3d31a42f423b958f846e51f4ae6985d7b27b4d857b20ade8b7af660116218966",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl2.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl2.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "fornax-cluster--p3tbl3.dat",
+      "catalog": "VII/180",
+      "table": "p3tbl3.dat",
+      "rows": 79,
+      "record_width": 148,
+      "schema_sha256": "3d31a42f423b958f846e51f4ae6985d7b27b4d857b20ade8b7af660116218966",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl3.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl3.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "fornax-cluster--p3tbl4.dat",
+      "catalog": "VII/180",
+      "table": "p3tbl4.dat",
+      "rows": 120,
+      "record_width": 148,
+      "schema_sha256": "3d31a42f423b958f846e51f4ae6985d7b27b4d857b20ade8b7af660116218966",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl4.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl4.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "fornax-cluster--p3tbl5.dat",
+      "catalog": "VII/180",
+      "table": "p3tbl5.dat",
+      "rows": 162,
+      "record_width": 148,
+      "schema_sha256": "3d31a42f423b958f846e51f4ae6985d7b27b4d857b20ade8b7af660116218966",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl5.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl5.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "fornax-cluster--p3tbl6.dat",
+      "catalog": "VII/180",
+      "table": "p3tbl6.dat",
+      "rows": 375,
+      "record_width": 148,
+      "schema_sha256": "3d31a42f423b958f846e51f4ae6985d7b27b4d857b20ade8b7af660116218966",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl6.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/180/p3tbl6.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "markarian--descrip.doc",
+      "catalog": "VII/172",
+      "table": "descrip.doc",
+      "rows": 1177,
+      "record_width": 76,
+      "schema_sha256": "1e17a26a9005b7f3eb275dbb0aee2abae9f09d2f0307d775e5a5be5cedfe3643",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/descrip.doc",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/descrip.doc.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "markarian--table7.dat",
+      "catalog": "VII/172",
+      "table": "table7.dat",
+      "rows": 1469,
+      "record_width": 140,
+      "schema_sha256": "1e17a26a9005b7f3eb275dbb0aee2abae9f09d2f0307d775e5a5be5cedfe3643",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table7.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table7.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "markarian--notes.dat",
+      "catalog": "VII/172",
+      "table": "notes.dat",
+      "rows": 39,
+      "record_width": 88,
+      "schema_sha256": "1e17a26a9005b7f3eb275dbb0aee2abae9f09d2f0307d775e5a5be5cedfe3643",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/notes.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/notes.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "markarian--table6.dat",
+      "catalog": "VII/172",
+      "table": "table6.dat",
+      "rows": 48,
+      "record_width": 68,
+      "schema_sha256": "1e17a26a9005b7f3eb275dbb0aee2abae9f09d2f0307d775e5a5be5cedfe3643",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table6.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table6.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "markarian--table8.dat",
+      "catalog": "VII/172",
+      "table": "table8.dat",
+      "rows": 818,
+      "record_width": 62,
+      "schema_sha256": "1e17a26a9005b7f3eb275dbb0aee2abae9f09d2f0307d775e5a5be5cedfe3643",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table8.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table8.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "markarian--table9.dat",
+      "catalog": "VII/172",
+      "table": "table9.dat",
+      "rows": 1549,
+      "record_width": 20,
+      "schema_sha256": "1e17a26a9005b7f3eb275dbb0aee2abae9f09d2f0307d775e5a5be5cedfe3643",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table9.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table9.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "markarian--table10.dat",
+      "catalog": "VII/172",
+      "table": "table10.dat",
+      "rows": 1517,
+      "record_width": 13,
+      "schema_sha256": "1e17a26a9005b7f3eb275dbb0aee2abae9f09d2f0307d775e5a5be5cedfe3643",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table10.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/table10.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "markarian--refs.dat",
+      "catalog": "VII/172",
+      "table": "refs.dat",
+      "rows": 195,
+      "record_width": 80,
+      "schema_sha256": "1e17a26a9005b7f3eb275dbb0aee2abae9f09d2f0307d775e5a5be5cedfe3643",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/refs.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/172/refs.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "local-volume--table1.dat",
+      "catalog": "J/AJ/145/101",
+      "table": "table1.dat",
+      "rows": 869,
+      "record_width": 124,
+      "schema_sha256": "cbf378cafcdbf529a98297a8e86cf04a9f2e5e2f55e5f23ab09976591ff18af7",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table1.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table1.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "local-volume--table2.dat",
+      "catalog": "J/AJ/145/101",
+      "table": "table2.dat",
+      "rows": 869,
+      "record_width": 124,
+      "schema_sha256": "cbf378cafcdbf529a98297a8e86cf04a9f2e5e2f55e5f23ab09976591ff18af7",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table2.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table2.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "local-volume--table3.dat",
+      "catalog": "J/AJ/145/101",
+      "table": "table3.dat",
+      "rows": 3190,
+      "record_width": 40,
+      "schema_sha256": "cbf378cafcdbf529a98297a8e86cf04a9f2e5e2f55e5f23ab09976591ff18af7",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table3.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table3.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "local-volume--table4.dat",
+      "catalog": "J/AJ/145/101",
+      "table": "table4.dat",
+      "rows": 761,
+      "record_width": 33,
+      "schema_sha256": "cbf378cafcdbf529a98297a8e86cf04a9f2e5e2f55e5f23ab09976591ff18af7",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table4.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table4.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "local-volume--table5.dat",
+      "catalog": "J/AJ/145/101",
+      "table": "table5.dat",
+      "rows": 610,
+      "record_width": 31,
+      "schema_sha256": "cbf378cafcdbf529a98297a8e86cf04a9f2e5e2f55e5f23ab09976591ff18af7",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table5.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table5.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "local-volume--table6.dat",
+      "catalog": "J/AJ/145/101",
+      "table": "table6.dat",
+      "rows": 783,
+      "record_width": 41,
+      "schema_sha256": "cbf378cafcdbf529a98297a8e86cf04a9f2e5e2f55e5f23ab09976591ff18af7",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table6.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/table6.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "local-volume--refs.dat",
+      "catalog": "J/AJ/145/101",
+      "table": "refs.dat",
+      "rows": 346,
+      "record_width": 96,
+      "schema_sha256": "cbf378cafcdbf529a98297a8e86cf04a9f2e5e2f55e5f23ab09976591ff18af7",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/refs.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/145/101/refs.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nvss--nvss.dat",
+      "catalog": "VIII/65",
+      "table": "nvss.dat",
+      "rows": 1773484,
+      "record_width": 158,
+      "schema_sha256": "7235bb67b68e98321ff2551eb912f2eff67db3a18a48266da6cd438f3f76b429",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VIII/65/nvss.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/VIII/65/nvss.dat.gz"
+      ],
+      "max_source_bytes": 567514880
+    },
+    {
+      "id": "clusters--catalog",
+      "catalog": "VII/202",
+      "table": "catalog",
+      "rows": 147,
+      "record_width": 236,
+      "schema_sha256": "55b4d043fc2f1f08eba622a6fe5fe70cc50d8954f456ee88984afa5fc10aedb9",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/202/catalog",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/202/catalog.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "clusters--sources.txt",
+      "catalog": "VII/202",
+      "table": "sources.txt",
+      "rows": 1176,
+      "record_width": 80,
+      "schema_sha256": "55b4d043fc2f1f08eba622a6fe5fe70cc50d8954f456ee88984afa5fc10aedb9",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/VII/202/sources.txt",
+        "https://cdsarc.cds.unistra.fr/ftp/VII/202/sources.txt.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--main.dat",
+      "catalog": "V/84",
+      "table": "main.dat",
+      "rows": 1143,
+      "record_width": 224,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/main.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/main.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--diam.dat",
+      "catalog": "V/84",
+      "table": "diam.dat",
+      "rows": 1143,
+      "record_width": 66,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/diam.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/diam.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--dist.dat",
+      "catalog": "V/84",
+      "table": "dist.dat",
+      "rows": 296,
+      "record_width": 38,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/dist.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/dist.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--dista.dat",
+      "catalog": "V/84",
+      "table": "dista.dat",
+      "rows": 3017,
+      "record_width": 38,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/dista.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/dista.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--hbeta.dat",
+      "catalog": "V/84",
+      "table": "hbeta.dat",
+      "rows": 991,
+      "record_width": 62,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/hbeta.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/hbeta.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--intens.dat",
+      "catalog": "V/84",
+      "table": "intens.dat",
+      "rows": 1046,
+      "record_width": 117,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/intens.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/intens.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--iue.dat",
+      "catalog": "V/84",
+      "table": "iue.dat",
+      "rows": 1715,
+      "record_width": 77,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/iue.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/iue.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--iras.dat",
+      "catalog": "V/84",
+      "table": "iras.dat",
+      "rows": 774,
+      "record_width": 88,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/iras.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/iras.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--nir.dat",
+      "catalog": "V/84",
+      "table": "nir.dat",
+      "rows": 365,
+      "record_width": 106,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/nir.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/nir.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--radio.dat",
+      "catalog": "V/84",
+      "table": "radio.dat",
+      "rows": 689,
+      "record_width": 46,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/radio.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/radio.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--vel.dat",
+      "catalog": "V/84",
+      "table": "vel.dat",
+      "rows": 614,
+      "record_width": 73,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/vel.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/vel.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--cstar.dat",
+      "catalog": "V/84",
+      "table": "cstar.dat",
+      "rows": 692,
+      "record_width": 285,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/cstar.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/cstar.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--notes.dat",
+      "catalog": "V/84",
+      "table": "notes.dat",
+      "rows": 703,
+      "record_width": 115,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/notes.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/notes.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--refs.dat",
+      "catalog": "V/84",
+      "table": "refs.dat",
+      "rows": 872,
+      "record_width": 80,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/refs.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/refs.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--pospn.dat",
+      "catalog": "V/84",
+      "table": "pospn.dat",
+      "rows": 347,
+      "record_width": 111,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/pospn.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/pospn.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "nebulae--notpn.dat",
+      "catalog": "V/84",
+      "table": "notpn.dat",
+      "rows": 330,
+      "record_width": 121,
+      "schema_sha256": "fcb6c72380968f3ade1e07e7feccfd70db7a814e9942d51313e93486df4848ee",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/notpn.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/V/84/notpn.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "bass-dr2--table8.dat",
+      "catalog": "J/ApJS/261/2",
+      "table": "table8.dat",
+      "rows": 1449,
+      "record_width": 302,
+      "schema_sha256": "ae67366a80a9bc87113bf21325b791cb6936ac90fcbc33fba56498a72d5d822d",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/261/2/table8.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/261/2/table8.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "bass-dr2--table9.dat",
+      "catalog": "J/ApJS/261/2",
+      "table": "table9.dat",
+      "rows": 858,
+      "record_width": 133,
+      "schema_sha256": "ae67366a80a9bc87113bf21325b791cb6936ac90fcbc33fba56498a72d5d822d",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/261/2/table9.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/261/2/table9.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    },
+    {
+      "id": "bass-dr2--table11.dat",
+      "catalog": "J/ApJS/261/2",
+      "table": "table11.dat",
+      "rows": 47,
+      "record_width": 106,
+      "schema_sha256": "ae67366a80a9bc87113bf21325b791cb6936ac90fcbc33fba56498a72d5d822d",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/261/2/table11.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/ApJS/261/2/table11.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    }
+  ]
+}
