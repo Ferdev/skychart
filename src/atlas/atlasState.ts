@@ -1,4 +1,19 @@
 import type { Body, CatalogSummary, Ephemeris } from "./contracts";
+import type { DisplayLayer } from "../viewState";
+
+export function createDefaultDisplayLayers(): Record<DisplayLayer, boolean> {
+  return {
+    labels: true,
+    orbits: true,
+    grid: true,
+    constellations: false,
+    milkyWay: true,
+    milkyWayArms: true,
+    milkyWayDust: true,
+    milkyWayGuides: true,
+    references: true,
+  };
+}
 
 export function catalogSummaryFromEphemeris(payload: Ephemeris): CatalogSummary | null {
   if (!payload.catalog?.object_count) return null;

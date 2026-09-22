@@ -24,6 +24,7 @@ import { SelectionConnectorView } from "./object/selectionConnectorView";
 import { CatalogSearchGateway } from "./catalog/catalogSearchGateway";
 import { DestinationSearchView, type DestinationSearchConfig, type DestinationSearchState } from "./destination/destinationSearchView";
 import { MilkyWayRenderer } from "./rendering/milkyWayRenderer";
+import { ConstellationOverlay } from "./atlas/constellationOverlay";
 import { ObjectComparisonView } from "./object/objectComparisonView";
 import { AtlasOverlayRenderer } from "./rendering/atlasOverlayRenderer";
 import { AtlasVisibilityModel, isSolarSystemBody } from "./rendering/atlasVisibilityModel";
@@ -52,7 +53,12 @@ import { AtlasEmbedController } from "./atlas/atlasEmbedController";
 import { AtlasTimeController } from "./atlas/atlasTimeController";
 import { AtlasLoadingView } from "./atlas/atlasLoadingView";
 import { AtlasDeferredEphemerisController } from "./atlas/atlasDeferredEphemerisController";
-import { catalogSummaryFromEphemeris, mergeBodyList, replaceBodyList } from "./atlas/atlasState";
+import {
+  catalogSummaryFromEphemeris,
+  createDefaultDisplayLayers,
+  mergeBodyList,
+  replaceBodyList,
+} from "./atlas/atlasState";
 import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController";
 import type {
   ActiveAtlasTab, SizeMode, ZoomPreset, Body, Ephemeris, CatalogSummary, ObjectDetailHydrationState,
@@ -162,16 +168,7 @@ let activeCompareFilter: BodyFilter = "all";
 let activeGuidedSetId: string | null = null;
 let sizeMode: SizeMode = "hybrid";
 let activeZoomPreset: ZoomPreset | null = "solar";
-let displayLayers: Record<DisplayLayer, boolean> = {
-  labels: true,
-  orbits: true,
-  grid: true,
-  milkyWay: true,
-  milkyWayArms: true,
-  milkyWayDust: true,
-  milkyWayGuides: true,
-  references: true,
-};
+let displayLayers: Record<DisplayLayer, boolean> = createDefaultDisplayLayers();
 let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
 let viewTime: "now" | string = "now";
 let loadSequence = 0;
@@ -364,6 +361,14 @@ const milkyWayRenderer = new MilkyWayRenderer({
   worldToScreen,
   drawLabel: atlasOverlay.drawLabel,
 });
+const constellationRenderer = new ConstellationOverlay({
+  stateChanged: scheduleViewStateReplace,
+  context: ctx,
+  bodyByKey: () => bodyByKey,
+  worldToScreen,
+  viewport: usableViewportRect,
+  requestRender: () => requestRender(),
+});
 const objectComparison = new ObjectComparisonView({
   heading: compareHeading,
   panel: comparePanel,
@@ -512,6 +517,7 @@ const destinationController = new DestinationCatalogController({
   searchDebounceMs: SEARCH_INPUT_DEBOUNCE_MS,
 });
 const viewStateController = new AtlasViewStateController({
+  constellations: constellationRenderer,
   state: {
     get camera() { return camera; }, set camera(value) { camera = value; },
     get viewTime() { return viewTime; }, set viewTime(value) { viewTime = value; },
@@ -799,6 +805,7 @@ function render() {
       if (displayLayers.milkyWay) drawMilkyWayLayer();
       if (displayLayers.grid) atlasOverlay.drawGrid();
       if (displayLayers.orbits) atlasOverlay.drawOrbitGuides();
+      if (displayLayers.constellations) constellationRenderer.draw(displayLayers.labels);
       atlasOverlay.drawComparisonGuide();
       atlasOverlay.drawBodies();
       if (displayLayers.labels) atlasOverlay.drawLabels();
