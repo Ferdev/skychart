@@ -3,13 +3,35 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from backend.settings import CACHE_DIR, CACHE_SCHEMA_VERSION, LIVE_TIMESTAMP_BUCKET_SECONDS
 
 
-_cache_lock = threading.Lock()
+_cache_locks_guard = threading.Lock()
+_cache_locks: dict[Path, tuple[threading.Lock, int]] = {}
+
+
+@contextmanager
+def cache_entry_lock(path: Path) -> Iterator[None]:
+    """Single-flight identical cache keys without serializing unrelated work."""
+    with _cache_locks_guard:
+        lock, users = _cache_locks.get(path, (threading.Lock(), 0))
+        _cache_locks[path] = (lock, users + 1)
+
+    lock.acquire()
+    try:
+        yield
+    finally:
+        lock.release()
+        with _cache_locks_guard:
+            current_lock, current_users = _cache_locks[path]
+            if current_users == 1:
+                del _cache_locks[path]
+            else:
+                _cache_locks[path] = (current_lock, current_users - 1)
 
 
 def cache_key_payload(kind: str, **parts: Any) -> dict[str, Any]:
@@ -55,7 +77,7 @@ def cached_payload(
     builder: Callable[[], dict[str, Any]],
     cache_dir: Path | None = None,
 ) -> dict[str, Any]:
-    with _cache_lock:
+    with cache_entry_lock(cache_path(namespace, key, cache_dir)):
         cached = read_cache(namespace, key, cache_dir)
         if cached is not None:
             return payload_with_cache_metadata(cached, True, namespace)

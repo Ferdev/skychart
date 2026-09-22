@@ -3,7 +3,7 @@ import { bodyDistanceKm, escapeHtml, formatRatio, identifierLabel, identifierVal
 import { clamp, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectUnion } from "../src/geometry.ts";
 import { eclipticCartesianToEquatorial } from "../src/coordinates.ts";
 import { objectMediaFor, objectMediaItemsFor, pixelBufferHasVisibleVariation } from "../src/objectMedia.ts";
-import { catalogSummaryFromEphemeris, mergeBodyList } from "../src/atlas/atlasState.ts";
+import { catalogSummaryFromEphemeris, mergeBodyList, replaceBodyList } from "../src/atlas/atlasState.ts";
 
 assert.equal(escapeHtml(`<a title="x">Tom & 'Ada'</a>`), "&lt;a title=&quot;x&quot;&gt;Tom &amp; &#039;Ada&#039;&lt;/a&gt;");
 assert.equal(identifierLabel("gaia_dr3_source_id"), "Gaia DR3 Source ID");
@@ -29,6 +29,13 @@ const additionalBody = { key: "earth", name: "Earth" };
 assert.deepEqual(
   mergeBodyList([previewBody] as never, [hydratedBody, additionalBody] as never),
   [hydratedBody, additionalBody],
+);
+assert.deepEqual(
+  replaceBodyList(
+    [{ key: "earth", position: { x_au: 1 } }, { key: "io", position: { x_au: 2 } }] as never,
+    [{ key: "io", position: { x_au: 3 } }, { key: "titan", position: { x_au: 4 } }] as never,
+  ),
+  [{ key: "earth", position: { x_au: 1 } }, { key: "io", position: { x_au: 3 } }, { key: "titan", position: { x_au: 4 } }],
 );
 
 const bounds = { left: 0, top: 0, right: 100, bottom: 80, width: 100, height: 80 };

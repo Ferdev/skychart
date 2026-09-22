@@ -51,22 +51,12 @@ import { installAtlasDiagnostics } from "./atlas/atlasDiagnostics";
 import { AtlasEmbedController } from "./atlas/atlasEmbedController";
 import { AtlasTimeController } from "./atlas/atlasTimeController";
 import { AtlasLoadingView } from "./atlas/atlasLoadingView";
-import { catalogSummaryFromEphemeris, mergeBodyList } from "./atlas/atlasState";
+import { AtlasDeferredEphemerisController } from "./atlas/atlasDeferredEphemerisController";
+import { catalogSummaryFromEphemeris, mergeBodyList, replaceBodyList } from "./atlas/atlasState";
 import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController";
 import type {
-  ActiveAtlasTab,
-  SizeMode,
-  ZoomPreset,
-  Body,
-  Ephemeris,
-  CatalogSummary,
-  ObjectDetailHydrationState,
-  Camera,
-  LoadingStep,
-  RenderRequestOptions,
-  SelectBodyOptions,
-  DataRefreshOptions,
-  CatalogPointHitEntry,
+  ActiveAtlasTab, SizeMode, ZoomPreset, Body, Ephemeris, CatalogSummary, ObjectDetailHydrationState,
+  Camera, LoadingStep, RenderRequestOptions, SelectBodyOptions, DataRefreshOptions, CatalogPointHitEntry,
   BodyFilterDefinition,
 } from "./atlas/contracts";
 
@@ -605,6 +595,16 @@ const spacecraftLoader = new SpacecraftLoader((bodies) => {
   updateAllUi();
   requestRender();
 }, () => selectedKey);
+const deferredEphemerisLoader = new AtlasDeferredEphemerisController({
+  serverBootObjectKey, hasBody: (key) => bodyByKey.has(key), restoreSelection: restoreSelectionFromViewState,
+  selectServerBoot: (key) => selectBodyByKey(key, { center: true }),
+  applyBodies: (bodies) => {
+    if (!ephemeris) return;
+    ephemeris = { ...ephemeris, bodies: replaceBodyList(ephemeris.bodies, bodies) };
+    for (const body of bodies) bodyByKey.set(body.key, body);
+    objectSelection.positionsUpdated(); updateAllUi(); requestRender();
+  },
+});
 
 if (bootViewState) applyDecodedViewStateFields(bootViewState);
 if (isEmbedMode) initializeEmbedMode();
@@ -621,6 +621,7 @@ requestRender({ data: true });
 async function loadAtlas(timestampIso?: string) {
   if (timestampIso) viewTime = new Date(timestampIso).toISOString();
   const loadId = ++loadSequence;
+  deferredEphemerisLoader.cancel();
   spacecraftLoader.stop();
   const showTimeBusy = loadingScreen.hidden;
   if (showTimeBusy) setTimeBusy(true);
@@ -665,6 +666,7 @@ async function loadAtlas(timestampIso?: string) {
     scheduleViewStateReplace();
     startBootTour();
     spacecraftLoader.start(payload.timestamp_utc);
+    deferredEphemerisLoader.load(payload.timestamp_utc, selectionState);
   } catch (error) {
     if (loadId !== loadSequence) return; // A newer load owns the UI state now.
     loadState.textContent = t("status.error");
