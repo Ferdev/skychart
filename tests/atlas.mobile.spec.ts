@@ -60,6 +60,7 @@ test.describe("Cosmic Atlas mobile layout", () => {
 
   test("keeps the physical frame and zoom controls legible in the compact scale sheet", async ({ page }) => {
     const issues = collectBrowserIssues(page);
+    await page.locator("#map-settings-toggle").click();
     await expect(page.locator(".map-frame-status")).toHaveText("Heliocentric ecliptic plane");
     await expect(page.locator('[data-projection-mode="sky-sphere"]')).toHaveCount(0);
     const slider = page.locator("#zoom-scale-slider");
@@ -70,7 +71,7 @@ test.describe("Cosmic Atlas mobile layout", () => {
 
   test("keeps footer links clear of the bottom scale sheet", async ({ page }) => {
     const issues = collectBrowserIssues(page);
-    const mobileScaleToggle = page.locator("#mobile-scale-toggle");
+    const settingsToggle = page.locator("#map-settings-toggle");
     const collapsed = await page.evaluate(() => {
       const footer = document.querySelector<HTMLElement>(".atlas-footer")?.getBoundingClientRect();
       const scale = document.querySelector<HTMLElement>(".scale-rail")?.getBoundingClientRect();
@@ -78,10 +79,12 @@ test.describe("Cosmic Atlas mobile layout", () => {
     });
     expect(collapsed, "footer must sit above the compact scale sheet").toBe(true);
 
-    await mobileScaleToggle.click();
-    await expect(page.locator("#controls")).toHaveClass(/scale-expanded/);
-    await expect(page.locator(".atlas-footer")).toHaveCSS("pointer-events", "none");
-    await expect(page.locator(".atlas-footer")).toHaveCSS("opacity", "0");
+    await settingsToggle.click();
+    await expect(page.locator("#map-settings")).toBeVisible();
+    await expect(settingsToggle).toHaveAttribute("aria-expanded", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#map-settings")).toBeHidden();
+    await expect(settingsToggle).toBeFocused();
     issues.assertClean();
   });
 

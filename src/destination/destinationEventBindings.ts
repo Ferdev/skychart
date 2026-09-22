@@ -98,11 +98,6 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
   }));
   dom.closePanel.addEventListener("click", () => options.state.activeTab === "object" ? options.clearSelectedObject() : options.setActiveTab(null));
   dom.workspaceSearchLink.addEventListener("click", () => options.setActiveTab("catalog"));
-  dom.mobileScaleToggle?.addEventListener("click", () => {
-    const expanded = dom.mapHud.classList.toggle("scale-expanded");
-    dom.mobileScaleToggle?.setAttribute("aria-expanded", String(expanded));
-    dom.mobileScaleToggle?.setAttribute("aria-label", expanded ? t("scale.collapse") : t("scale.expand"));
-  });
 
   const filterClick = (event: Event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");

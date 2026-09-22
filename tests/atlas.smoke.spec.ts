@@ -43,13 +43,48 @@ async function fulfillValidSurveyImage(route: Route) {
   await route.fulfill({ status: 200, contentType: "image/png", body: VISIBLE_SURVEY_IMAGE });
 }
 
+test("startup becomes usable before live outer-moon ephemerides finish", async ({ page, request }) => {
+  await skipIfAtlasUnavailable(request);
+  let initialGroups: string[] = [];
+  let deferredStarted = false;
+  let releaseDeferred!: () => void;
+  const deferredResponse = new Promise<void>((resolve) => { releaseDeferred = resolve; });
+
+  await page.route("**/api/ephemeris?**", async (route) => {
+    const url = new URL(route.request().url());
+    const groups = url.searchParams.get("groups")?.split(",") ?? [];
+    if (groups.includes("jupiter_major_moons") || groups.includes("saturn_major_moons")) {
+      deferredStarted = true;
+      await deferredResponse;
+    } else {
+      initialGroups = groups;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(TIME_CHANGE_EPHEMERIS)
+    });
+  });
+
+  try {
+    await openAtlas(page);
+    await expect.poll(() => deferredStarted).toBe(true);
+    await expect(page.locator("#loading-screen")).toBeHidden();
+    expect(initialGroups).toEqual(["core", "mars_moons", "nearby_exoplanet_systems", "messier_deep_sky"]);
+  } finally {
+    releaseDeferred();
+  }
+});
+
 test("time changes remain responsive while positions update", async ({ page, request }) => {
   await skipIfAtlasUnavailable(request);
   let releaseTimeUpdate: (() => void) | null = null;
 
   await page.route("**/api/ephemeris?**", async (route) => {
     const url = new URL(route.request().url());
-    if (url.searchParams.has("timestamp")) {
+    const groups = url.searchParams.get("groups") ?? "";
+    const isForegroundLoad = !groups.includes("jupiter_major_moons") && !groups.includes("saturn_major_moons");
+    if (url.searchParams.has("timestamp") && isForegroundLoad) {
       await new Promise<void>((resolve) => {
         releaseTimeUpdate = resolve;
       });
@@ -62,6 +97,7 @@ test("time changes remain responsive while positions update", async ({ page, req
   });
 
   await openAtlas(page);
+  await page.locator("#map-settings-toggle").click();
   const timeToggle = page.locator('[aria-controls="scale-time-controls"]');
   if (await timeToggle.getAttribute("aria-expanded") !== "true") await timeToggle.click();
 

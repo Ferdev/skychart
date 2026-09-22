@@ -198,7 +198,7 @@ test.describe("static catalog tile guardrails", () => {
     expect(repeatedHit).not.toBeNull();
     const retryHit = await fixtureScreenPoint();
     await page.mouse.click(retryHit.x, retryHit.y);
-    await page.locator('#display-toggles [data-layer="labels"]').evaluate((input: HTMLInputElement) => {
+    await page.locator('input[data-layer="labels"]').evaluate((input: HTMLInputElement) => {
       input.checked = false;
       input.dispatchEvent(new Event("change", { bubbles: true }));
     });
@@ -598,6 +598,7 @@ test.describe("static catalog tile guardrails", () => {
     await openAtlas(page);
     await waitForCatalogRequestsToSettle(page, 300, 10_000);
     tileUrls.clear();
+    await page.locator("#map-settings-toggle").click();
     await page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"]) .scale-collapse__toggle').click();
     await page.locator('#map-filter-buttons [data-body-filter="asteroid"]').click();
     await expect.poll(
@@ -611,6 +612,8 @@ test.describe("static catalog tile guardrails", () => {
     expect(Array.from(tileUrls).filter((url) => url.includes("/layers/small_bodies/"))).toEqual([]);
 
     tileUrls.clear();
+    await expect(page.locator("#map-settings")).toBeHidden();
+    await page.locator("#map-settings-toggle").click();
     await page.locator('#map-filter-buttons [data-body-filter="dwarf_planet"]').click();
     await expect.poll(
       () => Array.from(viewportUrls).some((url) => url.includes("jpl_small_bodies") && url.includes("types=dwarf_planet")),

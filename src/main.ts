@@ -24,6 +24,7 @@ import { SelectionConnectorView } from "./object/selectionConnectorView";
 import { CatalogSearchGateway } from "./catalog/catalogSearchGateway";
 import { DestinationSearchView, type DestinationSearchConfig, type DestinationSearchState } from "./destination/destinationSearchView";
 import { MilkyWayRenderer } from "./rendering/milkyWayRenderer";
+import { ConstellationOverlay } from "./atlas/constellationOverlay";
 import { ObjectComparisonView } from "./object/objectComparisonView";
 import { AtlasOverlayRenderer } from "./rendering/atlasOverlayRenderer";
 import { AtlasVisibilityModel, isSolarSystemBody } from "./rendering/atlasVisibilityModel";
@@ -51,22 +52,17 @@ import { installAtlasDiagnostics } from "./atlas/atlasDiagnostics";
 import { AtlasEmbedController } from "./atlas/atlasEmbedController";
 import { AtlasTimeController } from "./atlas/atlasTimeController";
 import { AtlasLoadingView } from "./atlas/atlasLoadingView";
-import { catalogSummaryFromEphemeris, mergeBodyList } from "./atlas/atlasState";
+import { AtlasDeferredEphemerisController } from "./atlas/atlasDeferredEphemerisController";
+import {
+  catalogSummaryFromEphemeris,
+  createDefaultDisplayLayers,
+  mergeBodyList,
+  replaceBodyList,
+} from "./atlas/atlasState";
 import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController";
 import type {
-  ActiveAtlasTab,
-  SizeMode,
-  ZoomPreset,
-  Body,
-  Ephemeris,
-  CatalogSummary,
-  ObjectDetailHydrationState,
-  Camera,
-  LoadingStep,
-  RenderRequestOptions,
-  SelectBodyOptions,
-  DataRefreshOptions,
-  CatalogPointHitEntry,
+  ActiveAtlasTab, SizeMode, ZoomPreset, Body, Ephemeris, CatalogSummary, ObjectDetailHydrationState,
+  Camera, LoadingStep, RenderRequestOptions, SelectBodyOptions, DataRefreshOptions, CatalogPointHitEntry,
   BodyFilterDefinition,
 } from "./atlas/contracts";
 
@@ -172,16 +168,7 @@ let activeCompareFilter: BodyFilter = "all";
 let activeGuidedSetId: string | null = null;
 let sizeMode: SizeMode = "hybrid";
 let activeZoomPreset: ZoomPreset | null = "solar";
-let displayLayers: Record<DisplayLayer, boolean> = {
-  labels: true,
-  orbits: true,
-  grid: true,
-  milkyWay: true,
-  milkyWayArms: true,
-  milkyWayDust: true,
-  milkyWayGuides: true,
-  references: true,
-};
+let displayLayers: Record<DisplayLayer, boolean> = createDefaultDisplayLayers();
 let camera: Camera = { xAu: 0, yAu: 0, pxPerAu: 24 };
 let viewTime: "now" | string = "now";
 let loadSequence = 0;
@@ -215,18 +202,7 @@ const viewportCatalogLoader = new ViewportCatalogLoader({
   canLoad: () => Boolean(ephemeris),
   viewWidthLy: currentViewWidthLy,
   filter: activeBodyFilterDefinition,
-  worldBounds: (paddingRatio) => {
-    const rect = usableViewportRect();
-    const leftTop = screenToWorld(rect.left, rect.top);
-    const rightBottom = screenToWorld(rect.right, rect.bottom);
-    const minXAu = Math.min(leftTop.xAu, rightBottom.xAu);
-    const maxXAu = Math.max(leftTop.xAu, rightBottom.xAu);
-    const minYAu = Math.min(leftTop.yAu, rightBottom.yAu);
-    const maxYAu = Math.max(leftTop.yAu, rightBottom.yAu);
-    const paddingXAu = (maxXAu - minXAu) * paddingRatio;
-    const paddingYAu = (maxYAu - minYAu) * paddingRatio;
-    return { minXAu: minXAu - paddingXAu, maxXAu: maxXAu + paddingXAu, minYAu: minYAu - paddingYAu, maxYAu: maxYAu + paddingYAu };
-  },
+  worldBounds: (paddingRatio) => atlasViewport.worldBounds(paddingRatio),
   hasBody: (key) => bodyByKey.has(key),
   mergeBodies,
   afterMerge: () => {
@@ -290,6 +266,7 @@ atlasVisibility = new AtlasVisibilityModel({
     ephemeris,
     camera,
     viewport: usableViewportRect(),
+    renderViewport: atlasViewport.renderRect(),
     selectedKey,
     compareTargetKey,
     hoverKey,
@@ -312,6 +289,7 @@ const catalogLayerRenderer = new CatalogLayerRenderer({
   planner: catalogPointPlanner,
   viewport: catalogPointViewport,
   viewportRect: usableViewportRect,
+  renderRect: () => atlasViewport.renderRect(),
   renderScale,
   camera: () => camera,
   ephemerisTimestamp: () => ephemeris?.timestamp_utc ?? "",
@@ -356,6 +334,7 @@ const atlasOverlay = new AtlasOverlayRenderer({
     hoverKey,
     pointRendererAvailable: pointRenderer.available,
     viewport: usableViewportRect(),
+    renderViewport: atlasViewport.renderRect(),
     visibleBodies: visibleBodies(),
     labelBodies: prioritizedLabelBodies(),
     edgeBodies: edgeReferenceBodies(),
@@ -381,6 +360,14 @@ const milkyWayRenderer = new MilkyWayRenderer({
   usableViewport: usableViewportRect,
   worldToScreen,
   drawLabel: atlasOverlay.drawLabel,
+});
+const constellationRenderer = new ConstellationOverlay({
+  stateChanged: scheduleViewStateReplace,
+  context: ctx,
+  bodyByKey: () => bodyByKey,
+  worldToScreen,
+  viewport: usableViewportRect,
+  requestRender: () => requestRender(),
 });
 const objectComparison = new ObjectComparisonView({
   heading: compareHeading,
@@ -530,6 +517,7 @@ const destinationController = new DestinationCatalogController({
   searchDebounceMs: SEARCH_INPUT_DEBOUNCE_MS,
 });
 const viewStateController = new AtlasViewStateController({
+  constellations: constellationRenderer,
   state: {
     get camera() { return camera; }, set camera(value) { camera = value; },
     get viewTime() { return viewTime; }, set viewTime(value) { viewTime = value; },
@@ -605,6 +593,16 @@ const spacecraftLoader = new SpacecraftLoader((bodies) => {
   updateAllUi();
   requestRender();
 }, () => selectedKey);
+const deferredEphemerisLoader = new AtlasDeferredEphemerisController({
+  serverBootObjectKey, hasBody: (key) => bodyByKey.has(key), restoreSelection: restoreSelectionFromViewState,
+  selectServerBoot: (key) => selectBodyByKey(key, { center: true }),
+  applyBodies: (bodies) => {
+    if (!ephemeris) return;
+    ephemeris = { ...ephemeris, bodies: replaceBodyList(ephemeris.bodies, bodies) };
+    for (const body of bodies) bodyByKey.set(body.key, body);
+    objectSelection.positionsUpdated(); updateAllUi(); requestRender();
+  },
+});
 
 if (bootViewState) applyDecodedViewStateFields(bootViewState);
 if (isEmbedMode) initializeEmbedMode();
@@ -621,6 +619,7 @@ requestRender({ data: true });
 async function loadAtlas(timestampIso?: string) {
   if (timestampIso) viewTime = new Date(timestampIso).toISOString();
   const loadId = ++loadSequence;
+  deferredEphemerisLoader.cancel();
   spacecraftLoader.stop();
   const showTimeBusy = loadingScreen.hidden;
   if (showTimeBusy) setTimeBusy(true);
@@ -665,6 +664,7 @@ async function loadAtlas(timestampIso?: string) {
     scheduleViewStateReplace();
     startBootTour();
     spacecraftLoader.start(payload.timestamp_utc);
+    deferredEphemerisLoader.load(payload.timestamp_utc, selectionState);
   } catch (error) {
     if (loadId !== loadSequence) return; // A newer load owns the UI state now.
     loadState.textContent = t("status.error");
@@ -805,6 +805,7 @@ function render() {
       if (displayLayers.milkyWay) drawMilkyWayLayer();
       if (displayLayers.grid) atlasOverlay.drawGrid();
       if (displayLayers.orbits) atlasOverlay.drawOrbitGuides();
+      if (displayLayers.constellations) constellationRenderer.draw(displayLayers.labels);
       atlasOverlay.drawComparisonGuide();
       atlasOverlay.drawBodies();
       if (displayLayers.labels) atlasOverlay.drawLabels();
@@ -906,7 +907,7 @@ async function loadCatalogTileManifest() {
 }
 
 function catalogPointViewport(): CatalogPointViewport {
-  const rect = usableViewportRect();
+  const rect = atlasViewport.renderRect();
   return {
     camera: { ...camera },
     viewportWidthPx: rect.width,
