@@ -46,6 +46,32 @@ class BackendRuntimeHardeningTest(unittest.TestCase):
         self.assertEqual(len(results), 6)
         self.assertEqual(sum(1 for result in results if not result["cache"]["hit"]), 1)
 
+    def test_cache_builds_for_different_keys_can_run_concurrently(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache_dir = Path(directory)
+            first_started = threading.Event()
+            second_started = threading.Event()
+            overlapped = []
+
+            def build_first():
+                first_started.set()
+                overlapped.append(second_started.wait(2))
+                return {"value": 1}
+
+            def build_second():
+                second_started.set()
+                overlapped.append(first_started.wait(2))
+                return {"value": 2}
+
+            threads = [
+                threading.Thread(target=cached_payload, args=("test", {"key": "first"}, build_first, cache_dir)),
+                threading.Thread(target=cached_payload, args=("test", {"key": "second"}, build_second, cache_dir)),
+            ]
+            for thread in threads: thread.start()
+            for thread in threads: thread.join()
+
+        self.assertEqual(overlapped, [True, True])
+
 
 if __name__ == "__main__":
     unittest.main()

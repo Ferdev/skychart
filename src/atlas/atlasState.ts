@@ -16,3 +16,10 @@ export function mergeBodyList(primaryBodies: readonly Body[], fallbackBodies: re
   }
   return Array.from(merged.values());
 }
+
+/** Replaces dated records while preserving the current list's stable ordering. */
+export function replaceBodyList(currentBodies: readonly Body[], replacements: readonly Body[]): Body[] {
+  const replaced = new Map(currentBodies.map((body) => [body.key, body]));
+  for (const body of replacements) replaced.set(body.key, body);
+  return Array.from(replaced.values());
+}
