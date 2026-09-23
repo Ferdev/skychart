@@ -26,8 +26,9 @@ for (const width of [1440, 2048]) {
       const scale = document.querySelector(".scale-rail")!.getBoundingClientRect();
       return { ...window.__ATLAS_DIAGNOSTICS__!.selectionGeometry(), scaleTop: scale.top, scaleRight: scale.right };
     });
-    const target = { x: (geometry.scaleRight + geometry.usable.right) / 2, y: (geometry.scaleTop + 990) / 2 };
-    expect(target.y).toBeGreaterThan(geometry.scaleTop + 80);
+    const target = { x: (geometry.scaleRight + geometry.usable.right) / 2, y: geometry.scaleTop + 90 };
+    expect(target.y).toBeLessThan(990);
+    expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.id, target)).toBe("map");
     const sun = geometry.selected!;
     expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.id, sun)).toBe("map");
     await page.mouse.move(sun.x, sun.y);
