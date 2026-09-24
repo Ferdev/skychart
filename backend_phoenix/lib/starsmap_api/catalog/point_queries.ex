@@ -422,6 +422,7 @@ defmodule StarsmapApi.Catalog.PointQueries do
                 catalog_group: group,
                 color: color,
                 apparent_magnitude: magnitude,
+                distance_au: distance_au,
                 direction: %{x: dx / distance_au, y: dy / distance_au, z: dz / distance_au}
               }
             ]

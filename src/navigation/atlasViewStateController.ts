@@ -1,4 +1,4 @@
-import { DISPLAY_LAYERS, encodeViewState, type BodyFilter, type DisplayLayer, type SkyViewState, type ViewState } from "../viewState";
+import { DISPLAY_LAYERS, encodeViewState, type BodyFilter, type DisplayLayer, type SkyViewState, type UniverseViewState, type ViewState } from "../viewState";
 import type { Camera, SelectBodyOptions, ZoomPreset } from "../atlas/contracts";
 import type { CatalogPointManifestRepository } from "../catalog/catalogPointManifest";
 import type { CatalogPointStream } from "../catalog/catalogPointStream";
@@ -36,6 +36,8 @@ interface AtlasViewStateControllerOptions {
   animateCameraTo: (target: Camera, durationMs: number, onComplete: () => void) => void;
   skyState: () => SkyViewState | undefined;
   restoreSky: (state: SkyViewState | undefined) => Promise<void>;
+  universeState: () => UniverseViewState | undefined;
+  restoreUniverse: (state: UniverseViewState | undefined) => void;
 }
 
 export interface TourNavigationOptions {
@@ -98,6 +100,7 @@ export class AtlasViewStateController {
       ? state.selectedKey
       : "";
     const sky = this.options.skyState();
+    const universe = this.options.universeState();
     return {
       center: { x: state.camera.xAu, y: state.camera.yAu },
       zoom: state.camera.pxPerAu,
@@ -111,6 +114,7 @@ export class AtlasViewStateController {
       hiddenConstellations: this.options.constellations.hidden,
       filters: { primary: state.activeFilter, compare: state.activeCompareFilter },
       ...(sky ? { sky } : {}),
+      ...(!sky && universe ? { universe } : {}),
     };
   }
 
@@ -152,7 +156,13 @@ export class AtlasViewStateController {
     const selected = view.compare?.[0] ?? view.objectKey;
     if (selected) await this.options.selectBodyByKey(selected);
     if (view.compare?.[1]) await this.options.setCompareTargetByKey(view.compare[1]);
-    await this.options.restoreSky(view.sky);
+    if (view.universe) {
+      await this.options.restoreSky(undefined);
+      this.options.restoreUniverse(view.universe);
+    } else {
+      this.options.restoreUniverse(undefined);
+      await this.options.restoreSky(view.sky);
+    }
   }
 
   async restore(view: ViewState): Promise<void> {

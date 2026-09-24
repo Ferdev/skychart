@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Cosmic Atlas is a scientific 2D map of Solar System, nearby-star, and Messier catalog objects using real ephemeris and catalog data."
+      content="Cosmic Atlas is a scientific 2D and navigable 3D map of Solar System, stellar, and deep-sky catalog objects using real ephemeris and catalog data."
     />
     <meta name="theme-color" content="#080a09" />
     <meta property="og:title" content="Cosmic Atlas" />
     <meta
       property="og:description"
-      content="A scientifically grounded 2D celestial atlas for inspecting, measuring, and comparing loaded objects."
+      content="A scientifically grounded 2D celestial atlas with free-flight 3D universe navigation."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://skychart.org/" />
@@ -27,6 +27,42 @@
     <main id="app">
       <canvas id="point-map" aria-hidden="true"></canvas>
       <canvas id="map" aria-label="2D heliocentric ecliptic celestial atlas" data-i18n-attrs="aria-label:app.mapLabel"></canvas>
+      <section id="universe-view" class="universe-view" aria-label="3D universe navigator" data-i18n-attrs="aria-label:universe3d.label" hidden>
+        <canvas id="universe-map" class="universe-view__canvas" tabindex="0" aria-label="Navigable 3D universe" data-i18n-attrs="aria-label:universe3d.canvasLabel"></canvas>
+        <header class="universe-view__header">
+          <div>
+            <p class="universe-view__eyebrow" data-i18n="universe3d.eyebrow">Free-flight view</p>
+            <h1 data-i18n="universe3d.title">3D Universe</h1>
+            <p id="universe-position" class="universe-view__position"></p>
+          </div>
+          <div class="universe-view__actions">
+            <button id="universe-reset" type="button" data-i18n="universe3d.reset">Reset flight</button>
+            <button id="universe-close" type="button" data-i18n="universe3d.exit">Exit 3D</button>
+          </div>
+        </header>
+        <div id="universe-tooltip" class="universe-view__tooltip" hidden></div>
+        <section class="universe-view__flight" aria-label="3D flight controls" data-i18n-attrs="aria-label:universe3d.flightControls">
+          <div class="universe-view__speed">
+            <span data-i18n="universe3d.step">Movement step</span>
+            <button type="button" data-universe-speed="slower" aria-label="Decrease movement step" data-i18n-attrs="aria-label:universe3d.slower">−</button>
+            <output id="universe-speed"></output>
+            <button type="button" data-universe-speed="faster" aria-label="Increase movement step" data-i18n-attrs="aria-label:universe3d.faster">+</button>
+          </div>
+          <div class="universe-view__move-pad">
+            <button type="button" data-universe-move="forward" aria-label="Move forward" data-i18n-attrs="aria-label:universe3d.forward">W</button>
+            <button type="button" data-universe-move="left" aria-label="Move left" data-i18n-attrs="aria-label:universe3d.left">A</button>
+            <button type="button" data-universe-move="back" aria-label="Move backward" data-i18n-attrs="aria-label:universe3d.back">S</button>
+            <button type="button" data-universe-move="right" aria-label="Move right" data-i18n-attrs="aria-label:universe3d.right">D</button>
+            <button type="button" data-universe-move="up" aria-label="Move up" data-i18n-attrs="aria-label:universe3d.up">E</button>
+            <button type="button" data-universe-move="down" aria-label="Move down" data-i18n-attrs="aria-label:universe3d.down">Q</button>
+          </div>
+        </section>
+        <footer class="universe-view__footer">
+          <span data-i18n="universe3d.controls">Drag or use arrow keys to look · W/S move · A/D strafe · Q/E move vertically · wheel moves forward or back</span>
+          <span id="universe-status" role="status" aria-live="polite"></span>
+          <span data-i18n="universe3d.disclosure">Heliocentric ecliptic 3D coordinates · catalog positions only · distances span many orders of magnitude</span>
+        </footer>
+      </section>
       <section id="sky-view" class="sky-view" aria-label="Object-centered sky view" data-i18n-attrs="aria-label:sky.label" hidden>
         <canvas id="sky-map" class="sky-view__canvas" tabindex="0" aria-label="Interactive horizonless sky" data-i18n-attrs="aria-label:sky.canvasLabel"></canvas>
         <header class="sky-view__header">
@@ -145,6 +181,7 @@
       <section class="map-hud" id="controls" aria-label="Atlas controls" data-i18n-attrs="aria-label:controls.label">
         <section class="scale-command scale-rail atlas-toolbar" aria-label="Zoom and scale" data-i18n-attrs="aria-label:scale.label">
           <div class="toolbar-zoom">
+            <button id="universe-3d-toggle" class="toolbar-3d-button" type="button" aria-label="Explore the universe in 3D" data-i18n="universe3d.action" data-i18n-attrs="aria-label:universe3d.actionLabel">3D</button>
             <button id="zoom-out" class="icon-button" type="button" aria-label="Zoom out" data-i18n-attrs="aria-label:scale.zoomOut">−</button>
             <div class="zoom-scale-control">
               <div class="toolbar-scale-summary">

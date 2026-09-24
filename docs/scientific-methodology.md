@@ -8,10 +8,19 @@ visible instead of presenting every position as equally certain.
 ## Coordinate frame and projection
 
 Positions are normalized to heliocentric ecliptic Cartesian coordinates. The
-map displays a top-down projection of the `x` and `y` axes. Source `z` values
-remain in catalog records but are not used as a visibility cut. The map ruler
-therefore measures projected `x/y` separation, not full three-dimensional
-separation.
+default map displays a top-down projection of the `x` and `y` axes. Source `z`
+values remain in catalog records but are not used as a visibility cut. The map
+ruler therefore measures projected `x/y` separation, not full
+three-dimensional separation.
+
+The 3D universe view uses the same measured or source-modeled `x/y/z`
+coordinates and moves an observer freely through that frame. Its catalog query
+includes only records with finite values on all three axes and returns a
+bounded, brightness-prioritized sample for interactive rendering. Compact map
+tiles that omit line-of-sight position are not placed on an invented plane in
+3D. Movement step size is user-adjustable because the atlas spans from
+kilometers to billions of light-years; changing that step does not rescale or
+alter the underlying coordinates.
 
 Solar System state vectors and catalog coordinates enter this frame through
 different pipelines. A matching map position does not imply that two records

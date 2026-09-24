@@ -36,11 +36,19 @@ export type SkyPermalinkState = SkyViewState & {
   locale: SkyShareLocale;
 };
 
+export type UniverseViewState = {
+  positionAu: { x: number; y: number; z: number };
+  yawDeg: number;
+  pitchDeg: number;
+  fovDeg: number;
+  moveStepAu: number;
+};
+
 export type ViewState = {
   center: { x: number; y: number }; zoom: number; time: "now" | string;
   objectKey?: string; compare?: readonly [string, string]; catalogRelease?: string;
   hiddenConstellations?: string[];
-  layers: Partial<Record<DisplayLayer, boolean>>; filters?: ViewFilters; sky?: SkyViewState; tour?: string; step?: number;
+  layers: Partial<Record<DisplayLayer, boolean>>; filters?: ViewFilters; sky?: SkyViewState; universe?: UniverseViewState; tour?: string; step?: number;
 };
 
 const finite = (value: string | null) => {
@@ -101,6 +109,13 @@ export function encodeViewState(state: ViewState): string {
       if (sky.hiddenObjectTypes.length > 0) params.set("sf", sky.hiddenObjectTypes.join(","));
     }
   }
+  if (state.universe && !state.sky) {
+    const universe = normalizeUniverseViewState(state.universe);
+    if (universe) {
+      params.set("u3", [universe.positionAu.x, universe.positionAu.y, universe.positionAu.z].map(compactNumber).join(","));
+      params.set("u3c", [universe.yawDeg, universe.pitchDeg, universe.fovDeg, universe.moveStepAu].map(compactNumber).join(","));
+    }
+  }
   if (state.tour) params.set("tour", state.tour);
   if (state.step !== undefined) params.set("step", String(state.step));
   return params.toString();
@@ -118,13 +133,44 @@ export function decodeViewState(input: URLSearchParams | string): ViewState | nu
   const rawStep = params.get("step"), step = rawStep === null ? undefined : Number(rawStep);
   if (step !== undefined && (!Number.isSafeInteger(step) || step < 0)) return null;
   const sky = decodeSkyState(params);
+  const universe = decodeUniverseState(params);
+  if (params.has("sky") && params.has("u3")) return null;
   return {
     center: { x, y }, zoom, time: rawTime === "now" ? "now" : new Date(rawTime).toISOString(),
     objectKey: params.get("o") || undefined,
     compare: compare.length === 2 ? [compare[0]!, compare[1]!] : undefined,
     catalogRelease: params.get("r") || undefined, layers: decodeLayerFlags(params.get("L")),
     ...(params.has("hc") ? { hiddenConstellations: normalizeHiddenConstellations(params.get("hc")!.split(",")) } : {}),
-    filters: decodeFilters(params.get("F")), ...(sky ? { sky } : {}), tour: params.get("tour") || undefined, step
+    filters: decodeFilters(params.get("F")), ...(sky ? { sky } : {}), ...(universe ? { universe } : {}), tour: params.get("tour") || undefined, step
+  };
+}
+
+function decodeUniverseState(params: URLSearchParams): UniverseViewState | undefined {
+  if (!params.has("u3") && !params.has("u3c")) return undefined;
+  const position = params.get("u3")?.split(",") ?? [];
+  const camera = params.get("u3c")?.split(",") ?? [];
+  if (position.length !== 3 || camera.length !== 4) return undefined;
+  const values = [...position, ...camera].map((value) => finite(value ?? null));
+  if (values.some((value) => value === null)) return undefined;
+  return normalizeUniverseViewState({
+    positionAu: { x: values[0]!, y: values[1]!, z: values[2]! },
+    yawDeg: values[3]!, pitchDeg: values[4]!, fovDeg: values[5]!, moveStepAu: values[6]!,
+  }) ?? undefined;
+}
+
+export function normalizeUniverseViewState(value: UniverseViewState): UniverseViewState | null {
+  const position = value?.positionAu;
+  const numbers = position && [position.x, position.y, position.z, value.yawDeg, value.pitchDeg, value.fovDeg, value.moveStepAu];
+  if (!numbers || !numbers.every((item) => typeof item === "number" && Number.isFinite(item))) return null;
+  if (numbers.slice(0, 3).some((item) => Math.abs(item) > 1e18)) return null;
+  if (value.pitchDeg < -89.5 || value.pitchDeg > 89.5 || value.fovDeg < 20 || value.fovDeg > 110) return null;
+  if (value.moveStepAu < 1e-12 || value.moveStepAu > 1e18) return null;
+  return {
+    positionAu: { ...position },
+    yawDeg: normalizeDegrees(value.yawDeg),
+    pitchDeg: value.pitchDeg,
+    fovDeg: value.fovDeg,
+    moveStepAu: value.moveStepAu,
   };
 }
 

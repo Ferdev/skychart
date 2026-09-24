@@ -13,9 +13,20 @@
 
 .toolbar-zoom {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) 36px auto;
+  grid-template-columns: auto 36px minmax(0, 1fr) 36px auto;
   gap: 12px;
   align-items: center;
+}
+
+.toolbar-3d-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(130, 203, 179, 0.34);
+  border-radius: 8px;
+  color: #a9dfcf;
+  background: rgba(130, 203, 179, 0.08);
+  font-size: 12px;
+  font-weight: 820;
 }
 
 .atlas-toolbar .icon-button {
@@ -228,7 +239,8 @@
     overflow: visible;
   }
 
-  .toolbar-zoom { grid-template-columns: 36px minmax(0, 1fr) 36px auto; gap: 6px; }
+  .toolbar-zoom { grid-template-columns: auto 36px minmax(0, 1fr) 36px auto; gap: 6px; }
+  .toolbar-3d-button { min-height: 44px; padding: 0 9px; }
   .toolbar-settings-button { padding: 0 8px; min-height: 44px; }
   .atlas-toolbar .icon-button { min-height: 44px; }
   .toolbar-settings-button svg { display: none; }
@@ -264,6 +276,11 @@
 
 @container (max-width: 300px) {
   .atlas-toolbar .zoom-presets button span { font-size: 11px; white-space: nowrap; }
+}
+
+@media (max-width: 340px) {
+  .scale-rail.atlas-toolbar { padding: 4px 8px; gap: 3px; }
+  .toolbar-bottom { gap: 2px; padding-top: 2px; }
 }
 
 #scale-constellations { font-size: 12px; }

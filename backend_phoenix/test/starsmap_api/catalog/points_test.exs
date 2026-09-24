@@ -115,6 +115,7 @@ defmodule StarsmapApi.Catalog.PointsTest do
     assert_in_delta point.direction.x, 1.0 / 3.0, 1.0e-12
     assert_in_delta point.direction.y, 2.0 / 3.0, 1.0e-12
     assert_in_delta point.direction.z, 2.0 / 3.0, 1.0e-12
+    assert_in_delta point.distance_au, 3.0, 1.0e-12
   end
 
   test "sky requires all three observer coordinates" do

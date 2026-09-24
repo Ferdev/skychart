@@ -14,15 +14,22 @@ const state = {
   time: "2042-04-05T06:07:08.000Z" as const, objectKey: "gaia:123",
   compare: ["gaia:123", "mars"] as const, catalogRelease: "v9",
   layers: { labels: true, grid: false, milkyWay: true, constellations: true }, filters: { primary: "galaxy", compare: "all" } as const,
-  sky: { observerKey: "earth", yawDeg: 182.5, pitchDeg: -12, fovDeg: 64, constellations: false, hiddenObjectTypes: ["asteroid", "comet"] },
+  universe: { positionAu: { x: 12.5, y: -3, z: 8 }, yawDeg: 182.5, pitchDeg: -12, fovDeg: 64, moveStepAu: 0.25 },
   tour: "local-group", step: 3
 };
 const encoded = encodeViewState(state);
 assert.deepEqual(decodeViewState(encoded), state);
 assert.equal(new URLSearchParams(encoded).get("F"), "galaxy.all");
-assert.equal(new URLSearchParams(encoded).get("sl"), "0");
+assert.equal(new URLSearchParams(encoded).get("u3"), "12.5,-3,8");
+assert.equal(new URLSearchParams(encoded).get("u3c"), "182.5,-12,64,0.25");
 assert.equal(decodeViewState(encodeViewState({ ...state, layers: { constellations: false } }))?.layers.constellations, false);
-assert.equal(new URLSearchParams(encoded).get("sf"), "asteroid,comet");
+const skyEncoded = encodeViewState({
+  ...state,
+  universe: undefined,
+  sky: { observerKey: "earth", yawDeg: 182.5, pitchDeg: -12, fovDeg: 64, constellations: false, hiddenObjectTypes: ["asteroid", "comet"] },
+});
+assert.equal(new URLSearchParams(skyEncoded).get("sl"), "0");
+assert.equal(new URLSearchParams(skyEncoded).get("sf"), "asteroid,comet");
 assert.equal(decodeViewState("?v=1&c=0,0&z=Infinity&t=now&L="), null);
 assert.equal(decodeViewState("?v=2&c=0,0&z=1&t=now&L="), null);
 assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=not-a-date&L="), null);
@@ -37,6 +44,9 @@ assert.deepEqual(
 );
 assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&sky=earth&sc=0,0,72&sl=2")?.sky, undefined);
 assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&sky=earth&sc=0,0,72&sf=asteroid,future")?.sky, undefined);
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,95,72,1")?.universe, undefined);
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,0,72,0")?.universe, undefined);
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&sky=earth&sc=0,0,72&u3=0,0,0&u3c=0,0,72,1"), null);
 
 const normalizedSky = normalizeSkyViewState({
   observerKey: " Proxima-Centauri ", yawDeg: -0.04, pitchDeg: 12.26, fovDeg: 71.94,

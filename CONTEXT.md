@@ -11,7 +11,15 @@ precision or lifecycle.
 
 The complete user-visible map state: camera position and scale, UTC time,
 displayed layers, active object filters, selected object, comparison target,
-and optional guided tour step.
+optional guided tour step, and an optional free-flight 3D position and camera.
+
+### 3D universe view
+
+A navigable perspective over catalog objects with finite heliocentric ecliptic
+`x/y/z` positions. The browser stores the flight position, orientation, field
+of view, and movement step in versioned view state. Dense 2D-only point-tile
+records are not assigned invented depth; the 3D endpoint returns a bounded,
+brightness-prioritized set of records that have all three coordinates.
 
 ### Catalog object
 
