@@ -1,0 +1,29 @@
+name: External availability
+
+on:
+  schedule:
+    - cron: '12,27,42,57 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  public-health:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Check public API health
+        shell: bash
+        run: |
+          set -euo pipefail
+          response=$(curl --fail --silent --show-error \
+            --connect-timeout 5 --max-time 15 \
+            --retry 2 --retry-all-errors --retry-delay 5 \
+            https://skychart.org/api/health)
+          printf '%s' "$response" | python3 -c '
+          import json, sys
+          health = json.load(sys.stdin)
+          if health.get("ok") is not True or health.get("service") != "starsmap_api":
+              raise SystemExit("Public API returned an unhealthy response")
+          print("Public HTTPS API is healthy")
+          '

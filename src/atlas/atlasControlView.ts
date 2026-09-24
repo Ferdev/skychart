@@ -108,7 +108,7 @@ export class AtlasControlView {
   }
 
   updateDisplayToggles(displayLayers: Record<DisplayLayer, boolean>, perfEnabled: boolean) {
-    for (const input of atlasDom.displayToggles.querySelectorAll<HTMLInputElement>("input[data-layer]")) input.checked = displayLayers[input.dataset.layer as DisplayLayer] ?? false;
+    for (const input of atlasDom.mapHud.querySelectorAll<HTMLInputElement>("input[data-layer]")) input.checked = displayLayers[input.dataset.layer as DisplayLayer] ?? false;
     atlasDom.diagnosticsToggle.checked = perfEnabled;
   }
 
@@ -126,7 +126,10 @@ export class AtlasControlView {
   }
 
   updateZoomPresets(activePreset: ZoomPreset | null) {
-    for (const button of atlasDom.zoomPresets.querySelectorAll<HTMLButtonElement>("[data-zoom-preset]")) button.classList.toggle("active", button.dataset.zoomPreset === activePreset);
+    for (const button of atlasDom.zoomPresets.querySelectorAll<HTMLButtonElement>("[data-zoom-preset]")) {
+      button.classList.toggle("active", button.dataset.zoomPreset === activePreset);
+      button.setAttribute("aria-pressed", String(button.dataset.zoomPreset === activePreset));
+    }
   }
 }
 

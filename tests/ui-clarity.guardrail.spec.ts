@@ -28,6 +28,7 @@ test.describe("compact and understandable atlas controls", () => {
     const issues = collectBrowserIssues(page);
     const scalePanel = page.locator(".scale-rail");
     const before = await scalePanel.boundingBox();
+    await page.locator("#map-settings-toggle").click();
     const objectSection = page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-display"])');
 
     await objectSection.locator(".scale-collapse__toggle").click();
@@ -48,6 +49,7 @@ test.describe("compact and understandable atlas controls", () => {
 
   test("explains ambiguous object size modes with an accessible info tip", async ({ page }) => {
     const issues = collectBrowserIssues(page);
+    await page.locator("#map-settings-toggle").click();
     const infoButton = page.getByRole("button", { name: "Explain object size modes" });
     await infoButton.click();
     await expect(page.locator("#control-info-tooltip")).toBeVisible();
@@ -59,6 +61,7 @@ test.describe("compact and understandable atlas controls", () => {
 
   test("filters map objects by type from the scale panel", async ({ page }) => {
     const issues = collectBrowserIssues(page);
+    await page.locator("#map-settings-toggle").click();
     const section = page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"])');
     await section.locator(".scale-collapse__toggle").click();
     await expect(page.locator("#scale-object-types")).toBeVisible();
@@ -134,6 +137,7 @@ test.describe("compact and understandable atlas controls", () => {
       await expect(authorLink).toBeVisible();
       await expect(authorLink).toHaveAttribute("href", "https://ferdev.com/");
       await expect(authorLink).toHaveAttribute("target", "_blank");
+      await page.locator("#map-settings-toggle").click();
       const section = page.locator('[data-scale-disclosure]:has([aria-controls="scale-object-types"])');
       await section.locator(".scale-collapse__toggle").click();
 

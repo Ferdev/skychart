@@ -5,7 +5,13 @@ import { isSolarSystemBody } from "../rendering/atlasVisibilityModel";
 import type { BodyFilter } from "../viewState";
 
 export const STARTUP_EPHEMERIS_GROUPS = [
-  "core", "mars_moons", "jupiter_major_moons", "saturn_major_moons", "nearby_exoplanet_systems", "messier_deep_sky",
+  "core", "mars_moons", "nearby_exoplanet_systems", "messier_deep_sky",
+] as const;
+
+// These positions come from live JPL Horizons requests and can take several
+// seconds on a cold cache. They are added after the usable atlas is visible.
+export const DEFERRED_EPHEMERIS_GROUPS = [
+  "jupiter_major_moons", "saturn_major_moons",
 ] as const;
 
 export const STARTUP_CATALOG_GROUPS = [
