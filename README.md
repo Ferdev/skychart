@@ -1,6 +1,6 @@
 # Cosmic Atlas
 
-Cosmic Atlas is a scientific 2D celestial atlas. It renders Solar System bodies, confirmed exoplanet host systems, Hipparcos bright stars, Gaia physical-map stars, JPL small bodies, DESI DR1 galaxies and quasars, SIMBAD extragalactic objects, BASS DR2 black-hole mass records, nearby stars, Messier deep-sky objects, and the generated OpenNGC NGC/IC deep-sky catalog in one heliocentric ecliptic coordinate space so they can be searched, inspected, centered, measured, and compared.
+Cosmic Atlas is a scientific celestial atlas with a precise 2D map and a free-flight 3D universe navigator. It renders Solar System bodies, confirmed exoplanet host systems, Hipparcos bright stars, Gaia physical-map stars, JPL small bodies, DESI DR1 galaxies and quasars, SIMBAD extragalactic objects, BASS DR2 black-hole mass records, nearby stars, Messier deep-sky objects, and the generated OpenNGC NGC/IC deep-sky catalog in one heliocentric ecliptic coordinate space so they can be searched, inspected, centered, measured, compared, and explored in three dimensions.
 
 ## What Is Included
 
@@ -20,6 +20,7 @@ Cosmic Atlas is a scientific 2D celestial atlas. It renders Solar System bodies,
 - Distance measurement between selected objects or map points, including light-time and scale comparisons.
 - UTC time controls: apply a timestamp, jump to now, or step by days/weeks/months.
 - Map view controls for object labels, orbit guides, scale grid, Milky Way projection, edge references, zoom presets, and readable/hybrid/true-size rendering. Universe-scale structure is drawn only from measured catalog points; procedural filaments and density artwork are intentionally absent.
+- A free-flight 3D mode that starts at the current map location or selected object, preserves all three heliocentric ecliptic coordinates, and supports drag/arrow look controls plus scale-adjustable keyboard, wheel, and on-screen movement.
 - Guided object sets for Solar neighborhood, bright stars, nearby stars, small bodies, Messier highlights, galaxies, active galaxies, nebulae, and universe-scale exploration.
 - A scale ladder that marks whether the current viewport is planetary, Solar System, nearby-star, Milky Way, Local Group, galaxy-cluster, or cosmic-web scale.
 
