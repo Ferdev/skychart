@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "kind": "complete_bibliographic_support_table_source_only",
+  "release": "CDS B/vsx refs.dat 2022-05-30; distinct from 2026-08-23 main table",
+  "files": [
+    {
+      "id": "variables--refs.dat",
+      "catalog": "B/vsx",
+      "table": "refs.dat",
+      "rows": 830415,
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/B/vsx/refs.dat.gz"
+      ],
+      "max_source_bytes": 10000000
+    }
+  ]
+}

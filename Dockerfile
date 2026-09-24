@@ -73,6 +73,7 @@ RUN groupadd --system app && useradd --system --gid app --home /app app
 COPY --from=builder --chown=app:app /app/backend_phoenix/_build/${MIX_ENV}/rel/starsmap_api ./
 COPY --chown=app:app backend backend
 COPY --chown=app:app backend_phoenix/priv/spacecraft.json backend_phoenix/priv/spacecraft.json
+COPY --chown=app:app backend_phoenix/priv/catalog_coordinate_contract.json backend_phoenix/priv/catalog_coordinate_contract.json
 COPY --chown=app:app data data
 COPY --chown=app:app requirements.txt requirements.txt
 COPY --chown=app:app scripts/docker-entrypoint.sh scripts/docker-entrypoint.sh

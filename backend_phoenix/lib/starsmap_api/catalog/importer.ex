@@ -197,8 +197,7 @@ defmodule StarsmapApi.Catalog.Importer do
     report.duplicate_key_count == 0 and
       report.missing_key_count == 0 and
       report.missing_name_count == 0 and
-      report.missing_source_type_count == 0 and
-      report.missing_map_position_count == 0
+      report.missing_source_type_count == 0
   end
 
   defp validation_warnings(report) do

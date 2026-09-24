@@ -1,0 +1,2058 @@
+{
+  "schema_version": 1,
+  "investigation_date": "2026-09-09",
+  "scope": "Existing-resource storage investigation; complete original import scope retained but not admitted or fulfilled.",
+  "constraints": {
+    "additional_spending": false,
+    "production_mutations": false,
+    "deployment": false,
+    "full_production_imports": false,
+    "agents": 1,
+    "scratch_cap_bytes": 4294967296,
+    "file_cap_bytes": 3758096384,
+    "scratch_database_reserve_bytes": 536870912,
+    "free_space_floor_bytes": 214748364800
+  },
+  "live_database_read_only": [
+    {
+      "database_bytes": 14484376599,
+      "observed_at": "2026-09-09T17:30:56.900965+00:00"
+    },
+    {
+      "table": "catalog_objects",
+      "estimated_rows": 3028767,
+      "total_bytes": 6801424384,
+      "indexes_bytes": 1792335872,
+      "heap_toast_bytes": 5009088512
+    },
+    {
+      "table": "catalog_erosita_dr2_objects",
+      "estimated_rows": 0,
+      "total_bytes": 5992341504,
+      "indexes_bytes": 1264173056,
+      "heap_toast_bytes": 4728168448
+    },
+    {
+      "table": "catalog_sdss_spiders_dr20_objects",
+      "estimated_rows": 0,
+      "total_bytes": 847306752,
+      "indexes_bytes": 177561600,
+      "heap_toast_bytes": 669745152
+    },
+    {
+      "table": "catalog_gaia_stars",
+      "estimated_rows": 33170,
+      "total_bytes": 304308224,
+      "indexes_bytes": 60334080,
+      "heap_toast_bytes": 243974144
+    },
+    {
+      "table": "catalog_small_bodies",
+      "estimated_rows": 17633,
+      "total_bytes": 185745408,
+      "indexes_bytes": 31326208,
+      "heap_toast_bytes": 154419200
+    },
+    {
+      "table": "catalog_deep_sky_objects",
+      "estimated_rows": 13418,
+      "total_bytes": 85336064,
+      "indexes_bytes": 15417344,
+      "heap_toast_bytes": 69918720
+    },
+    {
+      "table": "catalog_exoplanet_objects",
+      "estimated_rows": 10939,
+      "total_bytes": 81362944,
+      "indexes_bytes": 19226624,
+      "heap_toast_bytes": 62136320
+    },
+    {
+      "table": "catalog_simbad_objects",
+      "estimated_rows": 9838,
+      "total_bytes": 71737344,
+      "indexes_bytes": 20373504,
+      "heap_toast_bytes": 51363840
+    },
+    {
+      "table": "catalog_stellar_stars",
+      "estimated_rows": 8726,
+      "total_bytes": 62259200,
+      "indexes_bytes": 13885440,
+      "heap_toast_bytes": 48373760
+    },
+    {
+      "table": "catalog_bass_dr2_objects",
+      "estimated_rows": 790,
+      "total_bytes": 11927552,
+      "indexes_bytes": 4726784,
+      "heap_toast_bytes": 7200768
+    },
+    {
+      "table": "catalog_summary_counts",
+      "estimated_rows": 45,
+      "total_bytes": 32768,
+      "indexes_bytes": 16384,
+      "heap_toast_bytes": 16384
+    }
+  ],
+  "live_gaia_schema_read_only": [
+    {
+      "column": "id",
+      "type": "uuid"
+    },
+    {
+      "column": "key",
+      "type": "text"
+    },
+    {
+      "column": "name",
+      "type": "text"
+    },
+    {
+      "column": "position_model",
+      "type": "text"
+    },
+    {
+      "column": "parent_key",
+      "type": "text"
+    },
+    {
+      "column": "color",
+      "type": "text"
+    },
+    {
+      "column": "radius_km",
+      "type": "double precision"
+    },
+    {
+      "column": "distance_pc",
+      "type": "double precision"
+    },
+    {
+      "column": "distance_ly",
+      "type": "double precision"
+    },
+    {
+      "column": "x_au",
+      "type": "double precision"
+    },
+    {
+      "column": "y_au",
+      "type": "double precision"
+    },
+    {
+      "column": "z_au",
+      "type": "double precision"
+    },
+    {
+      "column": "x_km",
+      "type": "double precision"
+    },
+    {
+      "column": "y_km",
+      "type": "double precision"
+    },
+    {
+      "column": "z_km",
+      "type": "double precision"
+    },
+    {
+      "column": "apparent_magnitude",
+      "type": "double precision"
+    },
+    {
+      "column": "absolute_magnitude",
+      "type": "double precision"
+    },
+    {
+      "column": "search_text",
+      "type": "text"
+    },
+    {
+      "column": "aliases",
+      "type": "text[]"
+    },
+    {
+      "column": "external_ids",
+      "type": "jsonb"
+    },
+    {
+      "column": "facts",
+      "type": "jsonb"
+    },
+    {
+      "column": "source",
+      "type": "jsonb"
+    },
+    {
+      "column": "source_type",
+      "type": "text"
+    },
+    {
+      "column": "catalog_group",
+      "type": "text"
+    },
+    {
+      "column": "object_type",
+      "type": "text"
+    },
+    {
+      "column": "catalog_object_key",
+      "type": "text"
+    },
+    {
+      "column": "source_identifier",
+      "type": "text"
+    },
+    {
+      "column": "source_epoch",
+      "type": "double precision"
+    },
+    {
+      "column": "position_epoch",
+      "type": "double precision"
+    },
+    {
+      "column": "ra_deg",
+      "type": "double precision"
+    },
+    {
+      "column": "dec_deg",
+      "type": "double precision"
+    },
+    {
+      "column": "pmra_mas_yr",
+      "type": "double precision"
+    },
+    {
+      "column": "pmdec_mas_yr",
+      "type": "double precision"
+    },
+    {
+      "column": "radial_velocity_km_s",
+      "type": "double precision"
+    },
+    {
+      "column": "source_payload",
+      "type": "jsonb"
+    },
+    {
+      "column": "projected_payload",
+      "type": "jsonb"
+    },
+    {
+      "column": "inserted_at",
+      "type": "timestamp(0) without time zone"
+    },
+    {
+      "column": "updated_at",
+      "type": "timestamp(0) without time zone"
+    },
+    {
+      "index": "catalog_gaia_stars_pkey",
+      "definition": "CREATE UNIQUE INDEX catalog_gaia_stars_pkey ON public.catalog_gaia_stars USING btree (id)"
+    },
+    {
+      "index": "catalog_gaia_stars_apparent_magnitude_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_apparent_magnitude_index ON public.catalog_gaia_stars USING btree (apparent_magnitude)"
+    },
+    {
+      "index": "catalog_gaia_stars_catalog_group_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_catalog_group_index ON public.catalog_gaia_stars USING btree (catalog_group)"
+    },
+    {
+      "index": "catalog_gaia_stars_catalog_object_key_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_catalog_object_key_index ON public.catalog_gaia_stars USING btree (catalog_object_key)"
+    },
+    {
+      "index": "catalog_gaia_stars_key_index",
+      "definition": "CREATE UNIQUE INDEX catalog_gaia_stars_key_index ON public.catalog_gaia_stars USING btree (key)"
+    },
+    {
+      "index": "catalog_gaia_stars_object_type_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_object_type_index ON public.catalog_gaia_stars USING btree (object_type)"
+    },
+    {
+      "index": "catalog_gaia_stars_parent_key_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_parent_key_index ON public.catalog_gaia_stars USING btree (parent_key)"
+    },
+    {
+      "index": "catalog_gaia_stars_ra_deg_dec_deg_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_ra_deg_dec_deg_index ON public.catalog_gaia_stars USING btree (ra_deg, dec_deg)"
+    },
+    {
+      "index": "catalog_gaia_stars_search_text_trgm_idx",
+      "definition": "CREATE INDEX catalog_gaia_stars_search_text_trgm_idx ON public.catalog_gaia_stars USING gin (search_text gin_trgm_ops)"
+    },
+    {
+      "index": "catalog_gaia_stars_source_identifier_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_source_identifier_index ON public.catalog_gaia_stars USING btree (source_identifier)"
+    },
+    {
+      "index": "catalog_gaia_stars_source_type_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_source_type_index ON public.catalog_gaia_stars USING btree (source_type)"
+    },
+    {
+      "index": "catalog_gaia_stars_x_au_y_au_index",
+      "definition": "CREATE INDEX catalog_gaia_stars_x_au_y_au_index ON public.catalog_gaia_stars USING btree (x_au, y_au)"
+    },
+    {
+      "index": "catalog_gaia_stars_related_objects_idx",
+      "definition": "CREATE INDEX catalog_gaia_stars_related_objects_idx ON public.catalog_gaia_stars USING btree (catalog_group, apparent_magnitude, name) INCLUDE (key, object_type)"
+    },
+    {
+      "live_tuple_estimate": 33170,
+      "dead_tuple_estimate": 0,
+      "last_analyze": null,
+      "last_autoanalyze": "2026-09-07T17:20:18.528164+00:00"
+    },
+    {
+      "bounded_first_rows": 100,
+      "avg_tuple_bytes": 3094.0,
+      "avg_source_payload_bytes": 749.88
+    }
+  ],
+  "prototype_sample_audit": [
+    {
+      "rows": 33170,
+      "heap_bytes": 54591488,
+      "heap_toast_fsm_vm_bytes": 54632448,
+      "indexes_bytes": 7200768,
+      "total_bytes": 61833216,
+      "database_bytes": 69598231
+    },
+    {
+      "avg_tuple_bytes": 1581.9433825746157,
+      "avg_jsonb_bytes": 1442.553572505276,
+      "avg_record_key_bytes": 65.0,
+      "avg_provider_bytes": 4.0,
+      "avg_catalog_bytes": 20.0,
+      "avg_release_bytes": 4.0,
+      "avg_source_id_bytes": 19.828941814892975
+    },
+    {
+      "index": "prototype_pkey",
+      "bytes": 4292608,
+      "definition": "CREATE UNIQUE INDEX prototype_pkey ON public.prototype USING btree (record_key)"
+    },
+    {
+      "index": "prototype_namespace",
+      "bytes": 2908160,
+      "definition": "CREATE UNIQUE INDEX prototype_namespace ON public.prototype USING btree (provider, catalog, release, source_id)"
+    },
+    {
+      "scope": "original snapshot JSON in provenance columns, analogous to earlier probe",
+      "rows": 33170,
+      "heap_bytes": 38805504,
+      "indexes_bytes": 7200768,
+      "total_bytes": 46047232
+    },
+    {
+      "scope": "same original measurements, namespace once per table, ID index only",
+      "rows": 33170,
+      "heap_bytes": 34078720,
+      "indexes_bytes": 1376256,
+      "total_bytes": 35463168
+    },
+    {
+      "isolated_database_bytes": 151133207
+    }
+  ],
+  "gaia_selected_snapshot_candidate": {
+    "schema_version": 1,
+    "scope": "complete selected local Gaia snapshot, NOT complete Gaia DR3",
+    "source_sha256": "dcb9b1a73fe39eccd130ca76f1bbac8eb1bd6670985635dfc84a183ca10107be",
+    "source_file_bytes": 35816085,
+    "rows": 33170,
+    "fields": 22,
+    "original_field_roundtrip": "all records equal after typed Parquet decode",
+    "partitions": [
+      {
+        "name": "detail-0000.parquet",
+        "rows": 4096,
+        "bytes": 713359,
+        "allocated_bytes": 716800,
+        "sha256": "4b2db7516afa12e0ed552a3a8d83a524520c7805ca1d5ad228f63f7c19752871"
+      },
+      {
+        "name": "detail-0001.parquet",
+        "rows": 4096,
+        "bytes": 713059,
+        "allocated_bytes": 716800,
+        "sha256": "687f1db18bff1940d91dfc2122779ccf9990d45834ccc2d88de691f0f0921773"
+      },
+      {
+        "name": "detail-0002.parquet",
+        "rows": 4096,
+        "bytes": 715039,
+        "allocated_bytes": 716800,
+        "sha256": "49be1b3635db04ff2653911e1315d30d55debeaea8008316bf9272f11ef46cc7"
+      },
+      {
+        "name": "detail-0003.parquet",
+        "rows": 4096,
+        "bytes": 714653,
+        "allocated_bytes": 716800,
+        "sha256": "2f5e4aba471c54fcac2a1149efc8570af2f6b8f622f1457072a43da30915f819"
+      },
+      {
+        "name": "detail-0004.parquet",
+        "rows": 4096,
+        "bytes": 713724,
+        "allocated_bytes": 716800,
+        "sha256": "baae01de495b5698c63b564520be61a230c1f401faf8283aafa4dbe6f937fb03"
+      },
+      {
+        "name": "detail-0005.parquet",
+        "rows": 4096,
+        "bytes": 712841,
+        "allocated_bytes": 716800,
+        "sha256": "54de3c93295131ff09e7a62fd3d4094dbe2fe892ac383b3b1e0eacd07a39ce15"
+      },
+      {
+        "name": "detail-0006.parquet",
+        "rows": 4096,
+        "bytes": 713000,
+        "allocated_bytes": 716800,
+        "sha256": "ab476e70658968bc2d8c0f03e0529a0f1eb122ef04f3fd2df75d942fad472fea"
+      },
+      {
+        "name": "detail-0007.parquet",
+        "rows": 4096,
+        "bytes": 713968,
+        "allocated_bytes": 716800,
+        "sha256": "2e46c78c8485abd872e77259320591fe0b0236e13bb7def7a9afb2f93146f2eb"
+      },
+      {
+        "name": "detail-0008.parquet",
+        "rows": 402,
+        "bytes": 76578,
+        "allocated_bytes": 77824,
+        "sha256": "2f3167c95bbdfbd13daea6a82613237ba5d785dce999bca2a203b10ddaed32b2"
+      }
+    ],
+    "before_indexes": {
+      "logical_bytes": 13924973,
+      "allocated_bytes": 13955072
+    },
+    "final_artifacts": {
+      "logical_bytes": 19569261,
+      "allocated_bytes": 19599360
+    },
+    "sqlite_page_usage": [
+      {
+        "name": "alias_index",
+        "bytes": 3534848
+      },
+      {
+        "name": "aliases",
+        "bytes": 3448832
+      },
+      {
+        "name": "angular_node",
+        "bytes": 1572864
+      },
+      {
+        "name": "angular_parent",
+        "bytes": 20480
+      },
+      {
+        "name": "angular_rowid",
+        "bytes": 385024
+      },
+      {
+        "name": "lookup",
+        "bytes": 2707456
+      },
+      {
+        "name": "name_index",
+        "bytes": 1204224
+      },
+      {
+        "name": "source_id_index",
+        "bytes": 901120
+      },
+      {
+        "name": "sqlite_schema",
+        "bytes": 4096
+      },
+      {
+        "name": "sqlite_stat1",
+        "bytes": 4096
+      }
+    ],
+    "index_build_seconds": 0.16994435200467706,
+    "elapsed_seconds": 4.804460399784148,
+    "observed_scratch_high_water": {
+      "logical_bytes": 122895337,
+      "allocated_bytes": 123015168
+    },
+    "high_water_interval_ms": 100,
+    "max_process_rss_kib": 263500,
+    "queries_warm_local_library_only": [
+      {
+        "source_id": "1000058743756479744",
+        "detail_including_parquet_decode": {
+          "repeats": 30,
+          "median_ms": 1.3434919528663158,
+          "p95_ms": 2.041783183813095,
+          "max_ms": 24.75428581237793
+        },
+        "alias": {
+          "repeats": 30,
+          "median_ms": 0.011051073670387268,
+          "p95_ms": 0.013425014913082123,
+          "max_ms": 0.08509913459420204
+        },
+        "prefix": {
+          "repeats": 30,
+          "median_ms": 0.0117570161819458,
+          "p95_ms": 0.013374723494052887,
+          "max_ms": 0.032661017030477524
+        },
+        "cone_1deg": {
+          "repeats": 30,
+          "median_ms": 0.021420419216156006,
+          "p95_ms": 0.0274009071290493,
+          "max_ms": 0.07280614227056503
+        }
+      },
+      {
+        "source_id": "4120941272839761536",
+        "detail_including_parquet_decode": {
+          "repeats": 30,
+          "median_ms": 1.3087219558656216,
+          "p95_ms": 1.6583832912147045,
+          "max_ms": 51.21159879490733
+        },
+        "alias": {
+          "repeats": 30,
+          "median_ms": 0.011221040040254593,
+          "p95_ms": 0.027861911803483963,
+          "max_ms": 0.034845899790525436
+        },
+        "prefix": {
+          "repeats": 30,
+          "median_ms": 0.01182197593152523,
+          "p95_ms": 0.012472737580537796,
+          "max_ms": 0.017393380403518677
+        },
+        "cone_1deg": {
+          "repeats": 30,
+          "median_ms": 0.022657448425889015,
+          "p95_ms": 0.026339665055274963,
+          "max_ms": 0.04260987043380737
+        }
+      },
+      {
+        "source_id": "999934361503498880",
+        "detail_including_parquet_decode": {
+          "repeats": 30,
+          "median_ms": 0.9529490489512682,
+          "p95_ms": 0.989267136901617,
+          "max_ms": 1.0553807951509953
+        },
+        "alias": {
+          "repeats": 30,
+          "median_ms": 0.011130934581160545,
+          "p95_ms": 0.02498691901564598,
+          "max_ms": 0.03112899139523506
+        },
+        "prefix": {
+          "repeats": 30,
+          "median_ms": 0.011822208762168884,
+          "p95_ms": 0.012363307178020477,
+          "max_ms": 0.015488825738430023
+        },
+        "cone_1deg": {
+          "repeats": 30,
+          "median_ms": 0.023714732378721237,
+          "p95_ms": 0.03403425216674805,
+          "max_ms": 0.03618840128183365
+        }
+      }
+    ],
+    "query_plans": {
+      "exact": [
+        [
+          3,
+          0,
+          0,
+          "SEARCH lookup USING INDEX source_id_index (source_id=?)"
+        ]
+      ],
+      "prefix": [
+        [
+          5,
+          0,
+          0,
+          "SEARCH lookup USING INDEX name_index (name>? AND name<?)"
+        ]
+      ],
+      "alias": [
+        [
+          3,
+          0,
+          0,
+          "SEARCH aliases USING COVERING INDEX alias_index (alias=?)"
+        ]
+      ],
+      "cone": [
+        [
+          4,
+          0,
+          0,
+          "SCAN a VIRTUAL TABLE INDEX 2:B0D1B2D3"
+        ],
+        [
+          12,
+          0,
+          0,
+          "SEARCH l USING INTEGER PRIMARY KEY (rowid=?)"
+        ]
+      ]
+    },
+    "unknowns": [
+      "full source schemas/releases",
+      "global crossmatch/identity indexes",
+      "general substring/full-text search",
+      "physical and rendering indexes",
+      "concurrent/cold/HTTP/browser performance",
+      "exact instantaneous build peak",
+      "Postgres integration and WAL/replication/backups"
+    ]
+  },
+  "xsc_complete_candidate": {
+    "schema_version": 1,
+    "encoding": "xsc-all-columns-f64-v1",
+    "scope": "provided complete gzip files; reconcile entire release separately",
+    "fields": 389,
+    "rows": 1647599,
+    "source_verification_sums": {
+      "ext_key": 2146404951676,
+      "use_src": 1587504,
+      "dup_src": 196537,
+      "pts_key": 992540387061069
+    },
+    "inputs": [
+      {
+        "name": "xsc_aaa.gz",
+        "processed_rows": 738782,
+        "full_gzip_verified": true,
+        "bytes": 369484277,
+        "sha256": "e2b93b632b4a0c18a350c4d962b7707a9e887637009e8e727407a0e91bb07c24"
+      },
+      {
+        "name": "xsc_baa.gz",
+        "processed_rows": 908817,
+        "full_gzip_verified": true,
+        "bytes": 443941833,
+        "sha256": "1b6074f639b02e0e1ac0ac33963319ebdf132538ab19b9bac0e0b07c85e9a6c1"
+      }
+    ],
+    "partitions": [
+      {
+        "name": "part-00000.parquet",
+        "rows": 16384,
+        "bytes": 11694661,
+        "allocated_bytes": 11698176,
+        "sha256": "25c04847ab131b17c6437b40d640b49aaa5761d38d76444585a96fc06c272775"
+      },
+      {
+        "name": "part-00001.parquet",
+        "rows": 16384,
+        "bytes": 11806101,
+        "allocated_bytes": 11808768,
+        "sha256": "0b6b5c0970f0fd7abacc9d558ed58272f647aec948c08e5ae4226bf7ecab6b4a"
+      },
+      {
+        "name": "part-00002.parquet",
+        "rows": 16384,
+        "bytes": 11976780,
+        "allocated_bytes": 11980800,
+        "sha256": "ebbde96531ec226a1a90721e297218ada14499b717cc754dc4da03a68d201371"
+      },
+      {
+        "name": "part-00003.parquet",
+        "rows": 16384,
+        "bytes": 12017362,
+        "allocated_bytes": 12017664,
+        "sha256": "28a01dde63397304854e22cd0f0f9a5d9b2e75b1935b835fe951f6973689bb45"
+      },
+      {
+        "name": "part-00004.parquet",
+        "rows": 16384,
+        "bytes": 12074814,
+        "allocated_bytes": 12075008,
+        "sha256": "f001aa55467df6ff121f8b82b69efea385f2f429949b7a515c3db5fdafa14dc3"
+      },
+      {
+        "name": "part-00005.parquet",
+        "rows": 16384,
+        "bytes": 12134098,
+        "allocated_bytes": 12136448,
+        "sha256": "14048b15d4a17fbe3abb184cdf40d36ea79f500d92f9431f49302b93a1793bc0"
+      },
+      {
+        "name": "part-00006.parquet",
+        "rows": 16384,
+        "bytes": 12089021,
+        "allocated_bytes": 12091392,
+        "sha256": "214486ff1eb03c4c8a64357e25ac7e8f24b82edc028f505293f598c0427ad0fe"
+      },
+      {
+        "name": "part-00007.parquet",
+        "rows": 16384,
+        "bytes": 12083229,
+        "allocated_bytes": 12087296,
+        "sha256": "5bf0bd7d96a30468fee35d13840d3fa625a758595b21d839af5ebf13fbb08ea6"
+      },
+      {
+        "name": "part-00008.parquet",
+        "rows": 16384,
+        "bytes": 12069927,
+        "allocated_bytes": 12070912,
+        "sha256": "fd9a96c295cc026c32ab6827121a8ef491877f0295e7d427a326288649cc6182"
+      },
+      {
+        "name": "part-00009.parquet",
+        "rows": 16384,
+        "bytes": 11993735,
+        "allocated_bytes": 11997184,
+        "sha256": "386e3fb6008d7a03936ffc15121a846da48416b9b6551bf16facb86e6177a549"
+      },
+      {
+        "name": "part-00010.parquet",
+        "rows": 16384,
+        "bytes": 12034000,
+        "allocated_bytes": 12034048,
+        "sha256": "02c141e021f6eb0ff931a677ea69dae0eacbccedd08f22e1d208b51ecee33088"
+      },
+      {
+        "name": "part-00011.parquet",
+        "rows": 16384,
+        "bytes": 12036347,
+        "allocated_bytes": 12038144,
+        "sha256": "e3416ad9c3d866b00ed54939a1552d7f39b3032893c6eae0018a8b3256a6c032"
+      },
+      {
+        "name": "part-00012.parquet",
+        "rows": 16384,
+        "bytes": 11951828,
+        "allocated_bytes": 11952128,
+        "sha256": "0cc50d0ec589dfb28d818fd47e238ced846b505ddff378de9d28b3c55a188c6a"
+      },
+      {
+        "name": "part-00013.parquet",
+        "rows": 16384,
+        "bytes": 12031440,
+        "allocated_bytes": 12034048,
+        "sha256": "68217c7ba9467c627c327368c23ea46821cba24ca411f0bf90ec16a43b00cbeb"
+      },
+      {
+        "name": "part-00014.parquet",
+        "rows": 16384,
+        "bytes": 11992262,
+        "allocated_bytes": 11993088,
+        "sha256": "9692e7c1c9263c24983c50a8fa62f3d4d0311e4119ceb214a9c250cd0e6eb5db"
+      },
+      {
+        "name": "part-00015.parquet",
+        "rows": 16384,
+        "bytes": 11975102,
+        "allocated_bytes": 11976704,
+        "sha256": "a563b47c498e7a8e802d78470197b75c451539b1373751b1504b7456f15eda4d"
+      },
+      {
+        "name": "part-00016.parquet",
+        "rows": 16384,
+        "bytes": 11992358,
+        "allocated_bytes": 11993088,
+        "sha256": "91fd577bd2601d8829ad5300c0746e06066bdda36ea4b0dfb515297f720236cd"
+      },
+      {
+        "name": "part-00017.parquet",
+        "rows": 16384,
+        "bytes": 12022709,
+        "allocated_bytes": 12025856,
+        "sha256": "2c2881a136d012a6f7b4d07af200896672326014e61bfa83066e9c4bf3ce603c"
+      },
+      {
+        "name": "part-00018.parquet",
+        "rows": 16384,
+        "bytes": 12020869,
+        "allocated_bytes": 12021760,
+        "sha256": "2e10a9d752c1aff2a41074dd0d61bcd30de4188dd1b18fc680915ba12577beda"
+      },
+      {
+        "name": "part-00019.parquet",
+        "rows": 16384,
+        "bytes": 12005152,
+        "allocated_bytes": 12005376,
+        "sha256": "0d1ac38ed400a3676fdb2ade2682316779e5a8c5932b6cb7402790be19f3a1fc"
+      },
+      {
+        "name": "part-00020.parquet",
+        "rows": 16384,
+        "bytes": 12031687,
+        "allocated_bytes": 12034048,
+        "sha256": "1a6a46d8d6ecd1ae14b8ee56b05ea687534929bd0147d7b53ca8886a4499542c"
+      },
+      {
+        "name": "part-00021.parquet",
+        "rows": 16384,
+        "bytes": 12032527,
+        "allocated_bytes": 12034048,
+        "sha256": "36c6dbf9154b4ef09382e6dc6e5009070e6d201c3e6de00af4b09e5e712dc722"
+      },
+      {
+        "name": "part-00022.parquet",
+        "rows": 16384,
+        "bytes": 11972514,
+        "allocated_bytes": 11972608,
+        "sha256": "339acbcf1f92de8f860b8eb11e6a8b77365187bcc71ecd50eaf20f920fd0a44f"
+      },
+      {
+        "name": "part-00023.parquet",
+        "rows": 16384,
+        "bytes": 12013410,
+        "allocated_bytes": 12013568,
+        "sha256": "d53d7bdd65c21a5c22cc1f5fa192b6d6a2578009e59cc9d925aef8fceff64e38"
+      },
+      {
+        "name": "part-00024.parquet",
+        "rows": 16384,
+        "bytes": 12012967,
+        "allocated_bytes": 12013568,
+        "sha256": "a279f3c3aaf689686cd0b23a466469b1204a1216551086ca2dd7d3a3cdc04655"
+      },
+      {
+        "name": "part-00025.parquet",
+        "rows": 16384,
+        "bytes": 11995392,
+        "allocated_bytes": 11997184,
+        "sha256": "46c829613a60a541cb9aecd4d9ad5660b1a08f5f21ce870090f28d0a1d7ef374"
+      },
+      {
+        "name": "part-00026.parquet",
+        "rows": 16384,
+        "bytes": 11965511,
+        "allocated_bytes": 11968512,
+        "sha256": "4e5d83290d27843564c12cbf9aa21c1db59ac56975ca0220f79081c154eb77a0"
+      },
+      {
+        "name": "part-00027.parquet",
+        "rows": 16384,
+        "bytes": 11957181,
+        "allocated_bytes": 11960320,
+        "sha256": "af79b4e6a50e135cf5a4febd626193e82f257ab7ee2d76372ba49bf1de489823"
+      },
+      {
+        "name": "part-00028.parquet",
+        "rows": 16384,
+        "bytes": 11906430,
+        "allocated_bytes": 11907072,
+        "sha256": "024f989cf1c8ff645a01574cab9d0c83784dadbaa8aeea3e46fce10e763ca502"
+      },
+      {
+        "name": "part-00029.parquet",
+        "rows": 16384,
+        "bytes": 11937509,
+        "allocated_bytes": 11939840,
+        "sha256": "d18b3096ff62a4edb1924f89e7f3cd48fb0bb7c20c91e8c03bebb6f4354b991f"
+      },
+      {
+        "name": "part-00030.parquet",
+        "rows": 16384,
+        "bytes": 11934623,
+        "allocated_bytes": 11935744,
+        "sha256": "5e8d4f714f47e61f125281a547b94964c29e330a9c0645b3d7d631c4b0cef506"
+      },
+      {
+        "name": "part-00031.parquet",
+        "rows": 16384,
+        "bytes": 11942138,
+        "allocated_bytes": 11943936,
+        "sha256": "8dff79af8d395b6e9831c0c244091cb2cdcaee9c3beec2aa409ad3880814cb47"
+      },
+      {
+        "name": "part-00032.parquet",
+        "rows": 16384,
+        "bytes": 11953589,
+        "allocated_bytes": 11956224,
+        "sha256": "700973b4dceb72561ae7df50d7d565b4344a1e63211eae1125143051696a041a"
+      },
+      {
+        "name": "part-00033.parquet",
+        "rows": 16384,
+        "bytes": 11940736,
+        "allocated_bytes": 11943936,
+        "sha256": "fb4430a2dc40916c3319b87d54042cc52d50db138f4c5ee8251fcd4d311e877a"
+      },
+      {
+        "name": "part-00034.parquet",
+        "rows": 16384,
+        "bytes": 11946234,
+        "allocated_bytes": 11948032,
+        "sha256": "5f84b81a676ee1ef5816822620bbf395f30fbb21c67a6d3d87d4b5aacbf57e37"
+      },
+      {
+        "name": "part-00035.parquet",
+        "rows": 16384,
+        "bytes": 11936208,
+        "allocated_bytes": 11939840,
+        "sha256": "bd101c2f383ea5be8c0f30edba4ec109df4c245a73ae0cf8d89e922bcbcb1340"
+      },
+      {
+        "name": "part-00036.parquet",
+        "rows": 16384,
+        "bytes": 11885042,
+        "allocated_bytes": 11886592,
+        "sha256": "57538eca43827b1eead6ddac98d573bb34a714d4943eafcf7f8f46282eb95d53"
+      },
+      {
+        "name": "part-00037.parquet",
+        "rows": 16384,
+        "bytes": 11931807,
+        "allocated_bytes": 11935744,
+        "sha256": "eaad534df34f711303a9843649abb1df855b40c124ada0f43526571e9e595b72"
+      },
+      {
+        "name": "part-00038.parquet",
+        "rows": 16384,
+        "bytes": 11933917,
+        "allocated_bytes": 11935744,
+        "sha256": "6eb2be407b46e2bef483e487d940f7fb730f1b55271514f064d9101743e16b12"
+      },
+      {
+        "name": "part-00039.parquet",
+        "rows": 16384,
+        "bytes": 12006565,
+        "allocated_bytes": 12009472,
+        "sha256": "ba97b023be4532f651dd6acb725d2b8082615b76c28687e310e0ee26afffa7cd"
+      },
+      {
+        "name": "part-00040.parquet",
+        "rows": 16384,
+        "bytes": 11973605,
+        "allocated_bytes": 11976704,
+        "sha256": "229b5564bf1900ae525686c4f7c5d0263d69a1a62148ab34ed207dbf429d718f"
+      },
+      {
+        "name": "part-00041.parquet",
+        "rows": 16384,
+        "bytes": 11905500,
+        "allocated_bytes": 11907072,
+        "sha256": "b62e90e7f9e5e5b2fcb4c1260ca27411ff15ea8346a5f0032bb8846fe4878fac"
+      },
+      {
+        "name": "part-00042.parquet",
+        "rows": 16384,
+        "bytes": 11923520,
+        "allocated_bytes": 11927552,
+        "sha256": "36494e3ac99d0f771322e85cf581db78c53328b32fdfc622fc280264da1a6f9b"
+      },
+      {
+        "name": "part-00043.parquet",
+        "rows": 16384,
+        "bytes": 11972707,
+        "allocated_bytes": 11976704,
+        "sha256": "950634dcb8d78991d1ae75d0002b12ad54bfc7633552d20bfdaba2adab1dd59f"
+      },
+      {
+        "name": "part-00044.parquet",
+        "rows": 16384,
+        "bytes": 11967792,
+        "allocated_bytes": 11968512,
+        "sha256": "2c0681968afb8c8118f70538d86b35bef9cecda0acce55d5eaf99a02db97b7c8"
+      },
+      {
+        "name": "part-00045.parquet",
+        "rows": 16384,
+        "bytes": 11957253,
+        "allocated_bytes": 11960320,
+        "sha256": "05c8785d36eb21ab027f58ad85aa24df185271706c9ebc5d2206c8a671eee02d"
+      },
+      {
+        "name": "part-00046.parquet",
+        "rows": 16384,
+        "bytes": 11969434,
+        "allocated_bytes": 11972608,
+        "sha256": "a657845ebdb4d5c34eac5de8017d1e9b9d0d638afd74fceb0f31f0014bcd6adb"
+      },
+      {
+        "name": "part-00047.parquet",
+        "rows": 16384,
+        "bytes": 11986292,
+        "allocated_bytes": 11988992,
+        "sha256": "893431b2bbaace4514cad9e31eafeeb8ba0a5a88f728076c089b095714a5982b"
+      },
+      {
+        "name": "part-00048.parquet",
+        "rows": 16384,
+        "bytes": 11950646,
+        "allocated_bytes": 11952128,
+        "sha256": "0011024501d32f3c7abfeb22a3a63c97d9954bccabc634771bd9dff65d38c552"
+      },
+      {
+        "name": "part-00049.parquet",
+        "rows": 16384,
+        "bytes": 11935763,
+        "allocated_bytes": 11939840,
+        "sha256": "59b858c22b9427458de06df51fd17a584bc7a5c38c611eb881e7d27e2fd673e5"
+      },
+      {
+        "name": "part-00050.parquet",
+        "rows": 16384,
+        "bytes": 11993172,
+        "allocated_bytes": 11997184,
+        "sha256": "a1214ae6d395f387bf3bbc13ea1a0a5b1a4b014584bd619da1c3890508a4dc99"
+      },
+      {
+        "name": "part-00051.parquet",
+        "rows": 16384,
+        "bytes": 12000119,
+        "allocated_bytes": 12001280,
+        "sha256": "1502b57b060eb11dbef12ae2dff50dc0657feb089f0ca7054bdb526a0e5e6482"
+      },
+      {
+        "name": "part-00052.parquet",
+        "rows": 16384,
+        "bytes": 12017580,
+        "allocated_bytes": 12017664,
+        "sha256": "cbd48611e8361d136b6ac0dab5107b14f86b0efda7a9904b815a00bad7fb9234"
+      },
+      {
+        "name": "part-00053.parquet",
+        "rows": 16384,
+        "bytes": 11976458,
+        "allocated_bytes": 11976704,
+        "sha256": "1686cbc67f18e85f08524ea96a243a29bde99b516048b91ce4ac0055ddf38197"
+      },
+      {
+        "name": "part-00054.parquet",
+        "rows": 16384,
+        "bytes": 11984559,
+        "allocated_bytes": 11984896,
+        "sha256": "354444b90f5f3b390afb463099e1dfa7526a80cb6b80ec03366a79e16f030c72"
+      },
+      {
+        "name": "part-00055.parquet",
+        "rows": 16384,
+        "bytes": 11904283,
+        "allocated_bytes": 11907072,
+        "sha256": "427d670af584f03421b413f2f2d696d000ab822b9af39279f7b6a7fa19112aff"
+      },
+      {
+        "name": "part-00056.parquet",
+        "rows": 16384,
+        "bytes": 11910468,
+        "allocated_bytes": 11911168,
+        "sha256": "43d58a570cc6078c6fa4ea0929d1df4d12cf15323e100a919ace6abf6c249b0d"
+      },
+      {
+        "name": "part-00057.parquet",
+        "rows": 16384,
+        "bytes": 11907108,
+        "allocated_bytes": 11911168,
+        "sha256": "30e91b36e54f5f9b580004aa00d042ca4bf9236d790a2455aca69f5acad35c3c"
+      },
+      {
+        "name": "part-00058.parquet",
+        "rows": 16384,
+        "bytes": 11902929,
+        "allocated_bytes": 11902976,
+        "sha256": "67e0b9b55c6f4e132679ffd2411fb9223584ac53dd880dcba59a0d0c688386ad"
+      },
+      {
+        "name": "part-00059.parquet",
+        "rows": 16384,
+        "bytes": 11907729,
+        "allocated_bytes": 11911168,
+        "sha256": "f5bfb3b89fcab560efceaf4cc157b104ed6220236a14315f96f04bf3453a3cbe"
+      },
+      {
+        "name": "part-00060.parquet",
+        "rows": 16384,
+        "bytes": 11908410,
+        "allocated_bytes": 11911168,
+        "sha256": "b9ee9e8ec2af966caebc306199d75aa5b067d11b5069e7b35274f5e6d90cab9c"
+      },
+      {
+        "name": "part-00061.parquet",
+        "rows": 16384,
+        "bytes": 11863325,
+        "allocated_bytes": 11866112,
+        "sha256": "f0c00100dc723c63bbabd2a348db994147108d0da59d0a66261f3536d21e6c58"
+      },
+      {
+        "name": "part-00062.parquet",
+        "rows": 16384,
+        "bytes": 11855893,
+        "allocated_bytes": 11857920,
+        "sha256": "9e24f97864e8897f7eccafe19d6ea1e3f62c52cf611f974b420018acb7084c14"
+      },
+      {
+        "name": "part-00063.parquet",
+        "rows": 16384,
+        "bytes": 11900650,
+        "allocated_bytes": 11902976,
+        "sha256": "b2a586e7846dce9f3c594aa35b16467503bedf97f4c8285c7db91cc37041c842"
+      },
+      {
+        "name": "part-00064.parquet",
+        "rows": 16384,
+        "bytes": 11910244,
+        "allocated_bytes": 11911168,
+        "sha256": "9aaeaaae8f0a520cad6754f7ceecbbad438c27352010f2c320c0128c016ea958"
+      },
+      {
+        "name": "part-00065.parquet",
+        "rows": 16384,
+        "bytes": 11878822,
+        "allocated_bytes": 11882496,
+        "sha256": "b8caaca9ebf3e27918f9507b06c58f5b72fbf74664206ea11bfc619bbd0f3ad6"
+      },
+      {
+        "name": "part-00066.parquet",
+        "rows": 16384,
+        "bytes": 11806220,
+        "allocated_bytes": 11808768,
+        "sha256": "d03f533d59d899d9bf4da6ae22cebe018cbb30ef81e78b9aa7e0a71f162f9e21"
+      },
+      {
+        "name": "part-00067.parquet",
+        "rows": 16384,
+        "bytes": 11878135,
+        "allocated_bytes": 11878400,
+        "sha256": "ce1ff760f1a4fe4ee3aebd4a1378cdf57614f1b8d4eb7cd7494a8b004da429a8"
+      },
+      {
+        "name": "part-00068.parquet",
+        "rows": 16384,
+        "bytes": 11871882,
+        "allocated_bytes": 11874304,
+        "sha256": "b1b46e6f02f19f128e795dfaf6da567fa52564b1a7317e2a4c1e25e3b6fa83f6"
+      },
+      {
+        "name": "part-00069.parquet",
+        "rows": 16384,
+        "bytes": 11870438,
+        "allocated_bytes": 11874304,
+        "sha256": "ad8a0b3998024068f04ceca0e0bc8aed8c5b6c473955d595b46bff6d6d400ca0"
+      },
+      {
+        "name": "part-00070.parquet",
+        "rows": 16384,
+        "bytes": 11942914,
+        "allocated_bytes": 11943936,
+        "sha256": "26408d289925a2c5dc8d64a11b4ddeecfcb0baec256ed3d76a2bfb1a3fe6ee27"
+      },
+      {
+        "name": "part-00071.parquet",
+        "rows": 16384,
+        "bytes": 11891294,
+        "allocated_bytes": 11894784,
+        "sha256": "c3c4b76d636f665f51744248675b732142956a288954ec292f534360fcb68b23"
+      },
+      {
+        "name": "part-00072.parquet",
+        "rows": 16384,
+        "bytes": 11828383,
+        "allocated_bytes": 11829248,
+        "sha256": "2c2343bf6342abca2c48408d2b33a49febc7b142bf03da2667f7eb702f69838a"
+      },
+      {
+        "name": "part-00073.parquet",
+        "rows": 16384,
+        "bytes": 11836665,
+        "allocated_bytes": 11837440,
+        "sha256": "7373ed8145ec949228aaf2bdd2bbc010f48c5a2ba2df458bfdcf21fea8110e6c"
+      },
+      {
+        "name": "part-00074.parquet",
+        "rows": 16384,
+        "bytes": 11849535,
+        "allocated_bytes": 11849728,
+        "sha256": "581318659106f16326f0d80e1976a3ba4868d604896859806e7351d0b602dcf1"
+      },
+      {
+        "name": "part-00075.parquet",
+        "rows": 16384,
+        "bytes": 11825325,
+        "allocated_bytes": 11829248,
+        "sha256": "eb0c5e77b052b0f69d161801507124111dc2a8dc4ab6dcafbb7cfd876ea817c2"
+      },
+      {
+        "name": "part-00076.parquet",
+        "rows": 16384,
+        "bytes": 11828630,
+        "allocated_bytes": 11829248,
+        "sha256": "50c08ba97e99abcab40a2a3d6a35dcdb88d5d0ef8fe7afbf868cf2a14abd8c25"
+      },
+      {
+        "name": "part-00077.parquet",
+        "rows": 16384,
+        "bytes": 11875286,
+        "allocated_bytes": 11878400,
+        "sha256": "448144ae945c088059f8fa924a87a8b29ebf265feabd1f842a3aab6d907c5741"
+      },
+      {
+        "name": "part-00078.parquet",
+        "rows": 16384,
+        "bytes": 11887363,
+        "allocated_bytes": 11890688,
+        "sha256": "5dee9ba9a38ca9125149581f054f3f45970b23486113de7a0ce4538a75cb1ba1"
+      },
+      {
+        "name": "part-00079.parquet",
+        "rows": 16384,
+        "bytes": 11849867,
+        "allocated_bytes": 11853824,
+        "sha256": "64ef057bc9d2642d386b43ff451d622e868688a9c202340037ebeb640a9e6f09"
+      },
+      {
+        "name": "part-00080.parquet",
+        "rows": 16384,
+        "bytes": 11905343,
+        "allocated_bytes": 11907072,
+        "sha256": "640b7295320adb0ef08a3860e373c214b9b8f9268f4f83bdf173ee8c17a7eed6"
+      },
+      {
+        "name": "part-00081.parquet",
+        "rows": 16384,
+        "bytes": 11927582,
+        "allocated_bytes": 11931648,
+        "sha256": "0bf23d9d33290c14f78947c24b36de335b4376aceafd72b6bc63ba4aa26631b8"
+      },
+      {
+        "name": "part-00082.parquet",
+        "rows": 16384,
+        "bytes": 12037621,
+        "allocated_bytes": 12038144,
+        "sha256": "6eb1454c2ebbee807d3db0d566c2f79b85ddabaf16f2fe4607405740258765f9"
+      },
+      {
+        "name": "part-00083.parquet",
+        "rows": 16384,
+        "bytes": 11930190,
+        "allocated_bytes": 11931648,
+        "sha256": "8f7777a90f127749d9e0cef93235905bfca270c9ccbd112aa1d6dfea0c63e3ef"
+      },
+      {
+        "name": "part-00084.parquet",
+        "rows": 16384,
+        "bytes": 11913070,
+        "allocated_bytes": 11915264,
+        "sha256": "bd68aaf3da88b1431abe7d862e986e72ec5604fc4fa536e4a08697ff7b3166ee"
+      },
+      {
+        "name": "part-00085.parquet",
+        "rows": 16384,
+        "bytes": 11941303,
+        "allocated_bytes": 11943936,
+        "sha256": "6b261fdf7a5df14e3e158e8b9f71c6fcf4175f51b663f1c7b610eb518b7022f3"
+      },
+      {
+        "name": "part-00086.parquet",
+        "rows": 16384,
+        "bytes": 11929681,
+        "allocated_bytes": 11931648,
+        "sha256": "89b8c2cfe0a6c9686bd33be4c33ce7b3a72871572603e12aa6b63d84fe608aed"
+      },
+      {
+        "name": "part-00087.parquet",
+        "rows": 16384,
+        "bytes": 11872854,
+        "allocated_bytes": 11874304,
+        "sha256": "26d03049107c4bebfe2b8f2e73642cd4c0ee307f3730183b3f9bf58ea35c53f0"
+      },
+      {
+        "name": "part-00088.parquet",
+        "rows": 16384,
+        "bytes": 11988099,
+        "allocated_bytes": 11988992,
+        "sha256": "f2242e4661fa4b6ec229ae252ce952e226ba5cb51b5f236a19b97bad27d3555b"
+      },
+      {
+        "name": "part-00089.parquet",
+        "rows": 16384,
+        "bytes": 12005339,
+        "allocated_bytes": 12005376,
+        "sha256": "7cfc0369657d1471e3d43ba2f2f16a008ac12b1c874eb6e29ac0dc23b3b4bd49"
+      },
+      {
+        "name": "part-00090.parquet",
+        "rows": 16384,
+        "bytes": 11905298,
+        "allocated_bytes": 11907072,
+        "sha256": "078c5cc0a45dcf29fc1cbdf4436305ac791110e68d4c8bdf900404bca9250e96"
+      },
+      {
+        "name": "part-00091.parquet",
+        "rows": 16384,
+        "bytes": 11919973,
+        "allocated_bytes": 11923456,
+        "sha256": "9eac4eef9a470737986d4065bfb182b8b9b7c671e899fe0580938d2db42c3dbf"
+      },
+      {
+        "name": "part-00092.parquet",
+        "rows": 16384,
+        "bytes": 11844976,
+        "allocated_bytes": 11845632,
+        "sha256": "91b39199300cb86f7a637f523c1fa284d4dbd2d281d1a1276e1351da866bf55f"
+      },
+      {
+        "name": "part-00093.parquet",
+        "rows": 16384,
+        "bytes": 11900351,
+        "allocated_bytes": 11902976,
+        "sha256": "676c39c16c10b601c2f808de303f6d29e454ebe2311676a61d5a4ce94ab2e4ac"
+      },
+      {
+        "name": "part-00094.parquet",
+        "rows": 16384,
+        "bytes": 11973100,
+        "allocated_bytes": 11976704,
+        "sha256": "7ca3ef01774ce277535dcf764ae6b86afd96bb7675fd54c4cf7bdf10d86b9a85"
+      },
+      {
+        "name": "part-00095.parquet",
+        "rows": 16384,
+        "bytes": 11833133,
+        "allocated_bytes": 11833344,
+        "sha256": "dff81eab195a0b08bf0fc996b0f50be12f339fa7923a4ff31e3fe3285930752e"
+      },
+      {
+        "name": "part-00096.parquet",
+        "rows": 16384,
+        "bytes": 11839415,
+        "allocated_bytes": 11841536,
+        "sha256": "a669143b6429c2d21bc74bf92301df1316277f098d6a583f79b9c2b0affcb496"
+      },
+      {
+        "name": "part-00097.parquet",
+        "rows": 16384,
+        "bytes": 11818959,
+        "allocated_bytes": 11821056,
+        "sha256": "6ddb7e3aece132c420239c1c0982220f62d9f414f7c6241285aab3ab5d4520f3"
+      },
+      {
+        "name": "part-00098.parquet",
+        "rows": 16384,
+        "bytes": 11754699,
+        "allocated_bytes": 11755520,
+        "sha256": "52d6178b3eb6ffcc63016404f98354aabd411bba7e72a3f90fce38d3712d8c96"
+      },
+      {
+        "name": "part-00099.parquet",
+        "rows": 16384,
+        "bytes": 11690922,
+        "allocated_bytes": 11694080,
+        "sha256": "6b7a8c51d76fde444eebd329f097ee1e757b9d4a07eb9a3017cde97304719860"
+      },
+      {
+        "name": "part-00100.parquet",
+        "rows": 9199,
+        "bytes": 6517059,
+        "allocated_bytes": 6520832,
+        "sha256": "d2dad6e215d9565498d0b1034ec1cbf6f40611249dd5d45bdebdbee83bd7fd35"
+      }
+    ],
+    "before_designation_index": {
+      "logical_bytes": 1409616324,
+      "allocated_bytes": 1409830912
+    },
+    "final_artifacts": {
+      "logical_bytes": 1452652996,
+      "allocated_bytes": 1452867584
+    },
+    "sqlite_pages": [
+      [
+        "angular_node",
+        86528000
+      ],
+      [
+        "angular_parent",
+        802816
+      ],
+      [
+        "angular_rowid",
+        23318528
+      ],
+      [
+        "designation_index",
+        43032576
+      ],
+      [
+        "lookup",
+        98865152
+      ],
+      [
+        "sqlite_schema",
+        4096
+      ],
+      [
+        "sqlite_stat1",
+        4096
+      ]
+    ],
+    "index_build_seconds": 2.9639305216260254,
+    "build_seconds_before_queries": 706.4614854683168,
+    "elapsed_seconds": 708.2487571132369,
+    "observed_checkpoint_high_water": {
+      "logical_bytes": 2495077901,
+      "allocated_bytes": 2495455232
+    },
+    "peak_sampling": "batch/phase checkpoints; instantaneous peak unmeasured",
+    "max_process_rss_kib": 117572,
+    "queries_warm_local_library_only": [
+      {
+        "ext_key": 1952688,
+        "owned_detail": {
+          "repeats": 5,
+          "median_ms": 62.00330471619964,
+          "p95_ms": 95.33079713582993,
+          "max_ms": 95.33079713582993
+        }
+      },
+      {
+        "ext_key": 2311351,
+        "owned_detail": {
+          "repeats": 5,
+          "median_ms": 76.57041121274233,
+          "p95_ms": 85.88635409250855,
+          "max_ms": 85.88635409250855
+        }
+      },
+      {
+        "ext_key": 1904440,
+        "owned_detail": {
+          "repeats": 5,
+          "median_ms": 79.71849897876382,
+          "p95_ms": 84.45887500420213,
+          "max_ms": 84.45887500420213
+        }
+      }
+    ],
+    "coverage_admitted": false,
+    "unknowns": [
+      "full release when prefix-limited",
+      "aliases/crossmatches",
+      "native integration and rendering",
+      "cold/concurrent/network query latency",
+      "backup storage",
+      "exact instantaneous build peak"
+    ]
+  },
+  "xsc_independent_verification": {
+    "source_rows_independently_scanned": 1647599,
+    "source_scan_seconds": 23.8247015401721,
+    "verified_source_record_keys": [
+      3,
+      648382,
+      1261062,
+      1947039,
+      5000540
+    ],
+    "full_catalog_checksums_counts_and_integer_sums_match": true,
+    "all_389_fields_compared_for_selected_source_records": true,
+    "network_disabled_for_queries": true,
+    "queries_warm_local_only": [
+      {
+        "ext_key": 3,
+        "offline_detail_all_389_fields": {
+          "repeats": 10,
+          "median_ms": 16.763144405558705,
+          "p95_ms": 95.6196803599596,
+          "max_ms": 95.6196803599596
+        },
+        "designation_prefix": {
+          "repeats": 30,
+          "median_ms": 0.054892851039767265,
+          "p95_ms": 0.06078416481614113,
+          "max_ms": 8.27576220035553
+        },
+        "one_degree_cone": {
+          "repeats": 30,
+          "median_ms": 0.2849400043487549,
+          "p95_ms": 0.30029285699129105,
+          "max_ms": 0.7190587930381298
+        }
+      },
+      {
+        "ext_key": 648382,
+        "offline_detail_all_389_fields": {
+          "repeats": 10,
+          "median_ms": 15.978672076016665,
+          "p95_ms": 68.5351500287652,
+          "max_ms": 68.5351500287652
+        },
+        "designation_prefix": {
+          "repeats": 30,
+          "median_ms": 0.047063687816262245,
+          "p95_ms": 0.05529401823878288,
+          "max_ms": 0.24630222469568253
+        },
+        "one_degree_cone": {
+          "repeats": 30,
+          "median_ms": 0.16340217553079128,
+          "p95_ms": 0.23259595036506653,
+          "max_ms": 48.36294334381819
+        }
+      },
+      {
+        "ext_key": 1261062,
+        "offline_detail_all_389_fields": {
+          "repeats": 10,
+          "median_ms": 16.10406837426126,
+          "p95_ms": 68.1420317851007,
+          "max_ms": 68.1420317851007
+        },
+        "designation_prefix": {
+          "repeats": 30,
+          "median_ms": 0.04668743349611759,
+          "p95_ms": 0.049342866986989975,
+          "max_ms": 0.18513714894652367
+        },
+        "one_degree_cone": {
+          "repeats": 30,
+          "median_ms": 0.5414760671555996,
+          "p95_ms": 0.5774633027613163,
+          "max_ms": 0.8580000139772892
+        }
+      },
+      {
+        "ext_key": 1947039,
+        "offline_detail_all_389_fields": {
+          "repeats": 10,
+          "median_ms": 15.90787898749113,
+          "p95_ms": 67.94205820187926,
+          "max_ms": 67.94205820187926
+        },
+        "designation_prefix": {
+          "repeats": 30,
+          "median_ms": 0.055163633078336716,
+          "p95_ms": 0.06812810897827148,
+          "max_ms": 8.16244911402464
+        },
+        "one_degree_cone": {
+          "repeats": 30,
+          "median_ms": 0.28983899392187595,
+          "p95_ms": 0.44315215200185776,
+          "max_ms": 9.54343006014824
+        }
+      },
+      {
+        "ext_key": 5000540,
+        "offline_detail_all_389_fields": {
+          "repeats": 10,
+          "median_ms": 15.815516002476215,
+          "p95_ms": 69.38681891188025,
+          "max_ms": 69.38681891188025
+        },
+        "designation_prefix": {
+          "repeats": 30,
+          "median_ms": 0.046697910875082016,
+          "p95_ms": 0.09757326915860176,
+          "max_ms": 0.09862519800662994
+        },
+        "one_degree_cone": {
+          "repeats": 30,
+          "median_ms": 0.19753514789044857,
+          "p95_ms": 0.2172579988837242,
+          "max_ms": 0.3116549924015999
+        }
+      }
+    ],
+    "native_phoenix_integration_verified": false
+  },
+  "xsc_sampled_build_peak": {
+    "scope": "investigation filesystem plus open unlinked files of the observed process; Postgres separate",
+    "sample_interval_ms": 100,
+    "samples": 4683,
+    "observed_seconds": 497.74621552508324,
+    "observed_peak": {
+      "logical_bytes": 2523633572,
+      "allocated_bytes": 2524004352,
+      "open_unlinked_bytes": 39527319
+    },
+    "instantaneous_peak_exact": false,
+    "note": "Monitoring began after the build started; early transient allocations and between-sample peaks remain unmeasured."
+  },
+  "allwise_provider_metadata_not_local_storage": {
+    "scope": "provider metadata inventory, not locally verified catalog contents",
+    "rows_reported": 747634026,
+    "files": 12288,
+    "data_logical_bytes_reported": 364543757806,
+    "all_objects_bytes_reported": 365125943157,
+    "row_manifest_sha256": "f1afdbf3d328b76dcf5da63dd60fae752a558846b73598a4bd9d76b4c43347c3",
+    "object_inventory_sha256": "e8777d9cd8fad510da52e8fc39b45833d8617ff54bdc2f68f4f7d091e1e7310e",
+    "selected_for_bounded_recompression": [
+      {
+        "path": "wise-allwise.parquet/healpix_k0=1/healpix_k5=1091/part0.snappy.parquet",
+        "nrows": "36400",
+        "bytes": 18693495
+      },
+      {
+        "path": "wise-allwise.parquet/healpix_k0=8/healpix_k5=8438/part0.snappy.parquet",
+        "nrows": "58508",
+        "bytes": 28112753
+      },
+      {
+        "path": "wise-allwise.parquet/healpix_k0=8/healpix_k5=8274/part0.snappy.parquet",
+        "nrows": "90989",
+        "bytes": 50099787
+      }
+    ]
+  },
+  "allwise_selected_file_recompression": {
+    "allwise-zstd": {
+      "scope": "only listed owned AllWISE partitions; NOT a full-release measurement",
+      "codec": "zstd-3",
+      "row_group_size": 4096,
+      "partitions": [
+        {
+          "source": "allwise-1091.parquet",
+          "rows": 36400,
+          "columns": 298,
+          "source_bytes": 18693495,
+          "source_allocated_bytes": 18694144,
+          "source_sha256": "151cdc74817dbde42f8e6598bca8942ca42b0ce3dafe88f2882bc5e94b588ce2",
+          "candidate_bytes": 20370290,
+          "candidate_allocated_bytes": 20373504,
+          "candidate_sha256": "ebf32e4d1c20ee0aa9eca42d4ef4fe3328ac8e1d5bb95233f824e0c658aa4269",
+          "build_seconds": 1.4047067160718143,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 12.535369489341974,
+            "p95_ms": 65.05423272028565,
+            "max_ms": 65.56345894932747
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        },
+        {
+          "source": "allwise-8438.parquet",
+          "rows": 58508,
+          "columns": 298,
+          "source_bytes": 28112753,
+          "source_allocated_bytes": 28114944,
+          "source_sha256": "745c1f1bb74c661573d69030ac5a2e19d72568e68672cf2e2aabd395ba36f3fc",
+          "candidate_bytes": 32385281,
+          "candidate_allocated_bytes": 32387072,
+          "candidate_sha256": "cc35ba61902e70f304511111b261652940713a6c3cffe8256ee1e33c1a4aea52",
+          "build_seconds": 1.8980803727172315,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 12.673669029027224,
+            "p95_ms": 65.06746774539351,
+            "max_ms": 71.72886002808809
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        },
+        {
+          "source": "allwise-8274.parquet",
+          "rows": 90989,
+          "columns": 298,
+          "source_bytes": 50099787,
+          "source_allocated_bytes": 50102272,
+          "source_sha256": "8ed0379201a1110e23cc92258fdb2505bcc0f4ca39bf7bce08245d9d31dfaeae",
+          "candidate_bytes": 57982128,
+          "candidate_allocated_bytes": 57982976,
+          "candidate_sha256": "7fc6769bb226e9f1c02e5c35d0894331756d110bb5b5e778e5a31ab963cea584",
+          "build_seconds": 3.4147085049189627,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 14.267188962548971,
+            "p95_ms": 67.94032966718078,
+            "max_ms": 80.376829020679
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        }
+      ],
+      "final_artifacts": {
+        "logical_bytes": 110737699,
+        "allocated_bytes": 110743552
+      },
+      "max_process_rss_kib": 316328,
+      "unknowns": [
+        "complete-catalog recompressed total",
+        "global ID/alias/crossmatch indexes",
+        "HTTP/browser/concurrent/cold latency",
+        "full-release build peak and rollback artifacts"
+      ]
+    },
+    "allwise-zstd-original-groups": {
+      "scope": "only listed owned AllWISE partitions; NOT a full-release measurement",
+      "codec": "zstd-3",
+      "row_group_size": "preserve source row groups",
+      "partitions": [
+        {
+          "source": "allwise-1091.parquet",
+          "rows": 36400,
+          "columns": 298,
+          "source_bytes": 18693495,
+          "source_allocated_bytes": 18694144,
+          "source_sha256": "151cdc74817dbde42f8e6598bca8942ca42b0ce3dafe88f2882bc5e94b588ce2",
+          "candidate_bytes": 16092098,
+          "candidate_allocated_bytes": 16093184,
+          "candidate_sha256": "9981a47c3bd46a9168ff9ee6d62dfe4d89769ff804e7af4f8ecbf636c574917d",
+          "build_seconds": 1.2862640707753599,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 126.82542251423001,
+            "p95_ms": 262.0230671018362,
+            "max_ms": 299.5595531538129
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        },
+        {
+          "source": "allwise-8438.parquet",
+          "rows": 58508,
+          "columns": 298,
+          "source_bytes": 28112753,
+          "source_allocated_bytes": 28114944,
+          "source_sha256": "745c1f1bb74c661573d69030ac5a2e19d72568e68672cf2e2aabd395ba36f3fc",
+          "candidate_bytes": 24407577,
+          "candidate_allocated_bytes": 24408064,
+          "candidate_sha256": "1c5f844d0cd0318b122c276e606d77d7e4eebbb019869e2a519c81bb9dd5954e",
+          "build_seconds": 1.309977037832141,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 202.9564855620265,
+            "p95_ms": 303.2973692752421,
+            "max_ms": 340.79384012147784
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        },
+        {
+          "source": "allwise-8274.parquet",
+          "rows": 90989,
+          "columns": 298,
+          "source_bytes": 50099787,
+          "source_allocated_bytes": 50102272,
+          "source_sha256": "8ed0379201a1110e23cc92258fdb2505bcc0f4ca39bf7bce08245d9d31dfaeae",
+          "candidate_bytes": 43229758,
+          "candidate_allocated_bytes": 43233280,
+          "candidate_sha256": "efd6afeab5f8f0032a99fc0931651337e96bfdc737097b3fd8ad6bddbe2267f7",
+          "build_seconds": 2.7589044491760433,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 380.472598830238,
+            "p95_ms": 823.4499399550259,
+            "max_ms": 1186.0871659591794
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        }
+      ],
+      "final_artifacts": {
+        "logical_bytes": 83729433,
+        "allocated_bytes": 83734528
+      },
+      "max_process_rss_kib": 716104,
+      "unknowns": [
+        "complete-catalog recompressed total",
+        "global ID/alias/crossmatch indexes",
+        "HTTP/browser/concurrent/cold latency",
+        "full-release build peak and rollback artifacts"
+      ]
+    },
+    "allwise-zstd-byte-split": {
+      "scope": "only listed owned AllWISE partitions; NOT a full-release measurement",
+      "codec": "zstd-3",
+      "byte_stream_split_floats": true,
+      "row_group_size": 4096,
+      "partitions": [
+        {
+          "source": "allwise-1091.parquet",
+          "rows": 36400,
+          "columns": 298,
+          "source_bytes": 18693495,
+          "source_allocated_bytes": 18694144,
+          "source_sha256": "151cdc74817dbde42f8e6598bca8942ca42b0ce3dafe88f2882bc5e94b588ce2",
+          "candidate_bytes": 34857838,
+          "candidate_allocated_bytes": 34861056,
+          "candidate_sha256": "cce11b0dd2308d06bd6b400352eac192eb7a2e602e02de47fd5bf3f08fb83b41",
+          "build_seconds": 1.237260126043111,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 12.503651436418295,
+            "p95_ms": 64.98273927718401,
+            "max_ms": 66.8928143568337
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        },
+        {
+          "source": "allwise-8438.parquet",
+          "rows": 58508,
+          "columns": 298,
+          "source_bytes": 28112753,
+          "source_allocated_bytes": 28114944,
+          "source_sha256": "745c1f1bb74c661573d69030ac5a2e19d72568e68672cf2e2aabd395ba36f3fc",
+          "candidate_bytes": 56428882,
+          "candidate_allocated_bytes": 56430592,
+          "candidate_sha256": "986dc7ac6f68701577c11a2f7fbb1533ee3e888d7a921854d293c691de792770",
+          "build_seconds": 1.379628290887922,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 13.051179237663746,
+            "p95_ms": 65.97053166478872,
+            "max_ms": 66.79388601332903
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        },
+        {
+          "source": "allwise-8274.parquet",
+          "rows": 90989,
+          "columns": 298,
+          "source_bytes": 50099787,
+          "source_allocated_bytes": 50102272,
+          "source_sha256": "8ed0379201a1110e23cc92258fdb2505bcc0f4ca39bf7bce08245d9d31dfaeae",
+          "candidate_bytes": 97345451,
+          "candidate_allocated_bytes": 97345536,
+          "candidate_sha256": "57b418de275493e425c0ea5454672b137eeec66c3f907297bb1ffd43f8a6a0a1",
+          "build_seconds": 2.290253755170852,
+          "all_values_schema_and_nulls_verified": true,
+          "warm_first_row_group_detail": {
+            "repeats": 30,
+            "median_ms": 14.157796278595924,
+            "p95_ms": 67.28834565728903,
+            "max_ms": 70.14564890414476
+          },
+          "schema_sha256": "956adb8164d355520c41fdaec6173c0a11e57a4e73046deb823cf9bc1b3060fb"
+        }
+      ],
+      "final_artifacts": {
+        "logical_bytes": 188632171,
+        "allocated_bytes": 188641280
+      },
+      "max_process_rss_kib": 339240,
+      "unknowns": [
+        "complete-catalog recompressed total",
+        "global ID/alias/crossmatch indexes",
+        "HTTP/browser/concurrent/cold latency",
+        "full-release build peak and rollback artifacts"
+      ]
+    }
+  },
+  "gaia_source_header_only": {
+    "scope": "header from first Gaia source file only; no full-file checksum or full-release data verification",
+    "file": "GaiaSource_000000-003111.csv.gz",
+    "expected_full_file_md5": "52d800747f32a025bdcf1594bbbad29b",
+    "content_range": "bytes 0-131071/233642769",
+    "header_fields": [
+      "solution_id",
+      "designation",
+      "source_id",
+      "random_index",
+      "ref_epoch",
+      "ra",
+      "ra_error",
+      "dec",
+      "dec_error",
+      "parallax",
+      "parallax_error",
+      "parallax_over_error",
+      "pm",
+      "pmra",
+      "pmra_error",
+      "pmdec",
+      "pmdec_error",
+      "ra_dec_corr",
+      "ra_parallax_corr",
+      "ra_pmra_corr",
+      "ra_pmdec_corr",
+      "dec_parallax_corr",
+      "dec_pmra_corr",
+      "dec_pmdec_corr",
+      "parallax_pmra_corr",
+      "parallax_pmdec_corr",
+      "pmra_pmdec_corr",
+      "astrometric_n_obs_al",
+      "astrometric_n_obs_ac",
+      "astrometric_n_good_obs_al",
+      "astrometric_n_bad_obs_al",
+      "astrometric_gof_al",
+      "astrometric_chi2_al",
+      "astrometric_excess_noise",
+      "astrometric_excess_noise_sig",
+      "astrometric_params_solved",
+      "astrometric_primary_flag",
+      "nu_eff_used_in_astrometry",
+      "pseudocolour",
+      "pseudocolour_error",
+      "ra_pseudocolour_corr",
+      "dec_pseudocolour_corr",
+      "parallax_pseudocolour_corr",
+      "pmra_pseudocolour_corr",
+      "pmdec_pseudocolour_corr",
+      "astrometric_matched_transits",
+      "visibility_periods_used",
+      "astrometric_sigma5d_max",
+      "matched_transits",
+      "new_matched_transits",
+      "matched_transits_removed",
+      "ipd_gof_harmonic_amplitude",
+      "ipd_gof_harmonic_phase",
+      "ipd_frac_multi_peak",
+      "ipd_frac_odd_win",
+      "ruwe",
+      "scan_direction_strength_k1",
+      "scan_direction_strength_k2",
+      "scan_direction_strength_k3",
+      "scan_direction_strength_k4",
+      "scan_direction_mean_k1",
+      "scan_direction_mean_k2",
+      "scan_direction_mean_k3",
+      "scan_direction_mean_k4",
+      "duplicated_source",
+      "phot_g_n_obs",
+      "phot_g_mean_flux",
+      "phot_g_mean_flux_error",
+      "phot_g_mean_flux_over_error",
+      "phot_g_mean_mag",
+      "phot_bp_n_obs",
+      "phot_bp_mean_flux",
+      "phot_bp_mean_flux_error",
+      "phot_bp_mean_flux_over_error",
+      "phot_bp_mean_mag",
+      "phot_rp_n_obs",
+      "phot_rp_mean_flux",
+      "phot_rp_mean_flux_error",
+      "phot_rp_mean_flux_over_error",
+      "phot_rp_mean_mag",
+      "phot_bp_rp_excess_factor",
+      "phot_bp_n_contaminated_transits",
+      "phot_bp_n_blended_transits",
+      "phot_rp_n_contaminated_transits",
+      "phot_rp_n_blended_transits",
+      "phot_proc_mode",
+      "bp_rp",
+      "bp_g",
+      "g_rp",
+      "radial_velocity",
+      "radial_velocity_error",
+      "rv_method_used",
+      "rv_nb_transits",
+      "rv_nb_deblended_transits",
+      "rv_visibility_periods_used",
+      "rv_expected_sig_to_noise",
+      "rv_renormalised_gof",
+      "rv_chisq_pvalue",
+      "rv_time_duration",
+      "rv_amplitude_robust",
+      "rv_template_teff",
+      "rv_template_logg",
+      "rv_template_fe_h",
+      "rv_atm_param_origin",
+      "vbroad",
+      "vbroad_error",
+      "vbroad_nb_transits",
+      "grvs_mag",
+      "grvs_mag_error",
+      "grvs_mag_nb_transits",
+      "rvs_spec_sig_to_noise",
+      "phot_variable_flag",
+      "l",
+      "b",
+      "ecl_lon",
+      "ecl_lat",
+      "in_qso_candidates",
+      "in_galaxy_candidates",
+      "non_single_star",
+      "has_xp_continuous",
+      "has_xp_sampled",
+      "has_rvs",
+      "has_epoch_photometry",
+      "has_epoch_rv",
+      "has_mcmc_gspphot",
+      "has_mcmc_msc",
+      "in_andromeda_survey",
+      "classprob_dsc_combmod_quasar",
+      "classprob_dsc_combmod_galaxy",
+      "classprob_dsc_combmod_star",
+      "teff_gspphot",
+      "teff_gspphot_lower",
+      "teff_gspphot_upper",
+      "logg_gspphot",
+      "logg_gspphot_lower",
+      "logg_gspphot_upper",
+      "mh_gspphot",
+      "mh_gspphot_lower",
+      "mh_gspphot_upper",
+      "distance_gspphot",
+      "distance_gspphot_lower",
+      "distance_gspphot_upper",
+      "azero_gspphot",
+      "azero_gspphot_lower",
+      "azero_gspphot_upper",
+      "ag_gspphot",
+      "ag_gspphot_lower",
+      "ag_gspphot_upper",
+      "ebpminrp_gspphot",
+      "ebpminrp_gspphot_lower",
+      "ebpminrp_gspphot_upper",
+      "libname_gspphot"
+    ],
+    "field_count": 152
+  },
+  "gaia_source_manifest": {
+    "files": 3386,
+    "sha256": "9ec782f9c83b29885924c7d47bba18d70c86b8cbefbc408b19090b6a76e8e369",
+    "url": "https://cdn.gea.esac.esa.int/Gaia/gdr3/gaia_source/_MD5SUM.txt"
+  },
+  "xsc_schema": {
+    "provider_sql": "CREATE TABLE twomass_xsc (\n    jdate double precision,\n    designation character(17),\n    ra double precision,\n    decl double precision,\n    sup_ra double precision,\n    sup_dec double precision,\n    glon real,\n    glat real,\n    density real,\n    r_k20fe real,\n    j_m_k20fe real,\n    j_msig_k20fe real,\n    j_flg_k20fe smallint,\n    h_m_k20fe real,\n    h_msig_k20fe real,\n    h_flg_k20fe smallint,\n    k_m_k20fe real,\n    k_msig_k20fe real,\n    k_flg_k20fe smallint,\n    r_3sig real,\n    j_ba real,\n    j_phi smallint,\n    h_ba real,\n    h_phi smallint,\n    k_ba real,\n    k_phi smallint,\n    sup_r_3sig real,\n    sup_ba real,\n    sup_phi smallint,\n    r_fe real,\n    j_m_fe real,\n    j_msig_fe real,\n    j_flg_fe smallint,\n    h_m_fe real,\n    h_msig_fe real,\n    h_flg_fe smallint,\n    k_m_fe real,\n    k_msig_fe real,\n    k_flg_fe smallint,\n    r_ext real,\n    j_m_ext real,\n    j_msig_ext real,\n    j_pchi real,\n    h_m_ext real,\n    h_msig_ext real,\n    h_pchi real,\n    k_m_ext real,\n    k_msig_ext real,\n    k_pchi real,\n    j_r_eff real,\n    j_mnsurfb_eff real,\n    h_r_eff real,\n    h_mnsurfb_eff real,\n    k_r_eff real,\n    k_mnsurfb_eff real,\n    j_con_indx real,\n    h_con_indx real,\n    k_con_indx real,\n    j_peak real,\n    h_peak real,\n    k_peak real,\n    j_5surf real,\n    h_5surf real,\n    k_5surf real,\n    e_score real,\n    g_score real,\n    vc smallint,\n    cc_flg character(1),\n    im_nx smallint,\n    r_k20fc real,\n    j_m_k20fc real,\n    j_msig_k20fc real,\n    j_flg_k20fc smallint,\n    h_m_k20fc real,\n    h_msig_k20fc real,\n    h_flg_k20fc smallint,\n    k_m_k20fc real,\n    k_msig_k20fc real,\n    k_flg_k20fc smallint,\n    j_r_e real,\n    j_m_e real,\n    j_msig_e real,\n    j_flg_e smallint,\n    h_r_e real,\n    h_m_e real,\n    h_msig_e real,\n    h_flg_e smallint,\n    k_r_e real,\n    k_m_e real,\n    k_msig_e real,\n    k_flg_e smallint,\n    j_r_c real,\n    j_m_c real,\n    j_msig_c real,\n    j_flg_c smallint,\n    h_r_c real,\n    h_m_c real,\n    h_msig_c real,\n    h_flg_c smallint,\n    k_r_c real,\n    k_m_c real,\n    k_msig_c real,\n    k_flg_c smallint,\n    r_fc real,\n    j_m_fc real,\n    j_msig_fc real,\n    j_flg_fc smallint,\n    h_m_fc real,\n    h_msig_fc real,\n    h_flg_fc smallint,\n    k_m_fc real,\n    k_msig_fc real,\n    k_flg_fc smallint,\n    j_r_i20e real,\n    j_m_i20e real,\n    j_msig_i20e real,\n    j_flg_i20e smallint,\n    h_r_i20e real,\n    h_m_i20e real,\n    h_msig_i20e real,\n    h_flg_i20e smallint,\n    k_r_i20e real,\n    k_m_i20e real,\n    k_msig_i20e real,\n    k_flg_i20e smallint,\n    j_r_i20c real,\n    j_m_i20c real,\n    j_msig_i20c real,\n    j_flg_i20c smallint,\n    h_r_i20c real,\n    h_m_i20c real,\n    h_msig_i20c real,\n    h_flg_i20c smallint,\n    k_r_i20c real,\n    k_m_i20c real,\n    k_msig_i20c real,\n    k_flg_i20c smallint,\n    j_r_i21e real,\n    j_m_i21e real,\n    j_msig_i21e real,\n    j_flg_i21e smallint,\n    h_r_i21e real,\n    h_m_i21e real,\n    h_msig_i21e real,\n    h_flg_i21e smallint,\n    k_r_i21e real,\n    k_m_i21e real,\n    k_msig_i21e real,\n    k_flg_i21e smallint,\n    r_j21fe real,\n    j_m_j21fe real,\n    j_msig_j21fe real,\n    j_flg_j21fe smallint,\n    h_m_j21fe real,\n    h_msig_j21fe real,\n    h_flg_j21fe smallint,\n    k_m_j21fe real,\n    k_msig_j21fe real,\n    k_flg_j21fe smallint,\n    j_r_i21c real,\n    j_m_i21c real,\n    j_msig_i21c real,\n    j_flg_i21c smallint,\n    h_r_i21c real,\n    h_m_i21c real,\n    h_msig_i21c real,\n    h_flg_i21c smallint,\n    k_r_i21c real,\n    k_m_i21c real,\n    k_msig_i21c real,\n    k_flg_i21c smallint,\n    r_j21fc real,\n    j_m_j21fc real,\n    j_msig_j21fc real,\n    j_flg_j21fc smallint,\n    h_m_j21fc real,\n    h_msig_j21fc real,\n    h_flg_j21fc smallint,\n    k_m_j21fc real,\n    k_msig_j21fc real,\n    k_flg_j21fc smallint,\n    j_m_5 real,\n    j_msig_5 real,\n    j_flg_5 smallint,\n    h_m_5 real,\n    h_msig_5 real,\n    h_flg_5 smallint,\n    k_m_5 real,\n    k_msig_5 real,\n    k_flg_5 smallint,\n    j_m_7 real,\n    j_msig_7 real,\n    j_flg_7 smallint,\n    h_m_7 real,\n    h_msig_7 real,\n    h_flg_7 smallint,\n    k_m_7 real,\n    k_msig_7 real,\n    k_flg_7 smallint,\n    j_m_10 real,\n    j_msig_10 real,\n    j_flg_10 smallint,\n    h_m_10 real,\n    h_msig_10 real,\n    h_flg_10 smallint,\n    k_m_10 real,\n    k_msig_10 real,\n    k_flg_10 smallint,\n    j_m_15 real,\n    j_msig_15 real,\n    j_flg_15 smallint,\n    h_m_15 real,\n    h_msig_15 real,\n    h_flg_15 smallint,\n    k_m_15 real,\n    k_msig_15 real,\n    k_flg_15 smallint,\n    j_m_20 real,\n    j_msig_20 real,\n    j_flg_20 smallint,\n    h_m_20 real,\n    h_msig_20 real,\n    h_flg_20 smallint,\n    k_m_20 real,\n    k_msig_20 real,\n    k_flg_20 smallint,\n    j_m_25 real,\n    j_msig_25 real,\n    j_flg_25 smallint,\n    h_m_25 real,\n    h_msig_25 real,\n    h_flg_25 smallint,\n    k_m_25 real,\n    k_msig_25 real,\n    k_flg_25 smallint,\n    j_m_30 real,\n    j_msig_30 real,\n    j_flg_30 smallint,\n    h_m_30 real,\n    h_msig_30 real,\n    h_flg_30 smallint,\n    k_m_30 real,\n    k_msig_30 real,\n    k_flg_30 smallint,\n    j_m_40 real,\n    j_msig_40 real,\n    j_flg_40 smallint,\n    h_m_40 real,\n    h_msig_40 real,\n    h_flg_40 smallint,\n    k_m_40 real,\n    k_msig_40 real,\n    k_flg_40 smallint,\n    j_m_50 real,\n    j_msig_50 real,\n    j_flg_50 smallint,\n    h_m_50 real,\n    h_msig_50 real,\n    h_flg_50 smallint,\n    k_m_50 real,\n    k_msig_50 real,\n    k_flg_50 smallint,\n    j_m_60 real,\n    j_msig_60 real,\n    j_flg_60 smallint,\n    h_m_60 real,\n    h_msig_60 real,\n    h_flg_60 smallint,\n    k_m_60 real,\n    k_msig_60 real,\n    k_flg_60 smallint,\n    j_m_70 real,\n    j_msig_70 real,\n    j_flg_70 smallint,\n    h_m_70 real,\n    h_msig_70 real,\n    h_flg_70 smallint,\n    k_m_70 real,\n    k_msig_70 real,\n    k_flg_70 smallint,\n    j_m_sys real,\n    j_msig_sys real,\n    h_m_sys real,\n    h_msig_sys real,\n    k_m_sys real,\n    k_msig_sys real,\n    sys_flg smallint,\n    contam_flg smallint,\n    j_5sig_ba real,\n    j_5sig_phi smallint,\n    h_5sig_ba real,\n    h_5sig_phi smallint,\n    k_5sig_ba real,\n    k_5sig_phi smallint,\n    j_d_area smallint,\n    j_perc_darea smallint,\n    h_d_area smallint,\n    h_perc_darea smallint,\n    k_d_area smallint,\n    k_perc_darea smallint,\n    j_bisym_rat real,\n    j_bisym_chi real,\n    h_bisym_rat real,\n    h_bisym_chi real,\n    k_bisym_rat real,\n    k_bisym_chi real,\n    j_sh0 real,\n    j_sig_sh0 real,\n    h_sh0 real,\n    h_sig_sh0 real,\n    k_sh0 real,\n    k_sig_sh0 real,\n    j_sc_mxdn real,\n    j_sc_sh real,\n    j_sc_wsh real,\n    j_sc_r23 real,\n    j_sc_1mm real,\n    j_sc_2mm real,\n    j_sc_vint real,\n    j_sc_r1 real,\n    j_sc_msh real,\n    h_sc_mxdn real,\n    h_sc_sh real,\n    h_sc_wsh real,\n    h_sc_r23 real,\n    h_sc_1mm real,\n    h_sc_2mm real,\n    h_sc_vint real,\n    h_sc_r1 real,\n    h_sc_msh real,\n    k_sc_mxdn real,\n    k_sc_sh real,\n    k_sc_wsh real,\n    k_sc_r23 real,\n    k_sc_1mm real,\n    k_sc_2mm real,\n    k_sc_vint real,\n    k_sc_r1 real,\n    k_sc_msh real,\n    j_chif_ellf real,\n    k_chif_ellf real,\n    ellfit_flg smallint,\n    sup_chif_ellf real,\n    n_blank smallint,\n    n_sub smallint,\n    bl_sub_flg smallint,\n    id_flg smallint,\n    id_cat character(20),\n    fg_flg character(6),\n    blk_fac smallint,\n    dup_src smallint,\n    use_src smallint,\n    prox real,\n    pxpa smallint,\n    pxcntr integer,\n    dist_edge_ns integer,\n    dist_edge_ew smallint,\n    dist_edge_flg character(2),\n    pts_key integer,\n    mp_key integer,\n    night_key smallint,\n    scan_key integer,\n    coadd_key integer,\n    hemis character(1),\n    date date,\n    scan smallint,\n    coadd smallint,\n    id integer,\n    x_coadd real,\n    y_coadd real,\n    j_subst2 real,\n    h_subst2 real,\n    k_subst2 real,\n    j_back real,\n    h_back real,\n    k_back real,\n    j_resid_ann real,\n    h_resid_ann real,\n    k_resid_ann real,\n    j_bndg_per integer,\n    j_bndg_amp real,\n    h_bndg_per integer,\n    h_bndg_amp real,\n    k_bndg_per integer,\n    k_bndg_amp real,\n    j_seetrack real,\n    h_seetrack real,\n    k_seetrack real,\n    ext_key integer\n) WITHOUT OIDS;\n\n\n\n",
+    "sha256": "c48b7299a4c2395d970846404fa16205c0036e25f1b03d44c52e116f0bc5c021",
+    "url": "https://irsa.ipac.caltech.edu/2MASS/download/allsky/twomass_xsc_schema"
+  },
+  "full_required_storage_bytes": null,
+  "full_scope_fits_existing_infrastructure": null,
+  "prior_4_4_and_8_8_TB_numbers": "Unvalidated sample extrapolations; not measured storage requirements.",
+  "reproducible_allwise_inventory": {
+    "scope": "provider-reported remote metadata; catalog contents not downloaded/verified",
+    "files": 12288,
+    "rows_reported": 747634026,
+    "data_logical_bytes_reported": 364543757806,
+    "all_objects_bytes_reported": 365125943157,
+    "object_inventory_sha256": "e8777d9cd8fad510da52e8fc39b45833d8617ff54bdc2f68f4f7d091e1e7310e",
+    "row_manifest_sha256": "f1afdbf3d328b76dcf5da63dd60fae752a558846b73598a4bd9d76b4c43347c3",
+    "pages": 13,
+    "elapsed_seconds": 18.717386303003877
+  },
+  "verification": {
+    "python_tests_passed": 159,
+    "python_subtests_passed": 4,
+    "skipped": 0,
+    "prototype_fixture_byte_identical": true,
+    "sql_audit_wrong_database_rejected": true,
+    "standalone_allwise_inventory_reproduced": true
+  },
+  "measured_xsc_component_bytes": {
+    "parquet_logical": 1200092947,
+    "parquet_allocated": 1200300032,
+    "lookup_logical": 252555264,
+    "lookup_allocated": 252559360,
+    "source_gzip_logical": 813426110,
+    "source_gzip_allocated": 813441024
+  },
+  "xsc_field_documentation": {
+    "url": "https://irsa.ipac.caltech.edu/2MASS/download/allsky/format_xsc.html",
+    "bytes": 157242,
+    "sha256": "7c8ba477db128ed6fa92e0599d5cd7849c3e1f7ef07751622021e3267350b641"
+  },
+  "final_resource_checkpoint": {
+    "investigation_file_allocated_bytes": 2932756480,
+    "isolated_postgres_allocated_bytes": 151273472,
+    "task_filesystem_free_bytes": 231272251392
+  }
+}

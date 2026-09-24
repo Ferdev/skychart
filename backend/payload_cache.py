@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 
 from backend.settings import CACHE_DIR, CACHE_SCHEMA_VERSION, LIVE_TIMESTAMP_BUCKET_SECONDS
+from backend.catalog_astrometry import FRAME
 
 
 _cache_locks_guard = threading.Lock()
@@ -35,7 +36,7 @@ def cache_entry_lock(path: Path) -> Iterator[None]:
 
 
 def cache_key_payload(kind: str, **parts: Any) -> dict[str, Any]:
-    return {"schema_version": CACHE_SCHEMA_VERSION, "kind": kind, **parts}
+    return {"schema_version": CACHE_SCHEMA_VERSION, "frame_contract": FRAME, "kind": kind, **parts}
 
 
 def cache_path(namespace: str, key: dict[str, Any], cache_dir: Path | None = None) -> Path:

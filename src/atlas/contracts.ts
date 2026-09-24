@@ -320,6 +320,12 @@ export type CatalogNearestPayload = {
 };
 
 export type CatalogObjectPayload = {
+  capabilities?: {
+    searchable_metadata: boolean;
+    angular_position: boolean;
+    spatial_position: boolean;
+    dynamic_ephemeris: boolean;
+  };
   key: string;
   name: string;
   object_type?: DestinationBodyType | string | null;

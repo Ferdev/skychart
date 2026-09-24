@@ -1,0 +1,426 @@
+{
+  "schema_version": 1,
+  "registry_version": "2026-09-08.1",
+  "observed_at": "2026-09-08T14:23:21.690968+00:00",
+  "scope": "local evidence only; file counts are not imported database or unique object counts",
+  "snapshots": [
+    {
+      "file": "bass_dr2_black_holes.json",
+      "bytes": 1516901,
+      "records": 790,
+      "sha256": "cfbde8bda6d98b6de3200868d46b33b01fef6c3b769e3a6558eb85a80b150570",
+      "status": "observed",
+      "collection": "objects",
+      "generated_at": "2026-07-15T15:45:39.675989Z",
+      "source": {
+        "authors": "Koss et al. (2022)",
+        "bibcode": "2022ApJS..261....2K",
+        "catalog_url": "https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2",
+        "data_terms": {
+          "code_license_exclusion": "Upstream catalog measurements are not relicensed under the Cosmic Atlas MIT license.",
+          "upstream_license": "No SPDX-style redistribution license is stated on the BASS DR2 or VizieR catalog page; review current upstream terms before redistribution.",
+          "vizier_acknowledgment_doi": "10.26093/cds/vizier"
+        },
+        "doi": "10.3847/1538-4365/ac6c05",
+        "name": "BASS DR2 general hard-X-ray selected AGN properties",
+        "paper_url": "https://doi.org/10.3847/1538-4365/ac6c05",
+        "query": "SELECT\n  \"ID\",\n  \"m_ID\",\n  \"SWIFT\",\n  \"CName\",\n  \"RAJ2000\",\n  \"DEJ2000\",\n  \"Type\",\n  \"z\",\n  \"ztype\",\n  \"Dist\",\n  \"logMBH\",\n  \"Method\",\n  \"logLbol\",\n  \"logEdd\",\n  \"SimbadName\"\nFROM \"J/ApJS/261/2/table9\"\nWHERE \"logMBH\" IS NOT NULL\n  AND \"Dist\" > 0\nORDER BY \"ID\", \"m_ID\"",
+        "tap_url": "https://tapvizier.cds.unistra.fr/TAPVizieR/tap/sync",
+        "vizier_catalog": "J/ApJS/261/2",
+        "vizier_table": "J/ApJS/261/2/table9"
+      },
+      "selection": {
+        "criteria": "finite logMBH and positive catalog distance (Dist > 0)",
+        "distance_model": "BASS DR2 catalog distance in Mpc converted directly to light-years",
+        "radius_model": "Schwarzschild radius derived from BASS DR2 best black-hole mass",
+        "scientific_scope": "Hard-X-ray-selected AGNs represented by their central black-hole mass estimate; entries are not direct horizon detections."
+      },
+      "missing_distance": 0,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "bright_stars.json",
+      "bytes": 6725486,
+      "records": 8726,
+      "sha256": "93cba6b26c4ddcc76c41a3417c61038a7d2e58b0fa4b3e0e5bb3e2836b02bcfa",
+      "status": "observed",
+      "collection": "stars",
+      "generated_at": "2026-05-08T18:08:06.764875Z",
+      "source": {
+        "documentation_url": "https://cdsarc.cds.unistra.fr/viz-bin/cat/I/239",
+        "name": "Hipparcos Main Catalogue",
+        "query": {
+          "-out": "HIP,HD,RAICRS,DEICRS,Plx,Vmag,B-V,SpType",
+          "-out.max": "unlimited",
+          "-source": "I/239/hip_main",
+          "Plx": ">0",
+          "Vmag": "<6.5"
+        },
+        "table": "I/239/hip_main",
+        "vizier_url": "https://vizier.cds.unistra.fr/viz-bin/asu-tsv"
+      },
+      "selection": {
+        "apparent_magnitude": "<6.5",
+        "parallax_mas": ">0"
+      },
+      "missing_distance": 0,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "curated_extragalactic_survey.json",
+      "bytes": 1169351,
+      "records": 891,
+      "sha256": "e778a97f1ad156e49e92d883483a76c3bfefe92e1acafeaae45d51281307e963",
+      "status": "observed",
+      "collection": "objects",
+      "generated_at": "2026-07-14T07:49:53.644109Z",
+      "source": {
+        "description": "Real-catalog-backed Local Volume galaxies plus curated cluster, supercluster, and quasar landmarks for physical atlas navigation.",
+        "label": "Curated extragalactic survey landmarks",
+        "primary_services": [
+          "NASA HEASARC",
+          "NASA/IPAC Extragalactic Database",
+          "CDS SIMBAD"
+        ],
+        "survey_catalogs": [
+          "HEASARC NEARGALCAT",
+          "Local Volume Galaxy catalog",
+          "Virgo Cluster Catalog",
+          "Fornax Cluster Catalog",
+          "Abell clusters",
+          "3C radio catalog",
+          "2MASS/2MRS",
+          "APM"
+        ],
+        "urls": [
+          "https://heasarc.gsfc.nasa.gov/W3Browse/galaxy-catalog/neargalcat.html",
+          "https://ned.ipac.caltech.edu/",
+          "https://simbad.cds.unistra.fr/simbad/",
+          "https://heasarc.gsfc.nasa.gov/W3Browse/all/abell.html",
+          "https://irsa.ipac.caltech.edu/Missions/2mass.html"
+        ]
+      },
+      "selection": {
+        "distance_note": "Distances are rounded literature/redshift distances in million light years for atlas placement, not precision cosmology fitting.",
+        "download_policy": "The compact checked-in HEASARC source snapshot makes catalog builds deterministic and offline.",
+        "included": "NEARGALCAT galaxies with positive individual distance estimates plus named landmarks useful across Local Group, cluster, supercluster, and quasar-field zooms."
+      },
+      "missing_distance": 0,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "deep_sky_catalog.json",
+      "bytes": 98411,
+      "records": 110,
+      "sha256": "8999f59a736750afcb2a745f2b0f435484c7436f78395b23f5d6b67c795fbe53",
+      "status": "observed",
+      "collection": "objects",
+      "generated_at": "2026-05-06T22:50:00.840414Z",
+      "source": [
+        {
+          "label": "AstroPixels Messier Catalog",
+          "url": "https://astropixels.com/messier/messiercat.html",
+          "used_for": "Messier RA/Dec, distance, magnitude, angular size, constellation, season, common names"
+        },
+        {
+          "label": "NASA HEASARC Messier table notes",
+          "url": "https://heasarc.gsfc.nasa.gov/W3Browse/general-catalog/messier.html",
+          "used_for": "Catalog context, field definitions, and object class descriptions"
+        }
+      ],
+      "selection": null,
+      "missing_distance": 0,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "exoplanet_systems.json",
+      "bytes": 4712989,
+      "records": 4680,
+      "sha256": "b9408ca3be92234935e0ac17efc5d082c06b818275d5c1bd08dbd176065efc0e",
+      "status": "observed",
+      "collection": "systems",
+      "generated_at": "2026-05-07T20:48:38.556119Z",
+      "source": {
+        "documentation_url": "https://exoplanetarchive.ipac.caltech.edu/docs/pscp_about.html",
+        "name": "NASA Exoplanet Archive Planetary Systems Composite Parameters",
+        "query": "select\n  pl_name,\n  hostname,\n  hd_name,\n  hip_name,\n  tic_id,\n  ra,\n  dec,\n  sy_dist,\n  sy_pnum,\n  sy_snum,\n  sy_mnum,\n  st_rad,\n  st_teff,\n  st_mass,\n  st_spectype,\n  pl_rade,\n  pl_bmasse,\n  pl_orbper,\n  pl_orbsmax,\n  discoverymethod,\n  disc_year\nfrom pscomppars\nwhere hostname is not null\n  and ra is not null\n  and dec is not null\n  and sy_dist is not null\norder by hostname, pl_name",
+        "table": "pscomppars",
+        "tap_url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
+      },
+      "selection": null,
+      "missing_distance": 0,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "gaia_local_stars.json",
+      "bytes": 35816085,
+      "records": 33170,
+      "sha256": "dcb9b1a73fe39eccd130ca76f1bbac8eb1bd6670985635dfc84a183ca10107be",
+      "status": "observed",
+      "collection": "stars",
+      "generated_at": "2026-05-10T11:00:41.815003Z",
+      "source": {
+        "documentation_url": "https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_main_source_catalogue/ssec_dm_gaia_source.html",
+        "name": "ESA Gaia DR3 gaia_source",
+        "query": "SELECT TOP 35000\n  source_id,\n  ra,\n  dec,\n  parallax,\n  parallax_over_error,\n  phot_g_mean_mag,\n  bp_rp,\n  pmra,\n  pmdec,\n  radial_velocity,\n  astrometric_params_solved\nFROM gaiadr3.gaia_source\nWHERE parallax >= 20.0\n  AND parallax_over_error >= 10.0\n  AND phot_g_mean_mag IS NOT NULL\n  AND phot_g_mean_mag <= 16.0\nORDER BY phot_g_mean_mag ASC",
+        "tap_url": "https://gea.esac.esa.int/tap-server/tap/sync"
+      },
+      "selection": {
+        "limit": 35000,
+        "parallax_mas": ">= 20.0",
+        "parallax_over_error": ">= 10.0",
+        "phot_g_mean_mag": "<= 16.0"
+      },
+      "missing_distance": 0,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "ngc_ic_deep_sky.json",
+      "bytes": 8186769,
+      "records": 13308,
+      "sha256": "f6e9a0fcac3c630747c11b02778e79af51e2c20bb21ceddbadbb0f1d0e6d3d12",
+      "status": "observed",
+      "collection": "objects",
+      "generated_at": "2026-05-16T00:29:16.130983Z",
+      "source": {
+        "commit": "36cb178a0f69dba8bfc03a99c10512831edf1c6b",
+        "csv_url": "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/database_files/NGC.csv",
+        "guide_url": "https://raw.githubusercontent.com/mattiaverga/OpenNGC/master/NGC_guide.txt",
+        "label": "OpenNGC NGC/IC database",
+        "license": "CC-BY-SA-4.0",
+        "url": "https://github.com/mattiaverga/OpenNGC",
+        "used_for": "NGC/IC designations, RA/Dec, object classes, constellation, magnitudes, angular sizes, aliases, common names, and redshift/radial-velocity distance estimates where available"
+      },
+      "selection": {
+        "distance_note": "Distances are recorded only when OpenNGC supplies positive parallax, redshift, or radial velocity; redshift/radial-velocity distances use a simple Hubble-flow approximation with H0=70 km/s/Mpc.",
+        "excluded_types": [
+          "Dup",
+          "NonEx"
+        ],
+        "included": "NGC and IC entries with coordinates and physical/catalog object types"
+      },
+      "missing_distance": 2763,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "simbad_compact_objects.json",
+      "bytes": 4365279,
+      "records": 3947,
+      "sha256": "e5dbf90f9743b67e3b2c4594bc8efa2bbdcc210b605f921feecca796b50ff424",
+      "status": "observed",
+      "collection": "objects",
+      "generated_at": "2026-05-16T16:08:29.207290Z",
+      "source": {
+        "documentation_url": "https://simbad.cds.unistra.fr/guide/sim-tap",
+        "name": "SIMBAD TAP basic table",
+        "query": "SELECT TOP 5000\n  oid,\n  main_id,\n  otype,\n  otype_txt,\n  ra,\n  dec,\n  plx_value,\n  rvz_redshift,\n  nbref\nFROM basic\nWHERE ra IS NOT NULL\n  AND dec IS NOT NULL\n  AND otype IN ('BH', 'BH?', 'Psr')\nORDER BY nbref DESC",
+        "tap_url": "https://simbad.cds.unistra.fr/simbad/sim-tap/sync"
+      },
+      "selection": {
+        "distance_model": "Parallax when available; redshift cosmology when available; otherwise display shell for sky placement.",
+        "limit": 5000,
+        "object_types": [
+          "BH",
+          "BH?",
+          "Psr"
+        ],
+        "ordering": "black holes first, then SIMBAD reference count descending"
+      },
+      "missing_distance": 0,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "simbad_extragalactic.json",
+      "bytes": 6071502,
+      "records": 5000,
+      "sha256": "7181de9c4e293447b21408a8e869a99c6074c887f065ac36bdd0cb42292f3ac1",
+      "status": "observed",
+      "collection": "objects",
+      "generated_at": "2026-05-10T11:01:55.035071Z",
+      "source": {
+        "documentation_url": "https://simbad.cds.unistra.fr/guide/sim-tap",
+        "name": "SIMBAD TAP basic table",
+        "ned_lookup_url": "https://ned.ipac.caltech.edu/byname",
+        "query": "SELECT TOP 5000\n  oid,\n  main_id,\n  otype,\n  otype_txt,\n  ra,\n  dec,\n  rvz_redshift,\n  nbref,\n  galdim_majaxis,\n  galdim_minaxis\nFROM basic\nWHERE ra IS NOT NULL\n  AND dec IS NOT NULL\n  AND rvz_redshift IS NOT NULL\n  AND rvz_redshift > 0\n  AND otype IN ('QSO','AGN','BLL','Bla','SyG','Rad','G')\nORDER BY nbref DESC",
+        "tap_url": "https://simbad.cds.unistra.fr/simbad/sim-tap/sync"
+      },
+      "selection": {
+        "distance_model": "Flat Lambda-CDM approximation, H0=67.8, omega_m=0.308, omega_lambda=0.692",
+        "limit": 5000,
+        "minimum_redshift": "> 0",
+        "object_types": [
+          "AGN",
+          "BLL",
+          "Bla",
+          "G",
+          "QSO",
+          "Rad",
+          "SyG"
+        ],
+        "ordering": "SIMBAD reference count descending"
+      },
+      "missing_distance": 0,
+      "missing_angular_position": 0
+    },
+    {
+      "file": "small_bodies.json",
+      "bytes": 33374232,
+      "records": 17633,
+      "sha256": "98f869eb111a2c41c7dad76c531ff2c23495d89e19ba1b984a86017018fca52e",
+      "status": "observed",
+      "collection": "objects",
+      "generated_at": "2026-07-15T15:30:47.611768Z",
+      "source": {
+        "api_url": "https://ssd-api.jpl.nasa.gov/sbdb_query.api",
+        "documentation_url": "https://ssd-api.jpl.nasa.gov/doc/sbdb_query.html",
+        "fields": [
+          "spkid",
+          "full_name",
+          "pdes",
+          "name",
+          "kind",
+          "neo",
+          "pha",
+          "class",
+          "H",
+          "G",
+          "diameter",
+          "albedo",
+          "rot_per",
+          "GM",
+          "epoch",
+          "e",
+          "a",
+          "q",
+          "i",
+          "om",
+          "w",
+          "ma",
+          "n",
+          "per",
+          "ad",
+          "moid"
+        ],
+        "filter_documentation_url": "https://ssd-api.jpl.nasa.gov/doc/sbdb_filter.html",
+        "name": "NASA/JPL Small-Body Database Query API",
+        "query_slices": [
+          {
+            "name": "largest_diameter_asteroids",
+            "params": {
+              "limit": "10000",
+              "sb-cdata": "{\"AND\":[\"diameter|DF\"]}",
+              "sb-kind": "a",
+              "sort": "-diameter"
+            },
+            "returned_count": 10000,
+            "total_matching_count": 139583
+          },
+          {
+            "name": "bright_near_earth_asteroids",
+            "params": {
+              "limit": "6000",
+              "sb-cdata": "{\"AND\":[\"H|DF\"]}",
+              "sb-group": "neo",
+              "sb-kind": "a",
+              "sort": "H"
+            },
+            "returned_count": 6000,
+            "total_matching_count": 41630
+          },
+          {
+            "name": "periodic_and_named_comets",
+            "params": {
+              "limit": "5000",
+              "sb-kind": "c",
+              "sb-xfrag": "1",
+              "sort": "full_name"
+            },
+            "returned_count": 3893,
+            "total_matching_count": 3893
+          }
+        ],
+        "source_adapters": [
+          {
+            "api": "sbdb_query",
+            "family": "asteroid",
+            "name": "iau_recognized_dwarf_planets",
+            "params": {
+              "limit": "4",
+              "sb-cdata": "{\"OR\":[\"pdes|EQ|1\",\"pdes|EQ|136108\",\"pdes|EQ|136472\",\"pdes|EQ|136199\"]}",
+              "sb-kind": "a",
+              "sort": "pdes"
+            },
+            "retrieved_at_utc": "2026-07-15T15:30:47.611768Z",
+            "returned_count": 4,
+            "total_matching_count": 4
+          }
+        ]
+      },
+      "selection": {
+        "description": "Union of largest diameter-known asteroids, bright near-Earth asteroids, non-fragment comets, and an explicit IAU-recognized dwarf-planet completeness slice.",
+        "position_model": "Two-body propagation from JPL osculating elements to the per-object target recorded in position_generated_for_jd_utc."
+      },
+      "missing_distance": 17633,
+      "missing_angular_position": 17633
+    }
+  ],
+  "database": {
+    "status": "observed",
+    "scope": "explicit libpq connection; not production attestation",
+    "relation": "catalog_objects",
+    "counts": [
+      {
+        "source_type": "bright_star_catalog",
+        "catalog_group": "bright_stars",
+        "rows": 8726
+      },
+      {
+        "source_type": "curated_extragalactic_survey",
+        "catalog_group": "curated_extragalactic_survey",
+        "rows": 24
+      },
+      {
+        "source_type": "deep_sky_catalog",
+        "catalog_group": "messier_deep_sky",
+        "rows": 110
+      },
+      {
+        "source_type": "exoplanet_archive_planet",
+        "catalog_group": "exoplanets",
+        "rows": 6259
+      },
+      {
+        "source_type": "exoplanet_archive_system",
+        "catalog_group": "exoplanet_systems",
+        "rows": 4680
+      },
+      {
+        "source_type": "gaia_dr3",
+        "catalog_group": "gaia_local_stars",
+        "rows": 33170
+      },
+      {
+        "source_type": "jpl_sbdb_query",
+        "catalog_group": "jpl_small_bodies",
+        "rows": 17630
+      },
+      {
+        "source_type": "openngc_ngc_ic_catalog",
+        "catalog_group": "ngc_ic_deep_sky",
+        "rows": 13308
+      },
+      {
+        "source_type": "simbad_tap",
+        "catalog_group": "simbad_compact_objects",
+        "rows": 3947
+      },
+      {
+        "source_type": "simbad_tap",
+        "catalog_group": "simbad_extragalactic",
+        "rows": 5000
+      }
+    ],
+    "release_reconciliation": "unavailable"
+  },
+  "admitted_releases": []
+}

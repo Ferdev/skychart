@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "normalizer_version": "catalog-staging-v1",
+  "provider": "SkyChart fixtures",
+  "catalog": "ingestion-contract",
+  "release": "v1",
+  "documentation": "tests/fixtures/catalog_import.csv (synthetic validation fixture, not catalog coverage)",
+  "angular_frame": "ICRS",
+  "source_epoch": 2016.0,
+  "fields": [
+    {
+      "name": "id",
+      "type": "id",
+      "unit": null
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "unit": null
+    },
+    {
+      "name": "ra",
+      "type": "float",
+      "unit": "deg"
+    },
+    {
+      "name": "dec",
+      "type": "float",
+      "unit": "deg"
+    },
+    {
+      "name": "parallax",
+      "type": "float",
+      "unit": "mas"
+    },
+    {
+      "name": "error",
+      "type": "float",
+      "unit": "mas"
+    }
+  ],
+  "mapping": {
+    "id": "id",
+    "name": "name",
+    "ra": "ra",
+    "dec": "dec",
+    "parallax": "parallax",
+    "parallax_error": "error"
+  },
+  "files": [
+    {
+      "name": "catalog_import.csv",
+      "format": "csv",
+      "sha256": "edd8218528ac082beee49a901ee4d21b44a6275121be51acac796e895d2da1b7",
+      "rows": 4
+    }
+  ],
+  "expected_rows": 4
+}

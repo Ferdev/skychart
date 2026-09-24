@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "complete_source_files_only",
+  "serving_total": null,
+  "files": [
+    {
+      "id": "virgo-vcc--vcc.dat",
+      "catalog": "J/AJ/90/1681",
+      "table": "vcc.dat",
+      "rows": 2096,
+      "record_width": 69,
+      "schema_sha256": "49045746f20df19d6ff9e1b02793fa3444febe03483b32df83dbdfae38e31872",
+      "urls": [
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/90/1681/vcc.dat",
+        "https://cdsarc.cds.unistra.fr/ftp/J/AJ/90/1681/vcc.dat.gz"
+      ],
+      "max_source_bytes": 1048576
+    }
+  ]
+}

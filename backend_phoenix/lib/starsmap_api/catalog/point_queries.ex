@@ -383,7 +383,8 @@ defmodule StarsmapApi.Catalog.PointQueries do
         CatalogSourceObject
         |> where(
           [object],
-          not is_nil(object.x_au) and not is_nil(object.y_au) and not is_nil(object.z_au)
+          (not is_nil(object.x_au) and not is_nil(object.y_au) and not is_nil(object.z_au)) or
+            (not is_nil(object.ra_deg) and not is_nil(object.dec_deg))
         )
         |> maybe_exclude_key(observer_key)
         |> maybe_filter_groups(groups)
@@ -402,18 +403,28 @@ defmodule StarsmapApi.Catalog.PointQueries do
           object.apparent_magnitude,
           object.x_au,
           object.y_au,
-          object.z_au
+          object.z_au,
+          object.ra_deg,
+          object.dec_deg,
+          object.position_model
         ])
         |> Repo.all(timeout: @sky_query_timeout)
 
       points =
-        Enum.flat_map(rows, fn [key, name, type, group, color, magnitude, x, y, z] ->
-          dx = x - observer_x_au
-          dy = y - observer_y_au
-          dz = z - observer_z_au
-          distance_au = :math.sqrt(dx * dx + dy * dy + dz * dz)
+        Enum.flat_map(rows, fn [key, name, type, group, color, magnitude, x, y, z, ra, dec, model] ->
+          physical? =
+            model != "catalog_sky_position_reference_shell" and Enum.all?([x, y, z], &is_number/1)
 
-          if distance_au > 1.0e-12 do
+          direction =
+            if physical? do
+              normalize_direction(x - observer_x_au, y - observer_y_au, z - observer_z_au)
+            else
+              # No invented depth or observer-dependent parallax for an angular
+              # catalog record. This is the published direction at its epoch.
+              angular_direction(ra, dec)
+            end
+
+          if direction do
             [
               %{
                 key: key,
@@ -422,7 +433,12 @@ defmodule StarsmapApi.Catalog.PointQueries do
                 catalog_group: group,
                 color: color,
                 apparent_magnitude: magnitude,
-                direction: %{x: dx / distance_au, y: dy / distance_au, z: dz / distance_au}
+                direction: direction,
+                direction_model:
+                  if(physical?,
+                    do: "observer_relative_spatial",
+                    else: "catalog_angular_no_parallax"
+                  )
               }
             ]
           else
@@ -445,6 +461,18 @@ defmodule StarsmapApi.Catalog.PointQueries do
        }}
     end
   end
+
+  defp normalize_direction(x, y, z) do
+    distance = :math.sqrt(x * x + y * y + z * z)
+    if distance > 1.0e-12, do: %{x: x / distance, y: y / distance, z: z / distance}, else: nil
+  end
+
+  defp angular_direction(ra, dec)
+       when is_number(ra) and is_number(dec) and ra >= 0 and ra < 360 and dec >= -90 and dec <= 90 do
+    StarsmapApi.Catalog.Astrometry.project(ra, dec)
+  end
+
+  defp angular_direction(_, _), do: nil
 
   defp point_base_query(bounds, groups, types) do
     CatalogSourceObject

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-09T16:43:07.175841+00:00",
+  "target": "existing Apps Server via sk-apps-server-1",
+  "logical_cpus": 8,
+  "memory_total_bytes": 67200438272,
+  "memory_available_bytes": 59844894720,
+  "root_filesystem": {
+    "total_bytes": 493275160576,
+    "used_bytes": 207172878336,
+    "free_bytes": 260970049536,
+    "docker_shares_filesystem": true
+  },
+  "additional_catalog_storage_found": false,
+  "staging_and_production_share_host": true,
+  "staging_and_production_database": {
+    "host": "skychart-production-postgres",
+    "name": "skychart",
+    "same_configured_database": true
+  },
+  "skychart_containers_explicit_docker_memory_and_cpu_limits": false,
+  "capacity_approved": false,
+  "remote_operations": "read-only capacity report, filesystem/container configuration inspection; no imports, database writes or deployment",
+  "limitations": [
+    "Free capacity is shared with live production workloads.",
+    "The local 10k-row prototype does not establish a full-volume schema or storage budget.",
+    "Full-volume imports into the configured staging database would also affect production.",
+    "No database writes or resource allocations were authorized by this inspection."
+  ]
+}

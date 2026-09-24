@@ -119,14 +119,14 @@ def partition(connection, source: str, output: Path, tier: str) -> int:
     if projected_path.exists():
         projected_path.unlink()
     projected_destination = str(projected_path).replace("'", "''")
-    # Equatorial Cartesian -> ecliptic Cartesian at J2016 using mean obliquity.
+    # Source-epoch J2016 astrometry projected onto fixed J2000 mean-ecliptic axes.
     connection.execute(f"""
         COPY (
           SELECT source_id::UBIGINT source_id, phot_g_mean_mag::REAL magnitude, bp_rp::REAL bp_rp,
             (1000.0 / parallax) * {AU_PER_PC} * cos(radians(dec)) * cos(radians(ra)) AS x_au,
             (1000.0 / parallax) * {AU_PER_PC} *
-              (cos(radians(23.43928)) * cos(radians(dec)) * sin(radians(ra))
-               + sin(radians(23.43928)) * sin(radians(dec))) AS y_au
+              (cos(radians(23.4392911)) * cos(radians(dec)) * sin(radians(ra))
+               + sin(radians(23.4392911)) * sin(radians(dec))) AS y_au
           FROM {parquet_source(source)}
           WHERE parallax > 0 AND parallax_over_error >= {cut}
         ) TO '{projected_destination}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 122880)
@@ -204,6 +204,8 @@ def partition(connection, source: str, output: Path, tier: str) -> int:
 
     projected_path.unlink()
     (output / "build.json").write_text(json.dumps({
+        "frame_contract": "heliocentric-ecliptic-J2000-v1",
+        "position_epoch": 2016.0,
         "tier": tier,
         "cut": cut,
         "source_counts": {"gaia_dr3_bulk": selected_source_count},
@@ -301,6 +303,8 @@ def encode(connection, source: str, output: Path, version: str) -> int:
         "version": version, "format": "SMP3", "container_format": "SMPK1",
         "records_sorted_by": "magnitude", "record_bytes": 8,
         "projection": "heliocentric_ecliptic_top_down_au",
+        "frame_contract": build.get("frame_contract", "legacy-gaia-23.43928-2016"),
+        "position_epoch": build.get("position_epoch", 2016.0),
         "source_counts": build.get("source_counts", {}),
         "gaia_tier": build.get("tier"),
         "parallax_over_error_min": build.get("cut"),
