@@ -18,8 +18,10 @@ optional guided tour step, and an optional free-flight 3D position and camera.
 A navigable perspective over catalog objects with finite heliocentric ecliptic
 `x/y/z` positions. The browser stores the flight position, orientation, field
 of view, and movement step in versioned view state. Dense 2D-only point-tile
-records are not assigned invented depth; the 3D endpoint returns a bounded,
-brightness-prioritized set of records that have all three coordinates.
+records are not assigned invented depth; the 3D endpoint combines nearby
+positions with a bounded bright-landmark sample and excludes unknown-distance
+reference shells. Entry starts at the 2D map center and can aim at the selected
+object; a selected 3D point can be approached or inspected in 2D or Sky.
 
 ### Catalog object
 

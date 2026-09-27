@@ -20,7 +20,7 @@ Cosmic Atlas is a scientific celestial atlas with a precise 2D map and a free-fl
 - Distance measurement between selected objects or map points, including light-time and scale comparisons.
 - UTC time controls: apply a timestamp, jump to now, or step by days/weeks/months.
 - Map view controls for object labels, orbit guides, scale grid, Milky Way projection, edge references, zoom presets, and readable/hybrid/true-size rendering. Universe-scale structure is drawn only from measured catalog points; procedural filaments and density artwork are intentionally absent.
-- A free-flight 3D mode that starts at the current map location or selected object, preserves all three heliocentric ecliptic coordinates, and supports drag/arrow look controls plus scale-adjustable keyboard, wheel, and on-screen movement.
+- A free-flight 3D mode entered from the current 2D map center, aimed toward a selected object when one is available. It preserves all three heliocentric ecliptic coordinates, supports held keyboard or on-screen movement, drag/arrow look controls, and scale-adjustable travel. Selecting a 3D point offers go-to, return-to-2D inspection, and object-centered Sky actions.
 - Guided object sets for Solar neighborhood, bright stars, nearby stars, small bodies, Messier highlights, galaxies, active galaxies, nebulae, and universe-scale exploration.
 - A scale ladder that marks whether the current viewport is planetary, Solar System, nearby-star, Milky Way, Local Group, galaxy-cluster, or cosmic-web scale.
 

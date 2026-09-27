@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { moveUniversePosition, universeCameraBasis } from "../src/navigation/universeNavigation.ts";
+import { moveUniversePosition, universeCameraBasis, universeEntryState } from "../src/navigation/universeNavigation.ts";
 
 const near = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} ≈ ${expected}`);
 
@@ -20,5 +20,14 @@ const pitched = moveUniversePosition({ x: 0, y: 0, z: 0 }, 90, 30, "forward", 2)
 near(pitched.x, 0);
 near(pitched.y, Math.sqrt(3));
 near(pitched.z, 1);
+
+const entry = universeEntryState({ x: 2, y: 3 }, 5, { x: 102, y: 3, z: 0 });
+assert.deepEqual(entry.positionAu, { x: 2, y: 3, z: 0 });
+near(entry.yawDeg, 0);
+assert.equal(entry.moveStepAu, 5);
+
+const coincident = universeEntryState({ x: 2, y: 3 }, 5, { x: 2, y: 3, z: 0 });
+assert.deepEqual(coincident.positionAu, { x: 7, y: 3, z: 0 });
+near(coincident.yawDeg, 180);
 
 console.log("universe navigation tests passed");

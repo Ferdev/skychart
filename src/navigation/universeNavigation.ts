@@ -1,5 +1,7 @@
 import { clamp } from "../geometry.ts";
 import type { Vector3 } from "../sky/skyProjection.ts";
+import { cameraForDirection, relativeDirection } from "../sky/skyProjection.ts";
+import type { UniverseViewState } from "../viewState.ts";
 
 export type UniverseMove = "forward" | "back" | "left" | "right" | "up" | "down";
 
@@ -42,4 +44,21 @@ export function moveUniversePosition(
     y: position.y + axis.y * distanceAu * sign,
     z: position.z + axis.z * distanceAu * sign,
   };
+}
+
+/** Enter 3D from the 2D map center and aim at its selected object when possible. */
+export function universeEntryState(
+  center: { x: number; y: number }, moveStepAu: number, selected?: Vector3,
+): UniverseViewState {
+  const step = clamp(moveStepAu, 1e-12, 1e18);
+  const position = { x: center.x, y: center.y, z: 0 };
+  if (selected && [selected.x, selected.y, selected.z].every(Number.isFinite)) {
+    let direction = relativeDirection(position, selected);
+    if (!direction) {
+      position.x += step;
+      direction = relativeDirection(position, selected);
+    }
+    if (direction) return { positionAu: position, ...cameraForDirection(direction), moveStepAu: step };
+  }
+  return { positionAu: position, yawDeg: 180, pitchDeg: 0, fovDeg: 72, moveStepAu: step };
 }

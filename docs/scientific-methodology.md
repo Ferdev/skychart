@@ -16,9 +16,15 @@ three-dimensional separation.
 The 3D universe view uses the same measured or source-modeled `x/y/z`
 coordinates and moves an observer freely through that frame. Its catalog query
 includes only records with finite values on all three axes and returns a
-bounded, brightness-prioritized sample for interactive rendering. Compact map
-tiles that omit line-of-sight position are not placed on an invented plane in
-3D. Movement step size is user-adjustable because the atlas spans from
+bounded sample combining nearby positions with bright catalog landmarks.
+Nearby stars are queried within a smaller volume than nonstellar objects so
+dense star tables remain responsive. The sample is incomplete, and catalog
+apparent magnitudes are not recomputed for the moving observer. Objects placed
+on a reference shell because their distance is unknown are excluded from 3D.
+While the camera moves, a smaller deterministic subset is drawn; full sampled
+detail returns when movement stops.
+Compact map tiles that omit line-of-sight position are not placed on an invented
+plane in 3D. Movement step size is user-adjustable because the atlas spans from
 kilometers to billions of light-years; changing that step does not rescale or
 alter the underlying coordinates.
 

@@ -59,7 +59,7 @@ import {
   mergeBodyList,
   replaceBodyList,
 } from "./atlas/atlasState";
-import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController"; import { createUniverseViewController, UniverseViewController } from "./universe/universeViewController";
+import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController"; import { createUniverseViewController, initialUniverseState, UniverseViewController } from "./universe/universeViewController";
 import type {
   ActiveAtlasTab, SizeMode, ZoomPreset, Body, Ephemeris, CatalogSummary, ObjectDetailHydrationState,
   Camera, LoadingStep, RenderRequestOptions, SelectBodyOptions, DataRefreshOptions, CatalogPointHitEntry,
@@ -556,7 +556,7 @@ skyView = createSkyViewController(atlasDom, {
   catalogRelease: () => catalogPointManifest.value?.version,
   locale,
 });
-universeView = createUniverseViewController(atlasDom, { bodyByKey: () => bodyByKey, translate: t, selectBody: selectBodyByKey, stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), closeSky: () => skyView?.close({ updateHistory: false }), initialState: () => { const selected = selectedBody(); return { positionAu: selected ? { x: selected.position.x_au, y: selected.position.y_au, z: selected.position.z_au } : { x: camera.xAu, y: camera.yAu, z: 0 }, yawDeg: 180, pitchDeg: 0, fovDeg: 72, moveStepAu: Math.max(1e-12, Math.min(1e18, usableViewportRect().width / camera.pxPerAu / 12)) }; } });
+universeView = createUniverseViewController(atlasDom, { bodyByKey: () => bodyByKey, selectedBody, translate: t, selectBody: selectBodyByKey, openSky: (body) => skyView?.open(body) ?? Promise.resolve(), stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), closeSky: () => skyView?.close({ updateHistory: false }), resumeAtlas: () => requestRender(), initialState: () => initialUniverseState({ x: camera.xAu, y: camera.yAu }, usableViewportRect().width / camera.pxPerAu / 12, selectedBody()) });
 const embedController: AtlasEmbedController = new AtlasEmbedController({
   enabled: isEmbedMode,
   canvas,
@@ -787,7 +787,7 @@ function updateAllUi() {
   updateEmbedAttribution();
 }
 
-function render() {
+function render() { if (universeView?.active) { renderFrameId = null; return; }
   const frameStartedAt = performance.now();
   const previousFrameAt = perfLastFrameAt;
   perfLastFrameAt = frameStartedAt;
@@ -822,7 +822,7 @@ function render() {
   objectInspection.updateScienceLayerDisclosure();
 }
 
-function requestRender(options: RenderRequestOptions = {}) {
+function requestRender(options: RenderRequestOptions = {}) { if (universeView?.active) return;
   if (isEmbedMode && !embedController.visible) return;
   atlasVisibility.invalidate();
   if (options.data) requestDataRefresh();
