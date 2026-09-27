@@ -16,6 +16,7 @@ export const atlasDom = {
   universeView: requiredElement<HTMLElement>("#universe-view"),
   universeCanvas: requiredElement<HTMLCanvasElement>("#universe-map"),
   universePoints: requiredElement<HTMLCanvasElement>("#universe-points"),
+  universeBodies: requiredElement<HTMLCanvasElement>("#universe-bodies"),
   universeToggle: requiredElement<HTMLButtonElement>("#universe-3d-toggle"),
   universeClose: requiredElement<HTMLButtonElement>("#universe-close"),
   universeReset: requiredElement<HTMLButtonElement>("#universe-reset"),

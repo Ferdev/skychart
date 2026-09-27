@@ -30,6 +30,7 @@
       <section id="universe-view" class="universe-view" aria-label="3D universe navigator" data-i18n-attrs="aria-label:universe3d.label" hidden>
         <canvas id="universe-map" class="universe-view__canvas" tabindex="0" aria-label="Navigable 3D universe" data-i18n-attrs="aria-label:universe3d.canvasLabel"></canvas>
         <canvas id="universe-points" class="universe-view__points" aria-hidden="true"></canvas>
+        <canvas id="universe-bodies" class="universe-view__bodies" aria-hidden="true"></canvas>
         <svg id="universe-selection-connector" class="sky-selection-connector universe-selection-connector" aria-hidden="true" hidden>
           <path class="sky-selection-connector__leader"></path>
           <circle class="sky-selection-connector__source" r="12"></circle>
@@ -89,7 +90,7 @@
         <footer class="universe-view__footer">
           <span data-i18n="universe3d.controls">Drag or use arrow keys to look · W/S move · A/D strafe · E up · Q down · wheel moves forward or back</span>
           <span id="universe-status" role="status" aria-live="polite"></span>
-          <span data-i18n="universe3d.disclosure">Physical-depth positions only · up to 12,000 sampled catalog objects · unknown distances omitted</span>
+          <span data-i18n="universe3d.disclosure">Physical-depth positions only · solid-body sizes geometric; surface colors illustrative · catalog coverage sampled</span>
         </footer>
       </section>
       <section id="sky-view" class="sky-view" aria-label="Object-centered sky view" data-i18n-attrs="aria-label:sky.label" hidden>

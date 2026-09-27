@@ -18,6 +18,8 @@ import { normalizeUniverseViewState, type UniverseViewState } from "../viewState
 import { UniversePointRenderer, type UniverseScreenPoint } from "./universePointRenderer";
 import { observerApparentMagnitude, rankUniverseLabels } from "./universePhotometry";
 import { UniverseDestinationSearch } from "./universeDestinationSearch";
+import { AU_KM, projectPhysicalBody, safeUniverseEntryPosition } from "./universeBodyGeometry";
+import { UniverseBodyRenderer } from "./universeBodyRenderer";
 
 type CatalogUniversePoint = {
   key: string;
@@ -36,6 +38,7 @@ type UniversePoint = Omit<CatalogUniversePoint, "distance_au" | "direction"> & {
   position: Vector3;
   dynamic: boolean;
   absoluteMagnitudeH?: number | null;
+  radiusKm?: number | null;
 };
 
 type RenderedHit = { point: UniversePoint; x: number; y: number; radius: number };
@@ -46,6 +49,7 @@ type UniverseViewOptions = {
   root: HTMLElement;
   canvas: HTMLCanvasElement;
   pointsCanvas: HTMLCanvasElement;
+  bodiesCanvas: HTMLCanvasElement;
   toggleButton: HTMLButtonElement;
   closeButton: HTMLButtonElement;
   resetButton: HTMLButtonElement;
@@ -115,6 +119,7 @@ export class UniverseViewController {
   private backdropKey = "";
   private baseRenderKey = "";
   private pointRenderer: UniversePointRenderer;
+  private bodyRenderer: UniverseBodyRenderer;
   private readonly collectPerformance = new URLSearchParams(window.location.search).has("perf");
   private requestId = 0;
   private catalogAbort: AbortController | null = null;
@@ -134,6 +139,7 @@ export class UniverseViewController {
 
   constructor(private readonly options: UniverseViewOptions) {
     this.pointRenderer = new UniversePointRenderer(options.pointsCanvas);
+    this.bodyRenderer = new UniverseBodyRenderer(options.bodiesCanvas);
     this.selectionConnector = new SkySelectionConnectorView({
       element: options.selectionConnector, canvas: options.canvas, workspacePanel: options.workspacePanel,
     });
@@ -188,7 +194,9 @@ export class UniverseViewController {
     const normalized = normalizeUniverseViewState(state);
     if (!normalized) return;
     this.options.closeSky();
-    this.position = { ...normalized.positionAu };
+    this.position = historyMode === "push"
+      ? safeUniverseEntryPosition(normalized.positionAu, normalized, this.options.bodyByKey().values())
+      : { ...normalized.positionAu };
     this.camera = normalizeCamera(normalized);
     this.moveStepAu = Math.max(normalized.moveStepAu, positionPrecisionStep(this.position));
     const selected = this.options.selectedBody();
@@ -201,7 +209,7 @@ export class UniverseViewController {
     this.landmarksLoaded = false;
     if (this.target && !this.options.selectedObjectPanel.hidden) this.options.root.dataset.objectInspector = "true";
     else delete this.options.root.dataset.objectInspector;
-    this.initialState = { ...normalized, positionAu: { ...normalized.positionAu } };
+    this.initialState = { ...normalized, positionAu: { ...this.position } };
     this.options.root.hidden = false;
     document.body.dataset.universeView = "true";
     this.updateChrome();
@@ -384,7 +392,9 @@ export class UniverseViewController {
     const redrawBase = moving || !useWebgl || this.baseRenderKey !== baseKey;
     if (redrawBase) context.drawImage(this.backdropCanvas!, 0, 0, width, height);
     const baseDone = performance.now();
-    const labels = this.drawPoints(context, this.points(), width, height, project, useWebgl, dpr);
+    const framePoints = this.points();
+    const labels = this.drawPoints(context, framePoints, width, height, project, useWebgl, dpr);
+    this.bodyRenderer.render(framePoints, this.position, this.camera, width, height, dpr);
     const pointsDone = performance.now();
     if (redrawBase) {
       this.drawLabels(context, labels, width, height);
@@ -448,7 +458,9 @@ export class UniverseViewController {
       if (!projected) continue;
       const magnitude = observerApparentMagnitude(point, this.position);
       const appearance = skyPointAppearance({ ...point, apparent_magnitude: magnitude });
-      if (useWebgl) {
+      const bodyRadius = projectPhysicalBody(point, this.position, this.camera, width, height)?.radiusPx ?? 0;
+      if (bodyRadius >= 2.5) { /* A physically sized body is rendered on the sphere layer. */ }
+      else if (useWebgl) {
         screenPoints.push({ x: projected.x, y: projected.y, size: appearance.coreRadius * 4,
           opacity: appearance.opacity, color: appearance.color });
       } else {
@@ -475,7 +487,7 @@ export class UniverseViewController {
           context.fill();
         }
       }
-      const hit = { point, x: projected.x, y: projected.y, radius: Math.max(7, appearance.coreRadius + 4) };
+      const hit = { point, x: projected.x, y: projected.y, radius: Math.max(7, appearance.coreRadius + 4, bodyRadius) };
       hits.push(hit);
       labels.push({ ...hit, magnitude, distance: Math.hypot(
         point.position.x - this.position.x, point.position.y - this.position.y, point.position.z - this.position.z,
@@ -560,8 +572,13 @@ export class UniverseViewController {
       target.position.z - this.position.z,
     );
     this.options.targetName.textContent = target.name;
+    const surface = target.radiusKm && target.radiusKm > 0
+      ? distance <= target.radiusKm / AU_KM
+        ? this.options.translate("universe3d.insideSurface")
+        : this.options.translate("universe3d.aboveSurface", { distance: formatDistanceAu(distance - target.radiusKm / AU_KM) })
+      : "";
     this.options.targetMeta.textContent = this.options.translate("universe3d.targetMeta", {
-      type: (target.object_type ?? "Object").replace(/_/g, " "), distance: formatDistanceAu(distance),
+      type: (target.object_type ?? "Object").replace(/_/g, " "), distance: formatDistanceAu(distance), surface,
     });
     const magnitude = observerApparentMagnitude(target, this.position);
     this.options.targetMagnitude.textContent = magnitude === null
@@ -586,7 +603,8 @@ export class UniverseViewController {
       target.position.y - this.position.y,
       target.position.z - this.position.z,
     );
-    const standoff = Math.min(clamp(distance * 0.02, this.moveStepAu * 0.1, distance * 0.5), 1e11);
+    const standoff = Math.min(Math.max(distance * 0.02, Math.min(this.moveStepAu * 0.1, distance * 0.5),
+      (target.radiusKm ?? 0) / AU_KM * 3), 1e11);
     this.position = {
       x: target.position.x - direction.x * standoff,
       y: target.position.y - direction.y * standoff,
@@ -871,6 +889,7 @@ export class UniverseViewController {
   private updateSelectionConnector(): void {
     if (this.options.root.dataset.objectInspector !== "true") { this.selectionConnector.hide(); return; }
     const hit = this.renderedHits.find((candidate) => candidate.point.key === this.target?.key);
+    this.options.selectionConnector.dataset.sphere = String((hit?.radius ?? 0) > 24);
     this.selectionConnector.update(hit ? { key: hit.point.key, x: hit.x, y: hit.y } : null);
   }
 
@@ -901,6 +920,7 @@ export function createUniverseViewController(dom: typeof atlasDom, options: Univ
     root: dom.universeView,
     canvas: dom.universeCanvas,
     pointsCanvas: dom.universePoints,
+    bodiesCanvas: dom.universeBodies,
     toggleButton: dom.universeToggle,
     closeButton: dom.universeClose,
     resetButton: dom.universeReset,
@@ -971,6 +991,7 @@ function bodyToUniversePoint(body: Body | null): UniversePoint | null {
     absoluteMagnitudeH: body.small_body?.h_absolute_magnitude
       ?? (typeof body.catalog?.facts?.h_absolute_magnitude === "number" ? body.catalog.facts.h_absolute_magnitude : null),
     position: bodyVector(body),
+    radiusKm: body.radius_km,
     dynamic: isDynamicBody(body),
   };
 }
@@ -1017,7 +1038,7 @@ function formatCoordinate(value: number): string {
 }
 
 function formatDistanceAu(value: number): string {
-  if (value < 0.01) return `${formatNumber(value * 149_597_870.7)} km`;
+  if (value < 0.01) return `${new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(value * AU_KM)} km`;
   if (value < 10_000) return `${formatNumber(value)} AU`;
   const lightYears = value / 63_241.077;
   if (Math.abs(lightYears) < 1e3) return `${formatNumber(lightYears)} ly`;

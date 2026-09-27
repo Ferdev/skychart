@@ -22,8 +22,17 @@ dense star tables remain responsive. The 3D query also reserves a small
 nearby-galaxy sample (within 300 billion AU) so those landmarks are not lost
 among the brighter stars. The sample is incomplete. In 3D, catalog apparent
 magnitudes are scaled by the observer-to-object distance relative to the
-catalog's heliocentric distance. The Sun uses a 1-AU visual-magnitude reference;
-major planets use JPL's [V(1,0) values](https://ssd.jpl.nasa.gov/planets/phys_par.html)
+catalog's heliocentric distance. Solid Solar System bodies and stars with a
+supplied physical radius are rendered
+as ray-intersected spheres at their geometric angular size. Nearby limbs and
+interior viewpoints therefore do not collapse to brightness-sized points.
+Sunlight determines the illuminated side; procedural colors, cloud bands,
+terrain, and Saturn's rings are illustrative, not source-backed surface maps or
+rotation/axial-orientation models. The inspector shows distance from the center
+and altitude above the modeled radius. Galaxies and objects without a credible
+solid radius remain catalog symbols rather than invented spheres. The Sun uses
+a 1-AU visual-magnitude reference; major planets use JPL's
+[V(1,0) values](https://ssd.jpl.nasa.gov/planets/phys_par.html)
 with inverse-distance and approximate Lambertian phase terms. Minor bodies
 with an H value use the same geometric estimate. Ring tilt, atmospheric
 scattering, and detailed phase laws are not modeled, so 3D magnitude values are
