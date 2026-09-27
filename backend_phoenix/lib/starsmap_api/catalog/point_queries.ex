@@ -65,6 +65,7 @@ defmodule StarsmapApi.Catalog.PointQueries do
     :source_type,
     :color,
     :apparent_magnitude,
+    :radius_km,
     :position_model,
     :x_au,
     :y_au,
@@ -396,6 +397,7 @@ defmodule StarsmapApi.Catalog.PointQueries do
       observer_key = normalized_observer_key(params["observer_key"])
       physical_only? = truthy_param?(params["physical_only"])
       local_only? = truthy_param?(params["local_only"])
+      featured_keys = params["featured_keys"] |> csv_param() |> Enum.take(32)
       near_radius_au = bounded_float(params["near_radius_au"], 0.0, 0.0, @max_sky_near_radius_au)
       near_limit = min(@sky_near_limit, limit)
 
@@ -420,6 +422,16 @@ defmodule StarsmapApi.Catalog.PointQueries do
             asc: object.key
           )
           |> limit(^limit)
+          |> select([object], struct(object, ^@sky_fields))
+          |> Repo.all(timeout: @sky_query_timeout)
+        end
+
+      featured_rows =
+        if local_only? or featured_keys == [] do
+          []
+        else
+          base_query
+          |> where([object], object.key in ^featured_keys)
           |> select([object], struct(object, ^@sky_fields))
           |> Repo.all(timeout: @sky_query_timeout)
         end
@@ -478,7 +490,10 @@ defmodule StarsmapApi.Catalog.PointQueries do
           []
         end
 
-      rows = (nearby_rows ++ global_rows) |> Enum.uniq_by(& &1.key) |> Enum.take(limit)
+      rows =
+        (nearby_rows ++ featured_rows ++ global_rows)
+        |> Enum.uniq_by(& &1.key)
+        |> Enum.take(limit)
 
       points =
         Enum.flat_map(rows, fn object ->
@@ -491,6 +506,7 @@ defmodule StarsmapApi.Catalog.PointQueries do
             position_model: position_model,
             color: color,
             apparent_magnitude: magnitude,
+            radius_km: radius_km,
             x_au: x,
             y_au: y,
             z_au: z
@@ -512,6 +528,7 @@ defmodule StarsmapApi.Catalog.PointQueries do
                 position_model: position_model,
                 color: color,
                 apparent_magnitude: magnitude,
+                radius_km: radius_km,
                 distance_au: distance_au,
                 direction: %{x: dx / distance_au, y: dy / distance_au, z: dz / distance_au}
               }

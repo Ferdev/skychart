@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type { Body } from "../src/atlas/contracts.ts";
-import { AU_KM, hasRenderableRadius, projectPhysicalBody, safeUniverseEntryPosition } from "../src/universe/universeBodyGeometry.ts";
+import { AU_KM, hasRenderableRadius, projectPhysicalBody, projectSphericalExtent, safeUniverseEntryPosition } from "../src/universe/universeBodyGeometry.ts";
 
 const jupiter = {
   key: "jupiter", object_type: "planet", position: { x: -5, y: 0, z: 0 }, radiusKm: 69_911,
@@ -15,6 +15,9 @@ assert.ok(far && far.radiusPx > 10 && far.radiusPx < near.radiusPx);
 assert.equal(projectPhysicalBody(jupiter, { x: -5 + radiusAu * 10, y: 0, z: 0 },
   { yawDeg: 0, pitchDeg: 0, fovDeg: 72 }, 1280, 800), null);
 assert.equal(projectPhysicalBody({ ...jupiter, object_type: "galaxy" }, { x: -4, y: 0, z: 0 }, camera, 1280, 800), null);
+const galaxyExtent = projectSphericalExtent({ x: -5, y: 0, z: 0 }, radiusAu,
+  { x: -5 + radiusAu * 10, y: 0, z: 0 }, camera, 1280, 800);
+assert.ok(galaxyExtent && galaxyExtent.radiusPx > 10, "a non-solid volume still has a geometric angular extent");
 assert.equal(hasRenderableRadius({ ...jupiter, radiusKm: null }), false);
 const inside = projectPhysicalBody(jupiter, { x: -5, y: 0, z: 0 }, camera, 1280, 800);
 assert.ok(inside?.inside && inside.radiusPx > 1280);

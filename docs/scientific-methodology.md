@@ -20,17 +20,25 @@ bounded sample combining nearby positions with bright catalog landmarks.
 Nearby stars are queried within a smaller volume than nonstellar objects so
 dense star tables remain responsive. The 3D query also reserves a small
 nearby-galaxy sample (within 300 billion AU) so those landmarks are not lost
-among the brighter stars. The sample is incomplete. In 3D, catalog apparent
+among the brighter stars. Guided deep-sky highlights are reserved separately.
+The sample is incomplete. In 3D, catalog apparent
 magnitudes are scaled by the observer-to-object distance relative to the
 catalog's heliocentric distance. Solid Solar System bodies and stars with a
 supplied physical radius are rendered
 as ray-intersected spheres at their geometric angular size. Nearby limbs and
 interior viewpoints therefore do not collapse to brightness-sized points.
-Sunlight determines the illuminated side; procedural colors, cloud bands,
+Guided galaxies, nebulae, and star clusters with a catalog size are drawn as
+object-local 3D particle volumes at their estimated enclosing radius. Spiral
+arms, cluster distributions, remnant shells, and nebular clouds are
+illustrative reconstructions: orientation, internal depths, and individual
+particles are not measured. Active-galaxy highlights without a reported size
+use an explicitly labeled schematic 50,000-light-year radius, not a physical
+size measurement. Other deep-sky objects remain catalog symbols. Sunlight
+determines the illuminated side of solid bodies; procedural colors, cloud bands,
 terrain, and Saturn's rings are illustrative, not source-backed surface maps or
 rotation/axial-orientation models. The inspector shows distance from the center
-and altitude above the modeled radius. Galaxies and objects without a credible
-solid radius remain catalog symbols rather than invented spheres. The Sun uses
+and altitude above the modeled radius of solid bodies. Deep-sky highlights
+instead identify their structure or size as illustrative. The Sun uses
 a 1-AU visual-magnitude reference; major planets use JPL's
 [V(1,0) values](https://ssd.jpl.nasa.gov/planets/phys_par.html)
 with inverse-distance and approximate Lambertian phase terms. Minor bodies

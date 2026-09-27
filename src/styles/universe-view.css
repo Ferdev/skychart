@@ -20,7 +20,8 @@
   cursor: grab;
 }
 
-.universe-view__points {
+.universe-view__points,
+.universe-view__deep-sky {
   position: absolute;
   z-index: 1;
   inset: 0;
@@ -28,6 +29,8 @@
   height: 100%;
   pointer-events: none;
 }
+
+.universe-view__deep-sky { z-index: 1; }
 
 .universe-view__bodies {
   position: absolute;

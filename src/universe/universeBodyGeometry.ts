@@ -46,8 +46,14 @@ export function safeUniverseEntryPosition(position: Vector3, camera: SkyCamera, 
 export function projectPhysicalBody(body: PhysicalBody, observer: Vector3, camera: SkyCamera,
   width: number, height: number): ProjectedBody | null {
   if (!hasRenderableRadius(body) || width <= 0 || height <= 0) return null;
-  const radiusAu = Number(body.radiusKm) / AU_KM;
-  const delta = { x: body.position.x - observer.x, y: body.position.y - observer.y, z: body.position.z - observer.z };
+  return projectSphericalExtent(body.position, Number(body.radiusKm) / AU_KM, observer, camera, width, height);
+}
+
+/** Project an enclosing extent without claiming the enclosed object has a solid surface. */
+export function projectSphericalExtent(position: Vector3, radiusAu: number, observer: Vector3, camera: SkyCamera,
+  width: number, height: number): ProjectedBody | null {
+  if (!Number.isFinite(radiusAu) || radiusAu <= 0 || width <= 0 || height <= 0) return null;
+  const delta = { x: position.x - observer.x, y: position.y - observer.y, z: position.z - observer.z };
   const distanceAu = Math.hypot(delta.x, delta.y, delta.z);
   if (!Number.isFinite(distanceAu)) return null;
   const basis = universeCameraBasis(camera.yawDeg, camera.pitchDeg);

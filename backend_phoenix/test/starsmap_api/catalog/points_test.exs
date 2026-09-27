@@ -160,6 +160,44 @@ defmodule StarsmapApi.Catalog.PointsTest do
     assert Enum.map(payload.points, & &1.key) == ["near"]
   end
 
+  test "3D sky keeps requested guided highlights in a dense brightness sample" do
+    insert_object!("a-bright", "gaia_500pc_stars", 100.0, 0.0, nil, 1.0)
+
+    insert_object!(
+      "m31",
+      "messier_deep_sky",
+      200.0,
+      0.0,
+      nil,
+      2.0,
+      "deep_sky_catalog_coordinates",
+      "galaxy"
+    )
+
+    insert_object!(
+      "m42",
+      "messier_deep_sky",
+      300.0,
+      0.0,
+      nil,
+      3.0,
+      "deep_sky_catalog_coordinates",
+      "nebula"
+    )
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "featured_keys" => "m31,m42",
+               "limit" => "3"
+             })
+
+    assert Enum.map(payload.points, & &1.key) == ["m31", "m42", "a-bright"]
+    assert Enum.all?(payload.points, &Map.has_key?(&1, :radius_km))
+  end
+
   test "3D physical-only catalog omits display reference shells" do
     insert_object!("measured", "gaia_500pc_stars", 1.0, 0.0, nil, 1.0)
 
@@ -180,6 +218,7 @@ defmodule StarsmapApi.Catalog.PointsTest do
                "observer_z_au" => "0",
                "near_radius_au" => "10",
                "physical_only" => "1",
+               "featured_keys" => "shell",
                "limit" => "10",
                "groups" => "gaia_500pc_stars"
              })

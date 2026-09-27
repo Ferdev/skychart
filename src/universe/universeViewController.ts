@@ -1,8 +1,9 @@
 import type { Body } from "../atlas/contracts";
+import { GUIDED_DEEP_SKY_KEYS } from "../atlas/atlasDefinitions";
 import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
 import { moveUniversePosition, universeEntryState, type UniverseMove } from "../navigation/universeNavigation";
-import { bodyCanObserveSky, bodyVector, isDynamicBody } from "../sky/skyBody";
+import { bodyCanObserveSky } from "../sky/skyBody";
 import { skyPointAppearance } from "../sky/skyPointAppearance";
 import { SkySelectionConnectorView } from "../sky/skySelectionConnectorView";
 import {
@@ -18,28 +19,11 @@ import { normalizeUniverseViewState, type UniverseViewState } from "../viewState
 import { UniversePointRenderer, type UniverseScreenPoint } from "./universePointRenderer";
 import { observerApparentMagnitude, rankUniverseLabels } from "./universePhotometry";
 import { UniverseDestinationSearch } from "./universeDestinationSearch";
-import { AU_KM, projectPhysicalBody, safeUniverseEntryPosition } from "./universeBodyGeometry";
+import { AU_KM, hasRenderableRadius, projectPhysicalBody, projectSphericalExtent, safeUniverseEntryPosition } from "./universeBodyGeometry";
 import { UniverseBodyRenderer } from "./universeBodyRenderer";
-
-type CatalogUniversePoint = {
-  key: string;
-  name: string;
-  object_type?: string | null;
-  catalog_group?: string | null;
-  source_type?: string | null;
-  position_model?: string | null;
-  color?: string | null;
-  apparent_magnitude?: number | null;
-  direction: Vector3;
-  distance_au?: number | null;
-};
-
-type UniversePoint = Omit<CatalogUniversePoint, "distance_au" | "direction"> & {
-  position: Vector3;
-  dynamic: boolean;
-  absoluteMagnitudeH?: number | null;
-  radiusKm?: number | null;
-};
+import { deepSkyModel } from "./universeDeepSkyModel";
+import { UniverseDeepSkyRenderer } from "./universeDeepSkyRenderer";
+import { bodyToUniversePoint, sampleDuringFlight, validCatalogPoint, type CatalogUniversePoint, type UniversePoint } from "./universePointModel";
 
 type RenderedHit = { point: UniversePoint; x: number; y: number; radius: number };
 type RenderedLabel = RenderedHit & { magnitude: number | null; distance: number };
@@ -49,6 +33,7 @@ type UniverseViewOptions = {
   root: HTMLElement;
   canvas: HTMLCanvasElement;
   pointsCanvas: HTMLCanvasElement;
+  deepSkyCanvas: HTMLCanvasElement;
   bodiesCanvas: HTMLCanvasElement;
   toggleButton: HTMLButtonElement;
   closeButton: HTMLButtonElement;
@@ -120,6 +105,7 @@ export class UniverseViewController {
   private baseRenderKey = "";
   private pointRenderer: UniversePointRenderer;
   private bodyRenderer: UniverseBodyRenderer;
+  private deepSkyRenderer: UniverseDeepSkyRenderer;
   private readonly collectPerformance = new URLSearchParams(window.location.search).has("perf");
   private requestId = 0;
   private catalogAbort: AbortController | null = null;
@@ -140,6 +126,7 @@ export class UniverseViewController {
   constructor(private readonly options: UniverseViewOptions) {
     this.pointRenderer = new UniversePointRenderer(options.pointsCanvas);
     this.bodyRenderer = new UniverseBodyRenderer(options.bodiesCanvas);
+    this.deepSkyRenderer = new UniverseDeepSkyRenderer(options.deepSkyCanvas);
     this.selectionConnector = new SkySelectionConnectorView({
       element: options.selectionConnector, canvas: options.canvas, workspacePanel: options.workspacePanel,
     });
@@ -288,6 +275,7 @@ export class UniverseViewController {
       limit: String(localOnly ? 2_000 : CATALOG_LIMIT),
       near_radius_au: String(clamp(this.moveStepAu * 200, 1e7, 1e11)),
       physical_only: "1",
+      ...(!localOnly ? { featured_keys: GUIDED_DEEP_SKY_KEYS.join(",") } : {}),
       ...(localOnly ? { local_only: "1" } : {}),
     });
     try {
@@ -303,6 +291,7 @@ export class UniverseViewController {
           z: requestPosition.z + point.direction.z * Number(point.distance_au),
         },
         dynamic: false,
+        radiusKm: point.radius_km,
       }));
       const nearbyCount = Math.min(loaded.length, Math.max(0, payload.nearby_returned ?? loaded.length));
       if (!localOnly) {
@@ -393,7 +382,8 @@ export class UniverseViewController {
     if (redrawBase) context.drawImage(this.backdropCanvas!, 0, 0, width, height);
     const baseDone = performance.now();
     const framePoints = this.points();
-    const labels = this.drawPoints(context, framePoints, width, height, project, useWebgl, dpr);
+    const modeled = this.deepSkyRenderer.render(framePoints, this.position, this.camera, width, height, dpr);
+    const labels = this.drawPoints(context, framePoints, width, height, project, useWebgl, dpr, modeled);
     this.bodyRenderer.render(framePoints, this.position, this.camera, width, height, dpr);
     const pointsDone = performance.now();
     if (redrawBase) {
@@ -442,7 +432,7 @@ export class UniverseViewController {
   }
 
   private drawPoints(context: CanvasRenderingContext2D, points: UniversePoint[], width: number, height: number,
-    project: Projector, useWebgl: boolean, dpr: number): RenderedLabel[] {
+    project: Projector, useWebgl: boolean, dpr: number, modeled: ReadonlySet<string>): RenderedLabel[] {
     const hits: RenderedHit[] = [];
     const labels: RenderedLabel[] = [];
     const screenPoints: UniverseScreenPoint[] = [];
@@ -458,8 +448,10 @@ export class UniverseViewController {
       if (!projected) continue;
       const magnitude = observerApparentMagnitude(point, this.position);
       const appearance = skyPointAppearance({ ...point, apparent_magnitude: magnitude });
-      const bodyRadius = projectPhysicalBody(point, this.position, this.camera, width, height)?.radiusPx ?? 0;
-      if (bodyRadius >= 2.5) { /* A physically sized body is rendered on the sphere layer. */ }
+      const deepSky = deepSkyModel(point);
+      const bodyRadius = projectPhysicalBody(point, this.position, this.camera, width, height)?.radiusPx
+        ?? (deepSky ? projectSphericalExtent(point.position, deepSky.radiusAu, this.position, this.camera, width, height)?.radiusPx : 0) ?? 0;
+      if (bodyRadius >= 2.5 && (hasRenderableRadius(point) || modeled.has(point.key))) { /* Geometric layer renders this object. */ }
       else if (useWebgl) {
         screenPoints.push({ x: projected.x, y: projected.y, size: appearance.coreRadius * 4,
           opacity: appearance.opacity, color: appearance.color });
@@ -572,7 +564,10 @@ export class UniverseViewController {
       target.position.z - this.position.z,
     );
     this.options.targetName.textContent = target.name;
-    const surface = target.radiusKm && target.radiusKm > 0
+    const deepSky = deepSkyModel(target);
+    const surface = deepSky
+      ? this.options.translate(deepSky.schematicSize ? "universe3d.schematicVolume" : "universe3d.illustrativeVolume")
+      : hasRenderableRadius(target) && target.radiusKm && target.radiusKm > 0
       ? distance <= target.radiusKm / AU_KM
         ? this.options.translate("universe3d.insideSurface")
         : this.options.translate("universe3d.aboveSurface", { distance: formatDistanceAu(distance - target.radiusKm / AU_KM) })
@@ -603,8 +598,11 @@ export class UniverseViewController {
       target.position.y - this.position.y,
       target.position.z - this.position.z,
     );
-    const standoff = Math.min(Math.max(distance * 0.02, Math.min(this.moveStepAu * 0.1, distance * 0.5),
-      (target.radiusKm ?? 0) / AU_KM * 3), 1e11);
+    const deepSky = deepSkyModel(target);
+    const standoff = deepSky
+      ? Math.max(deepSky.radiusAu * 3, positionPrecisionStep(target.position) * 10)
+      : Math.min(Math.max(distance * 0.02, Math.min(this.moveStepAu * 0.1, distance * 0.5),
+        (target.radiusKm ?? 0) / AU_KM * 3), 1e11);
     this.position = {
       x: target.position.x - direction.x * standoff,
       y: target.position.y - direction.y * standoff,
@@ -920,6 +918,7 @@ export function createUniverseViewController(dom: typeof atlasDom, options: Univ
     root: dom.universeView,
     canvas: dom.universeCanvas,
     pointsCanvas: dom.universePoints,
+    deepSkyCanvas: dom.universeDeepSky,
     bodiesCanvas: dom.universeBodies,
     toggleButton: dom.universeToggle,
     closeButton: dom.universeClose,
@@ -951,49 +950,6 @@ export function createUniverseViewController(dom: typeof atlasDom, options: Univ
 
 export function initialUniverseState(center: { x: number; y: number }, moveStepAu: number, selected: Body | null): UniverseViewState {
   return universeEntryState(center, moveStepAu, bodyToUniversePoint(selected)?.position);
-}
-
-function validCatalogPoint(point: CatalogUniversePoint): boolean {
-  return Boolean(point?.key && point.name && point.direction &&
-    [point.direction.x, point.direction.y, point.direction.z].every(Number.isFinite) &&
-    typeof point.distance_au === "number" && Number.isFinite(point.distance_au) && point.distance_au > 0 &&
-    point.position_model !== "catalog_sky_position_reference_shell");
-}
-
-function sampleDuringFlight(points: UniversePoint[], nearbyCount: number, limit: number): UniversePoint[] {
-  if (points.length <= limit) return points;
-  const chosen = new Set<number>();
-  const nearKeep = Math.min(500, nearbyCount, limit);
-  for (let index = 0; index < nearKeep; index += 1) chosen.add(index);
-  const brightKeep = Math.min(300, points.length - nearbyCount, limit - chosen.size);
-  for (let index = nearbyCount; index < nearbyCount + brightKeep; index += 1) chosen.add(index);
-  const remaining = limit - chosen.size;
-  for (let slot = 0; slot < remaining; slot += 1) {
-    chosen.add(Math.floor((slot + 0.5) * points.length / remaining));
-  }
-  for (let index = 0; chosen.size < limit && index < points.length; index += 1) chosen.add(index);
-  return [...chosen].sort((left, right) => left - right).slice(0, limit).map((index) => points[index]!);
-}
-
-function bodyToUniversePoint(body: Body | null): UniversePoint | null {
-  if (!body || !bodyCanObserveSky(body) ||
-    body.catalog?.position_model === "catalog_sky_position_reference_shell" ||
-    body.catalog?.facts?.distance_unknown === true) return null;
-  return {
-    key: body.key,
-    name: body.name,
-    object_type: body.object_type,
-    catalog_group: body.catalog_group,
-    source_type: body.catalog?.source_type,
-    position_model: body.catalog?.position_model,
-    color: body.color,
-    apparent_magnitude: body.stellar?.apparent_magnitude ?? body.deep_sky?.apparent_magnitude,
-    absoluteMagnitudeH: body.small_body?.h_absolute_magnitude
-      ?? (typeof body.catalog?.facts?.h_absolute_magnitude === "number" ? body.catalog.facts.h_absolute_magnitude : null),
-    position: bodyVector(body),
-    radiusKm: body.radius_km,
-    dynamic: isDynamicBody(body),
-  };
 }
 
 function keyMovement(key: string): UniverseMove | undefined {
