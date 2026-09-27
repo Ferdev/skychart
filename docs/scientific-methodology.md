@@ -8,10 +8,66 @@ visible instead of presenting every position as equally certain.
 ## Coordinate frame and projection
 
 Positions are normalized to heliocentric ecliptic Cartesian coordinates. The
-map displays a top-down projection of the `x` and `y` axes. Source `z` values
-remain in catalog records but are not used as a visibility cut. The map ruler
-therefore measures projected `x/y` separation, not full three-dimensional
-separation.
+default map displays a top-down projection of the `x` and `y` axes. Source `z`
+values remain in catalog records but are not used as a visibility cut. The map
+ruler therefore measures projected `x/y` separation, not full
+three-dimensional separation.
+
+The 3D universe view uses the same measured or source-modeled `x/y/z`
+coordinates and moves an observer freely through that frame. Its catalog query
+includes only records with finite values on all three axes and returns a
+bounded sample combining nearby positions with bright catalog landmarks.
+Nearby stars are queried within a smaller volume than nonstellar objects so
+dense star tables remain responsive. The 3D query also reserves a small
+nearby-galaxy sample (within 300 billion AU) so those landmarks are not lost
+among the brighter stars. Guided deep-sky highlights are reserved separately.
+The sample is incomplete. In 3D, catalog apparent
+magnitudes are scaled by the observer-to-object distance relative to the
+catalog's heliocentric distance. Solid Solar System bodies and stars with a
+supplied physical radius are rendered
+as ray-intersected spheres at their geometric angular size. Nearby limbs and
+interior viewpoints therefore do not collapse to brightness-sized points.
+Guided galaxies, nebulae, and star clusters with a catalog size are drawn as
+object-local 3D particle volumes at their estimated enclosing radius. Spiral
+arms, cluster distributions, remnant shells, and nebular clouds are
+illustrative reconstructions: orientation, internal depths, and individual
+particles are not measured. Active-galaxy highlights without a reported size
+use an explicitly labeled schematic 50,000-light-year radius, not a physical
+size measurement. Other deep-sky objects remain catalog symbols. Sunlight
+determines the illuminated side of solid bodies. Credited NASA, JPL and Solar
+System Scope maps supply planetary detail; Earth has a separate static cloud
+layer and the Moon uses elevation-based shading. Unmapped surfaces, additional
+relief and ring density are illustrative. Approximate axial tilts and texture
+phases do not constitute a rotational ephemeris. Gas, dust and stars form stable,
+depth-sorted deep-sky volumes; their colors are a visualization, not a naked-eye
+exposure. See [appearance methodology and credits](universe-appearance.md). The inspector shows distance from the center
+and altitude above the modeled radius of solid bodies. Deep-sky highlights
+instead identify their structure or size as illustrative. The Sun uses
+a 1-AU visual-magnitude reference; major planets use JPL's
+[V(1,0) values](https://ssd.jpl.nasa.gov/planets/phys_par.html)
+with inverse-distance and approximate Lambertian phase terms. Minor bodies
+with an H value use the same geometric estimate. Ring tilt, atmospheric
+scattering, and detailed phase laws are not modeled, so 3D magnitude values are
+clearly marked as estimates, not ephemeris-grade predictions. Objects placed
+on a reference shell or explicitly marked as having unknown distance are excluded
+from 3D, including nearby and guided-highlight query results.
+While the camera moves, a smaller deterministic subset is drawn; full sampled
+detail returns when movement stops. The first 3D load retains a bounded global
+landmark sample; subsequent camera-position refreshes query nearby objects only
+and merge them with those landmarks. Held flight and autopilot refresh the local
+sample at most once every 1.5 seconds, allowing an in-flight request to finish;
+stopping or jumping to a destination also refreshes the surrounding sample.
+This avoids repeating a full-catalog
+brightness sort on each move. The destination search uses the same catalog as
+the 2D atlas, but only objects with credible 3D positions can be selected.
+Compact map tiles that omit line-of-sight position are not placed on an invented
+plane in 3D. Movement step size is user-adjustable because the atlas spans from
+kilometers to billions of light-years; changing that step does not rescale or
+alter the underlying coordinates. Autopilot uses the same numeric value as an
+AU-per-second travel speed, moving toward the selected object or straight ahead
+if none is selected. It is a navigation control, not a physically constrained
+spaceflight simulation; it pauses on arrival and does not resume automatically
+from a shared URL.
 
 Solar System state vectors and catalog coordinates enter this frame through
 different pipelines. A matching map position does not imply that two records

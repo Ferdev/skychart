@@ -65,9 +65,13 @@ export const GUIDED_SETS: { id: string; labelKey: string; keys: string[] }[] = [
   { id: "exoplanets", labelKey: "guided.exoplanetSystems", keys: ["exosys-trappist-1", "exosys-55-cnc", "exosys-hr-8799", "exosys-kepler-11", "exosys-toi-700", "exosys-lhs-1140"] },
   { id: "deep-sky", labelKey: "guided.messierHighlights", keys: ["m1", "m13", "m31", "m42", "m45", "m57"] },
   { id: "galaxies", labelKey: "guided.galaxies", keys: ["m31", "m33", "m51", "m81", "m82", "m87"] },
-  { id: "active-galaxies", labelKey: "guided.activeGalaxies", keys: ["simbad-m-87", "simbad-3c-273", "simbad-ngc-1068", "simbad-3c-279"] },
+  { id: "active-galaxies", labelKey: "guided.activeGalaxies", keys: ["simbad-m-87", "simbad-3c-273", "m77", "simbad-3c-279"] },
   { id: "nebulae", labelKey: "guided.nebulae", keys: ["m1", "m8", "m16", "m17", "m20", "m42", "m57"] },
 ];
+
+export const GUIDED_DEEP_SKY_KEYS = [...new Set(GUIDED_SETS
+  .filter((set) => ["deep-sky", "galaxies", "active-galaxies", "nebulae"].includes(set.id))
+  .flatMap((set) => set.keys))];
 
 export const EXPLORE_DOMAINS: ExploreDomainDefinition[] = [
   { id: "solar-system", titleKey: "explore.solarSystem.title", descriptionKey: "explore.solarSystem.description", filterKey: "solar_system", guidedSetId: "solar-neighborhood", zoomPreset: "solar", count: (_summary, bodies) => bodies.filter(isSolarSystemBody).length },

@@ -49,8 +49,13 @@ export function projectDirection(
   width: number,
   height: number,
 ): SkyProjection | null {
-  const point = normalizeVector(direction);
-  if (!point || width <= 0 || height <= 0) return null;
+  return createSkyProjector(camera, width, height)(direction);
+}
+
+/** Reuse camera basis and focal length when projecting a whole frame of points. */
+export function createSkyProjector(camera: SkyCamera, width: number, height: number, clipMargin = 16):
+  (direction: Vector3) => SkyProjection | null {
+  if (width <= 0 || height <= 0) return () => null;
   const normalizedCamera = normalizeCamera(camera);
   const yaw = normalizedCamera.yawDeg * DEG_TO_RAD;
   const pitch = normalizedCamera.pitchDeg * DEG_TO_RAD;
@@ -65,13 +70,17 @@ export function projectDirection(
     y: -Math.sin(pitch) * Math.sin(yaw),
     z: Math.cos(pitch),
   };
-  const depth = dot(point, forward);
-  if (depth <= 1e-4) return null;
   const focalLength = Math.min(width, height) / (2 * Math.tan(normalizedCamera.fovDeg * DEG_TO_RAD / 2));
-  const x = width / 2 + dot(point, right) * focalLength / depth;
-  const y = height / 2 - dot(point, up) * focalLength / depth;
-  if (x < -16 || x > width + 16 || y < -16 || y > height + 16) return null;
-  return { x, y, depth };
+  return (direction) => {
+    const point = normalizeVector(direction);
+    if (!point) return null;
+    const depth = dot(point, forward);
+    if (depth <= 1e-4) return null;
+    const x = width / 2 + dot(point, right) * focalLength / depth;
+    const y = height / 2 - dot(point, up) * focalLength / depth;
+    if (x < -clipMargin || x > width + clipMargin || y < -clipMargin || y > height + clipMargin) return null;
+    return { x, y, depth };
+  };
 }
 
 export function directionFromEcliptic(longitudeDeg: number, latitudeDeg: number): Vector3 {
