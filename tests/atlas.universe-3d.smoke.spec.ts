@@ -69,7 +69,9 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   });
   await context.route("**/catalog-tiles/**", (route) => route.fulfill({ status: 404, body: "" }));
 
-  await openAtlas(page);
+  // Begin between the Sun and Fixture A; the Sun now correctly occludes stars
+  // behind its disk, so the old collinear Sun-origin fixture is not selectable.
+  await openAtlas(page, "/?v=1&c=-5,0&z=24&t=2026-08-26T12:00:00.000Z&L=");
   await expect(page.locator("#universe-3d-toggle")).toHaveAccessibleName("Explore the universe in 3D");
   await page.locator("#universe-3d-toggle").click();
   await expect(page.locator("#universe-view")).toBeVisible();

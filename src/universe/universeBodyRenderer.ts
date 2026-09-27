@@ -1,109 +1,11 @@
 import { universeCameraBasis } from "../navigation/universeNavigation";
 import type { SkyCamera, Vector3 } from "../sky/skyProjection";
-import { AU_KM, hasRenderableRadius, projectPhysicalBody, type PhysicalBody, type ProjectedBody } from "./universeBodyGeometry";
+import { AU_KM, projectPhysicalBody, projectSphericalExtent, type PhysicalBody, type ProjectedBody } from "./universeBodyGeometry";
 
-const VERTEX_SHADER = `
-attribute vec2 aPosition;
-void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }
-`;
-
-// Each pixel casts a camera ray into a radius-one sphere. This keeps nearby
-// limbs and the horizon correct even when the sphere fills the whole view.
-const FRAGMENT_SHADER = `
-precision highp float;
-uniform vec2 uResolution;
-uniform float uFocal;
-uniform vec3 uForward;
-uniform vec3 uRight;
-uniform vec3 uUp;
-uniform vec3 uCenter;
-uniform vec3 uSun;
-uniform vec3 uBase;
-uniform float uMaterial;
-
-vec3 surfaceColor(vec3 n) {
-  float lon = atan(n.y, n.x);
-  float lat = asin(clamp(n.z, -1.0, 1.0));
-  if (uMaterial < 0.5) return uBase;
-  if (uMaterial < 1.5) {
-    float waves = sin(lat * 36.0 + 0.24 * sin(lon * 5.0)) * 0.55
-      + sin(lat * 82.0 - 0.17 * sin(lon * 7.0)) * 0.18;
-    vec3 cloud = mix(vec3(0.89, 0.77, 0.59), vec3(0.61, 0.36, 0.24), smoothstep(-0.2, 0.55, waves));
-    // Finer cloud swirls become visible only at close range; from afar they
-    // would alias into a false surface pattern.
-    float closeDetail = 1.0 - smoothstep(1.05, 4.0, length(uCenter));
-    float eddy = sin(lat * 11800.0 + 2.2 * sin(lon * 7400.0 + lat * 3100.0))
-      * sin(lon * 9200.0 - 1.7 * sin(lat * 6700.0));
-    cloud *= 1.0 + closeDetail * eddy * 0.28;
-    float spot = 1.0 - smoothstep(0.12, 0.19, length(vec2(sin(lon - 0.55) * 0.7, (lat + 0.35) * 1.5)));
-    return mix(cloud, vec3(0.65, 0.29, 0.20), spot * 0.75);
-  }
-  if (uMaterial < 2.5) {
-    float band = sin(lat * 42.0 + 0.15 * sin(lon * 4.0));
-    return mix(vec3(0.84, 0.74, 0.55), vec3(0.68, 0.54, 0.37), smoothstep(-0.3, 0.6, band));
-  }
-  if (uMaterial < 3.5) {
-    float land = sin(lon * 3.0 + sin(lat * 4.0)) * cos(lat * 3.0 - lon * 0.5)
-      + 0.34 * sin(lon * 9.0 + lat * 7.0);
-    vec3 ground = mix(vec3(0.10, 0.30, 0.61), vec3(0.30, 0.48, 0.25), smoothstep(0.08, 0.28, land));
-    float cloud = smoothstep(0.75, 0.9, sin(lon * 12.0 + lat * 8.0) * sin(lat * 13.0 - lon * 3.0));
-    return mix(ground, vec3(0.92, 0.95, 0.92), cloud * 0.65);
-  }
-  if (uMaterial < 4.5) {
-    float terrain = sin(lon * 7.0 + lat * 3.0) * sin(lat * 11.0 - lon * 2.0);
-    vec3 rusty = mix(vec3(0.66, 0.29, 0.16), vec3(0.40, 0.20, 0.13), smoothstep(0.05, 0.55, terrain));
-    return mix(rusty, vec3(0.88, 0.82, 0.73), smoothstep(1.2, 1.45, abs(lat)));
-  }
-  if (uMaterial < 5.5) return uBase * (0.94 + 0.06 * sin(lat * 24.0));
-  if (uMaterial < 6.5) return mix(uBase, vec3(0.97, 0.88, 0.69), 0.35 + 0.18 * sin(lat * 18.0));
-  float terrain = sin(lon * 11.0) * sin(lat * 13.0 + lon * 3.0);
-  return uBase * (0.82 + 0.18 * terrain);
-}
-
-void main() {
-  vec2 pixel = gl_FragCoord.xy - uResolution * 0.5;
-  vec3 ray = normalize(uForward + uRight * pixel.x / uFocal + uUp * pixel.y / uFocal);
-  float along = dot(ray, uCenter);
-  float discriminant = along * along - (dot(uCenter, uCenter) - 1.0);
-  float sphereT = -1.0;
-  if (discriminant >= 0.0) {
-    sphereT = along - sqrt(discriminant);
-    if (sphereT < 0.0) sphereT = along + sqrt(discriminant);
-  }
-
-  if (uMaterial > 1.5 && uMaterial < 2.5) {
-    vec3 ringNormal = normalize(vec3(0.18, 0.43, 0.88));
-    float denominator = dot(ray, ringNormal);
-    if (abs(denominator) > 0.0001) {
-      float ringT = dot(uCenter, ringNormal) / denominator;
-      float ringRadius = length(ray * ringT - uCenter);
-      if (ringT > 0.0 && ringRadius > 1.22 && ringRadius < 2.36 && (sphereT < 0.0 || ringT < sphereT)) {
-        float gap = smoothstep(0.05, 0.14, abs(ringRadius - 1.86));
-        float stripe = 0.73 + 0.18 * sin(ringRadius * 42.0);
-        vec3 ring = vec3(0.79, 0.70, 0.53) * stripe * gap;
-        gl_FragColor = vec4(ring, 0.86 * gap);
-        return;
-      }
-    }
-  }
-
-  if (sphereT < 0.0) discard;
-  vec3 normal = normalize(ray * sphereT - uCenter);
-  vec3 color = surfaceColor(normal);
-  if (uMaterial < 0.5) {
-    float limb = max(0.0, dot(normal, -ray));
-    gl_FragColor = vec4(color * (0.8 + 0.3 * limb), 1.0);
-    return;
-  }
-  float sunlight = dot(normal, uSun);
-  float diffuse = 0.12 + 0.88 * max(0.0, sunlight);
-  float viewLimb = max(0.0, dot(normal, -ray));
-  color *= diffuse * (0.79 + 0.21 * viewLimb);
-  float specular = pow(max(0.0, dot(reflect(-uSun, normal), -ray)), 36.0);
-  color += vec3(0.10) * specular * max(0.0, sunlight);
-  gl_FragColor = vec4(color, 1.0);
-}
-`;
+import { BODY_VERTEX_SHADER, BODY_FRAGMENT_SHADER } from "./universeBodyShaders";
+import { appearanceRotation, bodyAppearance, resolvedBodyWeight } from "./universeAppearanceProfiles";
+import { UniverseTextureCache } from "./universeTextureCache";
+import { renderBodyFallback } from "./universeBodyFallback";
 
 export class UniverseBodyRenderer {
   private readonly gl: WebGLRenderingContext | null;
@@ -112,9 +14,14 @@ export class UniverseBodyRenderer {
   private buffer: WebGLBuffer | null = null;
   private readonly uniforms: Record<string, WebGLUniformLocation | null> = {};
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  private readonly textures: UniverseTextureCache;
+  private blankTexture: WebGLTexture | null = null;
+  private hasContent = false;
+
+  constructor(private readonly canvas: HTMLCanvasElement, private readonly invalidate: () => void = () => {}) {
     const gl = canvas.getContext("webgl", { alpha: true, antialias: true, preserveDrawingBuffer: true });
     this.gl = gl;
+    this.textures = new UniverseTextureCache(gl, invalidate);
     this.fallback = gl ? null : canvas.getContext("2d");
     if (gl) {
       this.initializeWebgl();
@@ -123,7 +30,9 @@ export class UniverseBodyRenderer {
         this.program = null;
         this.buffer = null;
       });
-      canvas.addEventListener("webglcontextrestored", () => this.initializeWebgl());
+      canvas.addEventListener("webglcontextrestored", () => {
+        this.initializeWebgl(); this.textures.contextRestored(gl);
+      });
     }
   }
 
@@ -133,26 +42,43 @@ export class UniverseBodyRenderer {
     this.program = buildProgram(gl);
     this.buffer = this.program ? gl.createBuffer() : null;
     if (!this.program) return;
-    for (const name of ["uResolution", "uFocal", "uForward", "uRight", "uUp", "uCenter", "uSun", "uBase", "uMaterial"])
+    for (const name of ["uResolution", "uFocal", "uForward", "uRight", "uUp", "uCenter", "uSun", "uBase", "uMaterial", "uRotation", "uOpacity", "uAtmosphere", "uRelief", "uHasMap", "uHasDetail", "uTexel", "uMap", "uDetail"])
       this.uniforms[name] = gl.getUniformLocation(this.program, name);
+    this.blankTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.blankTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128,128,128,255]));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   }
 
   render(points: readonly PhysicalBody[], observer: Vector3, camera: SkyCamera,
-    width: number, height: number, dpr: number): void {
-    const pixelWidth = Math.max(1, Math.round(width * dpr));
-    const pixelHeight = Math.max(1, Math.round(height * dpr));
+    width: number, height: number, dpr: number, moving = false): void {
+    const bodies = points.map((body) => ({ body, projected: projectPhysicalBody(body, observer, camera, width, height)
+      ?? (body.key === "saturn" ? projectSphericalExtent(body.position, Number(body.radiusKm) / AU_KM * 2.32, observer, camera, width, height) : null) }))
+      .filter((item): item is { body: PhysicalBody; projected: ProjectedBody } =>
+        item.projected !== null && item.projected.radiusPx > 1.5)
+      .sort((a, b) => b.projected.distanceAu - a.projected.distanceAu);
+    // Bound fragment work when a surface fills the viewport. Navigation and
+    // angular extents stay in CSS pixels; stopping restores close-up detail.
+    const pixelBudget = moving ? 400_000 : bodies.some((item) => item.projected.inside) ? 600_000 : 2_000_000;
+    dpr = Math.min(dpr, Math.sqrt(pixelBudget / Math.max(1, width * height)));
+    const pixelWidth = Math.max(1, Math.floor(width * dpr));
+    const pixelHeight = Math.max(1, Math.floor(height * dpr));
     if (this.canvas.width !== pixelWidth || this.canvas.height !== pixelHeight) {
       this.canvas.width = pixelWidth;
       this.canvas.height = pixelHeight;
     }
-    const bodies = points.map((body) => ({ body, projected: projectPhysicalBody(body, observer, camera, width, height) }))
-      .filter((item): item is { body: PhysicalBody; projected: ProjectedBody } =>
-        item.projected !== null && item.projected.radiusPx >= 2.5)
-      .sort((a, b) => b.projected.distanceAu - a.projected.distanceAu);
     this.canvas.dataset.visibleBodies = bodies.map((item) => item.body.key).join(",");
     this.canvas.dataset.largestRadiusPx = String(Math.round(Math.max(0, ...bodies.map((item) => item.projected.radiusPx))));
-    if (this.gl && this.program && this.buffer) this.renderWebgl(bodies, observer, camera, pixelWidth, pixelHeight, dpr);
-    else if (this.fallback) this.renderFallback(bodies, width, height, dpr);
+    this.canvas.hidden = bodies.length === 0;
+    this.textures.beginFrame();
+    if (bodies.length || this.hasContent) {
+      if (this.gl && this.program && this.buffer) this.renderWebgl(bodies, observer, camera, pixelWidth, pixelHeight, dpr);
+      else if (this.fallback) renderBodyFallback(this.fallback, bodies, observer, camera, width, height, dpr, this.textures);
+    }
+    this.hasContent = bodies.length > 0;
+    this.canvas.dataset.textureBytes = String(this.textures.bytes);
+    this.canvas.dataset.loadedTextures = this.textures.loaded.map((url) => url.split("/").pop()).join(",");
+    this.canvas.dataset.renderer = this.gl ? "webgl" : "canvas";
   }
 
   private renderWebgl(bodies: Array<{ body: PhysicalBody; projected: ProjectedBody }>, observer: Vector3,
@@ -175,7 +101,7 @@ export class UniverseBodyRenderer {
     gl.uniform3f(this.uniforms.uRight, basis.right.x, basis.right.y, basis.right.z);
     gl.uniform3f(this.uniforms.uUp, basis.up.x, basis.up.y, basis.up.z);
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.SCISSOR_TEST);
     for (const { body, projected } of bodies) {
       const extent = projected.radiusPx * (body.key === "saturn" ? 3 : 1.5);
@@ -193,65 +119,31 @@ export class UniverseBodyRenderer {
         (body.position.y - observer.y) / radiusAu, (body.position.z - observer.z) / radiusAu);
       const light = normalized({ x: -body.position.x, y: -body.position.y, z: -body.position.z });
       gl.uniform3f(this.uniforms.uSun, light.x, light.y, light.z);
-      const color = bodyColor(body);
+      const profile = bodyAppearance(body);
+      const map = projected.radiusPx >= 12 ? this.textures.get(profile.map) : null;
+      const detail = projected.radiusPx >= 40 ? this.textures.get(profile.detail) : null;
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, map?.texture ?? this.blankTexture);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, detail?.texture ?? this.blankTexture);
+      gl.uniform1i(this.uniforms.uMap, 0); gl.uniform1i(this.uniforms.uDetail, 1);
+      gl.uniform1f(this.uniforms.uHasMap, map?.texture ? 1 : 0);
+      gl.uniform1f(this.uniforms.uHasDetail, detail?.texture ? 1 : 0);
+      gl.uniform2f(this.uniforms.uTexel, 1 / (detail?.width ?? 1024), 1 / (detail?.height ?? 512));
+      gl.uniformMatrix3fv(this.uniforms.uRotation, false, appearanceRotation(profile));
+      gl.uniform1f(this.uniforms.uOpacity, resolvedBodyWeight(projected.radiusPx));
+      gl.uniform1f(this.uniforms.uAtmosphere, profile.atmosphere);
+      gl.uniform1f(this.uniforms.uRelief, profile.relief);
+      const color = profile.color;
       gl.uniform3f(this.uniforms.uBase, color[0], color[1], color[2]);
-      gl.uniform1f(this.uniforms.uMaterial, materialCode(body));
+      gl.uniform1f(this.uniforms.uMaterial, profile.material);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
     gl.disable(gl.SCISSOR_TEST);
     gl.disable(gl.BLEND);
   }
 
-  private renderFallback(bodies: Array<{ body: PhysicalBody; projected: ProjectedBody }>,
-    width: number, height: number, dpr: number): void {
-    const context = this.fallback!;
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    context.clearRect(0, 0, width, height);
-    for (const { body, projected } of bodies) {
-      if (!projected.centerVisible) continue;
-      const radius = Math.min(projected.radiusPx, Math.max(width, height) * 4);
-      context.save();
-      context.beginPath();
-      context.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
-      context.clip();
-      const base = body.color ?? "#a9a9a9";
-      const gradient = context.createRadialGradient(projected.x - radius * 0.35, projected.y - radius * 0.35,
-        radius * 0.1, projected.x, projected.y, radius * 1.2);
-      gradient.addColorStop(0, "#fff0d8");
-      gradient.addColorStop(0.28, base);
-      gradient.addColorStop(1, "#080d13");
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, width, height);
-      if (body.key === "jupiter" || body.key === "saturn") {
-        context.globalAlpha = 0.25;
-        context.fillStyle = "#583522";
-        for (let band = -9; band <= 9; band += 2)
-          context.fillRect(projected.x - radius, projected.y + band * radius / 10, radius * 2, radius / 11);
-      }
-      context.restore();
-    }
+  release(): void {
+    this.textures.clear(); this.canvas.dataset.textureBytes = "0"; this.canvas.dataset.loadedTextures = "";
   }
-}
-
-function materialCode(body: PhysicalBody): number {
-  if (body.key === "sun" || body.object_type === "star") return 0;
-  if (body.key === "jupiter") return 1;
-  if (body.key === "saturn") return 2;
-  if (body.key === "earth") return 3;
-  if (body.key === "mars") return 4;
-  if (body.key === "uranus" || body.key === "neptune") return 5;
-  if (body.key === "venus") return 6;
-  return 7;
-}
-
-function bodyColor(body: PhysicalBody): [number, number, number] {
-  const defaults: Record<string, string> = {
-    sun: "#ffd166", earth: "#327ac0", jupiter: "#d5a87a", saturn: "#cbb88b",
-    mars: "#b55a34", venus: "#e9d8a4", uranus: "#8bd2d3", neptune: "#426abd",
-  };
-  const hex = defaults[body.key] ?? body.color ?? "#aaaaaa";
-  if (!/^#[0-9a-f]{6}$/i.test(hex)) return [0.67, 0.67, 0.67];
-  return [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255) as [number, number, number];
 }
 
 function normalized(value: Vector3): Vector3 {
@@ -263,7 +155,7 @@ function buildProgram(gl: WebGLRenderingContext): WebGLProgram | null {
   const shaders = [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER].map((kind, index) => {
     const shader = gl.createShader(kind);
     if (!shader) return null;
-    gl.shaderSource(shader, index === 0 ? VERTEX_SHADER : FRAGMENT_SHADER);
+    gl.shaderSource(shader, index === 0 ? BODY_VERTEX_SHADER : BODY_FRAGMENT_SHADER);
     gl.compileShader(shader);
     if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return shader;
     console.warn("3D body shader unavailable:", gl.getShaderInfoLog(shader));

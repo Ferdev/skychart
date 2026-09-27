@@ -53,7 +53,7 @@ export function projectDirection(
 }
 
 /** Reuse camera basis and focal length when projecting a whole frame of points. */
-export function createSkyProjector(camera: SkyCamera, width: number, height: number):
+export function createSkyProjector(camera: SkyCamera, width: number, height: number, clipMargin = 16):
   (direction: Vector3) => SkyProjection | null {
   if (width <= 0 || height <= 0) return () => null;
   const normalizedCamera = normalizeCamera(camera);
@@ -78,7 +78,7 @@ export function createSkyProjector(camera: SkyCamera, width: number, height: num
     if (depth <= 1e-4) return null;
     const x = width / 2 + dot(point, right) * focalLength / depth;
     const y = height / 2 - dot(point, up) * focalLength / depth;
-    if (x < -16 || x > width + 16 || y < -16 || y > height + 16) return null;
+    if (x < -clipMargin || x > width + clipMargin || y < -clipMargin || y > height + clipMargin) return null;
     return { x, y, depth };
   };
 }

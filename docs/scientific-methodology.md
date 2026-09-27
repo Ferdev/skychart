@@ -34,9 +34,13 @@ illustrative reconstructions: orientation, internal depths, and individual
 particles are not measured. Active-galaxy highlights without a reported size
 use an explicitly labeled schematic 50,000-light-year radius, not a physical
 size measurement. Other deep-sky objects remain catalog symbols. Sunlight
-determines the illuminated side of solid bodies; procedural colors, cloud bands,
-terrain, and Saturn's rings are illustrative, not source-backed surface maps or
-rotation/axial-orientation models. The inspector shows distance from the center
+determines the illuminated side of solid bodies. Credited NASA, JPL and Solar
+System Scope maps supply planetary detail; Earth has a separate static cloud
+layer and the Moon uses elevation-based shading. Unmapped surfaces, additional
+relief and ring density are illustrative. Approximate axial tilts and texture
+phases do not constitute a rotational ephemeris. Gas, dust and stars form stable,
+depth-sorted deep-sky volumes; their colors are a visualization, not a naked-eye
+exposure. See [appearance methodology and credits](universe-appearance.md). The inspector shows distance from the center
 and altitude above the modeled radius of solid bodies. Deep-sky highlights
 instead identify their structure or size as illustrative. The Sun uses
 a 1-AU visual-magnitude reference; major planets use JPL's

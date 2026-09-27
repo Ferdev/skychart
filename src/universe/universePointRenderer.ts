@@ -14,8 +14,9 @@ export class UniversePointRenderer {
   private resolution: WebGLUniformLocation | null = null;
   private dpr: WebGLUniformLocation | null = null;
   private colorCache = new Map<string, readonly [number, number, number]>();
+  private hasContent = false;
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  constructor(private readonly canvas: HTMLCanvasElement, invalidate: () => void = () => {}) {
     this.initialize();
     canvas.addEventListener("webglcontextlost", (event) => {
       event.preventDefault();
@@ -23,7 +24,7 @@ export class UniversePointRenderer {
       this.program = null;
       this.buffer = null;
     });
-    canvas.addEventListener("webglcontextrestored", () => this.initialize());
+    canvas.addEventListener("webglcontextrestored", () => { this.initialize(); invalidate(); });
   }
 
   get available(): boolean { return Boolean(this.gl && this.program && this.buffer); }
@@ -37,6 +38,9 @@ export class UniversePointRenderer {
       this.canvas.width = pixelWidth;
       this.canvas.height = pixelHeight;
     }
+    this.canvas.hidden = points.length === 0;
+    if (!points.length && !this.hasContent) return;
+    this.hasContent = points.length > 0;
     gl.viewport(0, 0, pixelWidth, pixelHeight);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);

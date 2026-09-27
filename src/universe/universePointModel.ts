@@ -21,6 +21,7 @@ export type UniversePoint = Omit<CatalogUniversePoint, "distance_au" | "directio
   dynamic: boolean;
   absoluteMagnitudeH?: number | null;
   radiusKm?: number | null;
+  temperatureK?: number | null;
 };
 
 export function validCatalogPoint(point: CatalogUniversePoint): boolean {
@@ -62,6 +63,7 @@ export function bodyToUniversePoint(body: Body | null): UniversePoint | null {
       ?? (typeof body.catalog?.facts?.h_absolute_magnitude === "number" ? body.catalog.facts.h_absolute_magnitude : null),
     position: bodyVector(body),
     radiusKm: body.radius_km,
+    temperatureK: body.stellar?.stellar_teff_k,
     dynamic: isDynamicBody(body),
   };
 }

@@ -1,81 +1,88 @@
 import type { SkyCamera, Vector3 } from "../sky/skyProjection";
 import { createSkyProjector } from "../sky/skyProjection";
 import { projectSphericalExtent } from "./universeBodyGeometry";
-import { deepSkyModel, makeDeepSkyCloud, type CloudParticle, type DeepSkyPoint, type DeepSkyModel } from "./universeDeepSkyModel";
-import { UniversePointRenderer, type UniverseScreenPoint } from "./universePointRenderer";
+import { deepSkyModel, makeDeepSkyCloud, type CloudParticle, type DeepSkyPoint } from "./universeDeepSkyModel";
+import { canonicalDeepSkyKey } from "./universeDeepSkyProfiles";
+import { UniverseCloudRenderer, type CloudSplat } from "./universeCloudRenderer";
+import { resolvedBodyWeight } from "./universeAppearanceProfiles";
+import { occludedByBody, type BodyOccluder } from "./universeOcclusion";
 
-type VisibleModel = { point: DeepSkyPoint; model: DeepSkyModel; particles: CloudParticle[] };
-
-/** Project stable object-local 3D particle volumes into the flight camera. */
+/** CPU double precision projection, then sorted, soft 3D gas/dust/star splats. */
 export class UniverseDeepSkyRenderer {
-  private readonly pointRenderer: UniversePointRenderer;
-  private readonly fallback: CanvasRenderingContext2D | null;
+  private readonly renderer: UniverseCloudRenderer;
   private readonly clouds = new Map<string, CloudParticle[]>();
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
-    this.pointRenderer = new UniversePointRenderer(canvas);
-    this.fallback = this.pointRenderer.available ? null : canvas.getContext("2d");
+  constructor(private readonly canvas: HTMLCanvasElement, invalidate: () => void = () => {}) {
+    this.renderer = new UniverseCloudRenderer(canvas, invalidate);
   }
 
   render(points: readonly DeepSkyPoint[], observer: Vector3, camera: SkyCamera,
-    width: number, height: number, dpr: number): Set<string> {
-    const visible: VisibleModel[] = [];
-    for (const point of points) {
-      const model = deepSkyModel(point);
-      if (!model) continue;
-      const extent = projectSphericalExtent(point.position, model.radiusAu, observer, camera, width, height);
-      if (!extent || extent.radiusPx < 2.5) continue;
-      let particles = this.clouds.get(point.key);
-      if (!particles) {
-        particles = makeDeepSkyCloud(point.key, model.kind);
-        this.clouds.set(point.key, particles);
-      }
-      visible.push({ point, model, particles });
-    }
-    const visibleKeys = new Set(visible.map(({ point }) => point.key));
-    this.canvas.dataset.visibleObjects = [...visibleKeys].join(",");
-    const projector = createSkyProjector(camera, width, height);
+    width: number, height: number, dpr: number, occluders: BodyOccluder[] = [], moving = false, selectedKey?: string): Set<string> {
+    const visibleKeys = new Set<string>(), drawn = new Set<string>();
+    const projector = createSkyProjector(camera, width, height, Math.max(width, height) * .4);
     const focal = Math.min(width, height) / (2 * Math.tan(camera.fovDeg * Math.PI / 360));
-    const screenPoints: UniverseScreenPoint[] = [];
-    for (const { point, model, particles } of visible) {
+    const screenPoints: CloudSplat[] = [];
+    const candidates = points.flatMap((point) => {
+      const model = deepSkyModel(point);
+      const extent = model ? projectSphericalExtent(point.position, model.radiusAu, observer, camera, width, height) : null;
+      return model && extent && extent.radiusPx > 1.5 ? [{ point, model, extent }] : [];
+    }).sort((a, b) => Number(b.point.key === selectedKey) - Number(a.point.key === selectedKey) || b.extent.radiusPx - a.extent.radiusPx);
+    const budget = moving || width < 600 ? 12_000 : 24_000;
+    for (const { point, model, extent } of candidates) {
+      const canonical = canonicalDeepSkyKey(point.key);
+      if (drawn.has(canonical)) { visibleKeys.add(point.key); continue; }
+      if (screenPoints.length >= budget) continue;
+      drawn.add(canonical); visibleKeys.add(point.key);
+      let particles = this.clouds.get(canonical);
+      if (!particles) { particles = makeDeepSkyCloud(point.key, model.kind); this.clouds.set(canonical, particles); }
+      // +z in model space faces the Sun; actual internal depth and orientation
+      // remain illustrative. Flying around reveals stable, non-billboard depth.
+      const length = Math.hypot(point.position.x, point.position.y, point.position.z) || 1;
+      const normal = { x: -point.position.x / length, y: -point.position.y / length, z: -point.position.z / length };
+      const horizontal = Math.hypot(normal.x, normal.y);
+      const right = horizontal > 1e-12 ? { x: -normal.y / horizontal, y: normal.x / horizontal, z: 0 } : { x: 1, y: 0, z: 0 };
+      const up = { x: -normal.z * right.y, y: normal.z * right.x, z: normal.x * right.y - normal.y * right.x };
       const center = { x: point.position.x - observer.x, y: point.position.y - observer.y, z: point.position.z - observer.z };
-      for (const particle of particles) {
-        const projected = projector({ x: center.x + particle.x * model.radiusAu,
-          y: center.y + particle.y * model.radiusAu, z: center.z + particle.z * model.radiusAu });
-        if (!projected || projected.x < -12 || projected.x > width + 12 || projected.y < -12 || projected.y > height + 12) continue;
-        const distance = Math.hypot(center.x + particle.x * model.radiusAu,
-          center.y + particle.y * model.radiusAu, center.z + particle.z * model.radiusAu);
-        const apparentSize = Math.min(7, Math.max(particle.size, focal * model.radiusAu / Math.max(distance, 1e-12) * 0.018));
-        screenPoints.push({ x: projected.x, y: projected.y, size: apparentSize,
-          opacity: particle.opacity, color: particle.color });
+      const detail = Math.min(1, Math.max(.15, extent.radiusPx / 110)) * (moving || width < 600 ? .6 : 1);
+      const stride = Math.max(1, Math.ceil(1 / detail));
+      const weight = resolvedBodyWeight(extent.radiusPx);
+      for (let i = 0; i < particles.length && screenPoints.length < budget; i++) {
+        if (i >= 7 && i % stride !== 0) continue;
+        const p = particles[i]!;
+        const delta = { x: center.x + (right.x*p.x + up.x*p.y + normal.x*p.z)*model.radiusAu,
+          y: center.y + (right.y*p.x + up.y*p.y + normal.y*p.z)*model.radiusAu,
+          z: center.z + (right.z*p.x + up.z*p.y + normal.z*p.z)*model.radiusAu };
+        const projected = projector(delta);
+        if (!projected || (!this.renderer.available && occludedByBody(delta, occluders))) continue;
+        const distance = Math.hypot(delta.x, delta.y, delta.z);
+        const size = Math.min(Math.max(width, height) * .4, Math.max(p.layer === "star" ? 1.3 : 2,
+          focal * model.radiusAu * p.size / Math.max(distance, model.radiusAu * .005)));
+        if (projected.x < -size || projected.x > width + size || projected.y < -size || projected.y > height + size) continue;
+        const nearFade = Math.min(1, distance / (model.radiusAu * .04));
+        screenPoints.push({ x: projected.x, y: projected.y, size,
+          opacity: (1 - Math.pow(1 - p.opacity, stride)) * weight * nearFade, color: p.color, distance, star: p.layer === "star" });
       }
     }
-    this.canvas.dataset.particleCount = String(screenPoints.length);
-    if (this.pointRenderer.available) this.pointRenderer.render(screenPoints, width, height, dpr);
-    else this.renderFallback(screenPoints, width, height, dpr);
+    // A count budget alone cannot control overdraw inside a nebula: one nearby
+    // gas splat can cover most of the screen. Bound rasterized area as well.
+    const fillBudget = Math.min(width * height, 1_000_000) * (moving ? 6 : 10) / Math.max(1, dpr * dpr);
+    const gasArea = screenPoints.reduce((sum, p) => sum + (p.star ? 0 : p.size * p.size), 0);
+    const starArea = screenPoints.reduce((sum, p) => sum + (p.star ? p.size * p.size : 0), 0);
+    const fillStride = Math.max(1, Math.ceil(gasArea / Math.max(1, fillBudget - starArea)));
+    let usedArea = 0, gasIndex = 0;
+    const bounded = screenPoints.filter((p) => {
+      if (!p.star && gasIndex++ % fillStride !== 0) return false;
+      if (usedArea + p.size * p.size > fillBudget) return false;
+      usedArea += p.size * p.size;
+      if (!p.star) p.opacity = 1 - Math.pow(1 - p.opacity, fillStride);
+      return true;
+    });
+    this.canvas.dataset.visibleObjects = [...visibleKeys].join(",");
+    this.canvas.dataset.particleCount = String(bounded.length);
+    this.canvas.dataset.splatPixelArea = String(Math.round(usedArea));
+    this.renderer.render(bounded, width, height, dpr, camera, occluders);
     return visibleKeys;
   }
 
-  private renderFallback(points: UniverseScreenPoint[], width: number, height: number, dpr: number): void {
-    const context = this.fallback;
-    if (!context) return;
-    const pixelWidth = Math.max(1, Math.round(width * dpr));
-    const pixelHeight = Math.max(1, Math.round(height * dpr));
-    if (this.canvas.width !== pixelWidth || this.canvas.height !== pixelHeight) {
-      this.canvas.width = pixelWidth;
-      this.canvas.height = pixelHeight;
-    }
-    context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    context.clearRect(0, 0, width, height);
-    context.globalCompositeOperation = "lighter";
-    for (const point of points) {
-      context.globalAlpha = point.opacity;
-      context.fillStyle = point.color;
-      context.beginPath();
-      context.arc(point.x, point.y, point.size * 0.5, 0, Math.PI * 2);
-      context.fill();
-    }
-    context.globalAlpha = 1;
-    context.globalCompositeOperation = "source-over";
-  }
+  release(): void { this.clouds.clear(); this.renderer.release(); }
 }

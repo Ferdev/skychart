@@ -10,6 +10,7 @@ export type PhysicalBody = {
   color?: string | null;
   position: Vector3;
   radiusKm?: number | null;
+  temperatureK?: number | null;
 };
 
 export type ProjectedBody = {

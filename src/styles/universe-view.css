@@ -23,18 +23,16 @@
 .universe-view__points,
 .universe-view__deep-sky {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
 }
 
-.universe-view__deep-sky { z-index: 1; }
-
 .universe-view__bodies {
   position: absolute;
-  z-index: 2;
+  z-index: 1;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -312,3 +310,5 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   .universe-view[data-object-inspector="true"] .universe-view__flight { top: 120px; right: 12px; bottom: auto; }
   .universe-view[data-object-inspector="true"] .universe-view__move-pad { display: none; }
 }
+
+.universe-view__credits { color: inherit; pointer-events: auto; }

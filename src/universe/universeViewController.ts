@@ -20,6 +20,8 @@ import { UniversePointRenderer, type UniverseScreenPoint } from "./universePoint
 import { observerApparentMagnitude, rankUniverseLabels } from "./universePhotometry";
 import { UniverseDestinationSearch } from "./universeDestinationSearch";
 import { AU_KM, hasRenderableRadius, projectPhysicalBody, projectSphericalExtent, safeUniverseEntryPosition } from "./universeBodyGeometry";
+import { bodyOccluders, occludedByBody, ringTransmission, type BodyOccluder } from "./universeOcclusion";
+import { resolvedBodyWeight } from "./universeAppearanceProfiles";
 import { UniverseBodyRenderer } from "./universeBodyRenderer";
 import { deepSkyModel } from "./universeDeepSkyModel";
 import { UniverseDeepSkyRenderer } from "./universeDeepSkyRenderer";
@@ -125,9 +127,9 @@ export class UniverseViewController {
   private readonly selectionConnector: SkySelectionConnectorView;
 
   constructor(private readonly options: UniverseViewOptions) {
-    this.pointRenderer = new UniversePointRenderer(options.pointsCanvas);
-    this.bodyRenderer = new UniverseBodyRenderer(options.bodiesCanvas);
-    this.deepSkyRenderer = new UniverseDeepSkyRenderer(options.deepSkyCanvas);
+    this.pointRenderer = new UniversePointRenderer(options.pointsCanvas, () => this.requestRender());
+    this.bodyRenderer = new UniverseBodyRenderer(options.bodiesCanvas, () => this.requestRender());
+    this.deepSkyRenderer = new UniverseDeepSkyRenderer(options.deepSkyCanvas, () => this.requestRender());
     this.selectionConnector = new SkySelectionConnectorView({
       element: options.selectionConnector, canvas: options.canvas, workspacePanel: options.workspacePanel,
     });
@@ -222,6 +224,7 @@ export class UniverseViewController {
     this.requestId += 1;
     this.catalogAbort?.abort();
     this.destinationSearch.close();
+    this.bodyRenderer.release(); this.deepSkyRenderer.release();
     this.catalogAbort = null;
     this.stopFlight();
     this.hideObjectInspector();
@@ -384,9 +387,10 @@ export class UniverseViewController {
     if (redrawBase) context.drawImage(this.backdropCanvas!, 0, 0, width, height);
     const baseDone = performance.now();
     const framePoints = this.points();
-    const modeled = this.deepSkyRenderer.render(framePoints, this.position, this.camera, width, height, dpr);
-    const labels = this.drawPoints(context, framePoints, width, height, project, useWebgl, dpr, modeled);
-    this.bodyRenderer.render(framePoints, this.position, this.camera, width, height, dpr);
+    const occluders = bodyOccluders(framePoints, this.position, this.camera, width, height);
+    const modeled = this.deepSkyRenderer.render(framePoints, this.position, this.camera, width, height, dpr, occluders, moving, this.target?.key);
+    const labels = this.drawPoints(context, framePoints, width, height, project, useWebgl, dpr, modeled, occluders);
+    this.bodyRenderer.render(framePoints, this.position, this.camera, width, height, dpr, moving);
     const pointsDone = performance.now();
     if (redrawBase) {
       this.drawLabels(context, labels, width, height);
@@ -434,7 +438,7 @@ export class UniverseViewController {
   }
 
   private drawPoints(context: CanvasRenderingContext2D, points: UniversePoint[], width: number, height: number,
-    project: Projector, useWebgl: boolean, dpr: number, modeled: ReadonlySet<string>): RenderedLabel[] {
+    project: Projector, useWebgl: boolean, dpr: number, modeled: ReadonlySet<string>, occluders: BodyOccluder[]): RenderedLabel[] {
     const hits: RenderedHit[] = [];
     const labels: RenderedLabel[] = [];
     const screenPoints: UniverseScreenPoint[] = [];
@@ -447,13 +451,15 @@ export class UniverseViewController {
         y: point.position.y - this.position.y,
         z: point.position.z - this.position.z,
       });
-      if (!projected) continue;
+      if (!projected || occludedByBody({ x: point.position.x - this.position.x, y: point.position.y - this.position.y, z: point.position.z - this.position.z }, occluders, point.key)) continue;
       const magnitude = observerApparentMagnitude(point, this.position);
       const appearance = skyPointAppearance({ ...point, apparent_magnitude: magnitude });
       const deepSky = deepSkyModel(point);
       const bodyRadius = projectPhysicalBody(point, this.position, this.camera, width, height)?.radiusPx
         ?? (deepSky ? projectSphericalExtent(point.position, deepSky.radiusAu, this.position, this.camera, width, height)?.radiusPx : 0) ?? 0;
-      if (bodyRadius >= 2.5 && (hasRenderableRadius(point) || modeled.has(point.key))) { /* Geometric layer renders this object. */ }
+      const modelWeight = hasRenderableRadius(point) || modeled.has(point.key) ? resolvedBodyWeight(bodyRadius) : 0;
+      appearance.opacity *= (1 - modelWeight) * ringTransmission({ x: point.position.x - this.position.x, y: point.position.y - this.position.y, z: point.position.z - this.position.z }, occluders, point.key);
+      if (modelWeight >= 1) { /* Geometric layer renders this object. */ }
       else if (useWebgl) {
         screenPoints.push({ x: projected.x, y: projected.y, size: appearance.coreRadius * 4,
           opacity: appearance.opacity, color: appearance.color });
