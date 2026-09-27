@@ -109,6 +109,7 @@ export class UniverseViewController {
   private readonly collectPerformance = new URLSearchParams(window.location.search).has("perf");
   private requestId = 0;
   private catalogAbort: AbortController | null = null;
+  private catalogRequestedAt = 0;
   private readonly destinationSearch: UniverseDestinationSearch;
   private reloadTimer: number | null = null;
   private heldMoves = new Set<UniverseMove>();
@@ -262,6 +263,7 @@ export class UniverseViewController {
 
   private async loadCatalog(): Promise<void> {
     if (!this.active) return;
+    this.catalogRequestedAt = performance.now();
     const requestPosition = { ...this.position };
     const localOnly = this.landmarksLoaded;
     const requestId = ++this.requestId;
@@ -753,6 +755,10 @@ export class UniverseViewController {
       if (now - this.lastFlightUiAt >= 100) {
         this.lastFlightUiAt = now;
         this.updateChrome();
+        // Keep discovering nearby objects during held flight without cancelling
+        // a slow request or repeating the initial global landmark query.
+        if (this.landmarksLoaded && !this.catalogAbort && this.reloadTimer === null &&
+          now - this.catalogRequestedAt >= 1500) void this.loadCatalog();
         if (this.autopilot) this.options.status.textContent = this.options.translate(
           this.target ? "universe3d.autopilotToTarget" : "universe3d.autopilotForward",
           { name: this.target?.name ?? "", speed: formatDistanceAu(this.moveStepAu) });

@@ -226,6 +226,60 @@ defmodule StarsmapApi.Catalog.PointsTest do
     assert Enum.map(payload.points, & &1.key) == ["measured"]
   end
 
+  test "3D physical-only catalog excludes unknown distances from every sample" do
+    insert_object!("measured", "gaia_500pc_stars", 1.0, 0.0, nil, 1.0)
+
+    insert_object!(
+      "unknown",
+      "gaia_500pc_stars",
+      2.0,
+      0.0,
+      nil,
+      1.0,
+      "catalog_coordinates",
+      "star",
+      %{"distance_unknown" => true}
+    )
+
+    params = %{
+      "observer_x_au" => "0",
+      "observer_y_au" => "0",
+      "observer_z_au" => "0",
+      "physical_only" => "1",
+      "limit" => "10"
+    }
+
+    for sample <- [
+          %{},
+          %{"featured_keys" => "unknown"},
+          %{"near_radius_au" => "10", "local_only" => "1"}
+        ] do
+      assert {:ok, payload} = PointQueries.sky(Map.merge(params, sample))
+      assert Enum.map(payload.points, & &1.key) == ["measured"]
+    end
+
+    assert {:ok, sky_payload} = PointQueries.sky(Map.delete(params, "physical_only"))
+    assert Enum.any?(sky_payload.points, &(&1.key == "unknown"))
+  end
+
+  test "nearby count describes returned points when an object coincides with the observer" do
+    insert_object!("coincident", "gaia_500pc_stars", 0.0, 0.0, nil, 0.0)
+    insert_object!("near", "gaia_500pc_stars", 2.0, 0.0, nil, 0.0)
+    insert_object!("landmark", "gaia_500pc_stars", 100.0, 0.0, nil, 0.0)
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "10",
+               "limit" => "3"
+             })
+
+    assert Enum.map(payload.points, & &1.key) == ["near", "landmark"]
+    assert payload.nearby_returned == 1
+  end
+
   test "3D catalog finds a nearby galaxy at larger scales without broad star sampling" do
     insert_object!("a-star", "gaia_500pc_stars", 20_000_000.0, 0.0, nil, 1.0)
 
@@ -291,7 +345,8 @@ defmodule StarsmapApi.Catalog.PointsTest do
          color,
          z_au \\ nil,
          position_model \\ "catalog_coordinates",
-         object_type \\ "star"
+         object_type \\ "star",
+         facts \\ %{}
        ) do
     SnapshotStore.upsert_source_objects([
       %{
@@ -304,7 +359,7 @@ defmodule StarsmapApi.Catalog.PointsTest do
         search_text: key,
         aliases: [],
         external_ids: %{},
-        facts: %{},
+        facts: facts,
         source: %{},
         x_au: x_au,
         y_au: y_au,

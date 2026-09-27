@@ -45,11 +45,15 @@ with inverse-distance and approximate Lambertian phase terms. Minor bodies
 with an H value use the same geometric estimate. Ring tilt, atmospheric
 scattering, and detailed phase laws are not modeled, so 3D magnitude values are
 clearly marked as estimates, not ephemeris-grade predictions. Objects placed
-on a reference shell because their distance is unknown are excluded from 3D.
+on a reference shell or explicitly marked as having unknown distance are excluded
+from 3D, including nearby and guided-highlight query results.
 While the camera moves, a smaller deterministic subset is drawn; full sampled
 detail returns when movement stops. The first 3D load retains a bounded global
 landmark sample; subsequent camera-position refreshes query nearby objects only
-and merge them with those landmarks. This avoids repeating a full-catalog
+and merge them with those landmarks. Held flight and autopilot refresh the local
+sample at most once every 1.5 seconds, allowing an in-flight request to finish;
+stopping or jumping to a destination also refreshes the surrounding sample.
+This avoids repeating a full-catalog
 brightness sort on each move. The destination search uses the same catalog as
 the 2D atlas, but only objects with credible 3D positions can be selected.
 Compact map tiles that omit line-of-sight position are not placed on an invented

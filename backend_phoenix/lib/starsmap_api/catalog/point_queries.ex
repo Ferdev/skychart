@@ -538,6 +538,8 @@ defmodule StarsmapApi.Catalog.PointQueries do
           end
         end)
 
+      nearby_keys = MapSet.new(nearby_rows, & &1.key)
+
       {:ok,
        %{
          observer: %{
@@ -548,7 +550,7 @@ defmodule StarsmapApi.Catalog.PointQueries do
          groups: groups,
          types: types,
          limit: limit,
-         nearby_returned: length(nearby_rows),
+         nearby_returned: Enum.count(points, &MapSet.member?(nearby_keys, &1.key)),
          returned: length(points),
          points: points
        }}
@@ -604,8 +606,9 @@ defmodule StarsmapApi.Catalog.PointQueries do
     where(
       query,
       [object],
-      is_nil(object.position_model) or
-        object.position_model != "catalog_sky_position_reference_shell"
+      (is_nil(object.position_model) or
+         object.position_model != "catalog_sky_position_reference_shell") and
+        fragment("COALESCE(?->>'distance_unknown', 'false') != 'true'", object.facts)
     )
   end
 
