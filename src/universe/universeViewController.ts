@@ -17,6 +17,7 @@ import {
 import { normalizeUniverseViewState, type UniverseViewState } from "../viewState";
 import { UniversePointRenderer, type UniverseScreenPoint } from "./universePointRenderer";
 import { observerApparentMagnitude, rankUniverseLabels } from "./universePhotometry";
+import { UniverseDestinationSearch } from "./universeDestinationSearch";
 
 type CatalogUniversePoint = {
   key: string;
@@ -48,6 +49,11 @@ type UniverseViewOptions = {
   toggleButton: HTMLButtonElement;
   closeButton: HTMLButtonElement;
   resetButton: HTMLButtonElement;
+  findButton: HTMLButtonElement;
+  searchDialog: HTMLDialogElement;
+  searchCloseButton: HTMLButtonElement;
+  searchInput: HTMLInputElement;
+  searchResults: HTMLElement;
   positionLabel: HTMLElement;
   selectionSummary: HTMLElement;
   speedLabel: HTMLOutputElement;
@@ -69,6 +75,8 @@ type UniverseViewOptions = {
   selectedBody: () => Body | null;
   translate: (key: string, params?: Record<string, string | number>) => string;
   selectBody: (key: string) => Promise<void>;
+  inspectInAtlas: (key: string) => void;
+  searchDestinations: (query: string, signal: AbortSignal) => Promise<Body[]>;
   openSky: (body: Body) => Promise<void>;
   stateChanged: (mode: "push" | "replace") => void;
   closeSky: () => void;
@@ -77,7 +85,7 @@ type UniverseViewOptions = {
 };
 
 type UniverseIntegrationOptions = Pick<UniverseViewOptions,
-  "bodyByKey" | "selectedBody" | "translate" | "selectBody" | "openSky" | "stateChanged" | "closeSky" | "resumeAtlas" | "initialState">;
+  "bodyByKey" | "selectedBody" | "translate" | "selectBody" | "inspectInAtlas" | "searchDestinations" | "openSky" | "stateChanged" | "closeSky" | "resumeAtlas" | "initialState">;
 
 const DEFAULT_CAMERA: SkyCamera = { yawDeg: 180, pitchDeg: 0, fovDeg: 72 };
 const CATALOG_LIMIT = 12_000;
@@ -93,8 +101,11 @@ export class UniverseViewController {
   private moveStepAu = 1;
   private initialState: UniverseViewState | null = null;
   private catalogPoints: UniversePoint[] = [];
+  private landmarkPoints: UniversePoint[] = [];
+  private landmarksLoaded = false;
   private flightCatalogPoints: UniversePoint[] = [];
   private target: UniversePoint | null = null;
+  private targetKey: string | null = null;
   private renderedHits: RenderedHit[] = [];
   private pointers = new Map<number, { x: number; y: number }>();
   private lastPointer: { x: number; y: number } | null = null;
@@ -107,6 +118,7 @@ export class UniverseViewController {
   private readonly collectPerformance = new URLSearchParams(window.location.search).has("perf");
   private requestId = 0;
   private catalogAbort: AbortController | null = null;
+  private readonly destinationSearch: UniverseDestinationSearch;
   private reloadTimer: number | null = null;
   private heldMoves = new Set<UniverseMove>();
   private flightFrame: number | null = null;
@@ -128,8 +140,15 @@ export class UniverseViewController {
     options.toggleButton.addEventListener("click", () => this.open(options.initialState()));
     options.closeButton.addEventListener("click", () => this.close());
     options.resetButton.addEventListener("click", () => this.reset());
+    this.destinationSearch = new UniverseDestinationSearch({
+      findButton: options.findButton, dialog: options.searchDialog, closeButton: options.searchCloseButton,
+      input: options.searchInput, results: options.searchResults, active: () => this.active,
+      translate: options.translate, search: options.searchDestinations,
+      eligible: (body) => bodyToUniversePoint(body) !== null,
+      choose: (body) => { const point = bodyToUniversePoint(body); if (point) void this.chooseDestination(point); },
+    });
     options.focusButton.addEventListener("click", () => this.focusTarget());
-    options.inspectButton.addEventListener("click", () => this.close());
+    options.inspectButton.addEventListener("click", () => this.inspectInAtlas());
     options.skyButton.addEventListener("click", () => this.skyFromTarget());
     options.autopilotButton.addEventListener("click", () => this.toggleAutopilot());
     options.speedInput.addEventListener("change", () => this.setSpeedFromInput());
@@ -161,6 +180,7 @@ export class UniverseViewController {
       positionAu: { ...this.position },
       ...normalizeCamera(this.camera),
       moveStepAu: this.moveStepAu,
+      ...(this.targetKey ? { targetKey: this.targetKey } : {}),
     }) ?? undefined;
   }
 
@@ -171,8 +191,14 @@ export class UniverseViewController {
     this.position = { ...normalized.positionAu };
     this.camera = normalizeCamera(normalized);
     this.moveStepAu = Math.max(normalized.moveStepAu, positionPrecisionStep(this.position));
-    this.target = bodyToUniversePoint(this.options.selectedBody());
+    const selected = this.options.selectedBody();
+    this.targetKey = normalized.targetKey ?? selected?.key ?? null;
+    this.target = bodyToUniversePoint(this.targetKey
+      ? this.options.bodyByKey().get(this.targetKey) ?? (selected?.key === this.targetKey ? selected : null)
+      : null);
     this.autopilot = false;
+    this.landmarkPoints = [];
+    this.landmarksLoaded = false;
     if (this.target && !this.options.selectedObjectPanel.hidden) this.options.root.dataset.objectInspector = "true";
     else delete this.options.root.dataset.objectInspector;
     this.initialState = { ...normalized, positionAu: { ...normalized.positionAu } };
@@ -199,6 +225,7 @@ export class UniverseViewController {
     if (!this.active) return;
     this.requestId += 1;
     this.catalogAbort?.abort();
+    this.destinationSearch.close();
     this.catalogAbort = null;
     this.stopFlight();
     this.hideObjectInspector();
@@ -209,8 +236,11 @@ export class UniverseViewController {
     delete document.body.dataset.universeView;
     this.hideTooltip();
     this.catalogPoints = [];
+    this.landmarkPoints = [];
+    this.landmarksLoaded = false;
     this.flightCatalogPoints = [];
     this.target = null;
+    this.targetKey = null;
     this.options.targetPanel.hidden = true;
     this.renderedHits = [];
     this.initialState = null;
@@ -238,6 +268,7 @@ export class UniverseViewController {
   private async loadCatalog(): Promise<void> {
     if (!this.active) return;
     const requestPosition = { ...this.position };
+    const localOnly = this.landmarksLoaded;
     const requestId = ++this.requestId;
     this.catalogAbort?.abort();
     const abort = new AbortController();
@@ -246,16 +277,17 @@ export class UniverseViewController {
       observer_x_au: String(requestPosition.x),
       observer_y_au: String(requestPosition.y),
       observer_z_au: String(requestPosition.z),
-      limit: String(CATALOG_LIMIT),
+      limit: String(localOnly ? 2_000 : CATALOG_LIMIT),
       near_radius_au: String(clamp(this.moveStepAu * 200, 1e7, 1e11)),
       physical_only: "1",
+      ...(localOnly ? { local_only: "1" } : {}),
     });
     try {
       const response = await fetch(`/api/catalog/sky?${params.toString()}`, { signal: abort.signal });
       if (!response.ok) throw new Error(`3D catalog returned ${response.status}`);
       const payload = await response.json() as { points?: CatalogUniversePoint[]; nearby_returned?: number };
       if (requestId !== this.requestId || !this.active) return;
-      this.catalogPoints = (payload.points ?? []).filter(validCatalogPoint).map((point) => ({
+      const loaded = (payload.points ?? []).filter(validCatalogPoint).map((point) => ({
         ...point,
         position: {
           x: requestPosition.x + point.direction.x * Number(point.distance_au),
@@ -264,15 +296,25 @@ export class UniverseViewController {
         },
         dynamic: false,
       }));
+      const nearbyCount = Math.min(loaded.length, Math.max(0, payload.nearby_returned ?? loaded.length));
+      if (!localOnly) {
+        this.landmarkPoints = loaded.slice(nearbyCount);
+        this.landmarksLoaded = true;
+      }
+      const merged = new Map<string, UniversePoint>();
+      for (const point of [...loaded.slice(0, nearbyCount), ...this.landmarkPoints]) merged.set(point.key, point);
+      this.catalogPoints = [...merged.values()].slice(0, CATALOG_LIMIT);
       this.flightCatalogPoints = sampleDuringFlight(this.catalogPoints,
-        Math.min(this.catalogPoints.length, Math.max(0, payload.nearby_returned ?? 0)), MAX_FLIGHT_POINTS);
-      if (this.target && !this.target.dynamic) this.target = this.catalogPoints.find((point) => point.key === this.target?.key) ?? this.target;
-      this.options.status.textContent = this.options.translate("universe3d.ready", { count: this.catalogPoints.length });
+        nearbyCount, MAX_FLIGHT_POINTS);
+      if (this.targetKey) this.target = this.options.bodyByKey().has(this.targetKey)
+        ? bodyToUniversePoint(this.options.bodyByKey().get(this.targetKey) ?? null)
+        : this.catalogPoints.find((point) => point.key === this.targetKey) ?? null;
+      this.options.status.textContent = this.targetKey && !this.target
+        ? this.options.translate("universe3d.targetUnavailable", { key: this.targetKey })
+        : this.options.translate("universe3d.ready", { count: this.catalogPoints.length });
     } catch {
       if (abort.signal.aborted) return;
       if (requestId !== this.requestId || !this.active) return;
-      this.catalogPoints = [];
-      this.flightCatalogPoints = [];
       this.options.status.textContent = this.options.translate("universe3d.catalogUnavailable");
     }
     if (this.catalogAbort === abort) this.catalogAbort = null;
@@ -556,6 +598,30 @@ export class UniverseViewController {
     this.options.canvas.focus({ preventScroll: true });
   }
 
+  private async chooseDestination(point: UniversePoint): Promise<void> {
+    this.options.searchDialog.close();
+    this.target = point;
+    this.targetKey = point.key;
+    this.updateTarget();
+    this.focusTarget();
+    try {
+      await this.options.selectBody(point.key);
+      if (this.active && !this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === point.key) {
+        this.options.root.dataset.objectInspector = "true";
+        this.updateSelectionConnector();
+      }
+    } catch {
+      if (this.active) this.options.status.textContent = this.options.translate("universe3d.detailsUnavailable");
+    }
+  }
+
+  private inspectInAtlas(): void {
+    const key = this.target?.key;
+    this.close({ updateHistory: false });
+    if (key) this.options.inspectInAtlas(key);
+    this.options.stateChanged("push");
+  }
+
   private toggleAutopilot(): void {
     if (this.autopilot) {
       this.autopilot = false;
@@ -776,6 +842,7 @@ export class UniverseViewController {
     const hit = nearestHit(this.renderedHits, point);
     if (!hit) return;
     this.target = hit.point;
+    this.targetKey = hit.point.key;
     this.autopilotStandoffAu = 0;
     this.baseRenderKey = "";
     this.requestRender();
@@ -837,6 +904,11 @@ export function createUniverseViewController(dom: typeof atlasDom, options: Univ
     toggleButton: dom.universeToggle,
     closeButton: dom.universeClose,
     resetButton: dom.universeReset,
+    findButton: dom.universeFind,
+    searchDialog: dom.universeSearchDialog,
+    searchCloseButton: dom.universeSearchClose,
+    searchInput: dom.universeSearchInput,
+    searchResults: dom.universeSearchResults,
     positionLabel: dom.universePosition,
     selectionSummary: dom.universeSelectionSummary,
     speedLabel: dom.universeSpeed,

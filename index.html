@@ -43,10 +43,19 @@
             <p id="universe-selection-summary" class="universe-view__selection-summary"></p>
           </div>
           <div class="universe-view__actions">
+            <button id="universe-find" type="button" data-i18n="universe3d.find">Find destination</button>
             <button id="universe-reset" type="button" data-i18n="universe3d.reset">Reset flight</button>
             <button id="universe-close" type="button" data-i18n="universe3d.exit">Exit 3D</button>
           </div>
         </header>
+        <dialog id="universe-search-dialog" class="universe-view__search-dialog" aria-labelledby="universe-search-title">
+          <div class="universe-view__search-heading">
+            <h2 id="universe-search-title" data-i18n="universe3d.find">Find destination</h2>
+            <button id="universe-search-close" type="button" data-i18n="universe3d.searchClose">Close</button>
+          </div>
+          <input id="universe-search-input" type="search" autocomplete="off" data-i18n-attrs="placeholder:universe3d.searchPlaceholder;aria-label:universe3d.searchPlaceholder" placeholder="Search objects" aria-label="Search objects" />
+          <div id="universe-search-results" class="universe-view__search-results" aria-live="polite"></div>
+        </dialog>
         <div id="universe-tooltip" class="universe-view__tooltip" hidden></div>
         <aside id="universe-target" class="universe-view__target" aria-label="Selected 3D object" data-i18n-attrs="aria-label:universe3d.targetLabel" hidden>
           <strong id="universe-target-name"></strong>
@@ -80,7 +89,7 @@
         <footer class="universe-view__footer">
           <span data-i18n="universe3d.controls">Drag or use arrow keys to look · W/S move · A/D strafe · E up · Q down · wheel moves forward or back</span>
           <span id="universe-status" role="status" aria-live="polite"></span>
-          <span data-i18n="universe3d.disclosure">Real 3D catalog positions · sampled coverage · detail reduced while moving</span>
+          <span data-i18n="universe3d.disclosure">Physical-depth positions only · up to 12,000 sampled catalog objects · unknown distances omitted</span>
         </footer>
       </section>
       <section id="sky-view" class="sky-view" aria-label="Object-centered sky view" data-i18n-attrs="aria-label:sky.label" hidden>

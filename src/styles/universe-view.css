@@ -104,6 +104,28 @@
 
 .universe-view__actions button { padding: 8px 11px; }
 
+.universe-view__search-dialog {
+  z-index: 80;
+  width: min(440px, calc(100vw - 24px));
+  max-height: min(580px, calc(100vh - 24px));
+  padding: 18px;
+  border: 1px solid rgba(130, 203, 179, 0.5);
+  border-radius: 10px;
+  color: #eef2ea;
+  background: #0a1416;
+  box-shadow: 0 24px 80px #000b;
+}
+.universe-view__search-dialog::backdrop { background: #000b; }
+.universe-view__search-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.universe-view__search-heading h2 { margin: 0 0 12px; font-size: 1.1rem; }
+.universe-view__search-heading button,
+.universe-view__search-results button { border: 1px solid rgba(130, 203, 179, 0.35); border-radius: 6px; color: #eef2ea; background: #102024; cursor: pointer; }
+.universe-view__search-heading button { padding: 6px 10px; }
+.universe-view__search-dialog input { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid rgba(130, 203, 179, 0.45); border-radius: 6px; color: #eef2ea; background: #02090b; }
+.universe-view__search-results { display: grid; gap: 6px; min-height: 36px; max-height: 380px; margin-top: 12px; overflow: auto; color: #b9cac5; }
+.universe-view__search-results button { padding: 9px 10px; text-align: left; }
+.universe-view__search-results button:hover, .universe-view__search-results button:focus-visible { border-color: #f8cb65; color: #f8cb65; }
+
 .universe-view__actions button:hover,
 .universe-view__actions button:focus-visible,
 .universe-view__flight button:hover,
@@ -263,9 +285,9 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
 }
 
 @media (max-width: 640px) {
-  .universe-view__header { padding: 12px; }
-  .universe-view__actions { gap: 5px; }
-  .universe-view__actions button { min-height: 36px; padding: 6px 8px; font-size: 0.7rem; }
+  .universe-view__header { flex-wrap: wrap; gap: 5px; padding: 12px; }
+  .universe-view__actions { width: 100%; gap: 5px; }
+  .universe-view__actions button { flex: 1; min-height: 36px; padding: 6px 8px; font-size: 0.7rem; }
   .universe-view__position { max-width: calc(100vw - 160px); font-size: 0.62rem; }
   .universe-view__flight { right: 12px; bottom: 78px; }
   .universe-view__speed { grid-template-columns: 34px 90px auto 34px; }

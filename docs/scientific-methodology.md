@@ -30,7 +30,11 @@ scattering, and detailed phase laws are not modeled, so 3D magnitude values are
 clearly marked as estimates, not ephemeris-grade predictions. Objects placed
 on a reference shell because their distance is unknown are excluded from 3D.
 While the camera moves, a smaller deterministic subset is drawn; full sampled
-detail returns when movement stops.
+detail returns when movement stops. The first 3D load retains a bounded global
+landmark sample; subsequent camera-position refreshes query nearby objects only
+and merge them with those landmarks. This avoids repeating a full-catalog
+brightness sort on each move. The destination search uses the same catalog as
+the 2D atlas, but only objects with credible 3D positions can be selected.
 Compact map tiles that omit line-of-sight position are not placed on an invented
 plane in 3D. Movement step size is user-adjustable because the atlas spans from
 kilometers to billions of light-years; changing that step does not rescale or

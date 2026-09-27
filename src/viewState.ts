@@ -42,6 +42,7 @@ export type UniverseViewState = {
   pitchDeg: number;
   fovDeg: number;
   moveStepAu: number;
+  targetKey?: string;
 };
 
 export type ViewState = {
@@ -114,6 +115,7 @@ export function encodeViewState(state: ViewState): string {
     if (universe) {
       params.set("u3", [universe.positionAu.x, universe.positionAu.y, universe.positionAu.z].map(compactNumber).join(","));
       params.set("u3c", [universe.yawDeg, universe.pitchDeg, universe.fovDeg, universe.moveStepAu].map(compactNumber).join(","));
+      if (universe.targetKey) params.set("u3t", universe.targetKey);
     }
   }
   if (state.tour) params.set("tour", state.tour);
@@ -152,9 +154,12 @@ function decodeUniverseState(params: URLSearchParams): UniverseViewState | undef
   if (position.length !== 3 || camera.length !== 4) return undefined;
   const values = [...position, ...camera].map((value) => finite(value ?? null));
   if (values.some((value) => value === null)) return undefined;
+  const targetKey = params.has("u3t") ? normalizeObserverKey(params.get("u3t")) : null;
+  if (params.has("u3t") && !targetKey) return undefined;
   return normalizeUniverseViewState({
     positionAu: { x: values[0]!, y: values[1]!, z: values[2]! },
     yawDeg: values[3]!, pitchDeg: values[4]!, fovDeg: values[5]!, moveStepAu: values[6]!,
+    ...(targetKey ? { targetKey } : {}),
   }) ?? undefined;
 }
 
@@ -165,12 +170,15 @@ export function normalizeUniverseViewState(value: UniverseViewState): UniverseVi
   if (numbers.slice(0, 3).some((item) => Math.abs(item) > 1e18)) return null;
   if (value.pitchDeg < -89.5 || value.pitchDeg > 89.5 || value.fovDeg < 20 || value.fovDeg > 110) return null;
   if (value.moveStepAu < 1e-12 || value.moveStepAu > 1e18) return null;
+  const targetKey = value.targetKey === undefined ? null : normalizeObserverKey(value.targetKey);
+  if (value.targetKey !== undefined && !targetKey) return null;
   return {
     positionAu: { ...position },
     yawDeg: normalizeDegrees(value.yawDeg),
     pitchDeg: value.pitchDeg,
     fovDeg: value.fovDeg,
     moveStepAu: value.moveStepAu,
+    ...(targetKey ? { targetKey } : {}),
   };
 }
 

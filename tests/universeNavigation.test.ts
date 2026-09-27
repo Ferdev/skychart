@@ -30,4 +30,9 @@ const coincident = universeEntryState({ x: 2, y: 3 }, 5, { x: 2, y: 3, z: 0 });
 assert.deepEqual(coincident.positionAu, { x: 7, y: 3, z: 0 });
 near(coincident.yawDeg, 180);
 
+for (const [scale, step] of [[1, 0.001], [63_241, 1], [6.324e10, 1e7], [6.324e16, 1e13]]) {
+  const moved = moveUniversePosition({ x: scale, y: 0, z: 0 }, 0, 0, "forward", step);
+  assert.ok(Number.isFinite(moved.x) && moved.x > scale, `movement must remain representable at ${scale} AU`);
+}
+
 console.log("universe navigation tests passed");

@@ -14,7 +14,7 @@ const state = {
   time: "2042-04-05T06:07:08.000Z" as const, objectKey: "gaia:123",
   compare: ["gaia:123", "mars"] as const, catalogRelease: "v9",
   layers: { labels: true, grid: false, milkyWay: true, constellations: true }, filters: { primary: "galaxy", compare: "all" } as const,
-  universe: { positionAu: { x: 12.5, y: -3, z: 8 }, yawDeg: 182.5, pitchDeg: -12, fovDeg: 64, moveStepAu: 0.25 },
+  universe: { positionAu: { x: 12.5, y: -3, z: 8 }, yawDeg: 182.5, pitchDeg: -12, fovDeg: 64, moveStepAu: 0.25, targetKey: "gaia:123" },
   tour: "local-group", step: 3
 };
 const encoded = encodeViewState(state);
@@ -22,6 +22,8 @@ assert.deepEqual(decodeViewState(encoded), state);
 assert.equal(new URLSearchParams(encoded).get("F"), "galaxy.all");
 assert.equal(new URLSearchParams(encoded).get("u3"), "12.5,-3,8");
 assert.equal(new URLSearchParams(encoded).get("u3c"), "182.5,-12,64,0.25");
+assert.equal(new URLSearchParams(encoded).get("u3t"), "gaia:123");
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,0,72,1&u3t=bad%20key")?.universe, undefined);
 assert.equal(decodeViewState(encodeViewState({ ...state, layers: { constellations: false } }))?.layers.constellations, false);
 const skyEncoded = encodeViewState({
   ...state,

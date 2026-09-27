@@ -395,6 +395,7 @@ defmodule StarsmapApi.Catalog.PointQueries do
       types = csv_param(params["types"])
       observer_key = normalized_observer_key(params["observer_key"])
       physical_only? = truthy_param?(params["physical_only"])
+      local_only? = truthy_param?(params["local_only"])
       near_radius_au = bounded_float(params["near_radius_au"], 0.0, 0.0, @max_sky_near_radius_au)
       near_limit = min(@sky_near_limit, limit)
 
@@ -410,14 +411,18 @@ defmodule StarsmapApi.Catalog.PointQueries do
         |> maybe_exclude_reference_shells(physical_only?)
 
       global_rows =
-        base_query
-        |> order_by([object],
-          asc_nulls_last: object.apparent_magnitude,
-          asc: object.key
-        )
-        |> limit(^limit)
-        |> select([object], struct(object, ^@sky_fields))
-        |> Repo.all(timeout: @sky_query_timeout)
+        if local_only? do
+          []
+        else
+          base_query
+          |> order_by([object],
+            asc_nulls_last: object.apparent_magnitude,
+            asc: object.key
+          )
+          |> limit(^limit)
+          |> select([object], struct(object, ^@sky_fields))
+          |> Repo.all(timeout: @sky_query_timeout)
+        end
 
       nearby_rows =
         if near_radius_au > 0 do

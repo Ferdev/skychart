@@ -141,6 +141,25 @@ defmodule StarsmapApi.Catalog.PointsTest do
     assert Enum.map(payload.points, & &1.key) == ["z-near"]
   end
 
+  test "3D local-only refresh skips global landmarks and returns only nearby positions" do
+    insert_object!("bright-far", "gaia_500pc_stars", 100.0, 0.0, nil, 1.0)
+    insert_object!("near", "gaia_500pc_stars", 2.0, 0.0, nil, 9.0)
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "10",
+               "local_only" => "1",
+               "limit" => "10",
+               "groups" => "gaia_500pc_stars"
+             })
+
+    assert payload.nearby_returned == 1
+    assert Enum.map(payload.points, & &1.key) == ["near"]
+  end
+
   test "3D physical-only catalog omits display reference shells" do
     insert_object!("measured", "gaia_500pc_stars", 1.0, 0.0, nil, 1.0)
 
