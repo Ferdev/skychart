@@ -423,27 +423,52 @@ defmodule StarsmapApi.Catalog.PointQueries do
         if near_radius_au > 0 do
           observer = {observer_x_au, observer_y_au, observer_z_au}
 
+          # A 3D Solar System view needs local stars and Local Group landmarks
+          # even when a brightness-ordered global sample is dominated by stars.
+          reserve_galaxies? = physical_only? and near_limit >= 100
+          star_limit = if reserve_galaxies?, do: div(near_limit, 2), else: near_limit
+          galaxy_limit = if reserve_galaxies?, do: min(100, div(near_limit, 10)), else: 0
+
+          other_limit =
+            if reserve_galaxies?, do: near_limit - star_limit - galaxy_limit, else: near_limit
+
           stars =
             base_query
             |> where([object], object.object_type == "star")
             |> sky_near_rows(
               observer,
               min(near_radius_au, @max_sky_near_star_radius_au),
-              near_limit
+              star_limit
             )
 
           others =
             base_query
             |> where([object], object.object_type != "star")
-            |> sky_near_rows(observer, near_radius_au, near_limit)
+            |> maybe_exclude_galaxies(reserve_galaxies?)
+            |> sky_near_rows(observer, near_radius_au, other_limit)
 
-          (stars ++ others)
-          |> Enum.sort_by(fn object ->
-            :math.pow(object.x_au - observer_x_au, 2) +
-              :math.pow(object.y_au - observer_y_au, 2) +
-              :math.pow(object.z_au - observer_z_au, 2)
-          end)
-          |> Enum.take(near_limit)
+          galaxies =
+            if reserve_galaxies? do
+              base_query
+              |> where([object], object.object_type in ["galaxy", "active_galaxy"])
+              |> sky_near_rows(observer, max(near_radius_au, 3.0e11), galaxy_limit)
+            else
+              []
+            end
+
+          nearby = Enum.uniq_by(stars ++ others ++ galaxies, & &1.key)
+
+          if reserve_galaxies? do
+            nearby
+          else
+            nearby
+            |> Enum.sort_by(fn object ->
+              :math.pow(object.x_au - observer_x_au, 2) +
+                :math.pow(object.y_au - observer_y_au, 2) +
+                :math.pow(object.z_au - observer_z_au, 2)
+            end)
+            |> Enum.take(near_limit)
+          end
         else
           []
         end
@@ -543,6 +568,12 @@ defmodule StarsmapApi.Catalog.PointQueries do
     |> limit(^limit)
     |> select([object], struct(object, ^@sky_fields))
     |> Repo.all(timeout: @sky_query_timeout)
+  end
+
+  defp maybe_exclude_galaxies(query, false), do: query
+
+  defp maybe_exclude_galaxies(query, true) do
+    where(query, [object], object.object_type not in ["galaxy", "active_galaxy"])
   end
 
   defp maybe_exclude_reference_shells(query, false), do: query

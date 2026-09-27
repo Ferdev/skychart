@@ -29,6 +29,7 @@
     "test:sky-projection": "node --experimental-strip-types tests/skyProjection.test.ts",
     "test:sky-point-appearance": "node --experimental-strip-types tests/skyPointAppearance.test.ts",
     "test:universe-navigation": "node --experimental-strip-types tests/universeNavigation.test.ts",
+    "test:universe-photometry": "node --experimental-strip-types tests/universePhotometry.test.ts",
     "test:constellations": "node --experimental-strip-types tests/constellations.test.ts",
     "test:helpers": "node --experimental-strip-types tests/atlasHelpers.test.ts",
     "test:catalog-point-decoder": "node --experimental-strip-types tests/catalogPointDecoder.test.ts",

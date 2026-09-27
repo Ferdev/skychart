@@ -3,7 +3,8 @@ import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
 import { moveUniversePosition, universeEntryState, type UniverseMove } from "../navigation/universeNavigation";
 import { bodyCanObserveSky, bodyVector, isDynamicBody } from "../sky/skyBody";
-import { skyPointAppearance, type SkyPointAppearance } from "../sky/skyPointAppearance";
+import { skyPointAppearance } from "../sky/skyPointAppearance";
+import { SkySelectionConnectorView } from "../sky/skySelectionConnectorView";
 import {
   cameraForDirection,
   createSkyProjector,
@@ -15,6 +16,7 @@ import {
 } from "../sky/skyProjection";
 import { normalizeUniverseViewState, type UniverseViewState } from "../viewState";
 import { UniversePointRenderer, type UniverseScreenPoint } from "./universePointRenderer";
+import { observerApparentMagnitude, rankUniverseLabels } from "./universePhotometry";
 
 type CatalogUniversePoint = {
   key: string;
@@ -32,10 +34,11 @@ type CatalogUniversePoint = {
 type UniversePoint = Omit<CatalogUniversePoint, "distance_au" | "direction"> & {
   position: Vector3;
   dynamic: boolean;
-  appearance?: SkyPointAppearance;
+  absoluteMagnitudeH?: number | null;
 };
 
 type RenderedHit = { point: UniversePoint; x: number; y: number; radius: number };
+type RenderedLabel = RenderedHit & { magnitude: number | null; distance: number };
 type Projector = ReturnType<typeof createSkyProjector>;
 
 type UniverseViewOptions = {
@@ -46,12 +49,19 @@ type UniverseViewOptions = {
   closeButton: HTMLButtonElement;
   resetButton: HTMLButtonElement;
   positionLabel: HTMLElement;
+  selectionSummary: HTMLElement;
   speedLabel: HTMLOutputElement;
+  speedInput: HTMLInputElement;
+  autopilotButton: HTMLButtonElement;
+  selectionConnector: SVGSVGElement;
+  workspacePanel: HTMLElement;
+  selectedObjectPanel: HTMLElement;
   status: HTMLElement;
   tooltip: HTMLElement;
   targetPanel: HTMLElement;
   targetName: HTMLElement;
   targetMeta: HTMLElement;
+  targetMagnitude: HTMLElement;
   focusButton: HTMLButtonElement;
   inspectButton: HTMLButtonElement;
   skyButton: HTMLButtonElement;
@@ -106,15 +116,23 @@ export class UniverseViewController {
   private shiftHeld = false;
   private controlPointer: number | null = null;
   private pointerMovement: UniverseMove | null = null;
+  private autopilot = false;
+  private autopilotStandoffAu = 0;
+  private readonly selectionConnector: SkySelectionConnectorView;
 
   constructor(private readonly options: UniverseViewOptions) {
     this.pointRenderer = new UniversePointRenderer(options.pointsCanvas);
+    this.selectionConnector = new SkySelectionConnectorView({
+      element: options.selectionConnector, canvas: options.canvas, workspacePanel: options.workspacePanel,
+    });
     options.toggleButton.addEventListener("click", () => this.open(options.initialState()));
     options.closeButton.addEventListener("click", () => this.close());
     options.resetButton.addEventListener("click", () => this.reset());
     options.focusButton.addEventListener("click", () => this.focusTarget());
     options.inspectButton.addEventListener("click", () => this.close());
     options.skyButton.addEventListener("click", () => this.skyFromTarget());
+    options.autopilotButton.addEventListener("click", () => this.toggleAutopilot());
+    options.speedInput.addEventListener("change", () => this.setSpeedFromInput());
     options.root.addEventListener("click", (event) => this.controlClick(event));
     options.root.addEventListener("pointerdown", (event) => this.controlPointerDown(event));
     options.root.addEventListener("pointerup", (event) => this.controlPointerUp(event));
@@ -129,6 +147,9 @@ export class UniverseViewController {
     window.addEventListener("keyup", (event) => this.keyUp(event));
     window.addEventListener("blur", () => this.stopFlight());
     window.addEventListener("resize", () => this.requestRender());
+    new MutationObserver(() => {
+      if (options.workspacePanel.hidden) this.hideObjectInspector();
+    }).observe(options.workspacePanel, { attributes: true, attributeFilter: ["hidden"] });
     window.addEventListener("cosmic-atlas:locale-change", () => this.updateChrome());
   }
 
@@ -151,6 +172,9 @@ export class UniverseViewController {
     this.camera = normalizeCamera(normalized);
     this.moveStepAu = Math.max(normalized.moveStepAu, positionPrecisionStep(this.position));
     this.target = bodyToUniversePoint(this.options.selectedBody());
+    this.autopilot = false;
+    if (this.target && !this.options.selectedObjectPanel.hidden) this.options.root.dataset.objectInspector = "true";
+    else delete this.options.root.dataset.objectInspector;
     this.initialState = { ...normalized, positionAu: { ...normalized.positionAu } };
     this.options.root.hidden = false;
     document.body.dataset.universeView = "true";
@@ -177,6 +201,7 @@ export class UniverseViewController {
     this.catalogAbort?.abort();
     this.catalogAbort = null;
     this.stopFlight();
+    this.hideObjectInspector();
     if (this.reloadTimer !== null) window.clearTimeout(this.reloadTimer);
     this.reloadTimer = null;
     this.options.root.hidden = true;
@@ -202,6 +227,7 @@ export class UniverseViewController {
 
   private reset(): void {
     if (!this.initialState) return;
+    this.stopFlight();
     this.position = { ...this.initialState.positionAu };
     this.camera = normalizeCamera(this.initialState);
     this.moveStepAu = Math.max(this.initialState.moveStepAu, positionPrecisionStep(this.position));
@@ -221,7 +247,7 @@ export class UniverseViewController {
       observer_y_au: String(requestPosition.y),
       observer_z_au: String(requestPosition.z),
       limit: String(CATALOG_LIMIT),
-      near_radius_au: String(clamp(this.moveStepAu * 200, 1, 1e11)),
+      near_radius_au: String(clamp(this.moveStepAu * 200, 1e7, 1e11)),
       physical_only: "1",
     });
     try {
@@ -237,7 +263,6 @@ export class UniverseViewController {
           z: requestPosition.z + point.direction.z * Number(point.distance_au),
         },
         dynamic: false,
-        appearance: skyPointAppearance({ ...point, dynamic: false }),
       }));
       this.flightCatalogPoints = sampleDuringFlight(this.catalogPoints,
         Math.min(this.catalogPoints.length, Math.max(0, payload.nearby_returned ?? 0)), MAX_FLIGHT_POINTS);
@@ -257,7 +282,7 @@ export class UniverseViewController {
   }
 
   private points(): UniversePoint[] {
-    const catalog = this.heldMoves.size > 0 ? this.flightCatalogPoints : this.catalogPoints;
+    const catalog = this.heldMoves.size > 0 || this.autopilot ? this.flightCatalogPoints : this.catalogPoints;
     const points = new Map<string, UniversePoint>(catalog.map((point) => [point.key, point]));
     if (this.target) points.set(this.target.key, this.target);
     for (const body of this.options.bodyByKey().values()) {
@@ -312,18 +337,19 @@ export class UniverseViewController {
       this.backdropCanvas = backdrop;
       this.backdropKey = backdropKey;
     }
-    const moving = this.heldMoves.size > 0;
+    const moving = this.heldMoves.size > 0 || this.autopilot;
     const baseKey = `${backdropKey}:${useWebgl ? moving ? "flight" : `${this.position.x},${this.position.y},${this.position.z}` : "fallback"}`;
-    const redrawBase = !useWebgl || this.baseRenderKey !== baseKey;
+    const redrawBase = moving || !useWebgl || this.baseRenderKey !== baseKey;
     if (redrawBase) context.drawImage(this.backdropCanvas!, 0, 0, width, height);
     const baseDone = performance.now();
     const labels = this.drawPoints(context, this.points(), width, height, project, useWebgl, dpr);
     const pointsDone = performance.now();
     if (redrawBase) {
-      if (!moving) this.drawLabels(context, labels.slice(0, MAX_LABELS), width, height);
+      this.drawLabels(context, labels, width, height);
       drawReticle(context, width, height);
       this.baseRenderKey = baseKey;
     }
+    this.updateSelectionConnector();
     if (this.collectPerformance) {
       const debug = window as Window & { __universePerf?: Array<{ base: number; points: number; labels: number; webgl: boolean }> };
       const samples = debug.__universePerf ??= [];
@@ -364,9 +390,9 @@ export class UniverseViewController {
   }
 
   private drawPoints(context: CanvasRenderingContext2D, points: UniversePoint[], width: number, height: number,
-    project: Projector, useWebgl: boolean, dpr: number): RenderedHit[] {
+    project: Projector, useWebgl: boolean, dpr: number): RenderedLabel[] {
     const hits: RenderedHit[] = [];
-    const labels: RenderedHit[] = [];
+    const labels: RenderedLabel[] = [];
     const screenPoints: UniverseScreenPoint[] = [];
     if (!useWebgl) { context.save(); context.globalCompositeOperation = "lighter"; }
     let lastColor = "";
@@ -378,13 +404,13 @@ export class UniverseViewController {
         z: point.position.z - this.position.z,
       });
       if (!projected) continue;
-      const appearance = point.appearance ?? skyPointAppearance(point);
+      const magnitude = observerApparentMagnitude(point, this.position);
+      const appearance = skyPointAppearance({ ...point, apparent_magnitude: magnitude });
       if (useWebgl) {
         screenPoints.push({ x: projected.x, y: projected.y, size: appearance.coreRadius * 4,
           opacity: appearance.opacity, color: appearance.color });
       } else {
-        if (appearance.glowRadius > 0 && (point.dynamic ||
-          (Number.isFinite(point.apparent_magnitude) && Number(point.apparent_magnitude) <= 4.5))) {
+        if (appearance.glowRadius > 0 && magnitude !== null && magnitude <= 4.5) {
           context.globalAlpha = 1;
           const glow = context.createRadialGradient(projected.x, projected.y, 0, projected.x, projected.y, appearance.glowRadius);
           glow.addColorStop(0, appearance.glowColors.inner);
@@ -409,7 +435,9 @@ export class UniverseViewController {
       }
       const hit = { point, x: projected.x, y: projected.y, radius: Math.max(7, appearance.coreRadius + 4) };
       hits.push(hit);
-      if (point.dynamic || (Number.isFinite(point.apparent_magnitude) && Number(point.apparent_magnitude) <= 4.5)) labels.push(hit);
+      labels.push({ ...hit, magnitude, distance: Math.hypot(
+        point.position.x - this.position.x, point.position.y - this.position.y, point.position.z - this.position.z,
+      ) });
     }
     if (!useWebgl) context.restore();
     this.renderedHits = hits;
@@ -417,12 +445,16 @@ export class UniverseViewController {
     return labels;
   }
 
-  private drawLabels(context: CanvasRenderingContext2D, labels: RenderedHit[], width: number, height: number): void {
+  private drawLabels(context: CanvasRenderingContext2D, candidates: RenderedLabel[], width: number, height: number): void {
+    const selectedKey = this.target?.key;
+    const labels = rankUniverseLabels(candidates, this.position, selectedKey);
     const occupied: Array<{ left: number; top: number; right: number; bottom: number }> = [];
     context.save();
     context.font = "600 12px system-ui, sans-serif";
     for (const hit of labels) {
-      const labelWidth = context.measureText(hit.point.name).width + 12;
+      if (occupied.length >= MAX_LABELS) break;
+      const label = hit.magnitude === null ? hit.point.name : `${hit.point.name} · ${hit.magnitude.toFixed(1)}`;
+      const labelWidth = context.measureText(label).width + 12;
       const rect = { left: hit.x + 8, top: hit.y - 10, right: hit.x + 8 + labelWidth, bottom: hit.y + 10 };
       if (rect.left < 8 || rect.right > width - 8 || rect.top < 72 || rect.bottom > height - 60) continue;
       if (occupied.some((item) => overlaps(item, rect))) continue;
@@ -430,7 +462,15 @@ export class UniverseViewController {
       context.fillStyle = "rgba(3, 7, 8, 0.72)";
       context.fillRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
       context.fillStyle = "rgba(238, 242, 234, 0.84)";
-      context.fillText(hit.point.name, hit.x + 14, hit.y + 4);
+      context.fillText(label, hit.x + 14, hit.y + 4);
+    }
+    const selected = this.renderedHits.find((hit) => hit.point.key === selectedKey);
+    if (selected) {
+      context.beginPath();
+      context.arc(selected.x, selected.y, Math.max(11, selected.radius + 3), 0, Math.PI * 2);
+      context.strokeStyle = "#f8cb65";
+      context.lineWidth = 1.5;
+      context.stroke();
     }
     context.restore();
   }
@@ -461,14 +501,17 @@ export class UniverseViewController {
     this.options.positionLabel.textContent = this.options.translate("universe3d.position", {
       x: formatCoordinate(this.position.x), y: formatCoordinate(this.position.y), z: formatCoordinate(this.position.z),
     });
-    this.options.speedLabel.textContent = formatDistanceAu(this.moveStepAu);
+    this.options.speedLabel.textContent = `${formatDistanceAu(this.moveStepAu)}/s`;
+    if (document.activeElement !== this.options.speedInput) this.options.speedInput.value = formatSpeedInput(this.moveStepAu);
+    this.options.autopilotButton.setAttribute("aria-pressed", String(this.autopilot));
+    this.options.autopilotButton.textContent = this.options.translate(this.autopilot ? "universe3d.autopilotStop" : "universe3d.autopilotStart");
     this.updateTarget();
   }
 
   private updateTarget(): void {
     const target = this.target;
     this.options.targetPanel.hidden = !target;
-    if (!target) return;
+    if (!target) { this.options.selectionSummary.textContent = ""; return; }
     const distance = Math.hypot(
       target.position.x - this.position.x,
       target.position.y - this.position.y,
@@ -478,6 +521,13 @@ export class UniverseViewController {
     this.options.targetMeta.textContent = this.options.translate("universe3d.targetMeta", {
       type: (target.object_type ?? "Object").replace(/_/g, " "), distance: formatDistanceAu(distance),
     });
+    const magnitude = observerApparentMagnitude(target, this.position);
+    this.options.targetMagnitude.textContent = magnitude === null
+      ? this.options.translate("universe3d.unknownMagnitude")
+      : this.options.translate("universe3d.estimatedMagnitude", { magnitude: magnitude.toFixed(1) });
+    this.options.selectionSummary.textContent = this.options.translate("universe3d.selectionSummary", {
+      name: target.name, distance: formatDistanceAu(distance), magnitude: this.options.targetMagnitude.textContent,
+    });
     const body = this.options.bodyByKey().get(target.key) ?? this.options.selectedBody();
     this.options.skyButton.disabled = !body || body.key !== target.key || !bodyCanObserveSky(body);
     this.options.focusButton.disabled = distance <= 1e-12;
@@ -486,6 +536,7 @@ export class UniverseViewController {
   private focusTarget(): void {
     const target = this.target;
     if (!target) return;
+    this.stopFlight();
     const direction = relativeDirection(this.position, target.position);
     if (!direction) return;
     const distance = Math.hypot(
@@ -502,6 +553,27 @@ export class UniverseViewController {
     this.camera = cameraForDirection(direction, this.camera.fovDeg);
     this.moveStepAu = clamp(Math.max(standoff * 0.25, positionPrecisionStep(this.position)), MIN_MOVE_STEP_AU, MAX_MOVE_STEP_AU);
     this.afterNavigation(true, "push");
+    this.options.canvas.focus({ preventScroll: true });
+  }
+
+  private toggleAutopilot(): void {
+    if (this.autopilot) {
+      this.autopilot = false;
+      if (this.heldMoves.size === 0) this.endFlight();
+    } else {
+      this.autopilot = true;
+      this.autopilotStandoffAu = this.target ? Math.max(
+        (this.options.bodyByKey().get(this.target.key)?.radius_km ?? 0) / 149_597_870.7 * 3,
+        Math.min(this.moveStepAu * 0.1, Math.hypot(
+          this.target.position.x - this.position.x,
+          this.target.position.y - this.position.y,
+          this.target.position.z - this.position.z,
+        ) * 0.001),
+      ) : 0;
+      this.startFlight();
+    }
+    this.updateChrome();
+    this.options.stateChanged("replace");
     this.options.canvas.focus({ preventScroll: true });
   }
 
@@ -529,6 +601,15 @@ export class UniverseViewController {
     this.options.canvas.focus({ preventScroll: true });
   }
 
+  private setSpeedFromInput(): void {
+    const requested = Number(this.options.speedInput.value);
+    if (Number.isFinite(requested) && requested >= MIN_MOVE_STEP_AU && requested <= MAX_MOVE_STEP_AU) {
+      this.moveStepAu = Math.max(requested, positionPrecisionStep(this.position));
+      this.afterNavigation(true);
+    }
+    this.options.speedInput.value = formatSpeedInput(this.moveStepAu);
+  }
+
   private controlPointerDown(event: PointerEvent): void {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-universe-move]");
     if (!button || !this.active) return;
@@ -546,7 +627,7 @@ export class UniverseViewController {
     if (this.pointerMovement) this.heldMoves.delete(this.pointerMovement);
     this.controlPointer = null;
     this.pointerMovement = null;
-    if (this.heldMoves.size === 0) this.endFlight();
+    if (this.heldMoves.size === 0 && !this.autopilot) this.endFlight();
   }
 
   private startFlight(): void {
@@ -559,7 +640,7 @@ export class UniverseViewController {
 
   private flightTick(now: number): void {
     this.flightFrame = null;
-    if (!this.active || this.heldMoves.size === 0) return;
+    if (!this.active || this.heldMoves.size === 0 && !this.autopilot) return;
     const seconds = Math.min((now - this.lastFlightAt) / 1000, 0.1);
     this.lastFlightAt = now;
     if (now - this.flightStartedAt >= 160 && seconds > 0) {
@@ -568,10 +649,31 @@ export class UniverseViewController {
         this.position = moveUniversePosition(this.position, this.camera.yawDeg, this.camera.pitchDeg,
           movement, this.moveStepAu * seconds * (this.shiftHeld ? 10 : 1) * 3);
       }
+      if (this.autopilot) {
+        const direction = this.target ? relativeDirection(this.position, this.target.position) : null;
+        const distance = this.target ? Math.hypot(
+          this.target.position.x - this.position.x,
+          this.target.position.y - this.position.y,
+          this.target.position.z - this.position.z,
+        ) : Number.POSITIVE_INFINITY;
+        const travel = Math.min(this.moveStepAu * seconds, Math.max(0, distance - this.autopilotStandoffAu));
+        if (this.target && (travel <= positionPrecisionStep(this.position) * 0.5 || !direction)) {
+          this.autopilot = false;
+          this.options.status.textContent = this.options.translate("universe3d.autopilotArrived", { name: this.target.name });
+          this.updateChrome();
+          if (this.heldMoves.size === 0) { this.endFlight(); return; }
+        } else {
+          if (direction) this.camera = cameraForDirection(direction, this.camera.fovDeg);
+          this.position = moveUniversePosition(this.position, this.camera.yawDeg, this.camera.pitchDeg, "forward", travel);
+        }
+      }
       this.requestRender();
       if (now - this.lastFlightUiAt >= 100) {
         this.lastFlightUiAt = now;
         this.updateChrome();
+        if (this.autopilot) this.options.status.textContent = this.options.translate(
+          this.target ? "universe3d.autopilotToTarget" : "universe3d.autopilotForward",
+          { name: this.target?.name ?? "", speed: formatDistanceAu(this.moveStepAu) });
         this.options.stateChanged("replace");
       }
     }
@@ -585,6 +687,7 @@ export class UniverseViewController {
   }
 
   private stopFlight(): void {
+    this.autopilot = false;
     this.heldMoves.clear();
     this.pointerMovement = null;
     this.controlPointer = null;
@@ -666,13 +769,16 @@ export class UniverseViewController {
   private keyUp(event: KeyboardEvent): void {
     if (event.key === "Shift") this.shiftHeld = false;
     const movement = keyMovement(event.key.toLowerCase());
-    if (movement && this.heldMoves.delete(movement) && this.heldMoves.size === 0) this.endFlight();
+    if (movement && this.heldMoves.delete(movement) && this.heldMoves.size === 0 && !this.autopilot) this.endFlight();
   }
 
   private async selectAt(point: { x: number; y: number }): Promise<void> {
     const hit = nearestHit(this.renderedHits, point);
     if (!hit) return;
     this.target = hit.point;
+    this.autopilotStandoffAu = 0;
+    this.baseRenderKey = "";
+    this.requestRender();
     this.updateTarget();
     this.options.status.textContent = this.options.translate("universe3d.selecting", { name: hit.point.name });
     try { await this.options.selectBody(hit.point.key); }
@@ -681,9 +787,24 @@ export class UniverseViewController {
       return;
     }
     if (this.active) {
+      if (!this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === hit.point.key) {
+        this.options.root.dataset.objectInspector = "true";
+        this.updateSelectionConnector();
+      }
       this.options.status.textContent = this.options.translate("universe3d.selected", { name: hit.point.name });
       this.updateTarget();
     }
+  }
+
+  private hideObjectInspector(): void {
+    this.selectionConnector.hide();
+    delete this.options.root.dataset.objectInspector;
+  }
+
+  private updateSelectionConnector(): void {
+    if (this.options.root.dataset.objectInspector !== "true") { this.selectionConnector.hide(); return; }
+    const hit = this.renderedHits.find((candidate) => candidate.point.key === this.target?.key);
+    this.selectionConnector.update(hit ? { key: hit.point.key, x: hit.x, y: hit.y } : null);
   }
 
   private showTooltip(point: { x: number; y: number }): void {
@@ -717,12 +838,19 @@ export function createUniverseViewController(dom: typeof atlasDom, options: Univ
     closeButton: dom.universeClose,
     resetButton: dom.universeReset,
     positionLabel: dom.universePosition,
+    selectionSummary: dom.universeSelectionSummary,
     speedLabel: dom.universeSpeed,
+    speedInput: dom.universeSpeedInput,
+    autopilotButton: dom.universeAutopilot,
+    selectionConnector: dom.universeSelectionConnector,
+    workspacePanel: dom.workspacePanel,
+    selectedObjectPanel: dom.selectedObjectPanel,
     status: dom.universeStatus,
     tooltip: dom.universeTooltip,
     targetPanel: dom.universeTarget,
     targetName: dom.universeTargetName,
     targetMeta: dom.universeTargetMeta,
+    targetMagnitude: dom.universeTargetMagnitude,
     focusButton: dom.universeFocus,
     inspectButton: dom.universeInspect,
     skyButton: dom.universeSky,
@@ -768,6 +896,8 @@ function bodyToUniversePoint(body: Body | null): UniversePoint | null {
     position_model: body.catalog?.position_model,
     color: body.color,
     apparent_magnitude: body.stellar?.apparent_magnitude ?? body.deep_sky?.apparent_magnitude,
+    absoluteMagnitudeH: body.small_body?.h_absolute_magnitude
+      ?? (typeof body.catalog?.facts?.h_absolute_magnitude === "number" ? body.catalog.facts.h_absolute_magnitude : null),
     position: bodyVector(body),
     dynamic: isDynamicBody(body),
   };
@@ -822,6 +952,10 @@ function formatDistanceAu(value: number): string {
   if (Math.abs(lightYears) < 1e6) return `${formatNumber(lightYears / 1e3)} kly`;
   if (Math.abs(lightYears) < 1e9) return `${formatNumber(lightYears / 1e6)} Mly`;
   return `${formatNumber(lightYears / 1e9)} Gly`;
+}
+
+function formatSpeedInput(value: number): string {
+  return Number(value.toPrecision(6)).toString();
 }
 
 function formatNumber(value: number): string {

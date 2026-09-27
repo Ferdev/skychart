@@ -58,6 +58,11 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await page.locator("#universe-map").click({ position: { x: 720, y: 500 } });
   await expect(page.locator("#universe-target")).toBeVisible();
   await expect(page.locator("#universe-target-name")).toHaveText("Fixture A");
+  await expect(page.locator("#selected-object-panel")).toBeVisible();
+  await expect(page.locator("#body-info [data-object-view=\"science\"]")).toHaveCount(1);
+  await expect(page.locator("#universe-selection-connector")).toBeVisible();
+  await expect(page.locator("#universe-selection-connector")).toHaveAttribute("data-source-key", "fixture-a");
+  await expect(page.locator("#universe-target-magnitude")).toContainText("Estimated from here");
   await page.screenshot({ path: testInfo.outputPath("universe-3d.png") });
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileControlsInsideViewport = await page.locator("#universe-view button").evaluateAll((buttons) => buttons.every((button) => {
@@ -88,9 +93,20 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   const initialStep = await page.locator("#universe-speed").textContent();
   await page.locator('[data-universe-speed="faster"]').click();
   await expect(page.locator("#universe-speed")).not.toHaveText(initialStep!);
+  await page.locator("#universe-speed-input").fill("0.25");
+  await page.locator("#universe-speed-input").press("Tab");
+  await expect(page.locator("#universe-speed-input")).toHaveValue("0.25");
+  await expect(page.locator("#universe-speed")).toHaveText("0.25 AU/s");
+  const beforeAutopilot = await page.locator("#universe-position").textContent();
+  await page.locator("#universe-autopilot").click();
+  await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#universe-position")).not.toHaveText(beforeAutopilot!);
+  await page.locator("#universe-autopilot").click();
+  await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "false");
   await page.locator("#universe-map").press("ArrowRight");
   await expect.poll(() => new URL(page.url()).searchParams.get("u3c")).not.toBe(movedUrl.searchParams.get("u3c"));
 
+  await page.setViewportSize({ width: 1280, height: 800 });
   const beforeFocus = await page.locator("#universe-position").textContent();
   await page.locator("#universe-focus").click();
   await expect(page.locator("#universe-position")).not.toHaveText(beforeFocus!);
@@ -100,6 +116,11 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await page.locator("#universe-close").click();
   await expect(page.locator("#universe-view")).toBeHidden();
   await expect.poll(() => new URL(page.url()).searchParams.has("u3")).toBe(false);
+  await page.locator("#universe-3d-toggle").click();
+  await expect(page.locator("#universe-view")).toBeVisible();
+  await expect(page.locator("#selected-object-panel")).toBeVisible();
+  await expect(page.locator("#universe-selection-connector")).toBeVisible();
+  await page.locator("#universe-close").click();
 
   await page.goto(replayUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("#load-state")).toHaveText("ready", { timeout: 45_000 });

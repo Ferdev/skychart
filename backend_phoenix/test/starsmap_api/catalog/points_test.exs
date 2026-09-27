@@ -194,6 +194,37 @@ defmodule StarsmapApi.Catalog.PointsTest do
     assert Enum.map(payload.points, & &1.key) == ["z-galaxy"]
   end
 
+  test "3D Solar System sampling reserves nearby stars and Local Group galaxies" do
+    for index <- 1..120 do
+      insert_object!("aa-star-#{index}", "gaia_500pc_stars", index * 10_000.0, 0.0, nil, 1.0)
+    end
+
+    insert_object!(
+      "zz-local-galaxy",
+      "curated_extragalactic_survey",
+      160_000_000_000.0,
+      0.0,
+      nil,
+      1.0,
+      "catalog_coordinates",
+      "galaxy"
+    )
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "10000000",
+               "physical_only" => "1",
+               "limit" => "100"
+             })
+
+    assert payload.nearby_returned == 51
+    assert length(payload.points) == 100
+    assert Enum.any?(payload.points, &(&1.key == "zz-local-galaxy"))
+  end
+
   defp insert_object!(
          key,
          group,

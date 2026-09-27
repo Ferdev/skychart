@@ -18,15 +18,27 @@ coordinates and moves an observer freely through that frame. Its catalog query
 includes only records with finite values on all three axes and returns a
 bounded sample combining nearby positions with bright catalog landmarks.
 Nearby stars are queried within a smaller volume than nonstellar objects so
-dense star tables remain responsive. The sample is incomplete, and catalog
-apparent magnitudes are not recomputed for the moving observer. Objects placed
+dense star tables remain responsive. The 3D query also reserves a small
+nearby-galaxy sample (within 300 billion AU) so those landmarks are not lost
+among the brighter stars. The sample is incomplete. In 3D, catalog apparent
+magnitudes are scaled by the observer-to-object distance relative to the
+catalog's heliocentric distance. The Sun uses a 1-AU visual-magnitude reference;
+major planets use JPL's [V(1,0) values](https://ssd.jpl.nasa.gov/planets/phys_par.html)
+with inverse-distance and approximate Lambertian phase terms. Minor bodies
+with an H value use the same geometric estimate. Ring tilt, atmospheric
+scattering, and detailed phase laws are not modeled, so 3D magnitude values are
+clearly marked as estimates, not ephemeris-grade predictions. Objects placed
 on a reference shell because their distance is unknown are excluded from 3D.
 While the camera moves, a smaller deterministic subset is drawn; full sampled
 detail returns when movement stops.
 Compact map tiles that omit line-of-sight position are not placed on an invented
 plane in 3D. Movement step size is user-adjustable because the atlas spans from
 kilometers to billions of light-years; changing that step does not rescale or
-alter the underlying coordinates.
+alter the underlying coordinates. Autopilot uses the same numeric value as an
+AU-per-second travel speed, moving toward the selected object or straight ahead
+if none is selected. It is a navigation control, not a physically constrained
+spaceflight simulation; it pauses on arrival and does not resume automatically
+from a shared URL.
 
 Solar System state vectors and catalog coordinates enter this frame through
 different pipelines. A matching map position does not imply that two records
