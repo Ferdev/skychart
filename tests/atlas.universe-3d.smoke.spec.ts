@@ -118,13 +118,10 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await page.keyboard.up("w");
   expect(endOfHold).not.toBe(startOfHold);
 
-  const initialStep = await page.locator("#universe-speed").textContent();
-  await page.locator('[data-universe-speed="faster"]').click();
-  await expect(page.locator("#universe-speed")).not.toHaveText(initialStep!);
-  await page.locator("#universe-speed-input").fill("0.25");
-  await page.locator("#universe-speed-input").press("Tab");
-  await expect(page.locator("#universe-speed-input")).toHaveValue("0.25");
-  await expect(page.locator("#universe-speed")).toHaveText("0.25 AU/s");
+  // The speed gauge is an indicator, not a control: it returns to zero at rest.
+  await expect(page.locator("#universe-speed-gauge")).toHaveAttribute("role", "meter");
+  await expect(page.locator("#universe-speed")).toHaveText("0 km/s · 0 c", { timeout: 30_000 });
+  await expect(page.locator("#universe-speed-gauge")).toHaveAttribute("aria-valuenow", "0.000");
   const beforeAutopilot = await page.locator("#universe-position").textContent();
   await page.locator("#universe-autopilot").click();
   await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");

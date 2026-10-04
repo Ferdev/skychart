@@ -27,6 +27,9 @@
     <main id="app">
       <canvas id="point-map" aria-hidden="true"></canvas>
       <canvas id="map" aria-label="2D heliocentric ecliptic celestial atlas" data-i18n-attrs="aria-label:app.mapLabel"></canvas>
+      <div id="universe-entry-marker" class="universe-entry-marker" aria-hidden="true" hidden>
+        <svg viewBox="-22 -22 44 44" width="44" height="44"><path d="M-16 0H-6M6 0H16M0-16V-6M0 6V16" /><text x="7" y="-8">3D</text></svg>
+      </div>
       <section id="universe-view" class="universe-view" aria-label="3D universe navigator" data-i18n-attrs="aria-label:universe3d.label" hidden>
         <canvas id="universe-map" class="universe-view__canvas" tabindex="0" aria-label="Navigable 3D universe" data-i18n-attrs="aria-label:universe3d.canvasLabel"></canvas>
         <canvas id="universe-points" class="universe-view__points" aria-hidden="true"></canvas>
@@ -69,16 +72,23 @@
             <button id="universe-sky" type="button" data-i18n="universe3d.sky">Sky from object</button>
           </div>
         </aside>
+        <figure class="universe-view__minimap">
+          <figcaption id="universe-route" data-i18n="universe3d.minimap">Trip map · top view</figcaption>
+          <canvas id="universe-minimap" role="img" aria-label="Top-down map of this trip in the ecliptic plane" data-i18n-attrs="aria-label:universe3d.minimapLabel"></canvas>
+        </figure>
         <section class="universe-view__flight" aria-label="3D flight controls" data-i18n-attrs="aria-label:universe3d.flightControls">
           <div class="universe-view__speed">
-            <span data-i18n="universe3d.step">Speed / step</span>
-            <button type="button" data-universe-speed="slower" aria-label="Decrease speed" data-i18n-attrs="aria-label:universe3d.slower">−</button>
+            <span data-i18n="universe3d.step">Speed</span>
             <output id="universe-speed"></output>
-            <input id="universe-speed-input" type="number" min="0.000000000001" max="1000000000000000000" step="any" aria-label="Speed in AU per second" data-i18n-attrs="aria-label:universe3d.speedInput" />
-            <span class="universe-view__speed-unit">AU/s</span>
-            <button type="button" data-universe-speed="faster" aria-label="Increase speed" data-i18n-attrs="aria-label:universe3d.faster">+</button>
+            <div id="universe-speed-gauge" class="universe-view__gauge" role="meter" aria-valuemin="0" aria-valuemax="1" aria-label="Current speed on a logarithmic scale" data-i18n-attrs="aria-label:universe3d.speedGauge">
+              <span class="universe-view__gauge-fill"></span>
+              <span class="universe-view__light-speed" title="Speed of light" data-i18n-attrs="title:universe3d.lightSpeed">c</span>
+            </div>
           </div>
-          <button id="universe-autopilot" class="universe-view__autopilot" type="button" aria-pressed="false" data-i18n="universe3d.autopilotStart">Start autopilot</button>
+          <div class="universe-view__autopilot-row">
+            <button id="universe-gravity" class="universe-view__gravity" type="button" aria-pressed="false" title="Autopilot coasts on an orbit around the Sun or a planet instead of flying a straight line" data-i18n="universe3d.gravity" data-i18n-attrs="title:universe3d.gravityHint">Gravity route</button>
+            <button id="universe-autopilot" class="universe-view__autopilot" type="button" aria-pressed="false" data-i18n="universe3d.autopilotStart">Start autopilot</button>
+          </div>
           <div class="universe-view__move-pad">
             <button type="button" data-universe-move="forward" aria-label="Move forward" data-i18n-attrs="aria-label:universe3d.forward">W</button>
             <button type="button" data-universe-move="left" aria-label="Move left" data-i18n-attrs="aria-label:universe3d.left">A</button>
@@ -89,7 +99,7 @@
           </div>
         </section>
         <footer class="universe-view__footer">
-          <span data-i18n="universe3d.controls">Drag or use arrow keys to look · W/S move · A/D strafe · E up · Q down · wheel moves forward or back</span>
+          <span data-i18n="universe3d.controls">Drag or use arrow keys to look · hold W/S to accelerate or brake · A/D strafe · E up · Q down · wheel nudges forward or back</span>
           <span id="universe-status" role="status" aria-live="polite"></span>
           <span><span data-i18n="universe3d.disclosure">Catalog positions and sizes · mapped and illustrative surfaces · inferred deep-sky structure</span> · <a class="universe-view__credits" href="/textures/universe/credits.html" target="_blank" rel="noopener" data-i18n="universe3d.appearanceCredits">Appearance &amp; image credits</a></span>
         </footer>

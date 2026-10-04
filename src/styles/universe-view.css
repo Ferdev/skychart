@@ -153,15 +153,38 @@
   display: grid;
   justify-items: end;
   gap: 10px;
-  pointer-events: auto;
 }
+
+/* Only the controls take the pointer, so gaps in the panel do not block the view. */
+.universe-view__flight > * { pointer-events: auto; }
+
+.universe-view__minimap {
+  position: absolute;
+  z-index: 2;
+  left: 18px;
+  top: 136px;
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(116, 184, 183, 0.2);
+  border-radius: 9px;
+  background: rgba(3, 7, 8, 0.8);
+  backdrop-filter: blur(12px);
+  font-size: 0.74rem;
+  pointer-events: none;
+}
+
+.universe-view__minimap figcaption { max-width: 340px; color: rgba(238, 242, 234, 0.72); }
+.universe-view__minimap canvas { width: 340px; height: 270px; border-radius: 5px; background: rgba(1, 4, 5, 0.72); }
 
 .universe-view__speed {
   display: grid;
-  grid-template-columns: auto 36px minmax(88px, auto) 108px 36px;
-  align-items: center;
-  gap: 6px;
-  padding: 7px;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 7px 12px;
+  width: 300px;
+  padding: 9px 12px 8px;
   border: 1px solid rgba(116, 184, 183, 0.2);
   border-radius: 9px;
   background: rgba(3, 7, 8, 0.8);
@@ -170,25 +193,59 @@
 }
 
 .universe-view__speed output {
-  text-align: center;
+  text-align: right;
   color: #f8cb65;
   font-variant-numeric: tabular-nums;
   font-weight: 780;
 }
 
-.universe-view__speed input {
-  width: 100%;
-  min-width: 0;
-  min-height: 34px;
-  padding: 4px 6px;
-  border: 1px solid rgba(130, 203, 179, 0.36);
+/* Speedometer: a logarithmic bar that follows the current speed. The zone to
+   the right of the "c" mark is faster than light. */
+.universe-view__gauge {
+  position: relative;
+  grid-column: 1 / -1;
+  height: 9px;
+  margin-bottom: 16px;
   border-radius: 5px;
-  color: #eef2ea;
-  background: rgba(3, 8, 10, 0.9);
-  font: 600 0.72rem ui-monospace, monospace;
+  background: linear-gradient(90deg, rgba(130, 203, 179, 0.22) calc(var(--light-speed, 0.25) * 100%), rgba(248, 203, 101, 0.14) 0);
 }
+.universe-view__gauge-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--speed, 0) * 100%);
+  border-radius: 5px;
+  background: #82cbb3;
+  transition: width 140ms linear, background-color 140ms linear;
+}
+.universe-view__gauge-fill::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -1.5px;
+  width: 3px;
+  height: 17px;
+  border-radius: 2px;
+  background: #eef2ea;
+}
+.universe-view__gauge[data-faster-than-light="true"] .universe-view__gauge-fill { background: #f8cb65; }
+.universe-view__light-speed,
+.universe-view__gauge-tick {
+  position: absolute;
+  top: 0;
+  left: calc(var(--at, var(--light-speed, 0.25)) * 100%);
+  padding-top: 14px;
+  border-left: 1px solid rgba(238, 242, 234, 0.4);
+  color: rgba(238, 242, 234, 0.55);
+  font-size: 0.6rem;
+  line-height: 1;
+  text-indent: 3px;
+  white-space: nowrap;
+}
+.universe-view__light-speed { border-left-color: #f8cb65; color: #f8cb65; font: italic 700 0.74rem Georgia, serif; }
 
-.universe-view__speed-unit { display: none; color: #f8cb65; font-size: 0.68rem; }
+.universe-view__autopilot-row { display: flex; gap: 6px; }
+.universe-view__gravity { padding: 8px 12px; }
+.universe-view__gravity[aria-pressed="true"] { border-color: #82cbb3 !important; color: #82cbb3 !important; background: rgba(130, 203, 179, 0.18) !important; }
 
 .universe-view__move-pad {
   display: grid;
@@ -295,20 +352,44 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   .universe-selection-connector { display: none; }
 }
 
+@media (max-height: 780px) and (min-width: 641px) {
+  .universe-view__minimap canvas { width: 250px; height: 190px; }
+  .universe-view__minimap figcaption { max-width: 250px; }
+}
+
+@media (max-height: 640px) and (min-width: 641px) {
+  .universe-view__minimap canvas { width: 200px; height: 140px; }
+  .universe-view__minimap figcaption { max-width: 200px; }
+}
+
 @media (max-width: 640px) {
   .universe-view__header { flex-wrap: wrap; gap: 5px; padding: 12px; }
   .universe-view__actions { width: 100%; gap: 5px; }
   .universe-view__actions button { flex: 1; min-height: 36px; padding: 6px 8px; font-size: 0.7rem; }
   .universe-view__position { max-width: calc(100vw - 160px); font-size: 0.62rem; }
   .universe-view__flight { right: 12px; bottom: 78px; }
-  .universe-view__speed { grid-template-columns: 34px 90px auto 34px; }
-  .universe-view__speed > span, .universe-view__speed output { display: none; }
-  .universe-view__speed .universe-view__speed-unit { display: inline; }
+  .universe-view__speed { width: 236px; padding: 7px 9px 6px; }
+  .universe-view__minimap { left: 12px; top: auto; bottom: 78px; gap: 4px; padding: 6px; font-size: 0.66rem; }
+  .universe-view__minimap canvas { width: 200px; height: 100px; }
+  .universe-view__minimap figcaption { max-width: 200px; }
   .universe-view__footer { display: grid; gap: 3px; padding: 46px 12px 10px; }
   .universe-view__footer > span:first-child { display: none; }
-  .universe-view__target { left: 12px; top: 104px; bottom: auto; width: min(280px, calc(100vw - 24px)); }
-  .universe-view[data-object-inspector="true"] .universe-view__flight { top: 120px; right: 12px; bottom: auto; }
-  .universe-view[data-object-inspector="true"] .universe-view__move-pad { display: none; }
+  .universe-view__target { left: 12px; top: 152px; bottom: auto; width: min(280px, calc(100vw - 24px)); }
+  .universe-view[data-object-inspector="true"] .universe-view__flight { top: 152px; right: 12px; bottom: auto; }
+  .universe-view[data-object-inspector="true"] .universe-view__move-pad,
+  .universe-view[data-object-inspector="true"] .universe-view__minimap { display: none; }
 }
 
 .universe-view__credits { color: inherit; pointer-events: auto; }
+
+/* 2D map: crosshair at the point where the 3D view places the observer. */
+.universe-entry-marker {
+  position: fixed;
+  z-index: 2;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.universe-entry-marker path { fill: none; stroke: #82cbb3; stroke-width: 1.5; stroke-linecap: round; opacity: 0.9; }
+.universe-entry-marker text { fill: #82cbb3; font: 700 9px system-ui, sans-serif; paint-order: stroke; stroke: rgba(2, 5, 6, 0.85); stroke-width: 2.5px; }
+body[data-atlas-mode="embed"] .universe-entry-marker { display: none; }

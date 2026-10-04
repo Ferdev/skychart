@@ -2,14 +2,19 @@ import type { Body } from "../atlas/contracts";
 import { GUIDED_DEEP_SKY_KEYS } from "../atlas/atlasDefinitions";
 import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
-import { moveUniversePosition, universeEntryState, type UniverseMove } from "../navigation/universeNavigation";
+import { universeEntryState, type UniverseMove } from "../navigation/universeNavigation";
+import { autopilotTravel, thrustScale, turnCameraToward, UniverseFlight } from "../navigation/universeFlight";
+import { gravityBodies, planTransfer, playbackTimeFraction, transferPosition, transferSpeed, TRANSFER_PLAYBACK_SECONDS, type TransferResult } from "../navigation/universeTransfer";
+import { drawOrientationGrid, drawReticle } from "./universeBackdrop";
+import { formatCoordinate, formatDistanceAu, formatDuration } from "./universeFormat";
+import { UniverseSpeedGauge } from "./universeSpeedGauge";
+import { UniverseMinimap } from "./universeMinimap";
 import { bodyCanObserveSky } from "../sky/skyBody";
 import { skyPointAppearance } from "../sky/skyPointAppearance";
 import { SkySelectionConnectorView } from "../sky/skySelectionConnectorView";
 import {
   cameraForDirection,
   createSkyProjector,
-  directionFromEcliptic,
   normalizeCamera,
   relativeDirection,
   type SkyCamera,
@@ -48,8 +53,11 @@ type UniverseViewOptions = {
   positionLabel: HTMLElement;
   selectionSummary: HTMLElement;
   speedLabel: HTMLOutputElement;
-  speedInput: HTMLInputElement;
+  speedGauge: HTMLElement;
   autopilotButton: HTMLButtonElement;
+  gravityButton: HTMLButtonElement;
+  minimapCanvas: HTMLCanvasElement;
+  routeLabel: HTMLElement;
   selectionConnector: SVGSVGElement;
   workspacePanel: HTMLElement;
   selectedObjectPanel: HTMLElement;
@@ -115,8 +123,9 @@ export class UniverseViewController {
   private readonly destinationSearch: UniverseDestinationSearch;
   private reloadTimer: number | null = null;
   private heldMoves = new Set<UniverseMove>();
+  private readonly flight = new UniverseFlight();
   private flightFrame: number | null = null;
-  private flightStartedAt = 0;
+  private speedAu = 0;
   private lastFlightAt = 0;
   private lastFlightUiAt = 0;
   private shiftHeld = false;
@@ -124,12 +133,24 @@ export class UniverseViewController {
   private pointerMovement: UniverseMove | null = null;
   private autopilot = false;
   private autopilotStandoffAu = 0;
+  private gravityRoute = false;
+  private transfer: Extract<TransferResult, { plan: unknown }>["plan"] | null = null;
+  private transferPlayback = 0;
+  private readonly minimap: UniverseMinimap;
+  private readonly speedGauge: UniverseSpeedGauge;
   private readonly selectionConnector: SkySelectionConnectorView;
 
   constructor(private readonly options: UniverseViewOptions) {
     this.pointRenderer = new UniversePointRenderer(options.pointsCanvas, () => this.requestRender());
     this.bodyRenderer = new UniverseBodyRenderer(options.bodiesCanvas, () => this.requestRender());
     this.deepSkyRenderer = new UniverseDeepSkyRenderer(options.deepSkyCanvas, () => this.requestRender());
+    this.minimap = new UniverseMinimap(options.minimapCanvas);
+    this.speedGauge = new UniverseSpeedGauge(options.speedGauge, options.speedLabel);
+    options.gravityButton.addEventListener("click", () => {
+      this.gravityRoute = !this.gravityRoute;
+      this.stopFlight();
+      options.canvas.focus({ preventScroll: true });
+    });
     this.selectionConnector = new SkySelectionConnectorView({
       element: options.selectionConnector, canvas: options.canvas, workspacePanel: options.workspacePanel,
     });
@@ -147,7 +168,6 @@ export class UniverseViewController {
     options.inspectButton.addEventListener("click", () => this.inspectInAtlas());
     options.skyButton.addEventListener("click", () => this.skyFromTarget());
     options.autopilotButton.addEventListener("click", () => this.toggleAutopilot());
-    options.speedInput.addEventListener("change", () => this.setSpeedFromInput());
     options.root.addEventListener("click", (event) => this.controlClick(event));
     options.root.addEventListener("pointerdown", (event) => this.controlPointerDown(event));
     options.root.addEventListener("pointerup", (event) => this.controlPointerUp(event));
@@ -200,6 +220,7 @@ export class UniverseViewController {
     if (this.target && !this.options.selectedObjectPanel.hidden) this.options.root.dataset.objectInspector = "true";
     else delete this.options.root.dataset.objectInspector;
     this.initialState = { ...normalized, positionAu: { ...this.position } };
+    this.minimap.restart(this.position);
     this.options.root.hidden = false;
     document.body.dataset.universeView = "true";
     this.updateChrome();
@@ -260,6 +281,7 @@ export class UniverseViewController {
     this.position = { ...this.initialState.positionAu };
     this.camera = normalizeCamera(this.initialState);
     this.moveStepAu = Math.max(this.initialState.moveStepAu, positionPrecisionStep(this.position));
+    this.minimap.restart(this.position);
     this.afterNavigation();
     void this.loadCatalog();
   }
@@ -326,7 +348,7 @@ export class UniverseViewController {
   }
 
   private points(): UniversePoint[] {
-    const catalog = this.heldMoves.size > 0 || this.autopilot ? this.flightCatalogPoints : this.catalogPoints;
+    const catalog = this.flying ? this.flightCatalogPoints : this.catalogPoints;
     const points = new Map<string, UniversePoint>(catalog.map((point) => [point.key, point]));
     if (this.target) points.set(this.target.key, this.target);
     for (const body of this.options.bodyByKey().values()) {
@@ -351,7 +373,7 @@ export class UniverseViewController {
     const width = Math.max(1, this.options.root.clientWidth);
     const height = Math.max(1, this.options.root.clientHeight);
     const useWebgl = this.pointRenderer.available;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2) * (!useWebgl && this.heldMoves.size > 0 ? 0.5 : 1);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2) * (!useWebgl && this.flying ? 0.5 : 1);
     const pixelWidth = Math.round(width * dpr);
     const pixelHeight = Math.round(height * dpr);
     if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
@@ -377,11 +399,11 @@ export class UniverseViewController {
       background.addColorStop(1, "#020405");
       backdropContext.fillStyle = background;
       backdropContext.fillRect(0, 0, width, height);
-      this.drawOrientationGrid(backdropContext, width, height, project);
+      drawOrientationGrid(backdropContext, width, height, project);
       this.backdropCanvas = backdrop;
       this.backdropKey = backdropKey;
     }
-    const moving = this.heldMoves.size > 0 || this.autopilot;
+    const moving = this.flying;
     const baseKey = `${backdropKey}:${useWebgl ? moving ? "flight" : `${this.position.x},${this.position.y},${this.position.z}` : "fallback"}`;
     const redrawBase = moving || !useWebgl || this.baseRenderKey !== baseKey;
     if (redrawBase) context.drawImage(this.backdropCanvas!, 0, 0, width, height);
@@ -405,36 +427,6 @@ export class UniverseViewController {
         points: pointsDone - baseDone, labels: performance.now() - pointsDone, webgl: useWebgl });
       if (samples.length > 120) samples.shift();
     }
-  }
-
-  private drawOrientationGrid(context: CanvasRenderingContext2D, width: number, height: number, project: Projector): void {
-    context.save();
-    context.lineWidth = 1;
-    for (let longitude = 0; longitude < 360; longitude += 30) {
-      this.drawDirectionLine(context, width, height, Array.from({ length: 49 }, (_, index) =>
-        directionFromEcliptic(longitude, -90 + index * 3.75)), longitude % 90 === 0 ? 0.2 : 0.08, project);
-    }
-    for (const latitude of [-60, -30, 0, 30, 60]) {
-      this.drawDirectionLine(context, width, height, Array.from({ length: 97 }, (_, index) =>
-        directionFromEcliptic(index * 3.75, latitude)), latitude === 0 ? 0.24 : 0.1, project);
-    }
-    context.restore();
-  }
-
-  private drawDirectionLine(context: CanvasRenderingContext2D, width: number, height: number, directions: Vector3[], opacity: number, project: Projector): void {
-    context.beginPath();
-    context.strokeStyle = `rgba(116, 184, 183, ${opacity})`;
-    let previous: { x: number; y: number } | null = null;
-    for (const direction of directions) {
-      const projected = project(direction);
-      if (!projected || (previous && Math.hypot(projected.x - previous.x, projected.y - previous.y) > width * 0.3)) {
-        previous = null;
-        continue;
-      }
-      if (previous) context.lineTo(projected.x, projected.y); else context.moveTo(projected.x, projected.y);
-      previous = projected;
-    }
-    context.stroke();
   }
 
   private drawPoints(context: CanvasRenderingContext2D, points: UniversePoint[], width: number, height: number,
@@ -529,10 +521,28 @@ export class UniverseViewController {
     context.restore();
   }
 
-  private move(movement: UniverseMove, multiplier = 1): void {
+  private get flying(): boolean { return this.heldMoves.size > 0 || this.autopilot || this.flight.moving; }
+
+  /** Thruster reference speed; never below what the position can resolve. */
+  private baseSpeed(): number {
     this.moveStepAu = Math.max(this.moveStepAu, positionPrecisionStep(this.position));
-    this.position = moveUniversePosition(this.position, this.camera.yawDeg, this.camera.pitchDeg, movement, this.moveStepAu * multiplier);
-    this.afterNavigation(true);
+    return this.moveStepAu * (this.shiftHeld ? 10 : 1);
+  }
+
+  /** From rest, match the thrusters to the surroundings; there is no manual scale. */
+  private rescaleThrust(): void {
+    if (!this.flying) this.moveStepAu = clamp(thrustScale(this.position, this.points(), this.moveStepAu),
+      positionPrecisionStep(this.position), MAX_MOVE_STEP_AU);
+  }
+
+  /** A tap, wheel notch, or keyboard click is an impulse that glides to rest. */
+  private nudge(movement: UniverseMove, multiplier = 1): void {
+    this.rescaleThrust();
+    if (this.autopilot && this.target && (movement === "forward" || movement === "back")) {
+      this.flight.adjustThrottle((movement === "forward" ? 0.25 : -0.25) * multiplier);
+    } else this.flight.kick(movement, this.baseSpeed() * multiplier);
+    if (!this.autopilot) this.transfer = null;
+    this.startFlight();
   }
 
   private afterNavigation(reload = false, historyMode: "push" | "replace" = "replace"): void {
@@ -555,11 +565,35 @@ export class UniverseViewController {
     this.options.positionLabel.textContent = this.options.translate("universe3d.position", {
       x: formatCoordinate(this.position.x), y: formatCoordinate(this.position.y), z: formatCoordinate(this.position.z),
     });
-    this.options.speedLabel.textContent = `${formatDistanceAu(this.moveStepAu)}/s`;
-    if (document.activeElement !== this.options.speedInput) this.options.speedInput.value = formatSpeedInput(this.moveStepAu);
+    this.speedGauge.show(this.flying ? this.speedAu : 0);
+    this.options.gravityButton.setAttribute("aria-pressed", String(this.gravityRoute));
     this.options.autopilotButton.setAttribute("aria-pressed", String(this.autopilot));
     this.options.autopilotButton.textContent = this.options.translate(this.autopilot ? "universe3d.autopilotStop" : "universe3d.autopilotStart");
     this.updateTarget();
+    this.updateRoute();
+  }
+
+  /** Plan the gravity route, if enabled, from here to the selected object. */
+  private planRoute(): TransferResult | null {
+    const target = this.target;
+    const direction = target && this.gravityRoute ? relativeDirection(this.position, target.position) : null;
+    const standoff = this.autopilot ? this.autopilotStandoffAu : this.autopilotStandoff();
+    // Nothing to plan once the craft is already at the standoff distance.
+    if (!target || !direction || Math.hypot(target.position.x - this.position.x, target.position.y - this.position.y,
+      target.position.z - this.position.z) <= standoff * 1.001) return null;
+    return planTransfer(this.position, { x: target.position.x - direction.x * standoff, y: target.position.y - direction.y * standoff,
+      z: target.position.z - direction.z * standoff }, gravityBodies(this.options.bodyByKey().values()));
+  }
+
+  /** Redraw the trip map with the flown path and the planned route. */
+  private updateRoute(): void {
+    const result = this.transfer ? { plan: this.transfer } : this.planRoute();
+    this.options.routeLabel.textContent = !result ? this.options.translate("universe3d.minimap")
+      : "plan" in result ? this.options.translate("universe3d.routeGravity", { center: result.plan.center.name, duration: formatDuration(result.plan.durationSeconds) })
+      : this.options.translate(result.unavailable === "range" ? "universe3d.routeRange" : "universe3d.routeRadial");
+    const bodies = [...this.options.bodyByKey().values()].flatMap((body) => bodyToUniversePoint(body) ?? []);
+    this.minimap.draw({ position: this.position, yawDeg: this.camera.yawDeg, target: this.target, bodies,
+      route: result && "plan" in result ? result.plan.points : null, catalog: this.flightCatalogPoints, minimumSpanAu: this.moveStepAu * 4 });
   }
 
   private updateTarget(): void {
@@ -618,6 +652,7 @@ export class UniverseViewController {
     };
     this.camera = cameraForDirection(direction, this.camera.fovDeg);
     this.moveStepAu = clamp(Math.max(standoff * 0.25, positionPrecisionStep(this.position)), MIN_MOVE_STEP_AU, MAX_MOVE_STEP_AU);
+    this.minimap.restart(this.position);
     this.afterNavigation(true, "push");
     this.options.canvas.focus({ preventScroll: true });
   }
@@ -649,22 +684,33 @@ export class UniverseViewController {
   private toggleAutopilot(): void {
     if (this.autopilot) {
       this.autopilot = false;
-      if (this.heldMoves.size === 0) this.endFlight();
+      if (this.target && !this.transfer) this.flight.velocity.forward = this.speedAu;
+      this.transfer = null;
     } else {
+      this.flight.throttle = 1;
+      this.autopilotStandoffAu = this.autopilotStandoff();
+      const route = this.planRoute();
+      this.transfer = route && "plan" in route ? route.plan : null;
+      this.transferPlayback = 0;
+      this.rescaleThrust();
       this.autopilot = true;
-      this.autopilotStandoffAu = this.target ? Math.max(
-        (this.options.bodyByKey().get(this.target.key)?.radius_km ?? 0) / 149_597_870.7 * 3,
-        Math.min(this.moveStepAu * 0.1, Math.hypot(
-          this.target.position.x - this.position.x,
-          this.target.position.y - this.position.y,
-          this.target.position.z - this.position.z,
-        ) * 0.001),
-      ) : 0;
       this.startFlight();
     }
     this.updateChrome();
     this.options.stateChanged("replace");
     this.options.canvas.focus({ preventScroll: true });
+  }
+
+  /** Distance from the target's center at which autopilot stops. */
+  private autopilotStandoff(): number {
+    const target = this.target;
+    if (!target) return 0;
+    return Math.max(
+      (this.options.bodyByKey().get(target.key)?.radius_km ?? 0) / AU_KM * 3,
+      (deepSkyModel(target)?.radiusAu ?? 0) * 3,
+      Math.min(this.moveStepAu * 0.1, Math.hypot(target.position.x - this.position.x,
+        target.position.y - this.position.y, target.position.z - this.position.z) * 0.001),
+    );
   }
 
   private skyFromTarget(): void {
@@ -679,25 +725,10 @@ export class UniverseViewController {
     const target = event.target as HTMLElement;
     const moveButton = target.closest<HTMLButtonElement>("[data-universe-move]");
     if (moveButton) {
-      if (event.detail === 0) this.move(moveButton.dataset.universeMove as UniverseMove);
+      if (event.detail === 0) this.nudge(moveButton.dataset.universeMove as UniverseMove);
       this.options.canvas.focus({ preventScroll: true });
       return;
     }
-    const speedButton = target.closest<HTMLButtonElement>("[data-universe-speed]");
-    if (!speedButton) return;
-    const factor = speedButton.dataset.universeSpeed === "faster" ? 10 : 0.1;
-    this.moveStepAu = clamp(Math.max(this.moveStepAu * factor, positionPrecisionStep(this.position)), MIN_MOVE_STEP_AU, MAX_MOVE_STEP_AU);
-    this.afterNavigation(true);
-    this.options.canvas.focus({ preventScroll: true });
-  }
-
-  private setSpeedFromInput(): void {
-    const requested = Number(this.options.speedInput.value);
-    if (Number.isFinite(requested) && requested >= MIN_MOVE_STEP_AU && requested <= MAX_MOVE_STEP_AU) {
-      this.moveStepAu = Math.max(requested, positionPrecisionStep(this.position));
-      this.afterNavigation(true);
-    }
-    this.options.speedInput.value = formatSpeedInput(this.moveStepAu);
   }
 
   private controlPointerDown(event: PointerEvent): void {
@@ -706,9 +737,8 @@ export class UniverseViewController {
     event.preventDefault();
     this.controlPointer = event.pointerId;
     this.pointerMovement = button.dataset.universeMove as UniverseMove;
-    this.move(this.pointerMovement);
+    this.nudge(this.pointerMovement);
     this.heldMoves.add(this.pointerMovement);
-    this.startFlight();
     try { button.setPointerCapture(event.pointerId); } catch { /* Synthetic pointers may not own capture. */ }
   }
 
@@ -717,47 +747,33 @@ export class UniverseViewController {
     if (this.pointerMovement) this.heldMoves.delete(this.pointerMovement);
     this.controlPointer = null;
     this.pointerMovement = null;
-    if (this.heldMoves.size === 0 && !this.autopilot) this.endFlight();
   }
 
   private startFlight(): void {
     if (this.flightFrame !== null) return;
-    this.flightStartedAt = performance.now();
-    this.lastFlightAt = this.flightStartedAt;
-    this.lastFlightUiAt = this.flightStartedAt;
+    this.lastFlightAt = performance.now();
+    this.lastFlightUiAt = this.lastFlightAt;
     this.flightFrame = requestAnimationFrame((now) => this.flightTick(now));
   }
 
   private flightTick(now: number): void {
     this.flightFrame = null;
-    if (!this.active || this.heldMoves.size === 0 && !this.autopilot) return;
+    if (!this.active) return;
     const seconds = Math.min((now - this.lastFlightAt) / 1000, 0.1);
     this.lastFlightAt = now;
-    if (now - this.flightStartedAt >= 160 && seconds > 0) {
-      for (const movement of this.heldMoves) {
-        this.moveStepAu = Math.max(this.moveStepAu, positionPrecisionStep(this.position));
-        this.position = moveUniversePosition(this.position, this.camera.yawDeg, this.camera.pitchDeg,
-          movement, this.moveStepAu * seconds * (this.shiftHeld ? 10 : 1) * 3);
-      }
-      if (this.autopilot) {
-        const direction = this.target ? relativeDirection(this.position, this.target.position) : null;
-        const distance = this.target ? Math.hypot(
-          this.target.position.x - this.position.x,
-          this.target.position.y - this.position.y,
-          this.target.position.z - this.position.z,
-        ) : Number.POSITIVE_INFINITY;
-        const travel = Math.min(this.moveStepAu * seconds, Math.max(0, distance - this.autopilotStandoffAu));
-        if (this.target && (travel <= positionPrecisionStep(this.position) * 0.5 || !direction)) {
-          this.autopilot = false;
-          this.options.status.textContent = this.options.translate("universe3d.autopilotArrived", { name: this.target.name });
-          this.updateChrome();
-          if (this.heldMoves.size === 0) { this.endFlight(); return; }
-        } else {
-          if (direction) this.camera = cameraForDirection(direction, this.camera.fovDeg);
-          this.position = moveUniversePosition(this.position, this.camera.yawDeg, this.camera.pitchDeg, "forward", travel);
-        }
-      }
+    if (seconds > 0) {
+      const from = this.position;
+      const tracking = this.autopilot && this.target !== null;
+      const autopilotSpeed = tracking ? this.speedAu : 0;
+      this.flight.thrust(this.heldMoves, this.baseSpeed(), seconds, { cruise: this.autopilot, tracking });
+      this.position = this.flight.advance(this.position, this.camera, seconds);
+      if (tracking && this.transfer) this.flyTransfer(seconds);
+      else if (tracking) this.flyToTarget(autopilotSpeed, seconds);
+      // A gravity route reports the real orbital speed, not the time-compressed playback.
+      this.speedAu = tracking && this.transfer ? transferSpeed(this.transfer, this.position)
+        : Math.hypot(this.position.x - from.x, this.position.y - from.y, this.position.z - from.z) / seconds;
       this.requestRender();
+      if (!this.flying) { this.endFlight(); return; }
       if (now - this.lastFlightUiAt >= 100) {
         this.lastFlightUiAt = now;
         this.updateChrome();
@@ -765,23 +781,73 @@ export class UniverseViewController {
         // a slow request or repeating the initial global landmark query.
         if (this.landmarksLoaded && !this.catalogAbort && this.reloadTimer === null &&
           now - this.catalogRequestedAt >= 1500) void this.loadCatalog();
-        if (this.autopilot) this.options.status.textContent = this.options.translate(
+        if (this.autopilot && this.transfer) this.options.status.textContent = this.options.translate("universe3d.transferStatus", {
+          name: this.target?.name ?? "", elapsed: formatDuration(playbackTimeFraction(this.transferPlayback) * this.transfer.durationSeconds),
+          duration: formatDuration(this.transfer.durationSeconds),
+          rate: formatDuration(this.transfer.durationSeconds / TRANSFER_PLAYBACK_SECONDS * this.flight.throttle) });
+        else if (this.autopilot) this.options.status.textContent = this.options.translate(
           this.target ? "universe3d.autopilotToTarget" : "universe3d.autopilotForward",
-          { name: this.target?.name ?? "", speed: formatDistanceAu(this.moveStepAu) });
+          { name: this.target?.name ?? "", speed: formatDistanceAu(this.speedAu) });
         this.options.stateChanged("replace");
       }
     }
     this.flightFrame = requestAnimationFrame((time) => this.flightTick(time));
   }
 
+  /** One frame of a gravity route: coast along the planned orbit in compressed
+   * time while the camera keeps the destination in view. */
+  private flyTransfer(seconds: number): void {
+    const plan = this.transfer!;
+    this.transferPlayback += seconds * this.flight.throttle / TRANSFER_PLAYBACK_SECONDS;
+    this.position = transferPosition(plan, playbackTimeFraction(this.transferPlayback));
+    const direction = relativeDirection(this.position, this.target!.position);
+    if (direction) this.camera = turnCameraToward(this.camera, direction, seconds);
+    if (this.transferPlayback < 1) return;
+    this.endAutopilot();
+    this.moveStepAu = clamp(Math.max(this.autopilotStandoffAu * 0.25, positionPrecisionStep(this.position)), MIN_MOVE_STEP_AU, MAX_MOVE_STEP_AU);
+    this.options.status.textContent = this.options.translate("universe3d.transferArrived", {
+      name: this.target!.name, duration: formatDuration(plan.durationSeconds), center: plan.center.name });
+  }
+
+  /** Arrival: a forward or back control still held to set the pace must be
+   * pressed again before it thrusts, so the craft does not shoot past. */
+  private endAutopilot(): void {
+    this.autopilot = false;
+    for (const movement of ["forward", "back"] as const) this.heldMoves.delete(movement);
+  }
+
+  /** One autopilot frame toward the target: turn, accelerate, then slow to a
+   * stop at the standoff distance. */
+  private flyToTarget(speed: number, seconds: number): void {
+    const target = this.target!;
+    const direction = relativeDirection(this.position, target.position);
+    const remaining = Math.hypot(target.position.x - this.position.x, target.position.y - this.position.y,
+      target.position.z - this.position.z) - this.autopilotStandoffAu;
+    const precision = positionPrecisionStep(this.position);
+    if (direction && remaining > precision) {
+      const travel = autopilotTravel(speed, remaining, Math.max(this.autopilotStandoffAu * 0.03, precision * 60), seconds, this.flight.throttle);
+      this.camera = turnCameraToward(this.camera, direction, seconds);
+      this.position = { x: this.position.x + direction.x * travel, y: this.position.y + direction.y * travel, z: this.position.z + direction.z * travel };
+      if (travel < remaining) return;
+    }
+    this.endAutopilot();
+    if (direction) this.camera = cameraForDirection(direction, this.camera.fovDeg);
+    // Leave the thrusters scaled to the destination, as "Go to object" does.
+    this.moveStepAu = clamp(Math.max(this.autopilotStandoffAu * 0.25, precision), MIN_MOVE_STEP_AU, MAX_MOVE_STEP_AU);
+    this.options.status.textContent = this.options.translate("universe3d.autopilotArrived", { name: target.name });
+  }
+
   private endFlight(): void {
     if (this.flightFrame !== null) cancelAnimationFrame(this.flightFrame);
     this.flightFrame = null;
+    this.speedAu = 0;
     if (this.active) this.afterNavigation(true);
   }
 
   private stopFlight(): void {
     this.autopilot = false;
+    this.transfer = null;
+    this.flight.stop();
     this.heldMoves.clear();
     this.pointerMovement = null;
     this.controlPointer = null;
@@ -827,20 +893,17 @@ export class UniverseViewController {
   private wheel(event: WheelEvent): void {
     if (!this.active) return;
     event.preventDefault();
-    const multiplier = clamp(Math.abs(event.deltaY) / 100, 0.15, 4);
-    this.move(event.deltaY < 0 ? "forward" : "back", multiplier);
+    this.nudge(event.deltaY < 0 ? "forward" : "back", clamp(Math.abs(event.deltaY) / 100, 0.15, 4) * 2);
   }
 
   private keyDown(event: KeyboardEvent): void {
     if (!this.active) return;
     if (event.key === "Shift") { this.shiftHeld = true; return; }
     const key = event.key.toLowerCase();
-    const multiplier = event.shiftKey ? 10 : 1;
     const movement = keyMovement(key);
     if (movement) {
-      if (!this.heldMoves.has(movement)) this.move(movement, multiplier);
-      this.heldMoves.add(movement);
-      this.startFlight();
+      if (!event.repeat && !this.heldMoves.has(movement)) this.nudge(movement);
+      if (!event.repeat) this.heldMoves.add(movement);
     }
     else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -863,7 +926,7 @@ export class UniverseViewController {
   private keyUp(event: KeyboardEvent): void {
     if (event.key === "Shift") this.shiftHeld = false;
     const movement = keyMovement(event.key.toLowerCase());
-    if (movement && this.heldMoves.delete(movement) && this.heldMoves.size === 0 && !this.autopilot) this.endFlight();
+    if (movement) this.heldMoves.delete(movement);
   }
 
   private async selectAt(point: { x: number; y: number }): Promise<void> {
@@ -871,7 +934,7 @@ export class UniverseViewController {
     if (!hit) return;
     this.target = hit.point;
     this.targetKey = hit.point.key;
-    this.autopilotStandoffAu = 0;
+    this.autopilotStandoffAu = this.autopilotStandoff(); this.transfer = null;
     this.baseRenderKey = "";
     this.requestRender();
     this.updateTarget();
@@ -943,8 +1006,11 @@ export function createUniverseViewController(dom: typeof atlasDom, options: Univ
     positionLabel: dom.universePosition,
     selectionSummary: dom.universeSelectionSummary,
     speedLabel: dom.universeSpeed,
-    speedInput: dom.universeSpeedInput,
+    speedGauge: dom.universeSpeedGauge,
     autopilotButton: dom.universeAutopilot,
+    gravityButton: dom.universeGravity,
+    minimapCanvas: dom.universeMinimap,
+    routeLabel: dom.universeRoute,
     selectionConnector: dom.universeSelectionConnector,
     workspacePanel: dom.workspacePanel,
     selectedObjectPanel: dom.selectedObjectPanel,
@@ -970,19 +1036,6 @@ function keyMovement(key: string): UniverseMove | undefined {
       : key === "e" ? "up" : key === "q" ? "down" : undefined;
 }
 
-function drawReticle(context: CanvasRenderingContext2D, width: number, height: number): void {
-  context.save();
-  context.strokeStyle = "rgba(248, 203, 101, 0.4)";
-  context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(width / 2 - 9, height / 2);
-  context.lineTo(width / 2 + 9, height / 2);
-  context.moveTo(width / 2, height / 2 - 9);
-  context.lineTo(width / 2, height / 2 + 9);
-  context.stroke();
-  context.restore();
-}
-
 function nearestHit(hits: RenderedHit[], point: { x: number; y: number }): RenderedHit | null {
   let nearest: RenderedHit | null = null;
   let distance = Number.POSITIVE_INFINITY;
@@ -995,34 +1048,6 @@ function nearestHit(hits: RenderedHit[], point: { x: number; y: number }): Rende
 
 function overlaps(a: { left: number; top: number; right: number; bottom: number }, b: { left: number; top: number; right: number; bottom: number }): boolean {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-}
-
-function formatCoordinate(value: number): string {
-  const magnitude = Math.abs(value);
-  if (magnitude === 0) return "0 AU";
-  if (magnitude < 1e4) return `${formatNumber(value)} AU`;
-  const lightYears = value / 63_241.077;
-  return `${formatNumber(lightYears)} ly`;
-}
-
-function formatDistanceAu(value: number): string {
-  if (value < 0.01) return `${new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(value * AU_KM)} km`;
-  if (value < 10_000) return `${formatNumber(value)} AU`;
-  const lightYears = value / 63_241.077;
-  if (Math.abs(lightYears) < 1e3) return `${formatNumber(lightYears)} ly`;
-  if (Math.abs(lightYears) < 1e6) return `${formatNumber(lightYears / 1e3)} kly`;
-  if (Math.abs(lightYears) < 1e9) return `${formatNumber(lightYears / 1e6)} Mly`;
-  return `${formatNumber(lightYears / 1e9)} Gly`;
-}
-
-function formatSpeedInput(value: number): string {
-  return Number(value.toPrecision(6)).toString();
-}
-
-function formatNumber(value: number): string {
-  const magnitude = Math.abs(value);
-  if (magnitude >= 1e5 || (magnitude > 0 && magnitude < 0.001)) return value.toExponential(2);
-  return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(value);
 }
 
 function clamp(value: number, min: number, max: number): number {

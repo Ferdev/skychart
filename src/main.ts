@@ -339,7 +339,7 @@ const atlasOverlay = new AtlasOverlayRenderer({
     labelBodies: prioritizedLabelBodies(),
     edgeBodies: edgeReferenceBodies(),
   }),
-  bodyByKey: () => bodyByKey,
+  bodyByKey: () => bodyByKey, universeEntryMarker: atlasDom.universeEntryMarker,
   bodyToScreen,
   worldToScreen,
   screenToWorld,
@@ -808,7 +808,7 @@ function render() { if (universeView?.active) { renderFrameId = null; return; }
       if (displayLayers.orbits) atlasOverlay.drawOrbitGuides();
       if (displayLayers.constellations) constellationRenderer.draw(displayLayers.labels);
       atlasOverlay.drawComparisonGuide();
-      atlasOverlay.drawBodies();
+      atlasOverlay.drawBodies(); atlasOverlay.placeUniverseEntryMarker();
       if (displayLayers.labels) atlasOverlay.drawLabels();
       if (displayLayers.references) atlasOverlay.drawEdgeReferences();
     } else {

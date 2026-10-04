@@ -61,13 +61,37 @@ This avoids repeating a full-catalog
 brightness sort on each move. The destination search uses the same catalog as
 the 2D atlas, but only objects with credible 3D positions can be selected.
 Compact map tiles that omit line-of-sight position are not placed on an invented
-plane in 3D. Movement step size is user-adjustable because the atlas spans from
-kilometers to billions of light-years; changing that step does not rescale or
-alter the underlying coordinates. Autopilot uses the same numeric value as an
-AU-per-second travel speed, moving toward the selected object or straight ahead
-if none is selected. It is a navigation control, not a physically constrained
-spaceflight simulation; it pauses on arrival and does not resume automatically
-from a shared URL.
+plane in 3D. Movement controls act as thrusters, and there is no manual speed
+scale: when thrust starts from rest, the base speed is set to a quarter of the
+distance to the nearest loaded object per second (to its surface when the radius
+is known), because the atlas spans from kilometers to billions of light-years.
+Held input starts near that base speed and keeps doubling it, each doubling
+sooner than the last, up to 10^16 AU per second; opposite input brakes, and
+release coasts to rest. None of this rescales or alters the underlying
+coordinates. With a selected object, autopilot accelerates and then sheds speed
+in proportion to the remaining distance, so it stops smoothly at a standoff
+distance; forward and back input changes its pace. With no selection it cruises
+straight ahead at the base speed or the speed last set with the thrusters. These
+are navigation controls, not a physically constrained spaceflight simulation:
+speeds are unbounded by the speed of light. The speed gauge is a logarithmic
+indicator of the current speed, not a control. It marks the speed of light, and
+the readout states each speed as a multiple of it, so the faster-than-light
+speeds that make distant objects reachable in seconds are explicit. Autopilot
+pauses on arrival and does not resume automatically from a shared URL.
+
+The optional gravity route replaces the straight autopilot leg with an unpowered
+coast: the minimum-energy Kepler ellipse between the current position and the
+standoff point, about the Sun, or about a planet when both ends lie inside its
+sphere of influence. It is flown prograde unless that arc would pass through the
+central body. The path, the real flight time, and the orbital speed (vis-viva)
+are those of that two-body orbit; only the playback is time-compressed. This is
+a deliberately simple model. Every body stays at its position for the displayed
+epoch, so the route is not a launch-window solution: a real mission aims at
+where the target will be on arrival. Planetary flybys, perturbations from other
+bodies, and the departure and arrival burns are not modeled. Beyond 100,000 AU
+from the Sun, or when the two ends lie on one ray from the central body, no such
+orbit applies and autopilot flies the direct route. The trip map is a top-down
+projection onto the ecliptic plane and omits the z coordinate.
 
 Solar System state vectors and catalog coordinates enter this frame through
 different pipelines. A matching map position does not imply that two records

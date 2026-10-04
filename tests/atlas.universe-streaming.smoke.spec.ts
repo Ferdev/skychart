@@ -105,3 +105,178 @@ test("3D URLs and browser history restore the selected object and ephemeris time
   await expect(page.locator("#universe-target-meta")).toContainText("11 AU from center");
   issues.assertClean();
 });
+
+test("thrusters accelerate while held and autopilot decelerates into its destination", async ({ page, context }) => {
+  test.setTimeout(180_000);
+  const issues = collectBrowserIssues(page);
+  await installFixtures(context, []);
+  const timestamp = "2026-08-26T12:00:00.000Z";
+  const state = new URLSearchParams({
+    v: "1", c: "-10,0", z: "20", t: timestamp, o: "earth", L: "",
+    u3: "-10,0,0", u3c: "90,0,72,1", u3t: "earth",
+  });
+  await openAtlas(page, `/?${state}`);
+  await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+  await expect(page.locator("#universe-speed")).toHaveText("0 km/s · 0 c");
+  // The URL is written only after a pause in movement; the trip map carries the live position.
+  const position = async () => (await page.locator("#universe-minimap").getAttribute("data-position"))!.split(",").map(Number);
+  const earth = skyEphemerisFixture(timestamp).bodies.find((body) => body.key === "earth")!.position;
+  const range = ([x, y, z]: number[]) => Math.hypot(x! - earth.x_au, y! - earth.y_au, z! - earth.z_au);
+
+  // Held thrust keeps accelerating and the gauge follows it; frame pacing varies
+  // in headless runs, so read the speed readout instead of timing fixed windows.
+  const speedAu = async () => {
+    const text = await page.locator("#universe-speed").textContent() ?? "";
+    return text.includes(" AU/s") ? Number.parseFloat(text) : 0;
+  };
+  await page.locator("#universe-map").focus();
+  await page.keyboard.down("w");
+  try {
+    await expect.poll(speedAu, { timeout: 30_000 }).toBeGreaterThan(20);
+    expect(Number(await page.locator("#universe-speed-gauge").getAttribute("aria-valuenow"))).toBeGreaterThan(0.36);
+    await expect(page.locator("#universe-speed-gauge")).toHaveAttribute("data-faster-than-light", "true");
+  } finally {
+    await page.keyboard.up("w");
+  }
+  const atRelease = (await position())[1]!;
+  expect(atRelease).toBeGreaterThan(0);
+  // Release coasts on, then comes to rest; the gauge falls back to zero.
+  await expect.poll(async () => (await position())[1]!).toBeGreaterThan(atRelease);
+  await expect(page.locator("#universe-speed")).toHaveText("0 km/s · 0 c", { timeout: 30_000 });
+  await expect(page.locator("#universe-speed-gauge")).toHaveAttribute("aria-valuenow", "0.000");
+
+  const startRange = range(await position());
+  await page.evaluate(() => {
+    const samples: { at: number; u3: string }[] = [];
+    (window as Window & { __flightSamples?: typeof samples }).__flightSamples = samples;
+    window.setInterval(() => {
+      const u3 = document.querySelector<HTMLElement>("#universe-minimap")?.dataset.position ?? "";
+      if (samples.at(-1)?.u3 !== u3) samples.push({ at: performance.now(), u3 });
+    }, 50);
+  });
+  await page.locator("#universe-autopilot").click();
+  await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
+  // The arrival status is soon replaced by the destination's catalog refresh,
+  // so the released autopilot control is the durable arrival signal.
+  await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "false", { timeout: 120_000 });
+  const samples = await page.evaluate(() =>
+    (window as Window & { __flightSamples?: { at: number; u3: string }[] }).__flightSamples ?? []);
+  const ranges = samples.map((sample) => ({ at: sample.at, range: range(sample.u3.split(",").map(Number)) }));
+  expect(ranges.length).toBeGreaterThan(8);
+  const speeds = ranges.slice(1).map((sample, index) => (ranges[index]!.range - sample.range) / (sample.at - ranges[index]!.at));
+  expect(speeds.every((speed) => speed >= 0)).toBe(true);
+  const peak = Math.max(...speeds);
+  expect(speeds[0]!).toBeLessThan(peak);
+  expect(speeds.at(-1)!).toBeLessThan(peak * 0.2);
+  const arrivalRange = range(await position());
+  expect(arrivalRange).toBeGreaterThan(0);
+  expect(arrivalRange).toBeLessThan(startRange * 0.01);
+  // Thrusters rescale to the destination: a tap beside Earth is a small step,
+  // not the 10 AU-scale push it would be at the departure point.
+  await page.locator("#universe-map").press("w");
+  await expect(page.locator("#universe-speed")).toHaveText("0 km/s · 0 c", { timeout: 30_000 });
+  expect(range(await position())).toBeLessThan(startRange * 0.01);
+  issues.assertClean();
+});
+
+test("trip map, light-speed mark, gravity route and the 2D start crosshair", async ({ page, context }, testInfo) => {
+  test.setTimeout(240_000);
+  const issues = collectBrowserIssues(page);
+  await installFixtures(context, []);
+  const timestamp = "2026-08-26T12:00:00.000Z";
+  await openAtlas(page, `/?${new URLSearchParams({ v: "1", c: "-10,0", z: "20", t: timestamp, o: "earth", L: "" })}`);
+
+  // The 2D crosshair marks the map center, which is where 3D places the observer.
+  const marker = page.locator("#universe-entry-marker");
+  await expect(marker).toBeVisible();
+  const markerBox = (await marker.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(markerBox.x).toBeGreaterThan(0);
+  expect(markerBox.x + markerBox.width).toBeLessThan(viewport.width);
+  expect(markerBox.y).toBeGreaterThan(0);
+  expect(markerBox.y + markerBox.height).toBeLessThan(viewport.height);
+  await page.screenshot({ path: testInfo.outputPath("start-crosshair.png") });
+  await page.locator("#universe-3d-toggle").click();
+  await expect(page.locator("#universe-view")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get("u3")).toBe("-10,0,0");
+  await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+
+  // Trip map: a straight planned route until the gravity route is enabled.
+  const minimap = page.locator("#universe-minimap");
+  await expect(minimap).toBeVisible();
+  await expect(minimap).toHaveAttribute("data-route", "direct");
+  await expect(page.locator("#universe-route")).toHaveText("Trip map · top view");
+  const inked = await minimap.evaluate((canvas: HTMLCanvasElement) => {
+    const data = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let pixels = 0;
+    for (let index = 3; index < data.length; index += 4) if (data[index]! > 0) pixels += 1;
+    return pixels;
+  });
+  expect(inked).toBeGreaterThan(100);
+
+  // The speed gauge is a logarithmic indicator; its "c" mark sits at light speed.
+  const gauge = page.locator("#universe-speed-gauge");
+  await expect(page.locator("#universe-speed")).toHaveText("0 km/s · 0 c");
+  await expect(page.locator("#universe-speed-input")).toHaveCount(0);
+  const track = (await gauge.boundingBox())!;
+  const mark = (await page.locator(".universe-view__light-speed").boundingBox())!;
+  const lightSpeedExponent = Math.log10(299_792.458 / 149_597_870.7);
+  expect(Math.abs(mark.x - (track.x + track.width * (lightSpeedExponent + 9) / 25))).toBeLessThan(2);
+  await expect(page.locator(".universe-view__gauge-tick")).toHaveText(["AU/s", "ly/s", "Mly/s"]);
+
+  // Gravity route: a half orbit of the Sun from 10 AU to Earth, previewed before departure.
+  await page.locator("#universe-gravity").click();
+  await expect(page.locator("#universe-gravity")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#universe-route")).toHaveText(/^Orbit around Sun · 6\.\d+ yr$/);
+  await expect(minimap).toHaveAttribute("data-route", "gravity");
+  await page.screenshot({ path: testInfo.outputPath("gravity-route-preview.png") });
+  // With the inspector closed, the trip map and every flight control must fit a phone screen.
+  await page.locator("#close-panel").click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: testInfo.outputPath("gravity-route-mobile.png") });
+  const mobileControlsInsideViewport = await page.locator(".universe-view__flight > *, .universe-view__minimap").evaluateAll((controls) => controls.every((control) => {
+    const bounds = control.getBoundingClientRect();
+    return bounds.width === 0 || (bounds.left >= 0 && bounds.right <= window.innerWidth && bounds.top >= 0 && bounds.bottom <= window.innerHeight);
+  }));
+  expect(mobileControlsInsideViewport).toBe(true);
+  await page.setViewportSize(viewport);
+  await page.evaluate(() => {
+    const samples: string[] = [];
+    (window as Window & { __routeSamples?: string[] }).__routeSamples = samples;
+    window.setInterval(() => {
+      const position = document.querySelector<HTMLElement>("#universe-minimap")?.dataset.position ?? "";
+      if (samples[samples.length - 1] !== position) samples.push(position);
+    }, 50);
+  });
+  await page.locator("#universe-autopilot").click();
+  await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#universe-status")).toHaveText(/^Gravity route to Earth · .+ of 6\.\d+ yr · .+ per second$/, { timeout: 30_000 });
+  // On a gravity route the gauge shows the real orbital speed, far below light speed.
+  await expect(page.locator("#universe-speed")).toHaveText(/ km\/s · \d\.\d×10⁻⁵ c$/);
+  await expect(gauge).toHaveAttribute("data-faster-than-light", "false");
+  await page.waitForTimeout(2_500);
+  await page.screenshot({ path: testInfo.outputPath("gravity-route-flight.png") });
+  // Holding forward raises the time compression; it does not leave the orbit.
+  await page.locator("#universe-map").focus();
+  await page.keyboard.down("w");
+  try {
+    await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "false", { timeout: 180_000 });
+  } finally {
+    await page.keyboard.up("w");
+  }
+  const flown = (await page.evaluate(() => (window as Window & { __routeSamples?: string[] }).__routeSamples ?? []))
+    .map((sample) => sample.split(",").map(Number));
+  expect(flown.length).toBeGreaterThan(8);
+  // A straight flight would stay on the x axis; the orbit swings far around the Sun.
+  expect(Math.max(...flown.map(([, y]) => Math.abs(y!)))).toBeGreaterThan(2);
+  expect(flown.every(([x, y, z]) => Math.hypot(x!, y!, z!) > 0.9)).toBe(true);
+  const [x, y, z] = (await minimap.getAttribute("data-position"))!.split(",").map(Number);
+  expect(Math.hypot(x! - 1, y!, z!)).toBeLessThan(0.05);
+  await expect(page.locator("#universe-route")).toHaveText(/^Orbit around Sun · 6\.\d+ yr$/);
+  expect(Number(await minimap.getAttribute("data-trail-points"))).toBeGreaterThan(8);
+
+  await page.locator("#universe-gravity").click();
+  await expect(page.locator("#universe-gravity")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#universe-route")).toHaveText("Trip map · top view");
+  issues.assertClean();
+});
