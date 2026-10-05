@@ -34,6 +34,7 @@ type AtlasOverlayRendererOptions = {
   auKm: () => number;
   formatDistance: (kilometers: number) => string;
   smallBodyOrbitPathAu: (body: Body) => SmallBodyPosition[] | null;
+  universeEntryMarker: HTMLElement;
 };
 
 const POINT_ALPHA = 0.82;
@@ -77,6 +78,15 @@ export class AtlasOverlayRenderer {
     }
     this.drawScaleBar(frame.viewport, step, frame.camera);
     ctx.restore();
+  }
+
+  /** Keep the crosshair on the map center, where the 3D view places the
+   * observer. It is a page element, not canvas ink, so image exports stay clean. */
+  placeUniverseEntryMarker() {
+    const { camera } = this.options.frame();
+    const center = this.options.worldToScreen(camera.xAu, camera.yAu);
+    this.options.universeEntryMarker.style.transform = `translate(${center.x - 22}px, ${center.y - 22}px)`;
+    this.options.universeEntryMarker.hidden = false;
   }
 
   drawOrbitGuides() {

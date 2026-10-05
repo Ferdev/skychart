@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   cameraForDirection,
+  createSkyProjector,
   directionFromEcliptic,
   normalizeCamera,
   projectDirection,
@@ -18,6 +19,16 @@ assert.ok(center);
 assert.ok(Math.abs(center.x - 500) < 1e-8);
 assert.ok(Math.abs(center.y - 300) < 1e-8);
 assert.equal(projectDirection({ x: 0, y: -1, z: 0 }, camera, 1000, 600), null);
+const cachedProjector = createSkyProjector(camera, 1000, 600);
+assert.deepEqual(cachedProjector({ x: 0, y: 1, z: 0 }), center);
+assert.equal(cachedProjector({ x: 0, y: -1, z: 0 }), null);
+
+const nearObserver = relativeDirection({ x: 0, y: 0, z: 0 }, { x: 10, y: 10, z: 0 });
+const shiftedObserver = relativeDirection({ x: 0, y: 5, z: 0 }, { x: 10, y: 10, z: 0 });
+assert.ok(nearObserver && shiftedObserver);
+const nearScreen = projectDirection(nearObserver, { yawDeg: 0, pitchDeg: 0, fovDeg: 90 }, 1000, 600);
+const shiftedScreen = projectDirection(shiftedObserver, { yawDeg: 0, pitchDeg: 0, fovDeg: 90 }, 1000, 600);
+assert.ok(nearScreen && shiftedScreen && shiftedScreen.x < nearScreen.x, "observer translation creates parallax");
 
 const north = projectDirection(directionFromEcliptic(90, 30), camera, 1000, 600);
 assert.ok(north && north.y < 300, "positive ecliptic latitude projects upward");
