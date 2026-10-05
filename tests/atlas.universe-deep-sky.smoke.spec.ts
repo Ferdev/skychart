@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, skyEphemerisFixture } from "./atlas-test-utils";
+import { collectBrowserIssues, openAtlas, serveSourceModules, skyEphemerisFixture } from "./atlas-test-utils";
 
 test("guided deep-sky highlights become navigable 3D volumes", async ({ page, context }, testInfo) => {
   test.setTimeout(120_000);
@@ -37,6 +37,7 @@ test("guided deep-sky highlights become navigable 3D volumes", async ({ page, co
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(payload) });
   });
   await context.route("**/catalog-tiles/**", (route) => route.fulfill({ status: 404, body: "" }));
+  await serveSourceModules(page);
 
   const state = new URLSearchParams({
     v: "1", c: "-40,0", z: "1000000", t: "2026-08-26T12:00:00.000Z", L: "",

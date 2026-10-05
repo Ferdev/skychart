@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
-import { ATLAS_BASE_URL, collectBrowserIssues } from "./atlas-test-utils";
+import { ATLAS_BASE_URL, collectBrowserIssues, serveSourceModules } from "./atlas-test-utils";
 
 test.use({ video: "off" });
 
 async function installRendererScene(page: Page) {
+  await serveSourceModules(page);
   await page.route("**/realism-fixture", (route) => route.fulfill({ contentType: "text/html", body: `<!doctype html>
     <html><head><meta charset="utf-8"><title>3D appearance verification</title><style>
     body{display:flow-root;width:800px;margin:0;padding:1px 0;background:#030609;color:#d4e3e7;font:16px system-ui}h1{font-size:20px;margin:18px 24px}
