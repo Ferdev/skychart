@@ -25,7 +25,7 @@ import { normalizeUniverseViewState, type UniverseViewState } from "../viewState
 import { UniversePointRenderer, type UniverseScreenPoint } from "./universePointRenderer";
 import { observerApparentMagnitude } from "./universePhotometry";
 import { UniverseDestinationSearch } from "./universeDestinationSearch";
-import { AU_KM, hasRenderableRadius, projectPhysicalBody, projectSphericalExtent, safeUniverseEntryPosition } from "./universeBodyGeometry";
+import { approachDistance, AU_KM, hasRenderableRadius, projectPhysicalBody, projectSphericalExtent, safeUniverseEntryPosition } from "./universeBodyGeometry";
 import { bodyOccluders, occludedByBody, ringTransmission, type BodyOccluder } from "./universeOcclusion";
 import { resolvedBodyWeight } from "./universeAppearanceProfiles";
 import { UniverseBodyRenderer } from "./universeBodyRenderer";
@@ -608,16 +608,7 @@ export class UniverseViewController {
     this.stopFlight();
     const direction = relativeDirection(this.position, target.position);
     if (!direction) return;
-    const distance = Math.hypot(
-      target.position.x - this.position.x,
-      target.position.y - this.position.y,
-      target.position.z - this.position.z,
-    );
-    const deepSky = deepSkyModel(target);
-    const standoff = deepSky
-      ? Math.max(deepSky.radiusAu * 3, positionPrecisionStep(target.position) * 10)
-      : Math.min(Math.max(distance * 0.02, Math.min(this.moveStepAu * 0.1, distance * 0.5),
-        (target.radiusKm ?? 0) / AU_KM * 3), 1e11);
+    const standoff = this.autopilotStandoff();
     this.position = {
       x: target.position.x - direction.x * standoff,
       y: target.position.y - direction.y * standoff,
@@ -679,12 +670,8 @@ export class UniverseViewController {
   private autopilotStandoff(): number {
     const target = this.target;
     if (!target) return 0;
-    return Math.max(
-      (this.options.bodyByKey().get(target.key)?.radius_km ?? 0) / AU_KM * 3,
-      (deepSkyModel(target)?.radiusAu ?? 0) * 3,
-      Math.min(this.moveStepAu * 0.1, Math.hypot(target.position.x - this.position.x,
-        target.position.y - this.position.y, target.position.z - this.position.z) * 0.001),
-    );
+    return Math.max(approachDistance(target, deepSkyModel(target)?.radiusAu ?? null, this.camera.fovDeg),
+      positionPrecisionStep(target.position) * 10);
   }
 
   private skyFromTarget(): void {

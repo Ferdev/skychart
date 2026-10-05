@@ -74,7 +74,12 @@ sooner than the last, up to 10^16 AU per second; opposite input brakes, and
 release coasts to rest. None of this rescales or alters the underlying
 coordinates. With a selected object, autopilot accelerates and then sheds speed
 in proportion to the remaining distance, so it stops smoothly at a standoff
-distance. On a long leg the speed is first held at a steady cruise, a quarter of
+distance. "Go to object" and autopilot use the same standoff, which depends only
+on the object and the field of view: a star's disk spans 22% of the shorter view
+side, another solid body 30%, and the enclosing radius of a deep-sky form half
+of it. Rigel and Antares therefore arrive at the same apparent size although
+their radii differ fivefold. A record with no size uses a distance typical for
+its type (1 AU for a star), which is a viewing convention, not a measurement. On a long leg the speed is first held at a steady cruise, a quarter of
 the leg per second, so the progress is visible on the trip map; forward and back
 input changes the pace. With no selection it cruises
 straight ahead at the base speed or the speed last set with the thrusters. These

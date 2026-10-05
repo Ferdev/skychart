@@ -28,6 +28,42 @@ export function hasRenderableRadius(body: PhysicalBody): boolean {
     (body.key === "sun" || ["star", "planet", "moon", "dwarf_planet", "asteroid", "small_body", "comet"].includes(body.object_type ?? ""));
 }
 
+const LIGHT_YEAR_AU = 63_241.077;
+/** Share of the shorter view side that an approached object spans. Stars get
+ * less because their glow extends well beyond the disk. */
+const STAR_FRAME = 0.22;
+const SOLID_FRAME = 0.3;
+const VOLUME_FRAME = 0.5;
+/** Approach distances in AU for records with no size, by object type: about
+ * 1,000 km for small bodies, 150,000 km for planets, and typical object
+ * scales for deep-sky records. Anything else is treated like a star, at 1 AU. */
+const NOMINAL_APPROACH_AU: Record<string, number> = {
+  planet: 1e-3, moon: 6.7e-6, dwarf_planet: 6.7e-6, asteroid: 6.7e-6, small_body: 6.7e-6, comet: 6.7e-6, spacecraft: 6.7e-6,
+  nebula: 30 * LIGHT_YEAR_AU, star_cluster: 100 * LIGHT_YEAR_AU, deep_sky_object: 100 * LIGHT_YEAR_AU,
+  asterism: 100 * LIGHT_YEAR_AU, milky_way_patch: 100 * LIGHT_YEAR_AU,
+  galaxy: 150_000 * LIGHT_YEAR_AU, active_galaxy: 150_000 * LIGHT_YEAR_AU, quasar: 150_000 * LIGHT_YEAR_AU,
+};
+
+/** Distance from which a sphere spans the given share of the shorter view side. */
+export function framingDistance(radiusAu: number, fovDeg: number, frame: number): number {
+  const halfExtent = frame * Math.tan(Math.min(110, Math.max(20, fovDeg)) * Math.PI / 360);
+  return radiusAu * Math.sqrt(1 + 1 / (halfExtent * halfExtent));
+}
+
+/** Where "Go to object" and autopilot stop. The distance depends only on the
+ * object and the field of view, so every star, planet or nebula arrives at the
+ * same apparent size, from any start point. `volumeRadiusAu` is the enclosing
+ * radius of a deep-sky form, when the object has one. */
+export function approachDistance(body: PhysicalBody, volumeRadiusAu: number | null, fovDeg: number): number {
+  if (volumeRadiusAu && volumeRadiusAu > 0) return framingDistance(volumeRadiusAu, fovDeg, VOLUME_FRAME);
+  const radiusAu = typeof body.radiusKm === "number" && Number.isFinite(body.radiusKm) && body.radiusKm > 0 ? body.radiusKm / AU_KM : 0;
+  if (hasRenderableRadius(body)) {
+    return framingDistance(radiusAu, fovDeg, body.key === "sun" || body.object_type === "star" ? STAR_FRAME : SOLID_FRAME);
+  }
+  // A sized galaxy or nebula without a 3D form is still framed by its extent.
+  return radiusAu > 0 ? framingDistance(radiusAu, fovDeg, VOLUME_FRAME) : NOMINAL_APPROACH_AU[body.object_type ?? ""] ?? 1;
+}
+
 /** Fresh 2D→3D entries must not start inside the Sun or a selected planet. */
 export function safeUniverseEntryPosition(position: Vector3, camera: SkyCamera, bodies: Iterable<Body>): Vector3 {
   for (const body of bodies) {
