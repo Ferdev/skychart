@@ -13,6 +13,7 @@ backend_phoenix/priv/static/favicon.svg
 backend_phoenix/priv/static/og-image.svg
 backend_phoenix/priv/static/robots.txt
 backend_phoenix/priv/static/tours/
+backend_phoenix/priv/static/textures/
 backend_phoenix/priv/static/.vite/
 .venv/
 __pycache__/

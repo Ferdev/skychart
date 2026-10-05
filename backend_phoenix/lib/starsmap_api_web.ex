@@ -19,7 +19,7 @@ defmodule StarsmapApiWeb do
 
   def static_paths,
     do:
-      ~w(assets catalog-tiles fonts images tours favicon.ico favicon.svg robots.txt og-image.svg 404.html)
+      ~w(assets catalog-tiles fonts images textures tours favicon.ico favicon.svg robots.txt og-image.svg 404.html)
 
   def router do
     quote do

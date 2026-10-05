@@ -59,7 +59,7 @@ import {
   mergeBodyList,
   replaceBodyList,
 } from "./atlas/atlasState";
-import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController";
+import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController"; import { createUniverseViewController, initialUniverseState, UniverseViewController } from "./universe/universeViewController";
 import type {
   ActiveAtlasTab, SizeMode, ZoomPreset, Body, Ephemeris, CatalogSummary, ObjectDetailHydrationState,
   Camera, LoadingStep, RenderRequestOptions, SelectBodyOptions, DataRefreshOptions, CatalogPointHitEntry,
@@ -189,7 +189,7 @@ let perfDrawMs = 0;
 let perfHitTestMs = 0;
 let perfLastViewportMs = 0;
 let perfMilkyWayMs = 0;
-let perfViewportLoads = 0; let skyView: SkyViewController | null = null;
+let perfViewportLoads = 0; let skyView: SkyViewController | null = null; let universeView: UniverseViewController | null = null;
 
 const {
   formatDistance, nullableDistance, nullableNumber, nullableDegrees, nullableDays, nullableLightYears,
@@ -339,7 +339,7 @@ const atlasOverlay = new AtlasOverlayRenderer({
     labelBodies: prioritizedLabelBodies(),
     edgeBodies: edgeReferenceBodies(),
   }),
-  bodyByKey: () => bodyByKey,
+  bodyByKey: () => bodyByKey, universeEntryMarker: atlasDom.universeEntryMarker,
   bodyToScreen,
   worldToScreen,
   screenToWorld,
@@ -544,7 +544,7 @@ const viewStateController = new AtlasViewStateController({
   requestDataRefresh: () => requestDataRefresh({ immediate: true }),
   loadAtlas,
   animateCameraTo,
-  skyState: () => skyView?.state(), restoreSky: (state) => skyView?.restore(state) ?? Promise.resolve(),
+  skyState: () => skyView?.state(), restoreSky: (state) => skyView?.restore(state) ?? Promise.resolve(), universeState: () => universeView?.state(), restoreUniverse: (state) => universeView?.restore(state),
 }, bootViewState);
 skyView = createSkyViewController(atlasDom, {
   bodyByKey: () => bodyByKey,
@@ -556,6 +556,7 @@ skyView = createSkyViewController(atlasDom, {
   catalogRelease: () => catalogPointManifest.value?.version,
   locale,
 });
+universeView = createUniverseViewController(atlasDom, { bodyByKey: () => bodyByKey, selectedBody, translate: t, selectBody: selectBodyByKey, inspectInAtlas: (key) => { const body = bodyByKey.get(key); if (body) { centerOnBody(body, false); requestRender({ data: true }); } }, searchDestinations: async (query, signal) => (await catalogSearchGateway.search({ query, limit: 12, signal })).bodies, openSky: (body) => skyView?.open(body) ?? Promise.resolve(), stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), closeSky: () => skyView?.close({ updateHistory: false }), resumeAtlas: () => requestRender(), initialState: () => initialUniverseState({ x: camera.xAu, y: camera.yAu }, usableViewportRect().width / camera.pxPerAu / 12, selectedBody()) });
 const embedController: AtlasEmbedController = new AtlasEmbedController({
   enabled: isEmbedMode,
   canvas,
@@ -656,7 +657,7 @@ async function loadAtlas(timestampIso?: string) {
     if (selectionState) await restoreSelectionFromViewState(selectionState);
     else if (serverBootObjectKey) await selectBodyByKey(serverBootObjectKey, { center: true });
     else if (invalidSkyRoute) skyView?.showUnavailable(t("sky.invalidLink"));
-    if (skyView?.active && !selectionState?.sky) await skyView.refreshForTime();
+    if (skyView?.active && !selectionState?.sky) await skyView.refreshForTime(); if (universeView?.active && !selectionState?.universe) universeView.refreshForTime();
     requestDataRefresh({ immediate: true });
     loadingScreen.hidden = true;
     loadState.textContent = t("status.ready");
@@ -716,7 +717,7 @@ function bindEvents() {
     updateSizeModes, updateDisplayToggles, updatePerformanceHud: updatePerfHud, updateAllUi, resizeCanvas,
     updateSelectedPanelMetrics, requestRender: (data = false) => requestRender(data ? { data: true } : {}),
     scheduleViewStateReplace, translate: t,
-    viewSkySelected: () => { const body = selectedBody(); if (body && bodyCanObserveSky(body)) void skyView?.open(body); },
+    viewSkySelected: () => { const body = selectedBody(); if (body && bodyCanObserveSky(body)) { universeView?.close({ updateHistory: false }); void skyView?.open(body); } },
   });
 }
 
@@ -786,7 +787,7 @@ function updateAllUi() {
   updateEmbedAttribution();
 }
 
-function render() {
+function render() { if (universeView?.active) { renderFrameId = null; return; }
   const frameStartedAt = performance.now();
   const previousFrameAt = perfLastFrameAt;
   perfLastFrameAt = frameStartedAt;
@@ -807,7 +808,7 @@ function render() {
       if (displayLayers.orbits) atlasOverlay.drawOrbitGuides();
       if (displayLayers.constellations) constellationRenderer.draw(displayLayers.labels);
       atlasOverlay.drawComparisonGuide();
-      atlasOverlay.drawBodies();
+      atlasOverlay.drawBodies(); atlasOverlay.placeUniverseEntryMarker();
       if (displayLayers.labels) atlasOverlay.drawLabels();
       if (displayLayers.references) atlasOverlay.drawEdgeReferences();
     } else {
@@ -821,7 +822,7 @@ function render() {
   objectInspection.updateScienceLayerDisclosure();
 }
 
-function requestRender(options: RenderRequestOptions = {}) {
+function requestRender(options: RenderRequestOptions = {}) { if (universeView?.active) return;
   if (isEmbedMode && !embedController.visible) return;
   atlasVisibility.invalidate();
   if (options.data) requestDataRefresh();
