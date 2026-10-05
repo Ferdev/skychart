@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { expect, type APIRequestContext, type Page, test } from "@playwright/test";
 
 export const ATLAS_BASE_URL = process.env.ATLAS_BASE_URL ?? "http://127.0.0.1:4020";
@@ -34,6 +35,30 @@ export async function openAtlas(page: Page, path = "/") {
   await expect(page.locator("#load-state")).toHaveText("ready", { timeout: 45_000 });
   await expect(page.locator("#loading-screen")).toBeHidden({ timeout: 45_000 });
   await expect(page.locator("#map")).toBeVisible();
+}
+
+// Some specs import source modules in the page to drive renderers and models
+// directly. A Vite dev server serves those modules; the production build that
+// Phoenix serves does not, so transform them from the checkout with the
+// project's own Vite pipeline when the server under test has no source.
+export async function serveSourceModules(page: Page) {
+  const probe = await page.request.get("/src/main.ts");
+  if (probe.ok() && /javascript/.test(probe.headers()["content-type"] ?? "")) return;
+  const { createServer } = await import("vite");
+  const server = await createServer({
+    root: fileURLToPath(new URL("..", import.meta.url)),
+    appType: "custom",
+    logLevel: "error",
+    optimizeDeps: { noDiscovery: true, include: [] },
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null }
+  });
+  page.context().once("close", () => void server.close());
+  await page.route((url) => url.pathname.startsWith("/src/") || url.searchParams.has("import"), async (route) => {
+    const url = new URL(route.request().url());
+    const module = await server.transformRequest(url.pathname + url.search);
+    if (!module) return route.fulfill({ status: 404, body: "" });
+    return route.fulfill({ contentType: "text/javascript", body: module.code });
+  });
 }
 
 export async function openSearchWorkspace(page: Page) {

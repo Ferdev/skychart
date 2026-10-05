@@ -19,6 +19,9 @@ defmodule StarsmapApi.Catalog.PointQueries do
   @default_sky_limit 12_000
   @max_sky_limit 50_000
   @sky_query_timeout 30_000
+  @max_sky_near_radius_au 1.0e11
+  @max_sky_near_star_radius_au 1.0e7
+  @sky_near_limit 2_000
   @point_cache_version 1
   @point_cache_max_limit 50_000
   @point_cache_max_binary_bytes 2_000_000
@@ -53,6 +56,20 @@ defmodule StarsmapApi.Catalog.PointQueries do
     :external_ids,
     :facts,
     :source
+  ]
+  @sky_fields [
+    :key,
+    :name,
+    :object_type,
+    :catalog_group,
+    :source_type,
+    :color,
+    :apparent_magnitude,
+    :radius_km,
+    :position_model,
+    :x_au,
+    :y_au,
+    :z_au
   ]
 
   def list_viewport(params) do
@@ -378,8 +395,13 @@ defmodule StarsmapApi.Catalog.PointQueries do
       groups = csv_param(params["groups"])
       types = csv_param(params["types"])
       observer_key = normalized_observer_key(params["observer_key"])
+      physical_only? = truthy_param?(params["physical_only"])
+      local_only? = truthy_param?(params["local_only"])
+      featured_keys = params["featured_keys"] |> csv_param() |> Enum.take(32)
+      near_radius_au = bounded_float(params["near_radius_au"], 0.0, 0.0, @max_sky_near_radius_au)
+      near_limit = min(@sky_near_limit, limit)
 
-      rows =
+      base_query =
         CatalogSourceObject
         |> where(
           [object],
@@ -388,26 +410,108 @@ defmodule StarsmapApi.Catalog.PointQueries do
         |> maybe_exclude_key(observer_key)
         |> maybe_filter_groups(groups)
         |> maybe_filter_types(types)
-        |> order_by([object],
-          asc_nulls_last: object.apparent_magnitude,
-          asc: object.key
-        )
-        |> limit(^limit)
-        |> select([object], [
-          object.key,
-          object.name,
-          object.object_type,
-          object.catalog_group,
-          object.color,
-          object.apparent_magnitude,
-          object.x_au,
-          object.y_au,
-          object.z_au
-        ])
-        |> Repo.all(timeout: @sky_query_timeout)
+        |> maybe_exclude_reference_shells(physical_only?)
+
+      global_rows =
+        if local_only? do
+          []
+        else
+          base_query
+          |> order_by([object],
+            asc_nulls_last: object.apparent_magnitude,
+            asc: object.key
+          )
+          |> limit(^limit)
+          |> select([object], struct(object, ^@sky_fields))
+          |> Repo.all(timeout: @sky_query_timeout)
+        end
+
+      featured_rows =
+        if local_only? or featured_keys == [] do
+          []
+        else
+          base_query
+          |> where([object], object.key in ^featured_keys)
+          |> select([object], struct(object, ^@sky_fields))
+          |> Repo.all(timeout: @sky_query_timeout)
+        end
+
+      nearby_rows =
+        if near_radius_au > 0 do
+          observer = {observer_x_au, observer_y_au, observer_z_au}
+
+          # A 3D Solar System view needs local stars and Local Group landmarks
+          # even when a brightness-ordered global sample is dominated by stars.
+          reserve_galaxies? = physical_only? and near_limit >= 100
+          star_limit = if reserve_galaxies?, do: div(near_limit, 2), else: near_limit
+          galaxy_limit = if reserve_galaxies?, do: min(100, div(near_limit, 10)), else: 0
+
+          other_limit =
+            if reserve_galaxies?, do: near_limit - star_limit - galaxy_limit, else: near_limit
+
+          stars =
+            base_query
+            |> where([object], object.object_type == "star")
+            |> sky_near_rows(
+              observer,
+              min(near_radius_au, @max_sky_near_star_radius_au),
+              star_limit
+            )
+
+          others =
+            base_query
+            |> where([object], object.object_type != "star")
+            |> maybe_exclude_galaxies(reserve_galaxies?)
+            |> sky_near_rows(observer, near_radius_au, other_limit)
+
+          galaxies =
+            if reserve_galaxies? do
+              base_query
+              |> where([object], object.object_type in ["galaxy", "active_galaxy"])
+              |> sky_near_rows(observer, max(near_radius_au, 3.0e11), galaxy_limit)
+            else
+              []
+            end
+
+          nearby = Enum.uniq_by(stars ++ others ++ galaxies, & &1.key)
+
+          if reserve_galaxies? do
+            nearby
+          else
+            nearby
+            |> Enum.sort_by(fn object ->
+              :math.pow(object.x_au - observer_x_au, 2) +
+                :math.pow(object.y_au - observer_y_au, 2) +
+                :math.pow(object.z_au - observer_z_au, 2)
+            end)
+            |> Enum.take(near_limit)
+          end
+        else
+          []
+        end
+
+      rows =
+        (nearby_rows ++ featured_rows ++ global_rows)
+        |> Enum.uniq_by(& &1.key)
+        |> Enum.take(limit)
 
       points =
-        Enum.flat_map(rows, fn [key, name, type, group, color, magnitude, x, y, z] ->
+        Enum.flat_map(rows, fn object ->
+          %{
+            key: key,
+            name: name,
+            object_type: type,
+            catalog_group: group,
+            source_type: source_type,
+            position_model: position_model,
+            color: color,
+            apparent_magnitude: magnitude,
+            radius_km: radius_km,
+            x_au: x,
+            y_au: y,
+            z_au: z
+          } = object
+
           dx = x - observer_x_au
           dy = y - observer_y_au
           dz = z - observer_z_au
@@ -420,8 +524,12 @@ defmodule StarsmapApi.Catalog.PointQueries do
                 name: name,
                 object_type: type,
                 catalog_group: group,
+                source_type: source_type,
+                position_model: position_model,
                 color: color,
                 apparent_magnitude: magnitude,
+                radius_km: radius_km,
+                distance_au: distance_au,
                 direction: %{x: dx / distance_au, y: dy / distance_au, z: dz / distance_au}
               }
             ]
@@ -429,6 +537,8 @@ defmodule StarsmapApi.Catalog.PointQueries do
             []
           end
         end)
+
+      nearby_keys = MapSet.new(nearby_rows, & &1.key)
 
       {:ok,
        %{
@@ -440,10 +550,66 @@ defmodule StarsmapApi.Catalog.PointQueries do
          groups: groups,
          types: types,
          limit: limit,
+         nearby_returned: Enum.count(points, &MapSet.member?(nearby_keys, &1.key)),
          returned: length(points),
          points: points
        }}
     end
+  end
+
+  defp sky_near_rows(query, {x, y, z}, radius, limit) do
+    query
+    |> where(
+      [object],
+      object.x_au >= ^(x - radius) and object.x_au <= ^(x + radius) and
+        object.y_au >= ^(y - radius) and object.y_au <= ^(y + radius) and
+        object.z_au >= ^(z - radius) and object.z_au <= ^(z + radius)
+    )
+    |> where(
+      [object],
+      fragment(
+        "power(? - ?, 2) + power(? - ?, 2) + power(? - ?, 2)",
+        object.x_au,
+        ^x,
+        object.y_au,
+        ^y,
+        object.z_au,
+        ^z
+      ) <= ^(radius * radius)
+    )
+    |> order_by([object],
+      asc:
+        fragment(
+          "power(? - ?, 2) + power(? - ?, 2) + power(? - ?, 2)",
+          object.x_au,
+          ^x,
+          object.y_au,
+          ^y,
+          object.z_au,
+          ^z
+        )
+    )
+    |> limit(^limit)
+    |> select([object], struct(object, ^@sky_fields))
+    |> Repo.all(timeout: @sky_query_timeout)
+  end
+
+  defp maybe_exclude_galaxies(query, false), do: query
+
+  defp maybe_exclude_galaxies(query, true) do
+    where(query, [object], object.object_type not in ["galaxy", "active_galaxy"])
+  end
+
+  defp maybe_exclude_reference_shells(query, false), do: query
+
+  defp maybe_exclude_reference_shells(query, true) do
+    where(
+      query,
+      [object],
+      (is_nil(object.position_model) or
+         object.position_model != "catalog_sky_position_reference_shell") and
+        fragment("COALESCE(?->>'distance_unknown', 'false') != 'true'", object.facts)
+    )
   end
 
   defp point_base_query(bounds, groups, types) do

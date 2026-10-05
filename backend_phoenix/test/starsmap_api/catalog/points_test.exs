@@ -115,6 +115,7 @@ defmodule StarsmapApi.Catalog.PointsTest do
     assert_in_delta point.direction.x, 1.0 / 3.0, 1.0e-12
     assert_in_delta point.direction.y, 2.0 / 3.0, 1.0e-12
     assert_in_delta point.direction.z, 2.0 / 3.0, 1.0e-12
+    assert_in_delta point.distance_au, 3.0, 1.0e-12
   end
 
   test "sky requires all three observer coordinates" do
@@ -122,19 +123,243 @@ defmodule StarsmapApi.Catalog.PointsTest do
              PointQueries.sky(%{"observer_x_au" => "0", "observer_y_au" => "0"})
   end
 
-  defp insert_object!(key, group, x_au, y_au, color, z_au \\ nil) do
+  test "3D catalog includes nearby faint positions ahead of the global brightness sample" do
+    insert_object!("a-far", "gaia_500pc_stars", 100.0, 0.0, nil, 1.0)
+    insert_object!("z-near", "gaia_500pc_stars", 2.0, 0.0, nil, 1.0)
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "10",
+               "limit" => "1",
+               "groups" => "gaia_500pc_stars"
+             })
+
+    assert payload.nearby_returned == 1
+    assert Enum.map(payload.points, & &1.key) == ["z-near"]
+  end
+
+  test "3D local-only refresh skips global landmarks and returns only nearby positions" do
+    insert_object!("bright-far", "gaia_500pc_stars", 100.0, 0.0, nil, 1.0)
+    insert_object!("near", "gaia_500pc_stars", 2.0, 0.0, nil, 9.0)
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "10",
+               "local_only" => "1",
+               "limit" => "10",
+               "groups" => "gaia_500pc_stars"
+             })
+
+    assert payload.nearby_returned == 1
+    assert Enum.map(payload.points, & &1.key) == ["near"]
+  end
+
+  test "3D sky keeps requested guided highlights in a dense brightness sample" do
+    insert_object!("a-bright", "gaia_500pc_stars", 100.0, 0.0, nil, 1.0)
+
+    insert_object!(
+      "m31",
+      "messier_deep_sky",
+      200.0,
+      0.0,
+      nil,
+      2.0,
+      "deep_sky_catalog_coordinates",
+      "galaxy"
+    )
+
+    insert_object!(
+      "m42",
+      "messier_deep_sky",
+      300.0,
+      0.0,
+      nil,
+      3.0,
+      "deep_sky_catalog_coordinates",
+      "nebula"
+    )
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "featured_keys" => "m31,m42",
+               "limit" => "3"
+             })
+
+    assert Enum.map(payload.points, & &1.key) == ["m31", "m42", "a-bright"]
+    assert Enum.all?(payload.points, &Map.has_key?(&1, :radius_km))
+  end
+
+  test "3D physical-only catalog omits display reference shells" do
+    insert_object!("measured", "gaia_500pc_stars", 1.0, 0.0, nil, 1.0)
+
+    insert_object!(
+      "shell",
+      "gaia_500pc_stars",
+      2.0,
+      0.0,
+      nil,
+      1.0,
+      "catalog_sky_position_reference_shell"
+    )
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "10",
+               "physical_only" => "1",
+               "featured_keys" => "shell",
+               "limit" => "10",
+               "groups" => "gaia_500pc_stars"
+             })
+
+    assert Enum.map(payload.points, & &1.key) == ["measured"]
+  end
+
+  test "3D physical-only catalog excludes unknown distances from every sample" do
+    insert_object!("measured", "gaia_500pc_stars", 1.0, 0.0, nil, 1.0)
+
+    insert_object!(
+      "unknown",
+      "gaia_500pc_stars",
+      2.0,
+      0.0,
+      nil,
+      1.0,
+      "catalog_coordinates",
+      "star",
+      %{"distance_unknown" => true}
+    )
+
+    params = %{
+      "observer_x_au" => "0",
+      "observer_y_au" => "0",
+      "observer_z_au" => "0",
+      "physical_only" => "1",
+      "limit" => "10"
+    }
+
+    for sample <- [
+          %{},
+          %{"featured_keys" => "unknown"},
+          %{"near_radius_au" => "10", "local_only" => "1"}
+        ] do
+      assert {:ok, payload} = PointQueries.sky(Map.merge(params, sample))
+      assert Enum.map(payload.points, & &1.key) == ["measured"]
+    end
+
+    assert {:ok, sky_payload} = PointQueries.sky(Map.delete(params, "physical_only"))
+    assert Enum.any?(sky_payload.points, &(&1.key == "unknown"))
+  end
+
+  test "nearby count describes returned points when an object coincides with the observer" do
+    insert_object!("coincident", "gaia_500pc_stars", 0.0, 0.0, nil, 0.0)
+    insert_object!("near", "gaia_500pc_stars", 2.0, 0.0, nil, 0.0)
+    insert_object!("landmark", "gaia_500pc_stars", 100.0, 0.0, nil, 0.0)
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "10",
+               "limit" => "3"
+             })
+
+    assert Enum.map(payload.points, & &1.key) == ["near", "landmark"]
+    assert payload.nearby_returned == 1
+  end
+
+  test "3D catalog finds a nearby galaxy at larger scales without broad star sampling" do
+    insert_object!("a-star", "gaia_500pc_stars", 20_000_000.0, 0.0, nil, 1.0)
+
+    insert_object!(
+      "z-galaxy",
+      "curated_extragalactic_survey",
+      20_000_000.0,
+      0.0,
+      nil,
+      1.0,
+      "catalog_coordinates",
+      "galaxy"
+    )
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "30000000",
+               "limit" => "1"
+             })
+
+    assert Enum.map(payload.points, & &1.key) == ["z-galaxy"]
+  end
+
+  test "3D Solar System sampling reserves nearby stars and Local Group galaxies" do
+    for index <- 1..120 do
+      insert_object!("aa-star-#{index}", "gaia_500pc_stars", index * 10_000.0, 0.0, nil, 1.0)
+    end
+
+    insert_object!(
+      "zz-local-galaxy",
+      "curated_extragalactic_survey",
+      160_000_000_000.0,
+      0.0,
+      nil,
+      1.0,
+      "catalog_coordinates",
+      "galaxy"
+    )
+
+    assert {:ok, payload} =
+             PointQueries.sky(%{
+               "observer_x_au" => "0",
+               "observer_y_au" => "0",
+               "observer_z_au" => "0",
+               "near_radius_au" => "10000000",
+               "physical_only" => "1",
+               "limit" => "100"
+             })
+
+    assert payload.nearby_returned == 51
+    assert length(payload.points) == 100
+    assert Enum.any?(payload.points, &(&1.key == "zz-local-galaxy"))
+  end
+
+  defp insert_object!(
+         key,
+         group,
+         x_au,
+         y_au,
+         color,
+         z_au \\ nil,
+         position_model \\ "catalog_coordinates",
+         object_type \\ "star",
+         facts \\ %{}
+       ) do
     SnapshotStore.upsert_source_objects([
       %{
         key: key,
         name: key,
-        object_type: "star",
+        object_type: object_type,
         catalog_group: group,
         source_type: "gaia_dr3",
-        position_model: "catalog_coordinates",
+        position_model: position_model,
         search_text: key,
         aliases: [],
         external_ids: %{},
-        facts: %{},
+        facts: facts,
         source: %{},
         x_au: x_au,
         y_au: y_au,

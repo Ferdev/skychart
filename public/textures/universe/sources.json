@@ -1,0 +1,347 @@
+[
+  {
+    "file": "earth.jpg",
+    "url": "https://www.solarsystemscope.com/textures/download/2k_earth_daymap.jpg",
+    "source": "https://www.solarsystemscope.com/textures/",
+    "credit": "Solar System Scope / INOVE",
+    "license": "CC BY 4.0",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 463087,
+    "sha256": "767ee1dc6eb3802699bfccf6f264880f8acd0b80de3191cd24984fe279b07b7c",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "earth-clouds.jpg",
+    "url": "https://www.solarsystemscope.com/textures/download/2k_earth_clouds.jpg",
+    "source": "https://www.solarsystemscope.com/textures/",
+    "credit": "Solar System Scope / INOVE",
+    "license": "CC BY 4.0",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 965676,
+    "sha256": "fffd7f68d41b37274822150e54a6ef605af1d3ec35624d9f628c3b896bfa42ed",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "mercury.jpg",
+    "url": "https://www.solarsystemscope.com/textures/download/2k_mercury.jpg",
+    "source": "https://www.solarsystemscope.com/textures/",
+    "credit": "Solar System Scope / INOVE",
+    "license": "CC BY 4.0",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 872555,
+    "sha256": "5a5c80607f643496bac9a631e71957def35ed788895f18b678ac849c2b38e48a",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "venus.jpg",
+    "url": "https://www.solarsystemscope.com/textures/download/2k_venus_atmosphere.jpg",
+    "source": "https://www.solarsystemscope.com/textures/",
+    "credit": "Solar System Scope / INOVE",
+    "license": "CC BY 4.0",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 229696,
+    "sha256": "225012ad4911730605c4e189ca2a3bf674fce50cc48aab4102b936b47d6991ac",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "mars.jpg",
+    "url": "https://www.solarsystemscope.com/textures/download/2k_mars.jpg",
+    "source": "https://www.solarsystemscope.com/textures/",
+    "credit": "Solar System Scope / INOVE",
+    "license": "CC BY 4.0",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 750547,
+    "sha256": "2d187f3e77a98eaa8cea5f4cc722f633c122ef170b9e94ace6b5fb6cbc3f8e01",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "saturn.jpg",
+    "url": "https://www.solarsystemscope.com/textures/download/2k_saturn.jpg",
+    "source": "https://www.solarsystemscope.com/textures/",
+    "credit": "Solar System Scope / INOVE",
+    "license": "CC BY 4.0",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 199916,
+    "sha256": "54a900ca9bf7ab62e70f862852759abdf342e6d6436a95a2fe9ebdb6bcd3bbac",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "uranus.jpg",
+    "url": "https://www.solarsystemscope.com/textures/download/2k_uranus.jpg",
+    "source": "https://www.solarsystemscope.com/textures/",
+    "credit": "Solar System Scope / INOVE",
+    "license": "CC BY 4.0",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 77751,
+    "sha256": "d15239d46f82d3ea13d2b260b5b29b2a382f42f2916dae0694d0387b1204a09d",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "neptune.jpg",
+    "url": "https://www.solarsystemscope.com/textures/download/2k_neptune.jpg",
+    "source": "https://www.solarsystemscope.com/textures/",
+    "credit": "Solar System Scope / INOVE",
+    "license": "CC BY 4.0",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 241580,
+    "sha256": "cb42ea82709741d28b0af44d8b283cbc6dbd0c521a7f0e1e1e010ade00977df6",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "jupiter.png",
+    "url": "https://assets.science.nasa.gov/content/dam/science/missions/hubble/releases/2019/08/STScI-01EVSV9A3VN7VYXN5H6Z1GDG93.tif/jcr:content/renditions/2000x1000.png",
+    "source": "https://science.nasa.gov/asset/hubble/jupiter-global-map-2019/",
+    "credit": "NASA, ESA, A. Simon (GSFC), M. H. Wong (UC Berkeley)",
+    "license": "NASA imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 2243592,
+    "sha256": "0def4093a1d98dfa00fc9c0d0a30207973f9705dd66a6ef00cd70faddb7f7109",
+    "dimensions": [
+      2000,
+      1000
+    ]
+  },
+  {
+    "file": "moon.jpg",
+    "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/lroc_color_2k.jpg",
+    "source": "https://svs.gsfc.nasa.gov/4720/",
+    "credit": "NASA Scientific Visualization Studio / LROC",
+    "license": "NASA imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 457942,
+    "sha256": "f7130a1822681fa7512d7dcfd40db8c10b9ba4f06777910348698260ed7a2170",
+    "dimensions": [
+      2048,
+      1024
+    ]
+  },
+  {
+    "file": "moon-height.jpg",
+    "url": "https://svs.gsfc.nasa.gov/vis/a000000/a004700/a004720/ldem_3_8bit.jpg",
+    "source": "https://svs.gsfc.nasa.gov/4720/",
+    "credit": "NASA Scientific Visualization Studio / LOLA",
+    "license": "NASA imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 111552,
+    "sha256": "6d93f887e7d8bedfe35ab89ba785e5e3ca12381bd092a5e6abe2c707dda8bb98",
+    "dimensions": [
+      1024,
+      512
+    ]
+  },
+  {
+    "file": "io.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/jup1vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/jupiter.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 113001,
+    "sha256": "71c574f74555552fa4bec70931e954c6139d3489df825c9edf40213d49cba132",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "europa.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/jup2vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/jupiter.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 135970,
+    "sha256": "03164d293c46b3eff16678c20dfb73337db8a404e2d83f057bc320b95484b54f",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "ganymede.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/jup3vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/jupiter.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 183557,
+    "sha256": "626302a877528d7eab74f4229f6c7249fffc91be8e28e8edc040433aca98cc6d",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "callisto.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/jup4vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/jupiter.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 216624,
+    "sha256": "9659f85b76d5cb90cb709b32f3282f3ca94199be4d8b3b159d7d373a1887551c",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "phobos.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/mar1kuu2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/mars.html",
+    "credit": "NASA/JPL/Caltech/USGS (Viking mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 138689,
+    "sha256": "84eb21c08626a0558d1e88ccb666bd1e914606146423f9ebcf6c09953d7543af",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "deimos.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/mar2kuu2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/mars.html",
+    "credit": "NASA/JPL/Caltech/USGS (Viking mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 71976,
+    "sha256": "e8902c5b34e634c5146e5d8d2bf352bb5f45181c715ed15644edb5f009826ed6",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "mimas.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/sat1vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/saturn.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 111227,
+    "sha256": "c854a36beffc806bf1b86700f427c37d19f20f74e8e6275be2b4568e6c175a39",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "enceladus.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/sat2vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/saturn.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 101190,
+    "sha256": "224b4510a75dc6554cfb0802507f9f1bb959c52848b8ec9286d4253d417d6dd2",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "tethys.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/sat3vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/saturn.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 150474,
+    "sha256": "6510470c66bc47f3f50c4dad924c0546acaedfeefe380c101af171e78f37e5b8",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "dione.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/sat4vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/saturn.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 120516,
+    "sha256": "42984a39ab5839ea20351d8ec9d7f9d00091c0c8f9f24683644cea5db434ef43",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "rhea.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/sat5vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/saturn.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 99961,
+    "sha256": "8dd523b908012edfcb52f03e37d54bc1358f75bd1e1c04cf6223a71f2c82624c",
+    "dimensions": [
+      1440,
+      720
+    ]
+  },
+  {
+    "file": "iapetus.jpg",
+    "url": "https://maps.jpl.nasa.gov/tmaps/pix/sat8vss2.jpg",
+    "source": "https://maps.jpl.nasa.gov/tmaps/saturn.html",
+    "credit": "NASA/JPL/Caltech/USGS; David Seal (processed Voyager mosaics)",
+    "license": "JPL imagery; retain credit",
+    "retrieved": "2026-09-27",
+    "projection": "equirectangular",
+    "bytes": 64670,
+    "sha256": "3b5054f41e9cec5d220655260930c9d31a1ec44fa43b82f2d105f3ee4daac26b",
+    "dimensions": [
+      1440,
+      720
+    ]
+  }
+]
