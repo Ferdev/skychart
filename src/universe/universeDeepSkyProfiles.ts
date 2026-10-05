@@ -30,3 +30,22 @@ export function deepSkyAppearance(key: string): Morphology {
   return { arms: 2, winding: 5, bulge: .25, inclination: .4, angle: 0,
     tint: [240, 200, 157], lobes: 3, dust: .5, ...PROFILES[canonicalDeepSkyKey(key)] };
 }
+
+// Messier morphology codes from data/catalogs/deep_sky_catalog.json, so a
+// sampled 3D point that carries no catalog facts still gets the right form.
+// tests/universeAppearance.test.ts checks this table against the catalog.
+const MESSIER_TYPE_KEYS: Record<string, string> = {
+  Gc: "m2 m3 m4 m5 m9 m10 m12 m13 m14 m15 m19 m22 m28 m30 m53 m54 m55 m56 m62 m68 m69 m70 m71 m72 m75 m79 m80 m92 m107",
+  Oc: "m6 m7 m11 m16 m18 m21 m23 m25 m26 m29 m34 m35 m36 m37 m38 m39 m41 m44 m45 m46 m47 m48 m50 m52 m67 m93 m103",
+  Sp: "m31 m33 m51 m61 m63 m64 m65 m66 m74 m77 m81 m83 m88 m90 m94 m96 m98 m99 m100 m101 m104 m106 m108",
+  Ba: "m58 m91 m95 m109",
+  El: "m32 m49 m59 m60 m87 m89 m105 m110",
+  Ln: "m84 m85 m86 m102",
+  Ir: "m82",
+  Di: "m8 m17 m20 m42 m43 m78",
+  Pl: "m27 m57 m76 m97",
+  Sn: "m1",
+};
+const MESSIER_TYPES = new Map(Object.entries(MESSIER_TYPE_KEYS).flatMap(([code, keys]) => keys.split(" ").map((key) => [key, code] as const)));
+
+export const messierTypeCode = (key: string): string | undefined => MESSIER_TYPES.get(key);

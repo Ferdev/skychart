@@ -43,9 +43,16 @@ a restrained halo; catalog stellar color is retained where available. Unknown
 small-body, dwarf-planet, moon, and exoplanet surfaces use rough procedural
 materials rather than copying another planet's observed map.
 
-## Guided deep-sky reconstructions
+## Deep-sky reconstructions
 
-All 19 existing guided records remain supported. M87 and `simbad-m-87` share
+Every deep-sky record with a catalog morphology class and a derived size gets a
+form chosen by that class: globular and open clusters, spiral, elliptical and
+irregular galaxies, diffuse nebulae, planetary nebulae (ring) and supernova
+remnants (shell). The class comes from the record's `deep_sky_type` fact; a
+table of the Messier classes covers sampled 3D points, which carry no facts.
+Records without a hand-made profile use the default tint and proportions of
+their class, so their detail is generic. All 19 guided records keep their
+individual profiles. M87 and `simbad-m-87` share
 one deterministic appearance profile; overlapping representations are drawn
 once while the selected record retains its own position and size. The two
 quasars retain their explicit schematic-size label. Other model extents use
@@ -82,12 +89,15 @@ servers. Uploads use power-of-two mipmaps (non-power-of-two originals are
 resampled in the browser); a narrow longitude blend softens mosaic seams.
 Missing images preserve the procedural
 material. Context restoration recreates GPU assets and requests a fresh frame.
-The body layer caps its drawing buffer at two million pixels, reduced to 400,000
-during flight and 600,000 for interior viewpoints. This bounds full-screen
-fragment work; stopping outside a body restores the sharper close-up view.
+The body layer caps its drawing buffer at two million pixels, or 600,000 for
+interior viewpoints. This bounds full-screen fragment work. The cap is the same
+in flight and at rest, so a capable GPU shows no loss of sharpness in motion.
+Only when consecutive flight frames run slow (below about 22 frames per second)
+is the detail lowered in steps, to a floor of 300,000 pixels, and it is raised
+again when frames run fast. A software rasterizer starts at the low level.
 
 Deep-sky gas and dust use depth-sorted Gaussian quads with a 24,000-splat frame
-budget, reduced to 12,000 for movement and narrow viewports. A separate projected
+budget, reduced toward 12,000 for narrow viewports and for devices that cannot hold the frame rate in motion. A separate projected
 area budget limits overdraw inside nearby gas volumes. Density compensation
 reduces brightness changes between detail levels. Models and distant markers
 crossfade between 1.5 and 6 pixels in radius. Camera-relative projection uses

@@ -29,6 +29,15 @@ export class UniversePointRenderer {
 
   get available(): boolean { return Boolean(this.gl && this.program && this.buffer); }
 
+  /** True when WebGL runs on a CPU rasterizer such as SwiftShader or llvmpipe. */
+  get software(): boolean {
+    const gl = this.gl;
+    if (!gl) return true;
+    const info = gl.getExtension("WEBGL_debug_renderer_info");
+    const renderer = `${gl.getParameter(gl.RENDERER)} ${info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : ""}`;
+    return /swiftshader|llvmpipe|software/i.test(renderer);
+  }
+
   render(points: readonly UniverseScreenPoint[], width: number, height: number, dpr: number): void {
     const gl = this.gl;
     if (!gl || !this.program || !this.buffer) return;

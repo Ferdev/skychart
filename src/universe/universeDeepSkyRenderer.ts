@@ -17,7 +17,7 @@ export class UniverseDeepSkyRenderer {
   }
 
   render(points: readonly DeepSkyPoint[], observer: Vector3, camera: SkyCamera,
-    width: number, height: number, dpr: number, occluders: BodyOccluder[] = [], moving = false, selectedKey?: string): Set<string> {
+    width: number, height: number, dpr: number, occluders: BodyOccluder[] = [], quality = 1, selectedKey?: string): Set<string> {
     const visibleKeys = new Set<string>(), drawn = new Set<string>();
     const projector = createSkyProjector(camera, width, height, Math.max(width, height) * .4);
     const focal = Math.min(width, height) / (2 * Math.tan(camera.fovDeg * Math.PI / 360));
@@ -27,7 +27,10 @@ export class UniverseDeepSkyRenderer {
       const extent = model ? projectSphericalExtent(point.position, model.radiusAu, observer, camera, width, height) : null;
       return model && extent && extent.radiusPx > 1.5 ? [{ point, model, extent }] : [];
     }).sort((a, b) => Number(b.point.key === selectedKey) - Number(a.point.key === selectedKey) || b.extent.radiusPx - a.extent.radiusPx);
-    const budget = moving || width < 600 ? 12_000 : 24_000;
+    // 0 is the reduced particle budget for a slow device or a narrow screen;
+    // 1 is full detail, which a capable device keeps while it moves.
+    const level = width < 600 ? 0 : Math.max(0, Math.min(1, (quality - .4) / .6));
+    const budget = 12_000 + 12_000 * level;
     for (const { point, model, extent } of candidates) {
       const canonical = canonicalDeepSkyKey(point.key);
       if (drawn.has(canonical)) { visibleKeys.add(point.key); continue; }
@@ -43,7 +46,7 @@ export class UniverseDeepSkyRenderer {
       const right = horizontal > 1e-12 ? { x: -normal.y / horizontal, y: normal.x / horizontal, z: 0 } : { x: 1, y: 0, z: 0 };
       const up = { x: -normal.z * right.y, y: normal.z * right.x, z: normal.x * right.y - normal.y * right.x };
       const center = { x: point.position.x - observer.x, y: point.position.y - observer.y, z: point.position.z - observer.z };
-      const detail = Math.min(1, Math.max(.15, extent.radiusPx / 110)) * (moving || width < 600 ? .6 : 1);
+      const detail = Math.min(1, Math.max(.15, extent.radiusPx / 110)) * (.6 + .4 * level);
       const stride = Math.max(1, Math.ceil(1 / detail));
       const weight = resolvedBodyWeight(extent.radiusPx);
       for (let i = 0; i < particles.length && screenPoints.length < budget; i++) {
@@ -65,7 +68,7 @@ export class UniverseDeepSkyRenderer {
     }
     // A count budget alone cannot control overdraw inside a nebula: one nearby
     // gas splat can cover most of the screen. Bound rasterized area as well.
-    const fillBudget = Math.min(width * height, 1_000_000) * (moving ? 6 : 10) / Math.max(1, dpr * dpr);
+    const fillBudget = Math.min(width * height, 1_000_000) * (6 + 4 * Math.max(0, Math.min(1, (quality - .4) / .6))) / Math.max(1, dpr * dpr);
     const gasArea = screenPoints.reduce((sum, p) => sum + (p.star ? 0 : p.size * p.size), 0);
     const starArea = screenPoints.reduce((sum, p) => sum + (p.star ? p.size * p.size : 0), 0);
     const fillStride = Math.max(1, Math.ceil(gasArea / Math.max(1, fillBudget - starArea)));

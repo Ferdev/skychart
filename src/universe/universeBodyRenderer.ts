@@ -51,15 +51,16 @@ export class UniverseBodyRenderer {
   }
 
   render(points: readonly PhysicalBody[], observer: Vector3, camera: SkyCamera,
-    width: number, height: number, dpr: number, moving = false): void {
+    width: number, height: number, dpr: number, quality = 1): void {
     const bodies = points.map((body) => ({ body, projected: projectPhysicalBody(body, observer, camera, width, height)
       ?? (body.key === "saturn" ? projectSphericalExtent(body.position, Number(body.radiusKm) / AU_KM * 2.32, observer, camera, width, height) : null) }))
       .filter((item): item is { body: PhysicalBody; projected: ProjectedBody } =>
         item.projected !== null && item.projected.radiusPx > 1.5)
       .sort((a, b) => b.projected.distanceAu - a.projected.distanceAu);
     // Bound fragment work when a surface fills the viewport. Navigation and
-    // angular extents stay in CSS pixels; stopping restores close-up detail.
-    const pixelBudget = moving ? 400_000 : bodies.some((item) => item.projected.inside) ? 600_000 : 2_000_000;
+    // angular extents stay in CSS pixels. In motion the budget shrinks only
+    // when the device has shown that it cannot hold the frame rate.
+    const pixelBudget = Math.max(300_000, (bodies.some((item) => item.projected.inside) ? 600_000 : 2_000_000) * quality * quality);
     dpr = Math.min(dpr, Math.sqrt(pixelBudget / Math.max(1, width * height)));
     const pixelWidth = Math.max(1, Math.floor(width * dpr));
     const pixelHeight = Math.max(1, Math.floor(height * dpr));

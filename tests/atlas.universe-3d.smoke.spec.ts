@@ -77,9 +77,12 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await expect(page.locator("#universe-view")).toBeVisible();
   await expect(page.locator("#universe-map")).toBeFocused();
   await expect(page.locator("#universe-status")).toHaveText("2 sampled catalog positions loaded");
+  await expect(page.locator("#universe-minimap")).toHaveAttribute("data-route", "none");
   await page.locator("#universe-map").click({ position: { x: 720, y: 500 } });
   await expect(page.locator("#universe-target")).toBeVisible();
   await expect(page.locator("#universe-target-name")).toHaveText("Fixture A");
+  // The trip map shows the route to a newly selected object at once.
+  await expect(page.locator("#universe-minimap")).toHaveAttribute("data-route", "direct");
   await expect(page.locator("#selected-object-panel")).toBeVisible();
   await expect(page.locator("#body-info [data-object-view=\"science\"]")).toHaveCount(1);
   await expect(page.locator("#universe-selection-connector")).toBeVisible();

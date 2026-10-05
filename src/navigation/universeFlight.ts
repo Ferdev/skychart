@@ -23,6 +23,8 @@ const AU_KM = 149_597_870.7;
 /** Autopilot closes this fraction of the remaining distance per second. */
 const APPROACH_RATE = 2;
 const AUTOPILOT_RAMP_SECONDS = 0.8;
+/** Seconds a direct autopilot leg would take at its steady cruise speed. */
+const AUTOPILOT_CRUISE_SECONDS = 4;
 const TURN_SECONDS = 0.25;
 const MIN_THROTTLE = 0.25;
 const MAX_THROTTLE = 4;
@@ -74,11 +76,16 @@ export function thrustScale(position: Vector3, landmarks: Iterable<{ position: V
 /** Distance an autopilot leg covers this frame: it ramps up from the current
  * speed, then sheds speed in proportion to the remaining distance so arrival is
  * a smooth stop instead of a constant-speed halt. */
-export function autopilotTravel(speed: number, remaining: number, floorSpeed: number, seconds: number, throttle = 1): number {
+export function autopilotTravel(speed: number, remaining: number, floorSpeed: number, seconds: number, throttle = 1,
+  legDistance = 0): number {
   if (remaining <= 0 || seconds <= 0) return 0;
   const rate = APPROACH_RATE * throttle;
-  const ramped = speed + (Math.max(remaining * rate, floorSpeed) - speed) * (1 - Math.exp(-seconds / AUTOPILOT_RAMP_SECONDS));
-  const closing = remaining * (1 - Math.exp(-rate * seconds));
+  // Cruise: most of a long leg is flown at a steady speed, so the progress is
+  // visible on the trip map instead of being over in the first instant.
+  const cruise = legDistance > 0 ? Math.max(legDistance * throttle / AUTOPILOT_CRUISE_SECONDS, floorSpeed) : Number.POSITIVE_INFINITY;
+  const desired = Math.min(Math.max(remaining * rate, floorSpeed), cruise);
+  const ramped = speed + (desired - speed) * (1 - Math.exp(-seconds / AUTOPILOT_RAMP_SECONDS));
+  const closing = Math.min(remaining * (1 - Math.exp(-rate * seconds)), cruise * seconds);
   return Math.min(remaining, Math.max(Math.min(ramped * seconds, closing), floorSpeed * seconds));
 }
 

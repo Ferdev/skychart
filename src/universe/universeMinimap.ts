@@ -4,9 +4,7 @@ import { formatDistanceAu } from "./universeFormat";
 
 export type MinimapLandmark = { key: string; name: string; position: Vector3; color?: string | null; object_type?: string | null };
 
-export type MinimapFrame = {
-  position: Vector3;
-  yawDeg: number;
+export type MinimapScene = {
   target: { key: string; name: string; position: Vector3 } | null;
   /** Planned gravity arc; without one the route is the straight line to the target. */
   route: readonly Vector3[] | null;
@@ -29,6 +27,7 @@ const GOLD = "#f8cb65";
 export class UniverseMinimap {
   private start: Vector3 = { x: 0, y: 0, z: 0 };
   private trail: { x: number; y: number }[] = [];
+  private scene: MinimapScene = { target: null, route: null, bodies: [], catalog: [], minimumSpanAu: 1 };
 
   constructor(private readonly canvas: HTMLCanvasElement) {}
 
@@ -38,7 +37,13 @@ export class UniverseMinimap {
     this.trail = [{ x: position.x, y: position.y }];
   }
 
-  draw(frame: MinimapFrame): void {
+  /** Replace the slowly changing content: destination, route and landmarks. */
+  setScene(scene: MinimapScene): void { this.scene = scene; }
+
+  /** Draw the scene with the craft at its current position; cheap enough to
+   * call on every flight frame so the craft moves smoothly along the route. */
+  draw(position: Vector3, yawDeg: number): void {
+    const frame = { ...this.scene, position, yawDeg };
     const width = this.canvas.clientWidth;
     const height = this.canvas.clientHeight;
     this.canvas.dataset.position = `${frame.position.x},${frame.position.y},${frame.position.z}`;

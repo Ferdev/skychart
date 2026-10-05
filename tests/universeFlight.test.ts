@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { autopilotTravel, MAX_SPEED_AU_S, thrustAxis, thrustScale, turnCameraToward, UniverseFlight } from "../src/navigation/universeFlight.ts";
+import { UniverseRenderQuality } from "../src/universe/universeRenderQuality.ts";
 
 const FRAME = 1 / 60;
 const run = (seconds: number, step: () => void) => { for (let t = 0; t < seconds - 1e-9; t += FRAME) step(); };
@@ -100,6 +101,36 @@ for (const [distance, standoff] of [[5, 0.0014], [632_000, 0.1], [1.6e11, 2e10],
   assert.ok(profile.slice(peakIndex).every((value, index, tail) => index === 0 || value <= tail[index - 1]! * 1.0001), "no speed-up after the peak");
 }
 
+// A long leg cruises at a steady speed for most of the distance, so the craft
+// moves visibly across the trip map, and it still decelerates into the standoff.
+for (const [distance, standoff] of [[5, 0.0014], [632_000, 0.1], [1.6e11, 2e10], [3e15, 1e9]] as const) {
+  const leg = distance - standoff;
+  let remaining = leg;
+  let speed = 0;
+  let seconds = 0;
+  let cruiseSeconds = 0;
+  let halfwayAt = 0;
+  const profile: number[] = [];
+  while (remaining > 0 && seconds < 60) {
+    const travel = autopilotTravel(speed, remaining, standoff * 0.03, FRAME, 1, leg);
+    speed = travel / FRAME;
+    remaining -= travel;
+    seconds += FRAME;
+    profile.push(speed);
+    assert.ok(speed <= Math.max(leg / 4, standoff * 0.03) * 1.0001, "cruise speed is never exceeded");
+    if (speed > leg / 4 * 0.98) cruiseSeconds += FRAME;
+    if (!halfwayAt && remaining <= leg / 2) halfwayAt = seconds;
+  }
+  assert.equal(remaining, 0, `cruising autopilot must arrive from ${distance} AU`);
+  assert.ok(seconds < 30, `cruising trip from ${distance} AU took ${seconds} s`);
+  if (leg / 4 > standoff) {
+    assert.ok(halfwayAt > 1.5 && halfwayAt < 4, `half of the leg takes seconds, not an instant: ${halfwayAt}`);
+    assert.ok(cruiseSeconds > 1, `steady cruise lasted ${cruiseSeconds} s`);
+    assert.ok(profile.at(-1)! < leg / 4 * 0.05, "the craft still decelerates into the standoff");
+  }
+}
+assert.ok(autopilotTravel(0, 1000, 1, FRAME, 4, 1000) > autopilotTravel(0, 1000, 1, FRAME, 1, 1000), "throttle raises the cruise speed");
+
 // The forward/back thrusters change the autopilot throttle within bounds.
 const tracking = new UniverseFlight();
 run(10, () => tracking.thrust(["forward"], 1, FRAME, { tracking: true }));
@@ -131,5 +162,27 @@ assert.equal(thrustScale({ x: 0, y: 0, z: 0 }, landmarks, 7), 0.5);
 assert.ok(Math.abs(thrustScale({ x: 3.6, y: 0, z: 0 }, landmarks, 7) - 0.1) < 1e-12);
 assert.ok(thrustScale({ x: 5, y: 0, z: 0 }, landmarks, 7) > 0, "inside a body the scale stays positive");
 assert.equal(thrustScale({ x: 0, y: 0, z: 0 }, [], 7), 7);
+
+// Render detail stays full in motion on a fast device, drops only after a run
+// of slow frames, recovers slowly, and is always full for a still scene.
+let clock = 0;
+const frames = (quality: UniverseRenderQuality, count: number, interval: number, animating = true) => {
+  let level = 1;
+  for (let index = 0; index < count; index += 1) level = quality.frame(clock += interval, animating);
+  return level;
+};
+const fastDevice = new UniverseRenderQuality();
+assert.equal(frames(fastDevice, 600, 16.7), 1);
+frames(fastDevice, 1, 300);
+assert.equal(frames(fastDevice, 5, 16.7), 1, "a single long frame does not lower the detail");
+const slowDevice = new UniverseRenderQuality();
+assert.ok(frames(slowDevice, 12, 60) < 0.7, "a run of slow frames lowers the detail");
+assert.ok(frames(slowDevice, 200, 120) >= 0.4, "the detail has a floor");
+assert.equal(frames(slowDevice, 1, 16.7, false), 1, "a still scene is always drawn at full detail");
+frames(slowDevice, 1, 16.7);
+const recovering = frames(slowDevice, 60, 16.7);
+assert.ok(recovering < 0.5, "the detail does not bounce back at once");
+assert.ok(frames(slowDevice, 1200, 16.7) > recovering, "sustained fast frames raise the detail again");
+assert.equal(frames(new UniverseRenderQuality(true), 2, 16.7), 0.4, "a software rasterizer starts low");
 
 console.log("universe flight tests passed");

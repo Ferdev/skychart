@@ -26,8 +26,10 @@ async function installRendererScene(page: Page) {
     const render = () => {
       const camera = cameraForDirection({ x: -100-observer.x, y: -observer.y, z: -observer.z }, 60);
       const occluders = bodyOccluders(scene, observer, camera, 800, 560);
-      bodies.render(scene, observer, camera, 800, 560, 1, moving);
-      clouds.render(scene, observer, camera, 800, 560, 1, occluders, moving, scene[0]?.key);
+      // The renderers take a detail level: 1 is full detail, 0.4 is the floor
+      // that a device reaches in motion only when it cannot hold the frame rate.
+      bodies.render(scene, observer, camera, 800, 560, 1, moving ? .4 : 1);
+      clouds.render(scene, observer, camera, 800, 560, 1, occluders, moving ? .4 : 1, scene[0]?.key);
     };
     draw = render;
     (window as any).realism = {

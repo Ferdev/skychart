@@ -27,13 +27,17 @@ catalog's heliocentric distance. Solid Solar System bodies and stars with a
 supplied physical radius are rendered
 as ray-intersected spheres at their geometric angular size. Nearby limbs and
 interior viewpoints therefore do not collapse to brightness-sized points.
-Guided galaxies, nebulae, and star clusters with a catalog size are drawn as
-object-local 3D particle volumes at their estimated enclosing radius. Spiral
+Galaxies, nebulae, and star clusters with a catalog morphology class and a
+catalog size are drawn as object-local 3D particle volumes at their estimated
+enclosing radius. This covers the Messier catalog and those NGC/IC records whose
+facts give both; the class selects the form (for example globular or open
+cluster, spiral or elliptical galaxy, diffuse or planetary nebula). Spiral
 arms, cluster distributions, remnant shells, and nebular clouds are
 illustrative reconstructions: orientation, internal depths, and individual
 particles are not measured. Active-galaxy highlights without a reported size
 use an explicitly labeled schematic 50,000-light-year radius, not a physical
-size measurement. Other deep-sky objects remain catalog symbols. Sunlight
+size measurement. Deep-sky records with no morphology class or no derived size,
+and pairs, groups, asterisms and double stars, remain catalog symbols. Sunlight
 determines the illuminated side of solid bodies. Credited NASA, JPL and Solar
 System Scope maps supply planetary detail; Earth has a separate static cloud
 layer and the Moon uses elevation-based shading. Unmapped surfaces, additional
@@ -70,7 +74,9 @@ sooner than the last, up to 10^16 AU per second; opposite input brakes, and
 release coasts to rest. None of this rescales or alters the underlying
 coordinates. With a selected object, autopilot accelerates and then sheds speed
 in proportion to the remaining distance, so it stops smoothly at a standoff
-distance; forward and back input changes its pace. With no selection it cruises
+distance. On a long leg the speed is first held at a steady cruise, a quarter of
+the leg per second, so the progress is visible on the trip map; forward and back
+input changes the pace. With no selection it cruises
 straight ahead at the base speed or the speed last set with the thrusters. These
 are navigation controls, not a physically constrained spaceflight simulation:
 speeds are unbounded by the speed of light. The speed gauge is a logarithmic

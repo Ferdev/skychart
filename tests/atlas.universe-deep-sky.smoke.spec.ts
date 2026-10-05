@@ -66,6 +66,25 @@ test("guided deep-sky highlights become navigable 3D volumes", async ({ page, co
   }, auKm);
   expect(coverage).toHaveLength(19);
   expect(coverage.every((item) => item.hasModel && item.depth > 0.1)).toBe(true);
+  // Forms are not limited to the guided highlights: any deep-sky object with a
+  // catalog morphology and a derived size gets one. M55 is a globular cluster.
+  const kinds = await page.evaluate(async (auKm) => {
+    const { deepSkyModel } = await import("/src/universe/universeDeepSkyModel.ts");
+    const kind = (key: string, object_type: string, radiusKm: number, deepSkyType?: string) =>
+      deepSkyModel({ key, object_type, position: { x: 1, y: 0, z: 0 }, radiusKm, deepSkyType })?.kind ?? null;
+    return {
+      m55: kind("m55", "star_cluster", auKm), m55Unsized: kind("m55", "star_cluster", 0),
+      m13: kind("m13", "star_cluster", auKm), m45: kind("m45", "star_cluster", auKm), m11: kind("m11", "star_cluster", auKm),
+      m104: kind("m104", "galaxy", auKm), m49: kind("m49", "galaxy", auKm), m27: kind("m27", "nebula", auKm),
+      m40: kind("m40", "asterism", auKm),
+      ngcGlobular: kind("ngc-104", "star_cluster", auKm, "GCl"), ngcUntyped: kind("ngc-104", "star_cluster", auKm),
+      ngcPair: kind("ngc-1", "galaxy", auKm, "GPair"), unsizedActive: kind("simbad-x", "active_galaxy", 0),
+    };
+  }, auKm);
+  expect(kinds).toEqual({
+    m55: "globular", m55Unsized: null, m13: "globular", m45: "open", m11: "open", m104: "spiral", m49: "elliptical", m27: "ring",
+    m40: null, ngcGlobular: "globular", ngcUntyped: null, ngcPair: null, unsizedActive: null,
+  });
   await page.screenshot({ path: testInfo.outputPath("guided-deep-sky.png") });
 
   const positionBefore = await page.locator("#universe-position").textContent();

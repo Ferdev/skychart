@@ -5,8 +5,9 @@ import { trackEvent } from "../analytics";
 import { universeEntryState, type UniverseMove } from "../navigation/universeNavigation";
 import { autopilotTravel, thrustScale, turnCameraToward, UniverseFlight } from "../navigation/universeFlight";
 import { gravityBodies, planTransfer, playbackTimeFraction, transferPosition, transferSpeed, TRANSFER_PLAYBACK_SECONDS, type TransferResult } from "../navigation/universeTransfer";
-import { drawOrientationGrid, drawReticle } from "./universeBackdrop";
+import { drawOrientationGrid, drawReticle, drawUniverseLabels, type RenderedHit, type RenderedLabel } from "./universeBackdrop";
 import { formatCoordinate, formatDistanceAu, formatDuration } from "./universeFormat";
+import { UniverseRenderQuality } from "./universeRenderQuality";
 import { UniverseSpeedGauge } from "./universeSpeedGauge";
 import { UniverseMinimap } from "./universeMinimap";
 import { bodyCanObserveSky } from "../sky/skyBody";
@@ -22,7 +23,7 @@ import {
 } from "../sky/skyProjection";
 import { normalizeUniverseViewState, type UniverseViewState } from "../viewState";
 import { UniversePointRenderer, type UniverseScreenPoint } from "./universePointRenderer";
-import { observerApparentMagnitude, rankUniverseLabels } from "./universePhotometry";
+import { observerApparentMagnitude } from "./universePhotometry";
 import { UniverseDestinationSearch } from "./universeDestinationSearch";
 import { AU_KM, hasRenderableRadius, projectPhysicalBody, projectSphericalExtent, safeUniverseEntryPosition } from "./universeBodyGeometry";
 import { bodyOccluders, occludedByBody, ringTransmission, type BodyOccluder } from "./universeOcclusion";
@@ -32,8 +33,6 @@ import { deepSkyModel } from "./universeDeepSkyModel";
 import { UniverseDeepSkyRenderer } from "./universeDeepSkyRenderer";
 import { bodyToUniversePoint, sampleDuringFlight, validCatalogPoint, type CatalogUniversePoint, type UniversePoint } from "./universePointModel";
 
-type RenderedHit = { point: UniversePoint; x: number; y: number; radius: number };
-type RenderedLabel = RenderedHit & { magnitude: number | null; distance: number };
 type Projector = ReturnType<typeof createSkyProjector>;
 
 type UniverseViewOptions = {
@@ -89,7 +88,6 @@ type UniverseIntegrationOptions = Pick<UniverseViewOptions,
 const DEFAULT_CAMERA: SkyCamera = { yawDeg: 180, pitchDeg: 0, fovDeg: 72 };
 const CATALOG_LIMIT = 12_000;
 const MAX_FLIGHT_POINTS = 1_500;
-const MAX_LABELS = 30;
 const MIN_MOVE_STEP_AU = 1e-12;
 const MAX_MOVE_STEP_AU = 1e18;
 
@@ -133,15 +131,18 @@ export class UniverseViewController {
   private pointerMovement: UniverseMove | null = null;
   private autopilot = false;
   private autopilotStandoffAu = 0;
+  private autopilotLegAu = 0;
   private gravityRoute = false;
   private transfer: Extract<TransferResult, { plan: unknown }>["plan"] | null = null;
   private transferPlayback = 0;
   private readonly minimap: UniverseMinimap;
   private readonly speedGauge: UniverseSpeedGauge;
+  private readonly quality: UniverseRenderQuality;
   private readonly selectionConnector: SkySelectionConnectorView;
 
   constructor(private readonly options: UniverseViewOptions) {
     this.pointRenderer = new UniversePointRenderer(options.pointsCanvas, () => this.requestRender());
+    this.quality = new UniverseRenderQuality(this.pointRenderer.software);
     this.bodyRenderer = new UniverseBodyRenderer(options.bodiesCanvas, () => this.requestRender());
     this.deepSkyRenderer = new UniverseDeepSkyRenderer(options.deepSkyCanvas, () => this.requestRender());
     this.minimap = new UniverseMinimap(options.minimapCanvas);
@@ -404,18 +405,19 @@ export class UniverseViewController {
       this.backdropKey = backdropKey;
     }
     const moving = this.flying;
+    const quality = this.quality.frame(renderStarted, moving);
     const baseKey = `${backdropKey}:${useWebgl ? moving ? "flight" : `${this.position.x},${this.position.y},${this.position.z}` : "fallback"}`;
     const redrawBase = moving || !useWebgl || this.baseRenderKey !== baseKey;
     if (redrawBase) context.drawImage(this.backdropCanvas!, 0, 0, width, height);
     const baseDone = performance.now();
     const framePoints = this.points();
     const occluders = bodyOccluders(framePoints, this.position, this.camera, width, height);
-    const modeled = this.deepSkyRenderer.render(framePoints, this.position, this.camera, width, height, dpr, occluders, moving, this.target?.key);
+    const modeled = this.deepSkyRenderer.render(framePoints, this.position, this.camera, width, height, dpr, occluders, quality, this.target?.key);
     const labels = this.drawPoints(context, framePoints, width, height, project, useWebgl, dpr, modeled, occluders);
-    this.bodyRenderer.render(framePoints, this.position, this.camera, width, height, dpr, moving);
+    this.bodyRenderer.render(framePoints, this.position, this.camera, width, height, dpr, quality);
     const pointsDone = performance.now();
     if (redrawBase) {
-      this.drawLabels(context, labels, width, height);
+      drawUniverseLabels(context, labels, this.renderedHits, this.position, this.target?.key, width, height);
       drawReticle(context, width, height);
       this.baseRenderKey = baseKey;
     }
@@ -491,36 +493,6 @@ export class UniverseViewController {
     return labels;
   }
 
-  private drawLabels(context: CanvasRenderingContext2D, candidates: RenderedLabel[], width: number, height: number): void {
-    const selectedKey = this.target?.key;
-    const labels = rankUniverseLabels(candidates, this.position, selectedKey);
-    const occupied: Array<{ left: number; top: number; right: number; bottom: number }> = [];
-    context.save();
-    context.font = "600 12px system-ui, sans-serif";
-    for (const hit of labels) {
-      if (occupied.length >= MAX_LABELS) break;
-      const label = hit.magnitude === null ? hit.point.name : `${hit.point.name} · ${hit.magnitude.toFixed(1)}`;
-      const labelWidth = context.measureText(label).width + 12;
-      const rect = { left: hit.x + 8, top: hit.y - 10, right: hit.x + 8 + labelWidth, bottom: hit.y + 10 };
-      if (rect.left < 8 || rect.right > width - 8 || rect.top < 72 || rect.bottom > height - 60) continue;
-      if (occupied.some((item) => overlaps(item, rect))) continue;
-      occupied.push(rect);
-      context.fillStyle = "rgba(3, 7, 8, 0.72)";
-      context.fillRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-      context.fillStyle = "rgba(238, 242, 234, 0.84)";
-      context.fillText(label, hit.x + 14, hit.y + 4);
-    }
-    const selected = this.renderedHits.find((hit) => hit.point.key === selectedKey);
-    if (selected) {
-      context.beginPath();
-      context.arc(selected.x, selected.y, Math.max(11, selected.radius + 3), 0, Math.PI * 2);
-      context.strokeStyle = "#f8cb65";
-      context.lineWidth = 1.5;
-      context.stroke();
-    }
-    context.restore();
-  }
-
   private get flying(): boolean { return this.heldMoves.size > 0 || this.autopilot || this.flight.moving; }
 
   /** Thruster reference speed; never below what the position can resolve. */
@@ -570,7 +542,6 @@ export class UniverseViewController {
     this.options.autopilotButton.setAttribute("aria-pressed", String(this.autopilot));
     this.options.autopilotButton.textContent = this.options.translate(this.autopilot ? "universe3d.autopilotStop" : "universe3d.autopilotStart");
     this.updateTarget();
-    this.updateRoute();
   }
 
   /** Plan the gravity route, if enabled, from here to the selected object. */
@@ -592,11 +563,13 @@ export class UniverseViewController {
       : "plan" in result ? this.options.translate("universe3d.routeGravity", { center: result.plan.center.name, duration: formatDuration(result.plan.durationSeconds) })
       : this.options.translate(result.unavailable === "range" ? "universe3d.routeRange" : "universe3d.routeRadial");
     const bodies = [...this.options.bodyByKey().values()].flatMap((body) => bodyToUniversePoint(body) ?? []);
-    this.minimap.draw({ position: this.position, yawDeg: this.camera.yawDeg, target: this.target, bodies,
-      route: result && "plan" in result ? result.plan.points : null, catalog: this.flightCatalogPoints, minimumSpanAu: this.moveStepAu * 4 });
+    this.minimap.setScene({ target: this.target, bodies, route: result && "plan" in result ? result.plan.points : null,
+      catalog: this.flightCatalogPoints, minimumSpanAu: this.moveStepAu * 4 });
+    this.minimap.draw(this.position, this.camera.yawDeg);
   }
 
   private updateTarget(): void {
+    this.updateRoute();
     const target = this.target;
     this.options.targetPanel.hidden = !target;
     if (!target) { this.options.selectionSummary.textContent = ""; return; }
@@ -688,6 +661,7 @@ export class UniverseViewController {
       this.transfer = null;
     } else {
       this.flight.throttle = 1;
+      this.autopilotLegAu = 0;
       this.autopilotStandoffAu = this.autopilotStandoff();
       const route = this.planRoute();
       this.transfer = route && "plan" in route ? route.plan : null;
@@ -773,6 +747,7 @@ export class UniverseViewController {
       this.speedAu = tracking && this.transfer ? transferSpeed(this.transfer, this.position)
         : Math.hypot(this.position.x - from.x, this.position.y - from.y, this.position.z - from.z) / seconds;
       this.requestRender();
+      this.minimap.draw(this.position, this.camera.yawDeg);
       if (!this.flying) { this.endFlight(); return; }
       if (now - this.lastFlightUiAt >= 100) {
         this.lastFlightUiAt = now;
@@ -825,7 +800,9 @@ export class UniverseViewController {
       target.position.z - this.position.z) - this.autopilotStandoffAu;
     const precision = positionPrecisionStep(this.position);
     if (direction && remaining > precision) {
-      const travel = autopilotTravel(speed, remaining, Math.max(this.autopilotStandoffAu * 0.03, precision * 60), seconds, this.flight.throttle);
+      this.autopilotLegAu ||= remaining;
+      const travel = autopilotTravel(speed, remaining, Math.max(this.autopilotStandoffAu * 0.03, precision * 60), seconds,
+        this.flight.throttle, this.autopilotLegAu);
       this.camera = turnCameraToward(this.camera, direction, seconds);
       this.position = { x: this.position.x + direction.x * travel, y: this.position.y + direction.y * travel, z: this.position.z + direction.z * travel };
       if (travel < remaining) return;
@@ -934,7 +911,7 @@ export class UniverseViewController {
     if (!hit) return;
     this.target = hit.point;
     this.targetKey = hit.point.key;
-    this.autopilotStandoffAu = this.autopilotStandoff(); this.transfer = null;
+    this.autopilotStandoffAu = this.autopilotStandoff(); this.transfer = null; this.autopilotLegAu = 0;
     this.baseRenderKey = "";
     this.requestRender();
     this.updateTarget();
@@ -1044,10 +1021,6 @@ function nearestHit(hits: RenderedHit[], point: { x: number; y: number }): Rende
     if (nextDistance <= hit.radius && nextDistance < distance) { nearest = hit; distance = nextDistance; }
   }
   return nearest;
-}
-
-function overlaps(a: { left: number; top: number; right: number; bottom: number }, b: { left: number; top: number; right: number; bottom: number }): boolean {
-  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
 function clamp(value: number, min: number, max: number): number {
