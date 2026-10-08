@@ -15,6 +15,31 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
   @hipparcos_epoch 1991.25
   @default_stellar_position_epoch 2026.0
 
+  # The host star keeps a short planet list so that viewport responses stay
+  # small. The full orbit data lives on the planet row only.
+  @exoplanet_summary_fields ~w(
+    key name radius_earth mass_earth period_days semi_major_axis_au discovery_method discovery_year
+  )
+  @exoplanet_measurement_fields ~w(
+    period_days semi_major_axis_au eccentricity inclination_deg argument_of_periastron_deg
+    ephemeris_period_days ephemeris_reference_time_jd
+  )
+  @exoplanet_fact_fields ~w(
+    host_key host_name radius_earth mass_earth discovery_method discovery_year
+    system_star_count system_planet_count system_moon_count why_interesting
+    equilibrium_temperature_k insolation_earth mass_provenance minimum_mass mass_calculated
+    radius_calculated semi_major_axis_calculated detected_by_transit detected_by_radial_velocity
+    detected_by_imaging detected_by_microlensing transit_timing_variations circumbinary
+    controversial references orbit_display_state ephemeris_reference_type ephemeris_time_system
+    ephemeris_source_table ephemeris_mixed_references ephemeris_argument_of_periastron_deg
+    ephemeris_reference_label ephemeris_reference_url
+  ) ++
+                           Enum.flat_map(
+                             @exoplanet_measurement_fields,
+                             &[&1, "#{&1}_err_plus", "#{&1}_err_minus", "#{&1}_limit"]
+                           )
+  @exoplanet_orbit_display_states ~w(position orbit_only)
+
   def map(type, entry) do
     map(type, entry, entry_source_meta(type, entry))
   end
@@ -43,7 +68,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
           "system_moon_count",
           "why_interesting"
         ])
-        |> Map.put("planets", planets),
+        |> Map.put("planets", Enum.map(planets, &exoplanet_summary/1)),
       search_values: [
         entry["spectral_type"],
         entry["why_interesting"]
@@ -53,32 +78,20 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
   end
 
   def map(:exoplanet, entry, source_meta) do
+    # The stored coordinates stay equal to the host coordinates. The browser
+    # adds the orbit offset for the atlas time from the facts below.
     position = projected_position(entry)
 
     base_row(entry, source_meta, position, %{
       object_type: "planet",
       catalog_group: "exoplanets",
       source_type: "exoplanet_archive_planet",
-      position_model: "exoplanet_archive_host_coordinates",
+      position_model: exoplanet_position_model(entry),
       parent_key: entry["parent_key"],
       radius_km: earth_radius_to_km(entry["radius_earth"]),
       aliases: list(entry["aliases"]),
       external_ids: reject_nil_values(%{"nasa_exoplanet_archive_name" => entry["name"]}),
-      facts:
-        take(entry, [
-          "host_key",
-          "host_name",
-          "radius_earth",
-          "mass_earth",
-          "period_days",
-          "semi_major_axis_au",
-          "discovery_method",
-          "discovery_year",
-          "system_star_count",
-          "system_planet_count",
-          "system_moon_count",
-          "why_interesting"
-        ]),
+      facts: take(entry, @exoplanet_fact_fields),
       search_values: [
         entry["host_name"],
         entry["discovery_method"],
@@ -763,6 +776,20 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
     end)
     |> Enum.reject(fn planet -> planet["name"] == "" end)
   end
+
+  defp exoplanet_summary(planet) when is_map(planet) do
+    planet
+    |> Map.put_new_lazy("key", fn -> "exoplanet-#{slug_key(planet["name"])}" end)
+    |> take(@exoplanet_summary_fields)
+  end
+
+  defp exoplanet_summary(planet), do: planet
+
+  defp exoplanet_position_model(%{"orbit_display_state" => state})
+       when state in @exoplanet_orbit_display_states,
+       do: "exoplanet_archive_host_relative_orbit"
+
+  defp exoplanet_position_model(_entry), do: "exoplanet_archive_host_coordinates"
 
   defp slug_key(value) do
     value

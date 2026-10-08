@@ -4,6 +4,8 @@ import type { CatalogPointStream } from "../catalog/catalogPointStream";
 import type { WebglPointRenderer, PointLayerSource, PointRenderStats } from "../webglPointRenderer";
 import type { Body, Camera } from "../atlas/contracts";
 import type { Rect } from "../geometry";
+import { isPositionedExoplanet } from "../catalog/exoplanetOrbit";
+import { packRichPoints, RICH_POINT_STRIDE_FLOATS, richLayerOrigin, type PointLayerOrigin } from "./richPointLayer";
 
 export interface CatalogLayerMetrics {
   webglMs: number;
@@ -47,6 +49,7 @@ const EMPTY_POINT_STATS: PointRenderStats = {
 
 export class CatalogLayerRenderer {
   private bodyLayerCache: PointLayerSource | null = null;
+  private bodyLayerOrigin: PointLayerOrigin | null = null;
   private readonly colorCache = new Map<string, [number, number, number]>();
   private lastPointMeasureAt = -Infinity;
   private metricsState: CatalogLayerMetrics = {
@@ -124,10 +127,12 @@ export class CatalogLayerRenderer {
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     let visible = 0;
+    const originX = source.origin?.x ?? 0;
+    const originY = source.origin?.y ?? 0;
     for (let index = 0; index < source.count; index += 1) {
-      const offset = index * 6;
-      const x = centerX + ((source.vertices[offset] ?? 0) - camera.xAu) * camera.pxPerAu;
-      const y = centerY - ((source.vertices[offset + 1] ?? 0) - camera.yAu) * camera.pxPerAu;
+      const offset = index * RICH_POINT_STRIDE_FLOATS;
+      const x = centerX + (originX + (source.vertices[offset] ?? 0) - camera.xAu) * camera.pxPerAu;
+      const y = centerY - (originY + (source.vertices[offset + 1] ?? 0) - camera.yAu) * camera.pxPerAu;
       if (x >= clip.left && x < clip.right && y >= clip.top && y < clip.bottom) visible += 1;
     }
     return visible;
@@ -138,24 +143,29 @@ export class CatalogLayerRenderer {
     const selected = this.options.selectedBody();
     const bodies = this.options.visibleBodies().filter((body) => {
       const selectedOrHover = body.key === selected?.key || body.key === this.options.hoverKey();
-      return body.object_type !== "spacecraft" && !selectedOrHover && (!catalogLayerReady || !this.options.isDuplicateBody(body));
+      // The Canvas overlay draws spacecraft and exoplanets with their own marker shapes.
+      return body.object_type !== "spacecraft" && !isPositionedExoplanet(body) && !selectedOrHover
+        && (!catalogLayerReady || !this.options.isDuplicateBody(body));
     });
     if (bodies.length === 0) return null;
-    const signature = `bodies:${this.options.ephemerisTimestamp()}:${this.options.selectedKey()}:${this.options.hoverKey()}:${bodies.map((body) => body.key).join("|")}`;
+    const camera = this.options.camera();
+    const origin = richLayerOrigin(this.bodyLayerOrigin, camera, this.options.viewportRect().width / camera.pxPerAu);
+    this.bodyLayerOrigin = origin;
+    const signature = `bodies:${this.options.ephemerisTimestamp()}:${this.options.selectedKey()}:${this.options.hoverKey()}:${origin.x},${origin.y}:${bodies.map((body) => body.key).join("|")}`;
     if (this.bodyLayerCache?.signature === signature) return this.bodyLayerCache;
 
-    const vertices = new Float32Array(bodies.length * 6);
-    bodies.forEach((body, index) => {
+    const vertices = packRichPoints(bodies.map((body) => {
       const [red, green, blue] = this.rgb(body.color ?? null);
-      const offset = index * 6;
-      vertices[offset] = body.position.x_au;
-      vertices[offset + 1] = body.position.y_au;
-      vertices[offset + 2] = red / 255;
-      vertices[offset + 3] = green / 255;
-      vertices[offset + 4] = blue / 255;
-      vertices[offset + 5] = this.options.bodyRadiusAu(body);
-    });
-    this.bodyLayerCache = { kind: "rich", signature, vertices, count: bodies.length };
+      return {
+        xAu: body.position.x_au,
+        yAu: body.position.y_au,
+        red: red / 255,
+        green: green / 255,
+        blue: blue / 255,
+        radiusAu: this.options.bodyRadiusAu(body),
+      };
+    }), origin);
+    this.bodyLayerCache = { kind: "rich", signature, vertices, count: bodies.length, origin };
     return this.bodyLayerCache;
   }
 

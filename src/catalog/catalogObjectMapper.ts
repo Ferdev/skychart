@@ -7,6 +7,7 @@ import type {
   ExternalLink,
 } from "../atlas/contracts";
 import { smallBodyPositionAt } from "./smallBodyPropagation";
+import { positionExoplanet } from "./exoplanetOrbit";
 
 export type CatalogMappingContext = {
   auKm: number;
@@ -62,7 +63,7 @@ export class CatalogObjectMapper {
       ? context.normalizeExternalLinks(object.external_links ?? [])
       : [...(object.external_links ?? [])];
 
-    return {
+    const body: Body = {
       key: object.key,
       name: object.name,
       radius_km: finiteNumber(object.radius_km, 0),
@@ -156,6 +157,9 @@ export class CatalogObjectMapper {
       },
       distance_from_earth_km: distanceFromEarthKm,
     };
+    // The catalog stores an exoplanet at its host star. The orbit offset for
+    // the atlas time is added here, as the small-body position is above.
+    return positionExoplanet(body, context.timestamp ?? new Date().toISOString(), context.auKm, context.earth);
   }
 }
 
@@ -170,6 +174,7 @@ function isExoplanetObject(object: CatalogObjectPayload): boolean {
 function catalogObjectToExoplanet(object: CatalogObjectPayload): BodyExoplanet {
   const facts = object.facts ?? {};
   return {
+    key: object.key,
     name: object.name,
     radius_earth: finiteOptionalNumber(facts.radius_earth),
     mass_earth: finiteOptionalNumber(facts.mass_earth),

@@ -634,6 +634,45 @@
   background: rgba(255, 250, 240, 0.78);
 }
 
+.planet-list .planet-list-action {
+  padding: 0;
+}
+
+.planet-list button {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planet-list button:hover,
+.planet-list button:focus-visible {
+  background: rgba(233, 166, 63, 0.16);
+}
+
+.planetary-system-action {
+  margin: 0;
+}
+
+.exoplanet-notes {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: rgba(21, 23, 20, 0.72);
+  font-size: 0.84rem;
+}
+
+.exoplanet-orbit h3:not(:first-child) {
+  margin-top: 12px;
+}
+
 .planet-list strong,
 .planet-list span {
   min-width: 0;

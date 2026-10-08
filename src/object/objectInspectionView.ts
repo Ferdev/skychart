@@ -16,9 +16,9 @@ import {
   uniqueTextValues,
 } from "../atlasFormatting";
 import { AU_PER_LIGHT_YEAR } from "../galacticModel";
+import { renderExoplanetList, renderExoplanetOrbitSection, renderPlanetarySystemAction } from "./exoplanetInspection";
 import type {
   Body,
-  BodyExoplanet,
   Ephemeris,
   ExternalLink,
   ObjectDetailHydrationState,
@@ -231,7 +231,8 @@ update() {
   const scienceContent = [
     this.renderUniverseSciencePanel(body),
     this.renderDataSection(t("section.stellarFacts"), stellarRows),
-    this.renderDataSection(t("section.confirmedExoplanets"), exoplanetRows, this.renderExoplanetList(body.exoplanet_system?.planets ?? [])),
+    renderExoplanetOrbitSection(body),
+    this.renderDataSection(t("section.confirmedExoplanets"), exoplanetRows, renderExoplanetList(body.exoplanet_system?.planets ?? [], body.key)),
     this.renderDataSection(t("section.deepSkyFacts"), deepSkyRows),
     this.renderDataSection(t("section.smallBodyFacts"), smallBodyRows),
     this.renderObjectNotes(body),
@@ -276,7 +277,7 @@ update() {
       <div class="object-orientation">
         ${this.renderObjectDetailState(body)}
         ${this.renderObjectSummaryCard(body, classification.label)}
-        ${this.renderFactTiles(primaryStats)}
+        ${this.renderFactTiles(primaryStats)}${renderPlanetarySystemAction(body)}
         ${body.spacecraft ? `<p>${escapeHtml(t("mission.trajectory"))}</p>` : ""}
         ${body.key === "spacecraft-31" ? `<p><a href="https://science.nasa.gov/mission/voyager/voyager-1/voyager-1-what-is-a-light-day/" target="_blank" rel="noopener noreferrer">${escapeHtml(t("mission.milestone"))}</a></p>` : ""}
       </div>
@@ -1001,28 +1002,6 @@ private sameCatalogNeighbors(body: Body) {
   return (this.context.ephemeris()?.bodies ?? [])
     .filter((candidate) => candidate.key !== body.key && (candidate.catalog_group ?? candidate.catalog?.catalog_group) === catalogGroup)
     .sort((a, b) => this.context.bodyDistanceKm(body, a) - this.context.bodyDistanceKm(body, b));
-}
-
-private renderExoplanetList(planets: BodyExoplanet[]) {
-  if (planets.length === 0) return "";
-  const visiblePlanets = planets.slice(0, 8);
-  const hiddenCount = Math.max(0, planets.length - visiblePlanets.length);
-  return `
-    <ol class="planet-list">
-      ${visiblePlanets
-        .map((planet) => {
-          const facts = [
-            planet.semi_major_axis_au ? `${formatNumber(planet.semi_major_axis_au)} AU` : null,
-            planet.period_days ? `${formatNumber(planet.period_days)} d` : null,
-            planet.radius_earth ? `${formatNumber(planet.radius_earth)} Earth radii` : null,
-            planet.discovery_year ? String(planet.discovery_year) : null
-          ].filter(isPresent);
-          return `<li><strong>${escapeHtml(planet.name)}</strong><span>${escapeHtml(facts.join(" · ") || t("object.planetParametersIncomplete"))}</span></li>`;
-        })
-        .join("")}
-    </ol>
-    ${hiddenCount ? `<p class="object-note">${escapeHtml(t("object.moreConfirmedPlanets", { count: hiddenCount, planetWord: t(hiddenCount === 1 ? "object.planetSingular" : "object.planetPlural") }))}</p>` : ""}
-  `;
 }
 
 private renderFactTiles(rows: (string | number | null | undefined)[][]) {

@@ -36,6 +36,8 @@ The important plan difference is stable across all four groups:
 - Before: `Incremental Sort -> Merge Append -> Index Scan` on each branch's magnitude-only index.
   Unrelated branches were filtered after scanning; for example, the JPL plan removed all 33,170
   Gaia rows, 13,418 deep-sky rows, 10,939 exoplanet rows, and 9,838 SIMBAD rows.
+  (The exoplanet count is from the snapshot of 2026-05-07. The snapshot of 2026-10-08 has
+  11,099 rows: 4,752 host systems and 6,347 planets.)
 - After: `Limit -> Merge Append -> Index Only Scan` on every
   `*_related_objects_idx`, with `catalog_group` as the `Index Cond`, no explicit sort, and zero heap
   fetches in the measured plans. Only six rows were read from the matching branch.

@@ -94,6 +94,7 @@ export type BodyStellar = {
 };
 
 export type BodyExoplanet = {
+  key?: string | null;
   name: string;
   radius_earth?: number | null;
   mass_earth?: number | null;
@@ -111,6 +112,22 @@ export type BodyExoplanetSystem = {
   confirmed_planet_count?: number | null;
   planets?: BodyExoplanet[];
   why_interesting?: string | null;
+};
+
+/** A display convention that stands in for a value the archive does not give. */
+export type ExoplanetOrbitConvention = "node_angle" | "edge_on_inclination" | "circular_orbit";
+
+/** Host-relative orbit of one exoplanet at the atlas time. See `catalog/exoplanetOrbit.ts`. */
+export type BodyExoplanetOrbit = {
+  /** Catalog position of the host star. The planet position is this plus the orbit offset. */
+  host_position: { x_au: number; y_au: number; z_au: number };
+  display_state: "position" | "orbit_only" | "none";
+  display_reason: "calculated" | "no_timing" | "phase_uncertainty" | "no_orbit_size";
+  marker: "solid" | "hollow" | "none";
+  semi_major_axis_au: number | null;
+  mean_anomaly_rad: number | null;
+  phase_uncertainty_orbits: number | null;
+  conventions: readonly ExoplanetOrbitConvention[];
 };
 
 export type BodyDeepSky = {
@@ -151,6 +168,7 @@ export type Body = DestinationBody & {
   orbit?: BodyOrbit | null;
   stellar?: BodyStellar | null;
   exoplanet_system?: BodyExoplanetSystem | null;
+  exoplanet_orbit?: BodyExoplanetOrbit | null;
   deep_sky?: BodyDeepSky | null;
   small_body?: BodySmallBody | null;
 };

@@ -79,6 +79,7 @@ defmodule StarsmapApi.Catalog.ImporterTest do
 
     assert attrs.facts["planets"] == [
              %{
+               "key" => "exoplanet-11-com-b",
                "name" => "11 Com b",
                "discovery_method" => "Radial Velocity",
                "period_days" => 323.21
@@ -88,6 +89,138 @@ defmodule StarsmapApi.Catalog.ImporterTest do
     assert attrs.search_text =~ "11 com b"
     assert attrs.search_text =~ "radial velocity"
     assert attrs.search_text =~ "g8 iii"
+  end
+
+  test "keeps the host planet list short and puts the orbit facts on the planet row" do
+    system = %{
+      "key" => "exosys-trappist-1",
+      "name" => "TRAPPIST-1",
+      "ra_deg" => 346.6263919,
+      "dec_deg" => -5.0434618,
+      "distance_pc" => 12.42988881,
+      "system_planet_count" => 7,
+      "planets" => [
+        %{
+          "key" => "exoplanet-trappist-1-e",
+          "name" => "TRAPPIST-1 e",
+          "radius_earth" => 0.92,
+          "mass_earth" => 0.692,
+          "mass_provenance" => "Mass",
+          "period_days" => 6.101013,
+          "period_days_err_plus" => 3.5e-5,
+          "period_days_err_minus" => 3.5e-5,
+          "semi_major_axis_au" => 0.02925,
+          "semi_major_axis_au_err_plus" => 0.0025,
+          "eccentricity" => 0.0051,
+          "inclination_deg" => 89.793,
+          "argument_of_periastron_deg" => 108.37,
+          "discovery_method" => "Transit",
+          "discovery_year" => 2017,
+          "detected_by_transit" => true,
+          "transit_timing_variations" => true,
+          "orbit_display_state" => "position",
+          "ephemeris_reference_type" => "conjunction",
+          "ephemeris_reference_time_jd" => 2_457_660.3676621,
+          "ephemeris_reference_time_jd_err_plus" => 1.43e-5,
+          "ephemeris_period_days" => 6.09956479,
+          "ephemeris_period_days_err_plus" => 1.78e-6,
+          "ephemeris_time_system" => "BJD-TDB",
+          "ephemeris_source_table" => "ps",
+          "ephemeris_reference_label" => "Ducrot et al. 2020",
+          "references" => [
+            %{
+              "label" => "Agol et al. 2021",
+              "url" => "https://ui.adsabs.harvard.edu/abs/2021PSJ.....2....1A/abstract",
+              "quantities" => ["period", "semi_major_axis", "radius", "mass"]
+            }
+          ]
+        },
+        %{
+          "key" => "exoplanet-trappist-1-ring",
+          "name" => "TRAPPIST-1 ring",
+          "semi_major_axis_au" => 0.5,
+          "orbit_display_state" => "orbit_only"
+        }
+      ]
+    }
+
+    host = Importer.attrs_for_entry!({:exoplanet_system, system})
+
+    assert host.position_model == "exoplanet_archive_coordinates"
+
+    assert host.facts["planets"] == [
+             %{
+               "key" => "exoplanet-trappist-1-e",
+               "name" => "TRAPPIST-1 e",
+               "radius_earth" => 0.92,
+               "mass_earth" => 0.692,
+               "period_days" => 6.101013,
+               "semi_major_axis_au" => 0.02925,
+               "discovery_method" => "Transit",
+               "discovery_year" => 2017
+             },
+             %{
+               "key" => "exoplanet-trappist-1-ring",
+               "name" => "TRAPPIST-1 ring",
+               "semi_major_axis_au" => 0.5
+             }
+           ]
+
+    [planet, ring] =
+      system
+      |> StarsmapApi.Catalog.Importer.RowMapper.exoplanet_planet_entries()
+      |> Enum.map(&Importer.attrs_for_entry!({:exoplanet, &1}))
+
+    assert planet.key == "exoplanet-trappist-1-e"
+    assert planet.parent_key == "exosys-trappist-1"
+    assert planet.position_model == "exoplanet_archive_host_relative_orbit"
+    # The stored coordinates stay on the host star; the browser adds the offset.
+    assert {planet.x_au, planet.y_au, planet.z_au} == {host.x_au, host.y_au, host.z_au}
+    assert planet.facts["orbit_display_state"] == "position"
+    assert planet.facts["ephemeris_reference_type"] == "conjunction"
+    assert planet.facts["ephemeris_reference_time_jd"] == 2_457_660.3676621
+    assert planet.facts["ephemeris_reference_time_jd_err_plus"] == 1.43e-5
+    assert planet.facts["ephemeris_period_days"] == 6.09956479
+    assert planet.facts["ephemeris_time_system"] == "BJD-TDB"
+    assert planet.facts["period_days_err_minus"] == 3.5e-5
+    assert planet.facts["semi_major_axis_au_err_plus"] == 0.0025
+    assert planet.facts["eccentricity"] == 0.0051
+    assert planet.facts["inclination_deg"] == 89.793
+    assert planet.facts["argument_of_periastron_deg"] == 108.37
+    assert planet.facts["transit_timing_variations"] == true
+    assert planet.facts["mass_provenance"] == "Mass"
+    assert [%{"label" => "Agol et al. 2021"}] = planet.facts["references"]
+    refute Map.has_key?(planet.facts, "minimum_mass")
+    refute Map.has_key?(planet.facts, "eccentricity_limit")
+
+    assert ring.position_model == "exoplanet_archive_host_relative_orbit"
+    assert ring.facts["orbit_display_state"] == "orbit_only"
+    refute Map.has_key?(ring.facts, "ephemeris_reference_type")
+  end
+
+  test "keeps the host-coordinates model for a planet with no orbit data" do
+    system = %{
+      "key" => "exosys-lensed",
+      "name" => "Lensed",
+      "ra_deg" => 10.0,
+      "dec_deg" => -5.0,
+      "distance_pc" => 2500.0,
+      "planets" => [
+        %{"name" => "Lensed b", "mass_earth" => 300.0, "orbit_display_state" => "none"},
+        %{"name" => "Lensed c"}
+      ]
+    }
+
+    rows =
+      system
+      |> StarsmapApi.Catalog.Importer.RowMapper.exoplanet_planet_entries()
+      |> Enum.map(&Importer.attrs_for_entry!({:exoplanet, &1}))
+
+    assert Enum.map(rows, & &1.key) == ["exoplanet-lensed-b", "exoplanet-lensed-c"]
+    assert Enum.all?(rows, &(&1.position_model == "exoplanet_archive_host_coordinates"))
+    assert Enum.all?(rows, &is_float(&1.x_au))
+    refute Map.has_key?(hd(rows).facts, "semi_major_axis_au")
+    assert hd(rows).facts["orbit_display_state"] == "none"
   end
 
   test "maps JPL small-body entries from cartesian positions" do

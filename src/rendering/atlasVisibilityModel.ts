@@ -3,6 +3,7 @@ import type { Body, BodyHitEntry, Camera, CatalogPointHitEntry, Ephemeris } from
 import type { CatalogPointPlanner } from "../catalog/catalogPointPlanner";
 import type { CatalogPointStream } from "../catalog/catalogPointStream";
 import { catalogPointVertexStrideFloats } from "../catalog/catalogPointSelector";
+import { exoplanetOrbitReachAu, isExoplanetOrbitResolved, isPositionedExoplanet, isRingOnlyExoplanet } from "../catalog/exoplanetOrbit";
 import { classifyBody } from "../destinationPicker";
 import { expandedRect, pointInRect, type Rect, type ScreenPoint } from "../geometry";
 
@@ -33,6 +34,16 @@ const BODY_GRID_CELL_PX = 56;
 const POINT_GRID_CELL_PX = 4;
 const POINT_HIT_RADIUS_PX = 6;
 const MAP_POINT_RADIUS_PX = 1.3;
+const EXOPLANET_GROUP = "exoplanets";
+// A planet is much smaller than its orbit, so its marker has a readable minimum size.
+const EXOPLANET_MARKER_RADIUS_PX = 3;
+const EXOPLANET_HOST_GROUP = "exoplanet_systems";
+const CURATED_HOST_GROUP = "nearby_exoplanet_systems";
+// A curated nearby host and its archive record come from the same archive
+// coordinates. Measured on 2026-10-08, the 16 pairs are 0.0 AU apart.
+const HOST_TWIN_TOLERANCE_AU = 0.01;
+// Stands for each exoplanet host star when the model asks if the active filter shows the hosts.
+const EXOPLANET_HOST_PROBE = { key: "", name: "", radius_km: 0, object_type: "star", catalog_group: EXOPLANET_HOST_GROUP } as Body;
 
 /** Owns scale-aware body visibility, label priority, and body/catalog spatial indexes. */
 export class AtlasVisibilityModel {
@@ -41,11 +52,15 @@ export class AtlasVisibilityModel {
   private pointGrid = new Map<string, CatalogPointHitEntry>();
   private bodyGridValid = false;
   private pointGridValid = false;
+  private curatedHostCache: Body[] | null = null;
+  private resolvedExoplanetCache: Body[] | null = null;
 
   constructor(private readonly options: AtlasVisibilityModelOptions) {}
 
   invalidate() {
     this.visibleCache = null;
+    this.curatedHostCache = null;
+    this.resolvedExoplanetCache = null;
     this.bodyGridValid = false;
     this.pointGridValid = false;
   }
@@ -131,7 +146,8 @@ export class AtlasVisibilityModel {
   }
 
   bodyDisplayRadiusPx(body: Body) {
-    return Math.max(body.object_type === "spacecraft" ? 3.5 : MAP_POINT_RADIUS_PX, this.bodyRadiusAu(body) * this.options.frame().camera.pxPerAu);
+    const minimumPx = body.object_type === "spacecraft" ? 3.5 : isPositionedExoplanet(body) ? EXOPLANET_MARKER_RADIUS_PX : MAP_POINT_RADIUS_PX;
+    return Math.max(minimumPx, this.bodyRadiusAu(body) * this.options.frame().camera.pxPerAu);
   }
 
   bodyRadiusAu(body: Body) {
@@ -139,7 +155,35 @@ export class AtlasVisibilityModel {
   }
 
   isPointLayerDuplicateBody(body: Body) {
-    return Boolean(body.catalog_group && this.options.planner.ownsCatalogGroup(body.catalog_group));
+    // A tile point for an exoplanet is at the host star. The body with the
+    // orbit offset must draw, so no tile layer owns it.
+    if (isPositionedExoplanet(body)) return false;
+    return Boolean(body.catalog_group && this.options.planner.ownsCatalogGroup(body.catalog_group, this.options.frame().camera.pxPerAu));
+  }
+
+  /** False for a planet that has a ring and no marker: nothing on the map marks a position for it. */
+  hasMapMarker(body: Body | null) {
+    return !body || !isRingOnlyExoplanet(body, this.options.frame().camera.pxPerAu);
+  }
+
+  /**
+   * Exoplanets whose orbit ring is wide enough to draw. The ring of an
+   * orbit-only planet is in this list too; such a planet has no marker.
+   */
+  resolvedExoplanets() {
+    if (this.resolvedExoplanetCache) return this.resolvedExoplanetCache;
+    const frame = this.options.frame();
+    const rect = expandedRect(frame.renderViewport, 160);
+    this.resolvedExoplanetCache = (frame.ephemeris?.bodies ?? []).filter((body) => {
+      if (body.catalog_group !== EXOPLANET_GROUP || !isExoplanetOrbitResolved(body, frame.camera.pxPerAu)) return false;
+      if (body.key !== frame.selectedKey && !this.options.matchesActiveFilter(body)) return false;
+      const host = body.exoplanet_orbit!.host_position;
+      const reachPx = (exoplanetOrbitReachAu(body) ?? 0) * frame.camera.pxPerAu;
+      const center = this.worldToScreen(host.x_au, host.y_au, frame);
+      return center.x + reachPx >= rect.left && center.x - reachPx <= rect.right
+        && center.y + reachPx >= rect.top && center.y - reachPx <= rect.bottom;
+    });
+    return this.resolvedExoplanetCache;
   }
 
   private shouldRenderAtScale(body: Body, frame: VisibilityFrame) {
@@ -147,6 +191,8 @@ export class AtlasVisibilityModel {
     const width = frame.viewWidthLy;
     if (body.key === frame.selectedKey || body.key === frame.hoverKey || this.options.featuredKeys.includes(body.key)) return true;
     if (body.object_type === "spacecraft") return width < 0.03;
+    if (body.catalog_group === EXOPLANET_GROUP) return this.rendersExoplanet(body, frame);
+    if (body.catalog_group === EXOPLANET_HOST_GROUP && this.hasCuratedTwin(body, frame)) return false;
     if (body.catalog_group === "jpl_small_bodies" && width > 2) return false;
     if (["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"].includes(body.catalog_group ?? "") && width >= 6_000) return false;
     if (body.catalog_group === "simbad_extragalactic" && width < 15_000) return false;
@@ -155,6 +201,28 @@ export class AtlasVisibilityModel {
     if (isSolarSystemBody(body)) return true;
     if (width >= 6_000 && ["exoplanet_systems", "nearby_exoplanet_systems"].includes(body.catalog_group ?? "")) return false;
     return true;
+  }
+
+  /**
+   * An exoplanet has its own marker when its orbit is resolved and its
+   * position is calculated. At a smaller scale the host star represents the
+   * system, unless the active filter hides the host stars.
+   */
+  private rendersExoplanet(body: Body, frame: VisibilityFrame) {
+    if (isExoplanetOrbitResolved(body, frame.camera.pxPerAu)) return body.exoplanet_orbit?.display_state === "position";
+    return !this.options.matchesActiveFilter(EXOPLANET_HOST_PROBE);
+  }
+
+  /** One star has one marker: the archive host record yields to the curated record at the same position. */
+  private hasCuratedTwin(body: Body, frame: VisibilityFrame) {
+    this.curatedHostCache ??= (frame.ephemeris?.bodies ?? []).filter(
+      (candidate) => candidate.catalog_group === CURATED_HOST_GROUP && this.options.matchesActiveFilter(candidate),
+    );
+    return this.curatedHostCache.some((host) => (
+      Math.abs(host.position.x_au - body.position.x_au) < HOST_TWIN_TOLERANCE_AU
+      && Math.abs(host.position.y_au - body.position.y_au) < HOST_TWIN_TOLERANCE_AU
+      && Math.abs(host.position.z_au - body.position.z_au) < HOST_TWIN_TOLERANCE_AU
+    ));
   }
 
   private rebuildBodyGrid() {
@@ -204,10 +272,12 @@ export class AtlasVisibilityModel {
   }
 
   private isMajorBody(body: Body, frame: VisibilityFrame) {
+    // The rule is by group: an exoplanet is a major body only where it has its own marker.
+    if (body.catalog_group === EXOPLANET_GROUP) return body.key === frame.selectedKey || this.rendersExoplanet(body, frame);
     const type = classifyBody(body).type;
     return type === "planet" || type === "galaxy" || type === "quasar" || type === "active_galaxy" ||
       body.key === frame.selectedKey || this.options.featuredKeys.includes(body.key) ||
-      (type === "star" && body.catalog_group === "nearby_exoplanet_systems") ||
+      (type === "star" && (body.catalog_group === CURATED_HOST_GROUP || body.catalog_group === EXOPLANET_HOST_GROUP)) ||
       (type === "star" && body.catalog_group === "bright_stars" && (body.stellar?.apparent_magnitude ?? 99) <= 1.5);
   }
 
@@ -216,6 +286,8 @@ export class AtlasVisibilityModel {
     if (body.key === frame.hoverKey) return 90;
     const type = classifyBody(body).type;
     if (body.key === "sun") return 80;
+    // An exoplanet is below its host star, so that the star keeps its label.
+    if (body.catalog_group === EXOPLANET_GROUP) return 30;
     if (type === "planet") return 70;
     if (type === "moon") return 42;
     if (type === "star") return 36;

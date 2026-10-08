@@ -55,6 +55,16 @@ const POINT_LAYER_GROUP_SET = new Set(POINT_LAYER_GROUPS);
 // and non-bulk tiles do not carry hydratable source IDs. Keep them on the
 // viewport-object path even when an older manifest still advertises JPL tiles.
 const OBJECT_ONLY_CATALOG_GROUPS = new Set(["jpl_small_bodies"]);
+// A tile quantizes each position to 1/65,535 of the tile span: 256 AU at the
+// finest exoplanet level. From one pixel of that step, an exoplanet system
+// moves to the viewport-object path, which keeps the precise coordinates.
+const TILE_QUANTIZATION_STEPS = 65_535;
+const OBJECT_PATH_QUANTIZATION_PX = 1;
+const SYSTEM_SCALE_OBJECT_GROUPS = new Set(["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"]);
+// A tile point for a planet is at its host star. A layer of planets only
+// yields to the bodies with the orbit offset as soon as one orbit in view is
+// resolved.
+const EXOPLANET_PLANET_GROUP = "exoplanets";
 
 export type CatalogPointWorldBounds = {
   minXAu: number;
@@ -71,6 +81,8 @@ export type CatalogPointViewport = {
   visibleBounds: CatalogPointWorldBounds;
   filter: BodyFilterDefinition;
   embed: boolean;
+  /** True when the view shows an exoplanet orbit that is wide enough to draw. */
+  resolvedExoplanetOrbits?: boolean;
 };
 
 export type CatalogPointFilter = {
@@ -110,9 +122,18 @@ export class CatalogPointPlanner {
     );
   }
 
-  ownsCatalogGroup(group: string): boolean {
+  ownsCatalogGroup(group: string, pxPerAu?: number): boolean {
     if (OBJECT_ONLY_CATALOG_GROUPS.has(group)) return false;
+    if (pxPerAu !== undefined && this.usesObjectPath(group, pxPerAu)) return false;
     return POINT_LAYER_GROUP_SET.has(group) || this.manifestGroups().includes(group);
+  }
+
+  /** True when each tile layer of an exoplanet group is too coarse for the camera scale. */
+  usesObjectPath(group: string, pxPerAu: number): boolean {
+    if (!SYSTEM_SCALE_OBJECT_GROUPS.has(group)) return false;
+    const layers = (this.manifest.value?.layers ?? []).filter((layer) => layer.groups.includes(group));
+    return layers.length > 0
+      && layers.every((layer) => isExoplanetLayer(layer) && tileQuantizationPx(layer, pxPerAu) >= OBJECT_PATH_QUANTIZATION_PX);
   }
 
   plan(viewport: CatalogPointViewport): CatalogPointTileRequest[] {
@@ -217,7 +238,7 @@ export class CatalogPointPlanner {
     if (this.manifest.state === "loading") return null;
     if (this.manifest.state === "missing" && !this.manifest.allowDynamicFallback) return null;
     const staticLayers = this.prioritizedLayers(
-      this.staticLayersForFilter(filterParams),
+      this.staticLayersForFilter(filterParams).filter((layer) => !yieldsToObjectPath(layer, viewport)),
       viewport.viewWidthLy,
       viewport.filter.key === "all",
     );
@@ -467,6 +488,21 @@ function shouldUseCatalogPoints(viewWidthLy: number, filter: CatalogPointFilter)
 function layerCoversAnyType(layer: CatalogPointTileManifestLayer, types: DestinationBodyType[]): boolean {
   if (types.length === 0) return true;
   return layer.types.length > 0 && layer.types.some((type) => types.includes(type));
+}
+
+function tileQuantizationPx(layer: CatalogPointTileManifestLayer, pxPerAu: number): number {
+  const finestSpanAu = Math.min(...layer.levels.map((level) => level.span_au));
+  return Number.isFinite(finestSpanAu) ? (finestSpanAu / TILE_QUANTIZATION_STEPS) * pxPerAu : 0;
+}
+
+function isExoplanetLayer(layer: CatalogPointTileManifestLayer): boolean {
+  return layer.groups.length > 0 && layer.groups.every((group) => SYSTEM_SCALE_OBJECT_GROUPS.has(group));
+}
+
+function yieldsToObjectPath(layer: CatalogPointTileManifestLayer, viewport: CatalogPointViewport): boolean {
+  if (!isExoplanetLayer(layer)) return false;
+  if (viewport.resolvedExoplanetOrbits && layer.groups.every((group) => group === EXOPLANET_PLANET_GROUP)) return true;
+  return tileQuantizationPx(layer, viewport.camera.pxPerAu) >= OBJECT_PATH_QUANTIZATION_PX;
 }
 
 function isObjectOnlyLayer(layer: CatalogPointTileManifestLayer): boolean {

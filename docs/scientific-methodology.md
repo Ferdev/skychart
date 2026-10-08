@@ -124,6 +124,118 @@ are distinct concepts.
 The machine-readable position-model registry is checked in at
 `backend_phoenix/priv/science_semantics.json`.
 
+## Exoplanet orbits
+
+The atlas shows each confirmed exoplanet of the NASA Exoplanet Archive table
+`pscomppars` on an orbit around its host star, at true scale, at the atlas
+time. The catalog stores a planet at the coordinates of its host. The browser
+adds the orbit offset (`src/catalog/exoplanetOrbit.ts`).
+
+### What is measured and what is a convention
+
+| Quantity | Source | Display |
+| --- | --- | --- |
+| Orbit size (semi-major axis) | Archive | True scale. A flag shows when the archive calculated the value. |
+| Orbit shape (eccentricity, argument of periastron) | Archive, when the two values are measured | Ellipse. If a value is absent or is only a limit: a circle, with a flag. |
+| Position on the orbit (phase) | Period and conjunction time, or period and periastron time | Calculated for the atlas time, with its uncertainty. |
+| Inclination to the sky plane | Archive, when measured | Measured value. If absent or only a limit: 90 degrees (edge-on), with a flag. |
+| Node angle | Not in the table | Display convention for each planet. |
+
+The archive gives no node angle. This is the direction of the orbit around the
+line of sight. The atlas puts the line of nodes at 90 degrees to the line of
+sight and parallel to the ecliptic plane. The top-down map then shows an
+edge-on orbit as open as possible. For a host at an ecliptic pole the node is
+the x axis. A ring on the map is thus correct in size and in the timing of the
+planet, and is not a measurement of the orbit direction. The map states this in
+one line near the scale bar when a ring is in view, the rings use a dashed line
+style that Solar System orbits do not use, and the object inspector lists each
+convention in use.
+
+An edge-on orbit for an unmeasured inclination agrees with the minimum mass
+(`M sin i`) that the archive gives for those planets.
+
+### Frame and offset
+
+`s` is the unit vector from the Sun to the host. `n` is the unit vector of
+`k x s`, where `k` is the ecliptic north. `m` is `s x n`. With the angle `u`
+from the node, the inclination `i`, and the distance `r` from the host, the
+offset of the planet is
+
+`r * [cos(u) * n + sin(u) * (cos(i) * m - sin(i) * s)]`.
+
+`u` is 90 degrees at conjunction, where the planet is between the Sun and the
+host. With an argument of periastron `w` and a true anomaly `f`, `u = w + f`.
+
+### Phase and its uncertainty
+
+- A conjunction time is preferred to a periastron time, because it does not
+  depend on the argument of periastron. A periastron time is used only with
+  the argument of periastron of the same solution.
+- The composite table takes each value from the paper that the archive
+  prefers for that value. A period and a reference time from two papers are
+  not one ephemeris. The builder then reads the per-paper table `ps` and
+  selects one row that has the two values: the archive default row first, then
+  the newest paper. If no such row exists, the mixed values stay, a flag is
+  set, and the marker is hollow.
+- The phase is the phase that an observer in the Solar System sees at the
+  atlas time. The light travel time is not removed; star positions use the
+  same rule. A reference time in TDB or TT gets the 69.184 s offset from UTC.
+  Barycentric, heliocentric, and unlabelled Julian dates are used as given.
+- The 1-sigma phase uncertainty in orbits is
+  `sqrt(sigma_T^2 + (N * sigma_P)^2) / P`. `N` is the number of orbits from the
+  reference time to the atlas time. The larger of the two published
+  uncertainties is used for each value. The uncertainty is "not available"
+  when the archive gives no uncertainty for the period or for the time.
+- A reference time more than one period after the snapshot date is not a
+  measured epoch and is not used. The archive has such records with a wrong
+  Julian-day offset.
+
+### Display states
+
+1. **Position calculated.** Orbit ring, planet marker, and an arc for the
+   1-sigma phase interval. The marker is hollow when the uncertainty is 0.05
+   to 0.25 orbit, when it is not available, or when the papers are mixed.
+2. **Orbit only.** Orbit ring and no marker: there is no usable timing, or the
+   uncertainty is more than 0.25 orbit at the atlas time. The atlas does not
+   put the planet at an arbitrary point.
+3. **No orbit.** No ring and no marker: the archive gives no orbit size. The
+   planet stays a fact on its host star.
+
+A planet has its own marker only when its orbit is at least 4 pixels wide. At
+a smaller scale the host star represents the system. The snapshot of
+2026-10-08 has 6,347 planets in 4,752 systems: 5,352 with a calculated
+position, 568 with an orbit only, and 427 with no orbit.
+
+### Precision
+
+A tile quantizes each position to 1/65,535 of the tile span, which is 256 AU
+at the finest exoplanet level. From one pixel of that step, the host stars and
+planets draw from the viewport-object path with their 64-bit coordinates. The
+WebGL body layer subtracts an origin near the camera before the Float32
+conversion: absolute Float32 AU values have a step of 0.25 AU at 2.5 million
+AU.
+
+### Limits
+
+- Papers do not use one convention for the argument of periastron. An
+  eccentric ellipse can point the wrong way by 180 degrees, and a position
+  from a periastron time can be wrong by the same angle.
+- Transit timing variations make the true transit times deviate from a
+  constant period (the inspector shows the archive flag).
+- For a circumbinary planet the ring center is not one star (flag in the
+  inspector).
+- The curated nearby host stars and their archive records have the same
+  coordinates (16 pairs, 0.0 AU apart on 2026-10-08) and draw as one marker.
+  The Gaia or Hipparcos record of the same star uses its own astrometry and
+  epoch: measured offsets from the archive record are 30 to 880 AU for Gaia
+  and 1,666 AU for one Hipparcos record. At the scale of a close-in system
+  that record is out of view. For a system some hundred AU wide it can show
+  as a second star marker; the orbits are around the archive record.
+- Planet candidates (for example TESS objects of interest) are not in this
+  table and are not shown.
+- The 3D view uses the same positions. It lights each exoplanet from its host
+  star and uses one neutral material; see `docs/universe-appearance.md`.
+
 ## Distance evidence
 
 The atlas distinguishes the evidence behind a distance:

@@ -7,10 +7,13 @@ export const AU_KM = 149_597_870.7;
 export type PhysicalBody = {
   key: string;
   object_type?: string | null;
+  catalog_group?: string | null;
   color?: string | null;
   position: Vector3;
   radiusKm?: number | null;
   temperatureK?: number | null;
+  /** Position of the star that lights this body. The Sun at the origin when absent. */
+  lightSource?: Vector3 | null;
 };
 
 export type ProjectedBody = {

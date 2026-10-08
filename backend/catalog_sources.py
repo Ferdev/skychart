@@ -342,6 +342,17 @@ def catalog_identity_tokens(objects: list[dict[str, Any]]) -> set[str]:
     return tokens
 
 
+# The host star carries a short planet list. The full orbit data stays on the
+# planet rows of the catalog semantic index.
+EXOPLANET_SUMMARY_FIELDS = (
+    "key", "name", "radius_earth", "mass_earth", "period_days", "semi_major_axis_au", "discovery_method", "discovery_year",
+)
+
+
+def exoplanet_summary(planet: dict[str, Any]) -> dict[str, Any]:
+    return {field: planet[field] for field in EXOPLANET_SUMMARY_FIELDS if planet.get(field) is not None}
+
+
 def load_exoplanet_system_catalog_objects() -> list[dict[str, Any]]:
     if not EXOPLANET_CATALOG_PATH.exists():
         return []
@@ -385,7 +396,7 @@ def load_exoplanet_system_catalog_objects() -> list[dict[str, Any]]:
                 system_star_count=entry.get("system_star_count"),
                 system_planet_count=entry.get("system_planet_count"),
                 system_moon_count=entry.get("system_moon_count"),
-                planets=[planet for planet in entry.get("planets", []) if isinstance(planet, dict)],
+                planets=[exoplanet_summary(planet) for planet in entry.get("planets", []) if isinstance(planet, dict)],
                 aliases=[str(value) for value in entry.get("aliases", []) if value],
                 why_interesting=str(entry.get("why_interesting") or "A confirmed exoplanet host system from the NASA Exoplanet Archive."),
             )

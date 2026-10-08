@@ -1,5 +1,7 @@
 import type { Body, Camera, Ephemeris } from "../atlas/contracts";
 import type { SmallBodyPosition } from "../catalog/smallBodyPropagation";
+import { exoplanetOrbitPathAu, exoplanetOrbitReachAu, exoplanetUncertaintyPathAu, isPositionedExoplanet, isRingOnlyExoplanet } from "../catalog/exoplanetOrbit";
+import { t } from "../i18n";
 import { clamp, degToRad, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectsOverlap, rectUnion, type EdgeSide, type Rect, type ScreenPoint } from "../geometry";
 
 type EdgeBody = { body: Body; screen: ScreenPoint };
@@ -17,6 +19,7 @@ type OverlayFrame = {
   visibleBodies: Body[];
   labelBodies: Body[];
   edgeBodies: EdgeBody[];
+  exoplanetOrbits: Body[];
 };
 
 type AtlasOverlayRendererOptions = {
@@ -35,6 +38,8 @@ type AtlasOverlayRendererOptions = {
   formatDistance: (kilometers: number) => string;
   smallBodyOrbitPathAu: (body: Body) => SmallBodyPosition[] | null;
   universeEntryMarker: HTMLElement;
+  exoplanetOrbitNote: HTMLElement;
+  toolbar: HTMLElement;
 };
 
 const POINT_ALPHA = 0.82;
@@ -43,10 +48,18 @@ const SELECTION_RING_PX = 8.5;
 // visibly off the true ellipse once the on-screen orbit radius grows large.
 const ORBIT_MIN_SAMPLES = 180;
 const ORBIT_MAX_SAMPLES = 8192;
+// An exoplanet ring is dashed and blue. A Solar System orbit is a solid green
+// line from a measured state; the direction of an exoplanet ring is a convention.
+const EXOPLANET_ORBIT_DASH = [6, 5];
+const EXOPLANET_ORBIT_COLOR = "rgba(137, 214, 255, 0.5)";
+const EXOPLANET_UNCERTAINTY_COLOR = "rgba(137, 214, 255, 0.34)";
+const EXOPLANET_UNCERTAINTY_WIDTH_PX = 7;
 
 /** Draws the navigational overlays layered above the catalog point renderer. */
 export class AtlasOverlayRenderer {
   private edgeHitRegions: { body: Body; rect: Rect }[] = [];
+  // Canvas position of the convention line in this frame, or null when the frame has no exoplanet ring.
+  private exoplanetNoteAnchor: ScreenPoint | null = null;
 
   constructor(private readonly options: AtlasOverlayRendererOptions) {}
 
@@ -87,10 +100,32 @@ export class AtlasOverlayRenderer {
     const center = this.options.worldToScreen(camera.xAu, camera.yAu);
     this.options.universeEntryMarker.style.transform = `translate(${center.x - 22}px, ${center.y - 22}px)`;
     this.options.universeEntryMarker.hidden = false;
+    this.placeExoplanetOrbitNote();
+  }
+
+  /**
+   * The canvas line above the scale bar states the convention, and the PNG
+   * export contains it. Where the toolbar covers that line, the same text
+   * shows as a page element above the toolbar. One of the two is visible.
+   */
+  private placeExoplanetOrbitNote() {
+    const note = this.options.exoplanetOrbitNote;
+    const anchor = this.exoplanetNoteAnchor;
+    this.exoplanetNoteAnchor = null;
+    if (anchor === null) {
+      // No layout read in a frame with no exoplanet ring.
+      if (!note.hidden) note.hidden = true;
+      return;
+    }
+    const toolbar = this.options.toolbar.getBoundingClientRect();
+    const covered = toolbar.height > 0 && anchor.y >= toolbar.top && anchor.x >= toolbar.left && anchor.x <= toolbar.right;
+    note.hidden = !covered;
+    if (covered) note.style.bottom = `${Math.round(window.innerHeight - toolbar.top + 8)}px`;
   }
 
   drawOrbitGuides() {
     const frame = this.options.frame();
+    this.drawExoplanetOrbits(frame);
     if (this.options.currentViewWidthAu() > 1_000) return;
     const bodies = (frame.ephemeris?.bodies ?? []).filter((body) => this.options.bodyMatchesActiveFilter(body) && body.orbit && body.parent_key && this.options.isSolarSystemBody(body));
     const rect = expandedRect(frame.renderViewport, 160);
@@ -107,6 +142,71 @@ export class AtlasOverlayRenderer {
       const screens = path?.map((point) => this.options.worldToScreen(point.xAu, point.yAu));
       if (screens && screens.some((point) => pointInRect(point, rect))) this.strokeOrbitPath(screens, true);
     }
+    ctx.restore();
+  }
+
+  /** Draws each resolved exoplanet ring, the 1-sigma phase arc on it, and one line that states the convention. */
+  private drawExoplanetOrbits(frame: OverlayFrame) {
+    if (frame.exoplanetOrbits.length === 0) return;
+    const ctx = this.options.context;
+    ctx.save();
+    ctx.lineCap = "round";
+    for (const body of frame.exoplanetOrbits) {
+      const reachPx = (exoplanetOrbitReachAu(body) ?? 0) * this.options.pxPerAu();
+      const samples = clamp(Math.ceil(Math.PI * Math.sqrt(reachPx)), ORBIT_MIN_SAMPLES, ORBIT_MAX_SAMPLES);
+      const ring = exoplanetOrbitPathAu(body, samples);
+      if (!ring) continue;
+      const highlighted = body.key === frame.selectedKey;
+      ctx.setLineDash(EXOPLANET_ORBIT_DASH);
+      ctx.strokeStyle = highlighted ? "rgba(248, 218, 136, 0.78)" : EXOPLANET_ORBIT_COLOR;
+      ctx.lineWidth = highlighted ? 1.8 : 1.15;
+      this.strokePolyline(ring, true);
+      const arc = exoplanetUncertaintyPathAu(body, samples);
+      if (!arc) continue;
+      ctx.setLineDash([]);
+      ctx.strokeStyle = EXOPLANET_UNCERTAINTY_COLOR;
+      ctx.lineWidth = EXOPLANET_UNCERTAINTY_WIDTH_PX;
+      this.strokePolyline(arc, false);
+    }
+    ctx.restore();
+    this.drawExoplanetOrbitNote(frame.viewport);
+  }
+
+  /**
+   * True for a planet with no calculated position on a resolved orbit. It has
+   * no marker and no label at the star: its highlighted ring is the selection.
+   */
+  private hasRingOnly(body: Body) {
+    return isRingOnlyExoplanet(body, this.options.pxPerAu());
+  }
+
+  private strokePolyline(points: readonly SmallBodyPosition[], closed: boolean) {
+    const ctx = this.options.context;
+    ctx.beginPath();
+    points.forEach((point, index) => {
+      const screen = this.options.worldToScreen(point.xAu, point.yAu);
+      if (index === 0) ctx.moveTo(screen.x, screen.y);
+      else ctx.lineTo(screen.x, screen.y);
+    });
+    if (closed) ctx.closePath();
+    ctx.stroke();
+  }
+
+  /** States above the scale bar that the ring direction is a convention. The line wraps on a narrow view. */
+  private drawExoplanetOrbitNote(rect: Rect) {
+    const ctx = this.options.context;
+    ctx.save();
+    ctx.font = "11px Inter, system-ui, sans-serif";
+    ctx.fillStyle = "rgba(190, 228, 245, 0.82)";
+    const maxWidth = Math.max(120, rect.width - 48);
+    const lines: string[] = [];
+    for (const word of t("exoplanet.mapNote").split(" ")) {
+      const candidate = lines.length > 0 ? `${lines[lines.length - 1]} ${word}` : word;
+      if (lines.length > 0 && ctx.measureText(candidate).width <= maxWidth) lines[lines.length - 1] = candidate;
+      else lines.push(word);
+    }
+    this.exoplanetNoteAnchor = { x: rect.left + 24, y: rect.bottom - 62 };
+    lines.forEach((line, index) => ctx.fillText(line, rect.left + 24, rect.bottom - 62 - (lines.length - 1 - index) * 14));
     ctx.restore();
   }
 
@@ -141,7 +241,8 @@ export class AtlasOverlayRenderer {
     ctx.save();
     for (const body of frame.visibleBodies) {
       const selectedOrHover = body.key === frame.selected?.key || body.key === frame.hoverKey;
-      if (frame.pointRendererAvailable && !selectedOrHover && body.object_type !== "spacecraft") continue;
+      if (frame.pointRendererAvailable && !selectedOrHover && body.object_type !== "spacecraft" && !isPositionedExoplanet(body)) continue;
+      if (this.hasRingOnly(body)) continue;
       this.drawBodyPoint(body, this.options.bodyToScreen(body), selectedOrHover, frame.selectedKey);
     }
     ctx.restore();
@@ -154,6 +255,7 @@ export class AtlasOverlayRenderer {
     ctx.save();
     ctx.font = "12px Inter, system-ui, sans-serif";
     for (const body of frame.labelBodies) {
+      if (this.hasRingOnly(body)) continue;
       const screen = this.options.bodyToScreen(body);
       const width = ctx.measureText(body.name).width + 18;
       const rect = { left: screen.x + 10, top: screen.y - 30, right: screen.x + 10 + width, bottom: screen.y - 8, width, height: 22 };
@@ -289,7 +391,14 @@ export class AtlasOverlayRenderer {
       ctx.lineTo(screen.x - radius, screen.y);
       ctx.closePath();
     } else ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
-    ctx.fill();
+    if (body.exoplanet_orbit?.marker === "hollow") {
+      // A hollow marker: the phase is uncertain or its uncertainty is not available.
+      ctx.fillStyle = "rgba(8, 10, 9, 0.86)";
+      ctx.fill();
+      ctx.strokeStyle = body.color || "#d9b86f";
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+    } else ctx.fill();
     if (active) {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = body.key === selectedKey ? "rgba(248, 218, 136, 0.95)" : "rgba(177, 218, 205, 0.82)";
