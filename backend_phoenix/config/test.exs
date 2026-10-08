@@ -47,3 +47,29 @@ config :logger, level: :warning
 
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
+
+config :starsmap_api,
+  community_enabled: true,
+  ecto_repos: [StarsmapApi.Repo, StarsmapApi.CommunityRepo],
+  community_origin: "http://www.example.com",
+  community_cookie_secure: false,
+  community_secret: "community-test-secret-do-not-use-in-production",
+  community_mailer: StarsmapApi.Community.Mailer.Test,
+  community_storage: StarsmapApi.Community.Storage.Local,
+  community_media_root: "/tmp/cosmic-atlas-community-test",
+  community_media_url: "/api/community/media"
+
+config :starsmap_api, StarsmapApi.CommunityRepo,
+  hostname: System.get_env("PGHOST") || "localhost",
+  socket_dir:
+    if(System.get_env("PGHOST"),
+      do: nil,
+      else: System.get_env("PGSOCKET_DIR") || "/var/run/postgresql"
+    ),
+  username: System.get_env("PGUSER") || "postgres",
+  password: System.get_env("PGPASSWORD") || "",
+  database: "starsmap_community_test#{System.get_env("MIX_TEST_PARTITION")}",
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pool_size: 4
+
+config :starsmap_api, StarsmapApi.CommunityJobs, testing: :manual

@@ -29,7 +29,8 @@ config :starsmap_api,
   analytics_hash_salt: System.get_env("ANALYTICS_HASH_SALT") || "development-only-analytics-salt",
   analytics_enabled: System.get_env("ANALYTICS_ENABLED", "true") not in ~w(false 0),
   sky_events_refresh_enabled:
-    System.get_env("SKY_EVENTS_REFRESH_ENABLED", "true") not in ~w(false 0)
+    config_env() != :test and
+      System.get_env("SKY_EVENTS_REFRESH_ENABLED", "true") not in ~w(false 0)
 
 if config_env() == :prod do
   database_url =
@@ -120,4 +121,119 @@ if config_env() == :prod do
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
+end
+
+if config_env() != :test do
+  community_enabled = System.get_env("COMMUNITY_ENABLED") == "true"
+  config :starsmap_api, :community_enabled, community_enabled
+
+  if community_enabled do
+    database = System.fetch_env!("COMMUNITY_DATABASE_URL")
+
+    catalog_uri = URI.parse(System.get_env("DATABASE_URL") || "")
+    community_uri = URI.parse(database)
+
+    if database == System.get_env("DATABASE_URL") or
+         (community_uri.path == catalog_uri.path and community_uri.host == catalog_uri.host and
+            (community_uri.port || 5432) == (catalog_uri.port || 5432)),
+       do: raise("Community data requires a separate database")
+
+    repo_options = [url: database, pool_size: 3]
+
+    repo_options =
+      if socket = System.get_env("COMMUNITY_PGSOCKET_DIR"),
+        do: Keyword.put(repo_options, :socket_dir, socket),
+        else: repo_options
+
+    config :starsmap_api, StarsmapApi.CommunityRepo, repo_options
+    origin = System.get_env("COMMUNITY_ORIGIN") || "https://#{System.get_env("PHX_HOST")}"
+    uri = URI.parse(origin)
+
+    if uri.scheme not in ["http", "https"] or is_nil(uri.host) or uri.path not in [nil, ""] or
+         not is_nil(uri.query),
+       do: raise("COMMUNITY_ORIGIN must be an exact origin without a path")
+
+    if config_env() == :prod and uri.scheme != "https",
+      do: raise("Production community requires an HTTPS origin")
+
+    secret = System.fetch_env!("COMMUNITY_SECRET")
+    if byte_size(secret) < 32, do: raise("COMMUNITY_SECRET requires at least 32 bytes")
+
+    config :starsmap_api,
+      community_origin: origin,
+      community_cookie_secure: config_env() == :prod,
+      community_secret: secret,
+      community_media_root:
+        System.get_env("COMMUNITY_MEDIA_ROOT") || "/tmp/cosmic-atlas-community",
+      community_media_url: System.get_env("COMMUNITY_MEDIA_URL") || "/api/community/media",
+      community_storage:
+        if(System.get_env("COMMUNITY_STORAGE") == "s3",
+          do: StarsmapApi.Community.Storage.S3,
+          else: StarsmapApi.Community.Storage.Local
+        ),
+      community_s3_bucket: System.get_env("COMMUNITY_S3_BUCKET"),
+      community_mailer: StarsmapApi.Community.Mailer.Webhook,
+      community_mail_url: System.get_env("COMMUNITY_MAIL_URL"),
+      community_mail_token: System.get_env("COMMUNITY_MAIL_TOKEN")
+
+    if config_env() == :prod and System.get_env("COMMUNITY_STORAGE") != "s3",
+      do: raise("Production community media requires S3 storage")
+
+    if System.get_env("COMMUNITY_STORAGE") == "s3" do
+      for name <-
+            ~w(COMMUNITY_S3_BUCKET COMMUNITY_S3_ACCESS_KEY_ID COMMUNITY_S3_SECRET_ACCESS_KEY),
+          do: System.fetch_env!(name)
+    end
+
+    if config_env() == :prod do
+      for name <- ~w(COMMUNITY_MAIL_URL COMMUNITY_MAIL_TOKEN COMMUNITY_MEDIA_URL),
+          do: System.fetch_env!(name)
+
+      for name <- ~w(COMMUNITY_MAIL_URL COMMUNITY_MEDIA_URL) do
+        if URI.parse(System.fetch_env!(name)).scheme != "https",
+          do: raise("#{name} requires HTTPS")
+      end
+    end
+
+    config :ex_aws,
+      access_key_id: System.get_env("COMMUNITY_S3_ACCESS_KEY_ID"),
+      secret_access_key: System.get_env("COMMUNITY_S3_SECRET_ACCESS_KEY"),
+      region: System.get_env("COMMUNITY_S3_REGION") || "us-east-1"
+
+    if endpoint = System.get_env("COMMUNITY_S3_ENDPOINT") do
+      uri = URI.parse(endpoint)
+      if uri.scheme not in ["https", "http"] or is_nil(uri.host), do: raise("Invalid S3 endpoint")
+
+      if config_env() == :prod and uri.scheme != "https",
+        do: raise("Production S3 endpoint requires HTTPS")
+
+      config :ex_aws, :s3, scheme: uri.scheme <> "://", host: uri.host, port: uri.port
+    end
+
+    worker = System.get_env("COMMUNITY_WORKER") == "true"
+
+    cron = [
+      {"0 3 * * *", StarsmapApi.Community.MaintenanceWorker},
+      {"*/10 * * * *", StarsmapApi.Community.RankingWorker}
+    ]
+
+    cron =
+      if System.get_env("COMMUNITY_BACKUP_URI") not in [nil, ""],
+        do: [{"0 2 * * *", StarsmapApi.Community.BackupWorker} | cron],
+        else: cron
+
+    config :starsmap_api, StarsmapApi.CommunityJobs,
+      queues: if(worker, do: [media: 1, publish: 1], else: false),
+      plugins:
+        if(worker,
+          do: [
+            {Oban.Plugins.Pruner, max_age: 604_800},
+            {Oban.Plugins.Cron, crontab: cron}
+          ],
+          else: false
+        )
+
+    if worker, do: config(:starsmap_api, StarsmapApiWeb.Endpoint, server: false)
+    if worker, do: config(:starsmap_api, :sky_events_refresh_enabled, false)
+  end
 end

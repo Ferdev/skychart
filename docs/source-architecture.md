@@ -80,3 +80,8 @@ threshold needs a documented reason based on module depth, not convenience.
 Composition roots and transport adapters should stay far below the threshold.
 Large declarative data modules are reviewed for navigability rather than split
 mechanically.
+
+The `src/community/` modules own photo index deltas, credited galleries, native
+account/upload/review dialogs, and projected DOM photo markers. Rendering hooks
+use the positions already drawn by each view. Footprints and the selected photo
+plane annotate appearance without changing scientific catalog coordinates.

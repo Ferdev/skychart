@@ -37,9 +37,21 @@ config :starsmap_api,
   trusted_proxy_cidrs: ["127.0.0.0/8", "::1/128"]
 
 # GlitchTip/Sentry-compatible error tracking
+config :phoenix, :filter_parameters, ["password", "email", "code", "token", "csrf"]
+
 config :sentry,
+  before_send: {StarsmapApi.Community.Privacy, :scrub},
   environment_name: config_env(),
   client: Sentry.HackneyClient
+
+config :starsmap_api, :community_enabled, false
+config :starsmap_api, StarsmapApi.CommunityRepo, priv: "priv/community_repo"
+
+config :starsmap_api, StarsmapApi.CommunityJobs,
+  repo: StarsmapApi.CommunityRepo,
+  name: StarsmapApi.CommunityJobs,
+  queues: false,
+  plugins: false
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

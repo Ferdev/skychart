@@ -15,7 +15,9 @@ defmodule StarsmapApiWeb.Plugs.RateLimit do
     refill = Keyword.get(opts, :refill_per_second, 4.0)
     now = System.monotonic_time(:millisecond)
     window_ms = window_ms(capacity, refill)
-    key = {ClientIp.resolve(conn), div(now, window_ms)}
+    identity = Keyword.get(opts, :identity, ClientIp.resolve(conn))
+    scope = Keyword.get(opts, :scope, :atlas)
+    key = {{scope, identity}, div(now, window_ms)}
     count = :ets.update_counter(@table, key, {2, 1}, {key, 0, now})
 
     if count <= capacity do

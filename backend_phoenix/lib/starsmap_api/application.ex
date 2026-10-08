@@ -16,6 +16,14 @@ defmodule StarsmapApi.Application do
         do: [StarsmapApi.SkyEvents.Refresher],
         else: []
 
+    community_children =
+      if StarsmapApi.Community.enabled?(),
+        do: [
+          StarsmapApi.CommunityRepo,
+          {Oban, Application.fetch_env!(:starsmap_api, StarsmapApi.CommunityJobs)}
+        ],
+        else: []
+
     children =
       [
         StarsmapApiWeb.Telemetry,
@@ -25,6 +33,7 @@ defmodule StarsmapApi.Application do
         StarsmapApi.SkyShare.CardCache,
         StarsmapApiWeb.Plugs.RateLimitStore
       ] ++
+        community_children ++
         sky_event_children ++
         [
           {DNSCluster, query: Application.get_env(:starsmap_api, :dns_cluster_query) || :ignore},
