@@ -1,4 +1,5 @@
 import type { CatalogObjectPayload, CatalogViewportPayload } from "../atlas/contracts";
+import { EXOPLANET_CANDIDATE_GROUP, EXOPLANET_GROUP } from "./exoplanetGroups";
 
 // The catalog keeps each planet at the coordinates of its host star, so a
 // small box around the host finds the planets of one system.
@@ -8,7 +9,7 @@ const HOST_MATCH_TOLERANCE_AU = 0.01;
 
 type HostPosition = { x_au: number; y_au: number; z_au: number };
 
-/** Loads the catalog rows of the planets that belong to the host star at this position. */
+/** Loads the catalog rows of the planets and the planet candidates that belong to the host star at this position. */
 export async function loadExoplanetSystemObjects(
   host: HostPosition,
   signal?: AbortSignal,
@@ -19,7 +20,7 @@ export async function loadExoplanetSystemObjects(
     max_x_au: String(host.x_au + SYSTEM_BOX_HALF_WIDTH_AU),
     min_y_au: String(host.y_au - SYSTEM_BOX_HALF_WIDTH_AU),
     max_y_au: String(host.y_au + SYSTEM_BOX_HALF_WIDTH_AU),
-    groups: "exoplanets",
+    groups: `${EXOPLANET_GROUP},${EXOPLANET_CANDIDATE_GROUP}`,
     limit: String(SYSTEM_PLANET_LIMIT),
   });
   const response = await fetcher(`/api/catalog/viewport?${params.toString()}`, { signal });

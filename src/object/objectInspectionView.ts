@@ -16,7 +16,7 @@ import {
   uniqueTextValues,
 } from "../atlasFormatting";
 import { AU_PER_LIGHT_YEAR } from "../galacticModel";
-import { renderExoplanetList, renderExoplanetOrbitSection, renderPlanetarySystemAction } from "./exoplanetInspection";
+import { renderExoplanetList, renderExoplanetOrbitSection, renderPlanetCandidateSection, renderPlanetarySystemAction } from "./exoplanetInspection";
 import type {
   Body,
   Ephemeris,
@@ -233,6 +233,7 @@ update() {
     this.renderDataSection(t("section.stellarFacts"), stellarRows),
     renderExoplanetOrbitSection(body),
     this.renderDataSection(t("section.confirmedExoplanets"), exoplanetRows, renderExoplanetList(body.exoplanet_system?.planets ?? [], body.key)),
+    renderPlanetCandidateSection(body.planet_candidates ?? []),
     this.renderDataSection(t("section.deepSkyFacts"), deepSkyRows),
     this.renderDataSection(t("section.smallBodyFacts"), smallBodyRows),
     this.renderObjectNotes(body),
@@ -463,6 +464,8 @@ private objectSummaryText(body: Body, typeLabel: string) {
   switch (body.object_type) {
     case "planet":
       return t("summary.planet", { name });
+    case "planet_candidate":
+      return t("exoplanet.candidateSummary", { name });
     case "moon":
       return t("summary.moon", { name });
     case "star":

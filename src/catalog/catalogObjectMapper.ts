@@ -3,6 +3,7 @@ import type { DestinationBodyType } from "../destinationPicker";
 import type {
   Body,
   BodyExoplanet,
+  BodyPlanetCandidate,
   CatalogObjectPayload,
   ExternalLink,
 } from "../atlas/contracts";
@@ -129,6 +130,7 @@ export class CatalogObjectMapper {
             why_interesting: stringFact(facts.why_interesting),
           }
         : null,
+      planet_candidates: Array.isArray(facts.candidates) ? facts.candidates as BodyPlanetCandidate[] : null,
       small_body: isSmallBodyLike
         ? {
             orbit_class: stringFact(facts.orbit_class),
@@ -187,7 +189,7 @@ function catalogObjectToExoplanet(object: CatalogObjectPayload): BodyExoplanet {
 
 function normalizeDestinationType(type: string | null | undefined): DestinationBodyType {
   const allowed = new Set<DestinationBodyType>([
-    "star", "planet", "moon", "dwarf_planet", "galaxy", "quasar",
+    "star", "planet", "planet_candidate", "moon", "dwarf_planet", "galaxy", "quasar",
     "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster",
     "xray_source", "xray_extended",
     "spacecraft", "asterism", "milky_way_patch", "asteroid", "comet", "small_body", "unknown",

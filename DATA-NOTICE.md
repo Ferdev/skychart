@@ -30,6 +30,20 @@ products should review the upstream terms and cite:
 - the SDSS DR20 paper (arXiv `2607.26149`) and the SPIDERS DL1 value-added
   catalog (`DL1_SDSS_eROSITA` v1.1.0; Aydar, Merloni, Dwelly et al.).
 
+The other names of the Gaia local stars (`name`, `aliases`, and
+`simbad_main_id` in `data/catalogs/gaia_local_stars.json`) come from the SIMBAD
+database, operated at CDS, Strasbourg, France. Users who redistribute them
+should acknowledge SIMBAD and cite Wenger et al. (2000), *The SIMBAD
+astronomical database*, DOI `10.1051/aas:2000332`.
+
+The planet candidates (`data/catalogs/exoplanet_candidates.json`) come from
+the TESS Objects of Interest table of the NASA Exoplanet Archive, which is
+operated by the California Institute of Technology under contract with NASA.
+Users who redistribute them should acknowledge the archive and cite Guerrero
+et al. (2021), *The TESS Objects of Interest Catalog from the TESS Prime
+Mission*, DOI `10.3847/1538-4365/abefe1`. The orbit size and the star mass in
+that snapshot are atlas calculations, not archive values.
+
 Other generated snapshots identify their originating archives and source URLs
 inside each JSON file. The `/about` page and
 [`docs/scientific-methodology.md`](docs/scientific-methodology.md) provide the

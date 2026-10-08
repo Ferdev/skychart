@@ -137,7 +137,7 @@ test.describe("exoplanet orbits on the 2D map", () => {
     await openAtlas(page, viewUrl(host.position, 5_200));
     await waitForRings(page, TRAPPIST_PLANETS);
     // Far from the Sun, a system-scale view asks for the hosts and their planets, not for small bodies.
-    expect([...viewportGroups]).toContain("exoplanet_systems,exoplanets");
+    expect([...viewportGroups]).toContain("exoplanet_systems,exoplanets,exoplanet_candidate_hosts,exoplanet_candidates");
     // The map says that the ring direction is a convention. The toolbar covers the canvas line here, so the page shows it.
     await expect(page.locator("#exoplanet-orbit-note")).toBeVisible();
     await expect(page.locator("#exoplanet-orbit-note")).toContainText("display convention");
@@ -344,6 +344,125 @@ test.describe("exoplanet orbits on the 2D map", () => {
       return count;
     }, Buffer.concat(chunks).toString("base64"));
     expect(ringPixels).toBeGreaterThan(800);
+  });
+});
+
+/** Counts overlay pixels with the violet of a planet candidate ring or marker. A confirmed-planet ring is blue. */
+function candidatePixelCount(page: Page) {
+  return page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>("#map")!;
+    const pixels = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let count = 0;
+    for (let offset = 0; offset < pixels.length; offset += 4) {
+      if (pixels[offset + 3]! > 40 && pixels[offset + 2]! - pixels[offset + 1]! > 25 && pixels[offset]! - pixels[offset + 1]! > 6) count += 1;
+    }
+    return count;
+  });
+}
+
+test.describe("planet candidates", () => {
+  const TOI_119_CANDIDATES = ["toi-119-01", "toi-119-02"];
+
+  test.beforeEach(async ({ page, request }) => {
+    await skipIfAtlasUnavailable(request);
+    await page.route("**/api/survey-image?**", (route) => route.fulfill({ status: 200, contentType: "image/png", body: SURVEY_IMAGE }));
+    const candidate = await request.get("/api/objects/toi-119-01");
+    test.skip(!candidate.ok(), "The catalog under test has no planet candidates.");
+  });
+
+  test("search finds a candidate, the inspector says that it is not confirmed, and the system view shows violet rings", async ({ page, request }) => {
+    const candidate = await catalogObject(request, "toi-119-01");
+    const host = await catalogObject(request, "toi-119");
+    expect(candidate.position_model).toBe("tess_toi_host_relative_orbit");
+    expect(candidate.position).toEqual(host.position);
+    expect(candidate.facts.disposition).toBe("planet_candidate");
+    expect(candidate.facts.semi_major_axis_atlas_calculated).toBe(true);
+
+    const issues = collectBrowserIssues(page);
+    await openAtlas(page, `/?perf=1&t=${encodeURIComponent(ATLAS_TIME)}`);
+    await selectCatalogObject(page, "TOI-119.01", "toi-119-01", "TOI-119.01");
+    await expect(page.locator("#selected-object-panel")).toContainText("Planet candidate");
+    await openScienceView(page);
+    const section = page.locator("#body-info .exoplanet-orbit");
+    await expect(section).toHaveAttribute("data-planet-candidate", "");
+    await expect(section).toHaveAttribute("data-exoplanet-state", "position");
+    await expect(section.locator(".planet-candidate-notice")).toContainText("not a confirmed planet");
+    await expect(section).toContainText("Planet candidate (TFOPWG disposition PC)");
+    await expect(section).toContainText("calculated by the atlas");
+    await expect(section).toContainText("Transit depth");
+    await expect(section).toContainText("BJD-TDB");
+    await expect(page.locator("#body-info")).not.toContainText("Confirmed exoplanets");
+
+    await page.locator("#body-info [data-planetary-system]").click();
+    await waitForRings(page, TOI_119_CANDIDATES);
+    await expect.poll(async () => (await camera(page)).pxPerAu, { timeout: 20_000 }).toBeGreaterThan(1_000);
+    await expect.poll(async () => {
+      const first = (await camera(page)).pxPerAu;
+      await page.waitForTimeout(250);
+      return Math.abs((await camera(page)).pxPerAu - first);
+    }, { timeout: 20_000 }).toBe(0);
+    const state = await rings(page);
+    const visible = await visibleKeys(page);
+    for (const ring of state) {
+      expect(ring.displayState, ring.key).toBe("position");
+      expect(visible, "each candidate has a marker").toContain(ring.key);
+      expect(Math.hypot(ring.position.x - ring.host.x, ring.position.y - ring.host.y), "the candidate is apart from its star").toBeGreaterThan(20);
+    }
+    // One star marker for the host, with its label. The rings are violet, not the blue of a confirmed planet.
+    expect(visible).toContain("toi-119");
+    expect(await labelKeys(page)).toContain("toi-119");
+    expect(await candidatePixelCount(page)).toBeGreaterThan(300);
+    issues.assertClean();
+  });
+
+  test("the star of a candidate lists its candidates as not confirmed, and each entry selects that candidate", async ({ page }) => {
+    await openAtlas(page, "/?perf=1");
+    await selectCatalogObject(page, "TOI-119", "toi-119", "TOI-119");
+    await expect(page.locator("#body-info [data-planetary-system]")).toBeVisible();
+    await page.locator('#body-info [data-object-view="science"]').click();
+    const list = page.locator("#body-info .planet-candidates");
+    await expect(list).toHaveAttribute("data-planet-candidate-count", "2");
+    await expect(list.locator("h3")).toContainText("not confirmed");
+    await expect(list.locator(".planet-candidate-notice")).toContainText("not confirmed planets");
+    await expect(page.locator("#body-info")).not.toContainText("Confirmed exoplanets");
+    await list.locator('[data-related-key="toi-119-02"]').click();
+    await expect(page.locator("#selected-summary-name")).toContainText("TOI-119.02");
+  });
+
+  test("a confirmed host star keeps its planet list and shows its candidates in a separate list", async ({ page, request }) => {
+    // HIP 56998 (TOI-6276) has confirmed planets and one more TESS candidate. The test stops when the archive changes that.
+    const response = await request.get("/api/objects/toi-6276-03");
+    test.skip(!response.ok() || (await response.json()).object?.parent_key !== "exosys-hip-56998", "TOI-6276.03 is not a candidate of HIP 56998 in this catalog.");
+    const candidate = await catalogObject(request, "toi-6276-03");
+    const host = await catalogObject(request, "exosys-hip-56998");
+    expect(candidate.position).toEqual(host.position);
+    await expect.poll(async () => (await request.get("/api/objects/toi-6276")).status()).toBe(404);
+
+    await openAtlas(page, "/?perf=1");
+    await selectCatalogObject(page, "HIP 56998", "exosys-hip-56998", "HIP 56998");
+    await page.locator('#body-info [data-object-view="science"]').click();
+    await expect(page.locator("#body-info")).toContainText("Confirmed exoplanets");
+    await expect(page.locator("#body-info .planet-candidates [data-related-key]")).toHaveCount(1);
+    await expect(page.locator('#body-info .planet-candidates [data-related-key="toi-6276-03"]')).toBeVisible();
+    // The confirmed planets stay in their own list, with no candidate in it.
+    await expect(page.locator('#body-info .planet-list [data-related-key^="exoplanet-"]')).toHaveCount(2);
+    await expect(page.locator('#body-info [data-related-key="toi-6276-03"]')).toHaveCount(1);
+  });
+
+  test("a candidate with no period has no ring and the inspector says so", async ({ page, request }) => {
+    const response = await request.get("/api/objects/toi-125-04");
+    test.skip(!response.ok() || (await response.json()).object?.facts?.orbit_display_state !== "none", "TOI-125.04 has an orbit in this catalog.");
+    const candidate = await catalogObject(request, "toi-125-04");
+    expect(candidate.position_model).toBe("tess_toi_host_coordinates");
+    await openAtlas(page, "/?perf=1");
+    await selectCatalogObject(page, "TOI-125.04", "toi-125-04", "TOI-125.04");
+    await expect(page.locator("#body-info [data-planetary-system]")).toHaveCount(0);
+    await openScienceView(page);
+    const section = page.locator("#body-info .exoplanet-orbit");
+    await expect(section).toHaveAttribute("data-exoplanet-state", "none");
+    await expect(section).toContainText("the atlas calculates no orbit");
+    await expect(section.locator(".planet-candidate-notice")).toContainText("not a confirmed planet");
+    expect((await rings(page)).map((ring) => ring.key)).not.toContain("toi-125-04");
   });
 });
 

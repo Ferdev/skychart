@@ -673,6 +673,20 @@
   margin-top: 12px;
 }
 
+/*
+ * A planet candidate is not a confirmed planet. The notice stays prominent,
+ * in the violet of the candidate rings. Two classes keep it above the
+ * workspace colors of a plain note.
+ */
+.object-note.planet-candidate-notice {
+  margin-bottom: 10px;
+  border-color: rgba(201, 184, 255, 0.4);
+  border-left: 3px solid #c9b8ff;
+  color: #ece6ff;
+  background: rgba(201, 184, 255, 0.12);
+  font-weight: 600;
+}
+
 .planet-list strong,
 .planet-list span {
   min-width: 0;

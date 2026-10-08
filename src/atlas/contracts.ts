@@ -114,6 +114,16 @@ export type BodyExoplanetSystem = {
   why_interesting?: string | null;
 };
 
+/** A planet candidate of a host star. A candidate is not a confirmed planet. */
+export type BodyPlanetCandidate = {
+  key?: string | null;
+  name: string;
+  disposition?: string | null;
+  radius_earth?: number | null;
+  period_days?: number | null;
+  semi_major_axis_au?: number | null;
+};
+
 /** A display convention that stands in for a value the archive does not give. */
 export type ExoplanetOrbitConvention = "node_angle" | "edge_on_inclination" | "circular_orbit";
 
@@ -168,6 +178,8 @@ export type Body = DestinationBody & {
   orbit?: BodyOrbit | null;
   stellar?: BodyStellar | null;
   exoplanet_system?: BodyExoplanetSystem | null;
+  /** Planet candidates of this star. They are not in the confirmed planet list. */
+  planet_candidates?: BodyPlanetCandidate[] | null;
   exoplanet_orbit?: BodyExoplanetOrbit | null;
   deep_sky?: BodyDeepSky | null;
   small_body?: BodySmallBody | null;

@@ -1,5 +1,6 @@
 import type { BodyFilterDefinition, CatalogViewportPayload } from "../atlas/contracts";
 import type { CatalogObjectMapper } from "./catalogObjectMapper";
+import { EXOPLANET_VIEWPORT_GROUPS } from "./exoplanetGroups";
 
 type Bounds = { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number };
 
@@ -123,10 +124,11 @@ function catalogGroups(viewWidthLy: number, bounds: Bounds) {
     // Exoplanet orbits are visible only at this scale, so the hosts and their planets load here.
     const sunDistanceAu = Math.hypot(distanceFromZero(bounds.minXAu, bounds.maxXAu), distanceFromZero(bounds.minYAu, bounds.maxYAu));
     if (sunDistanceAu < SOLAR_SYSTEM_RADIUS_AU) return ["jpl_small_bodies"];
-    if (sunDistanceAu < SMALL_BODY_REACH_AU) return ["jpl_small_bodies", "exoplanet_systems", "exoplanets"];
-    return ["exoplanet_systems", "exoplanets"];
+    if (sunDistanceAu < SMALL_BODY_REACH_AU) return ["jpl_small_bodies", ...EXOPLANET_VIEWPORT_GROUPS];
+    return [...EXOPLANET_VIEWPORT_GROUPS];
   }
-  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", "exoplanet_systems", "exoplanets"];
+  // The stars with planet candidates load only below this width: no tile layer has them.
+  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", ...EXOPLANET_VIEWPORT_GROUPS];
   if (viewWidthLy < 6_000) return ["bright_stars", "gaia_local_stars", "gaia_500pc_stars", "exoplanet_systems", "exoplanets", "simbad_compact_objects"];
   if (viewWidthLy < 25_000) return ["bright_stars", "simbad_compact_objects"];
   return ["simbad_extragalactic", "simbad_compact_objects", "messier_deep_sky"];

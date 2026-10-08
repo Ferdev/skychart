@@ -1,11 +1,11 @@
 import type { Body, BodyExoplanetOrbit, ExoplanetOrbitConvention } from "../atlas/contracts";
+import { orbitsHostStar } from "./exoplanetGroups.ts";
 import { solveKepler, type SmallBodyPosition } from "./smallBodyPropagation.ts";
 
 const JULIAN_DAY_UNIX_EPOCH = 2_440_587.5;
 const MILLISECONDS_PER_DAY = 86_400_000;
 const SECONDS_PER_DAY = 86_400;
 const FULL_TURN = Math.PI * 2;
-const EXOPLANET_GROUP = "exoplanets";
 
 /*
  * Display conventions for host-relative exoplanet orbits. No other file
@@ -186,7 +186,7 @@ export function exoplanetUncertaintyArcAu(
  * back unchanged.
  */
 export function positionExoplanet(body: Body, timestamp: string, auKm: number, earth?: Body): Body {
-  if (body.catalog_group !== EXOPLANET_GROUP) return body;
+  if (!orbitsHostStar(body)) return body;
   const facts = body.catalog?.facts;
   const host = body.exoplanet_orbit?.host_position
     ?? { x_au: body.position.x_au, y_au: body.position.y_au, z_au: body.position.z_au };
@@ -266,7 +266,7 @@ export function exoplanetOrbitReachAu(body: Body): number | null {
 
 /** True for an exoplanet that the orbit module has positioned. The Canvas overlay draws its marker. */
 export function isPositionedExoplanet(body: Body): boolean {
-  return body.catalog_group === EXOPLANET_GROUP && Boolean(body.exoplanet_orbit);
+  return orbitsHostStar(body) && Boolean(body.exoplanet_orbit);
 }
 
 /** True when the orbit is wide enough on screen for the planet to have its own marker. */

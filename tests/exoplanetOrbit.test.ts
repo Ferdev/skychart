@@ -17,6 +17,7 @@ import {
   readExoplanetOrbit,
   type Vector3,
 } from "../src/catalog/exoplanetOrbit.ts";
+import { isExoplanetHostStar, isPlanetCandidate, orbitsHostStar } from "../src/catalog/exoplanetGroups.ts";
 import { packRichPoints, richLayerOrigin } from "../src/rendering/richPointLayer.ts";
 import { EXOPLANET_TRANSLATION_KEYS, EXOPLANET_TRANSLATIONS } from "../src/catalog/exoplanetTranslations.ts";
 import type { Body } from "../src/atlas/contracts.ts";
@@ -316,6 +317,26 @@ function planet(facts: Record<string, unknown>, host = TRAPPIST_HOST): Body {
   assert.equal(positionExoplanet(legacy, timestamp, AU_KM), legacy);
   const star = { ...planet(circularFacts), catalog_group: "exoplanet_systems" } as Body;
   assert.equal(positionExoplanet(star, timestamp, AU_KM), star);
+
+  // A planet candidate uses the same orbit code as a confirmed planet and stays a candidate.
+  const candidateBody = { ...planet(circularFacts), key: "toi-100-01", object_type: "planet_candidate", catalog_group: "exoplanet_candidates" } as Body;
+  const candidate = positionExoplanet(candidateBody, timestamp, AU_KM);
+  assert.equal(candidate.exoplanet_orbit?.display_state, "position");
+  assert.deepEqual(candidate.position, { ...positioned.position });
+  assert.deepEqual(candidate.exoplanet_orbit, positioned.exoplanet_orbit);
+  assert.equal(candidate.catalog_group, "exoplanet_candidates");
+  assert.equal(candidate.object_type, "planet_candidate");
+  assert.equal(hasResolvedExoplanetMarker(candidate, 4 / (2 * SEMI_MAJOR_AXIS_AU)), true);
+  const candidateHost = { ...star, catalog_group: "exoplanet_candidate_hosts" } as Body;
+  assert.equal(positionExoplanet(candidateHost, timestamp, AU_KM), candidateHost);
+
+  // The group rules: which bodies orbit a host, which stars are hosts, which bodies are candidates.
+  assert.deepEqual(["exoplanets", "exoplanet_candidates", "exoplanet_systems", "bright_stars", undefined].map((group) => orbitsHostStar({ catalog_group: group })), [true, true, false, false, false]);
+  assert.deepEqual(
+    ["exoplanet_systems", "nearby_exoplanet_systems", "exoplanet_candidate_hosts", "gaia_local_stars", "exoplanets", null].map((group) => isExoplanetHostStar({ catalog_group: group })),
+    [true, true, true, false, false, false],
+  );
+  assert.deepEqual(["exoplanet_candidates", "exoplanets", "exoplanet_candidate_hosts"].map((group) => isPlanetCandidate({ catalog_group: group })), [true, false, false]);
 
   // The marker rule: a calculated position on an orbit of 4 pixels or more.
   assert.equal(isExoplanetOrbitResolved(positioned, 4 / (2 * SEMI_MAJOR_AXIS_AU)), true);

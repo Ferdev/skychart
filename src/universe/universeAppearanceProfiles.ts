@@ -1,3 +1,4 @@
+import { orbitsHostStar } from "../catalog/exoplanetGroups.ts";
 import type { PhysicalBody } from "./universeBodyGeometry.ts";
 
 export type BodyAppearance = {
@@ -14,13 +15,13 @@ const TILTS: Record<string, number> = { earth: 23.44, mars: 25.19, jupiter: 3.13
 const COLORS: Record<string, string> = { sun: "#fff0d2", earth: "#34649c", mars: "#b07654",
   jupiter: "#ceae8b", saturn: "#c8b888", venus: "#e2cda2", uranus: "#9dcacd", neptune: "#7696bc" };
 const ROOT = "/textures/universe/";
-/** One neutral matte material for each exoplanet. No surface is selected from the mass or the temperature. */
+/** One neutral matte material for each exoplanet and each planet candidate. No surface is selected from the mass or the temperature. */
 export const EXOPLANET_MATERIAL = 9;
 export const EXOPLANET_COLOR = "#8f8f8f";
 
 export function bodyAppearance(body: PhysicalBody): BodyAppearance {
   // The rule is by catalog group. A key, a color, or a temperature gives an exoplanet no surface.
-  if (body.catalog_group === "exoplanets") {
+  if (orbitsHostStar(body)) {
     return { material: EXOPLANET_MATERIAL, tilt: 0, phase: 0, atmosphere: 0, relief: 0, color: parseBodyColor(EXOPLANET_COLOR) };
   }
   const star = body.key === "sun" || body.object_type === "star";

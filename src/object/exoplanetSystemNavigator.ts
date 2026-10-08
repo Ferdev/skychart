@@ -1,5 +1,6 @@
 import type { Body, BodyExoplanet, Camera } from "../atlas/contracts";
 import type { CatalogObjectMapper } from "../catalog/catalogObjectMapper";
+import { isExoplanetHostStar, orbitsHostStar } from "../catalog/exoplanetGroups";
 import { exoplanetOrbitReachAu } from "../catalog/exoplanetOrbit";
 import { isAtHost, loadExoplanetSystemObjects } from "../catalog/exoplanetSystemLoader";
 import type { Rect } from "../geometry";
@@ -18,11 +19,10 @@ type ExoplanetSystemNavigatorOptions = {
   maximumZoom: number;
 };
 
-const HOST_STAR_GROUPS = new Set(["exoplanet_systems", "nearby_exoplanet_systems"]);
 // The largest orbit fills the view with this margin on each side.
 const SYSTEM_VIEW_MARGIN_RATIO = 0.25;
 
-/** Moves the map to a host star and fits the largest planet orbit of its system. */
+/** Moves the map to a host star and fits the largest orbit of its planets and planet candidates. */
 export class ExoplanetSystemNavigator {
   private requestId = 0;
 
@@ -33,7 +33,7 @@ export class ExoplanetSystemNavigator {
     });
   }
 
-  /** Loads the planets of the host star at this position into the atlas body list, at the atlas time. */
+  /** Loads the planets and the planet candidates of the host star at this position into the atlas body list, at the atlas time. */
   async load(host: HostPosition): Promise<void> {
     const objects = await loadExoplanetSystemObjects(host);
     this.options.mergeBodies(objects.map((object) => this.options.mapper.map(object)));
@@ -68,7 +68,7 @@ export class ExoplanetSystemNavigator {
     const orbits = this.options.bodies()
       .filter((candidate) => candidate.exoplanet_orbit && isAtHost(candidate.exoplanet_orbit.host_position, host))
       .map((candidate) => exoplanetOrbitReachAu(candidate) ?? 0);
-    const planets: BodyExoplanet[] = body.exoplanet_system?.planets ?? [];
+    const planets: Pick<BodyExoplanet, "semi_major_axis_au">[] = [...(body.exoplanet_system?.planets ?? []), ...(body.planet_candidates ?? [])];
     const listed = planets.map((planet) => planet.semi_major_axis_au ?? 0);
     const reachAu = Math.max(0, ...orbits, ...listed);
     // With no orbit size in the archive, the view keeps a star-sized scale.
@@ -76,8 +76,8 @@ export class ExoplanetSystemNavigator {
   }
 }
 
-/** True when the atlas can show a planetary system for this body: a planet with an orbit, or a host star. */
+/** True when the atlas can show a planetary system for this body: a planet or a planet candidate with an orbit, or a host star. */
 export function hasPlanetarySystemView(body: Body): boolean {
-  if (body.catalog_group === "exoplanets") return Boolean(body.exoplanet_orbit && body.exoplanet_orbit.display_state !== "none");
-  return HOST_STAR_GROUPS.has(body.catalog_group ?? "");
+  if (orbitsHostStar(body)) return Boolean(body.exoplanet_orbit && body.exoplanet_orbit.display_state !== "none");
+  return isExoplanetHostStar(body);
 }

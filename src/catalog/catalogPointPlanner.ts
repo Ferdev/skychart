@@ -60,7 +60,9 @@ const OBJECT_ONLY_CATALOG_GROUPS = new Set(["jpl_small_bodies"]);
 // moves to the viewport-object path, which keeps the precise coordinates.
 const TILE_QUANTIZATION_STEPS = 65_535;
 const OBJECT_PATH_QUANTIZATION_PX = 1;
-const SYSTEM_SCALE_OBJECT_GROUPS = new Set(["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"]);
+const SYSTEM_SCALE_OBJECT_GROUPS = new Set([
+  "nearby_exoplanet_systems", "exoplanet_systems", "exoplanets", "exoplanet_candidate_hosts", "exoplanet_candidates",
+]);
 // A tile point for a planet is at its host star. A layer of planets only
 // yields to the bodies with the orbit offset as soon as one orbit in view is
 // resolved.

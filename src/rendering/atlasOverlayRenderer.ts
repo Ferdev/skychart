@@ -1,8 +1,9 @@
 import type { Body, Camera, Ephemeris } from "../atlas/contracts";
 import type { SmallBodyPosition } from "../catalog/smallBodyPropagation";
+import { isPlanetCandidate } from "../catalog/exoplanetGroups";
 import { exoplanetOrbitPathAu, exoplanetOrbitReachAu, exoplanetUncertaintyPathAu, isPositionedExoplanet, isRingOnlyExoplanet } from "../catalog/exoplanetOrbit";
 import { t } from "../i18n";
-import { clamp, degToRad, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectsOverlap, rectUnion, type EdgeSide, type Rect, type ScreenPoint } from "../geometry";
+import { clamp, degToRad, edgeAnchorForScreen, expandedRect, isPresent, niceStep, pointInRect, pointRect, rectsOverlap, rectUnion, type EdgeSide, type Rect, type ScreenPoint } from "../geometry";
 
 type EdgeBody = { body: Body; screen: ScreenPoint };
 
@@ -54,12 +55,19 @@ const EXOPLANET_ORBIT_DASH = [6, 5];
 const EXOPLANET_ORBIT_COLOR = "rgba(137, 214, 255, 0.5)";
 const EXOPLANET_UNCERTAINTY_COLOR = "rgba(137, 214, 255, 0.34)";
 const EXOPLANET_UNCERTAINTY_WIDTH_PX = 7;
+// The ring of a planet candidate is dotted and violet: a candidate is not a
+// confirmed planet, and the atlas calculates its orbit size.
+const CANDIDATE_ORBIT_DASH = [1.5, 5];
+const CANDIDATE_ORBIT_COLOR = "rgba(201, 184, 255, 0.6)";
+const CANDIDATE_UNCERTAINTY_COLOR = "rgba(201, 184, 255, 0.34)";
 
 /** Draws the navigational overlays layered above the catalog point renderer. */
 export class AtlasOverlayRenderer {
   private edgeHitRegions: { body: Body; rect: Rect }[] = [];
   // Canvas position of the convention line in this frame, or null when the frame has no exoplanet ring.
   private exoplanetNoteAnchor: ScreenPoint | null = null;
+  // Text of the convention line in this frame: one sentence for each kind of ring in view.
+  private exoplanetNoteText = "";
 
   constructor(private readonly options: AtlasOverlayRendererOptions) {}
 
@@ -120,7 +128,9 @@ export class AtlasOverlayRenderer {
     const toolbar = this.options.toolbar.getBoundingClientRect();
     const covered = toolbar.height > 0 && anchor.y >= toolbar.top && anchor.x >= toolbar.left && anchor.x <= toolbar.right;
     note.hidden = !covered;
-    if (covered) note.style.bottom = `${Math.round(window.innerHeight - toolbar.top + 8)}px`;
+    if (!covered) return;
+    note.style.bottom = `${Math.round(window.innerHeight - toolbar.top + 8)}px`;
+    if (note.textContent !== this.exoplanetNoteText) note.textContent = this.exoplanetNoteText;
   }
 
   drawOrbitGuides() {
@@ -157,18 +167,23 @@ export class AtlasOverlayRenderer {
       const ring = exoplanetOrbitPathAu(body, samples);
       if (!ring) continue;
       const highlighted = body.key === frame.selectedKey;
-      ctx.setLineDash(EXOPLANET_ORBIT_DASH);
-      ctx.strokeStyle = highlighted ? "rgba(248, 218, 136, 0.78)" : EXOPLANET_ORBIT_COLOR;
+      const candidate = isPlanetCandidate(body);
+      ctx.setLineDash(candidate ? CANDIDATE_ORBIT_DASH : EXOPLANET_ORBIT_DASH);
+      ctx.strokeStyle = highlighted ? "rgba(248, 218, 136, 0.78)" : candidate ? CANDIDATE_ORBIT_COLOR : EXOPLANET_ORBIT_COLOR;
       ctx.lineWidth = highlighted ? 1.8 : 1.15;
       this.strokePolyline(ring, true);
       const arc = exoplanetUncertaintyPathAu(body, samples);
       if (!arc) continue;
       ctx.setLineDash([]);
-      ctx.strokeStyle = EXOPLANET_UNCERTAINTY_COLOR;
+      ctx.strokeStyle = candidate ? CANDIDATE_UNCERTAINTY_COLOR : EXOPLANET_UNCERTAINTY_COLOR;
       ctx.lineWidth = EXOPLANET_UNCERTAINTY_WIDTH_PX;
       this.strokePolyline(arc, false);
     }
     ctx.restore();
+    this.exoplanetNoteText = [
+      frame.exoplanetOrbits.some((body) => !isPlanetCandidate(body)) ? t("exoplanet.mapNote") : null,
+      frame.exoplanetOrbits.some(isPlanetCandidate) ? t("exoplanet.candidateMapNote") : null,
+    ].filter(isPresent).join(" ");
     this.drawExoplanetOrbitNote(frame.viewport);
   }
 
@@ -192,7 +207,10 @@ export class AtlasOverlayRenderer {
     ctx.stroke();
   }
 
-  /** States above the scale bar that the ring direction is a convention. The line wraps on a narrow view. */
+  /**
+   * States above the scale bar that the ring direction is a convention, and
+   * that a violet ring is a planet candidate. The line wraps on a narrow view.
+   */
   private drawExoplanetOrbitNote(rect: Rect) {
     const ctx = this.options.context;
     ctx.save();
@@ -200,7 +218,7 @@ export class AtlasOverlayRenderer {
     ctx.fillStyle = "rgba(190, 228, 245, 0.82)";
     const maxWidth = Math.max(120, rect.width - 48);
     const lines: string[] = [];
-    for (const word of t("exoplanet.mapNote").split(" ")) {
+    for (const word of this.exoplanetNoteText.split(" ")) {
       const candidate = lines.length > 0 ? `${lines[lines.length - 1]} ${word}` : word;
       if (lines.length > 0 && ctx.measureText(candidate).width <= maxWidth) lines[lines.length - 1] = candidate;
       else lines.push(word);

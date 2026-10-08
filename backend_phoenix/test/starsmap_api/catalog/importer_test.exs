@@ -3,6 +3,7 @@ defmodule StarsmapApi.Catalog.ImporterTest do
 
   alias StarsmapApi.Catalog.CatalogSourceObject
   alias StarsmapApi.Catalog.Importer
+  alias StarsmapApi.Catalog.Importer.RowMapper
   alias StarsmapApi.Catalog.PublicObjects
   alias StarsmapApi.Catalog.SnapshotStore
 
@@ -290,6 +291,56 @@ defmodule StarsmapApi.Catalog.ImporterTest do
     assert attrs.ra_deg != 10.0
     assert attrs.dec_deg != -20.0
     assert attrs.search_text =~ "gaia dr3 123"
+  end
+
+  test "maps the SIMBAD names of a Gaia star to external ids and to the search text" do
+    attrs =
+      Importer.attrs_for_entry!(
+        {:gaia_star,
+         %{
+           "key" => "gaia-dr3-3220388198192519424",
+           "name" => "StKM 1-561",
+           "simbad_main_id" => "StKM 1-561",
+           "aliases" => [
+             "Gaia DR3 3220388198192519424",
+             "Gaia 3220388198192519424",
+             "3220388198192519424",
+             "StKM 1-561",
+             "HD 999",
+             "HIP 42",
+             "TIC 4206066",
+             "TYC 4753-1591-1",
+             "2MASS J05232636-0119380"
+           ],
+           "ra_deg" => 80.8598,
+           "dec_deg" => -1.3270,
+           "distance_pc" => 35.6,
+           "parallax_mas" => 28.075,
+           "apparent_magnitude" => 10.51,
+           "source_id" => "3220388198192519424",
+           "radius_km" => 466_000.0
+         }}
+      )
+
+    assert attrs.key == "gaia-dr3-3220388198192519424"
+    assert attrs.name == "StKM 1-561"
+
+    assert attrs.external_ids == %{
+             "gaia_dr3_source_id" => "3220388198192519424",
+             "hd" => "HD 999",
+             "hip" => "HIP 42",
+             "tic" => "TIC 4206066"
+           }
+
+    assert attrs.facts["simbad_main_id"] == "StKM 1-561"
+    assert "TIC 4206066" in attrs.aliases
+    # With the space, with no space, by the SIMBAD name, and by the Gaia number.
+    assert attrs.search_text =~ "tic 4206066"
+    assert attrs.search_text =~ "tic4206066"
+    assert attrs.search_text =~ "hd999"
+    assert attrs.search_text =~ "stkm 1-561"
+    assert attrs.search_text =~ "gaia dr3 3220388198192519424"
+    refute attrs.search_text =~ "2massj"
   end
 
   test "maps SIMBAD extragalactic entries with redshift facts" do
@@ -585,6 +636,180 @@ defmodule StarsmapApi.Catalog.ImporterTest do
 
     assert {:ok, %{total: 5}} = Importer.import_all(data_dir: data_dir)
     assert Repo.aggregate(CatalogSourceObject, :count, :id) == 5
+  end
+
+  test "maps a TESS planet candidate system to a star row and candidate rows" do
+    system =
+      candidate_system("100", "111", [
+        candidate("100", "01"),
+        candidate("100", "02", %{"orbit_display_state" => "none", "semi_major_axis_au" => nil})
+      ])
+
+    host = Importer.attrs_for_entry!({:exoplanet_candidate_system, system})
+
+    assert host.key == "toi-100"
+    assert host.object_type == "star"
+    assert host.catalog_group == "exoplanet_candidate_hosts"
+    assert host.source_type == "tess_toi_host"
+    assert host.position_model == "tess_toi_coordinates"
+    assert host.external_ids == %{"tic" => "TIC 111"}
+    assert host.facts["candidate_count"] == 2
+    assert host.facts["stellar_mass_atlas_calculated"] == true
+
+    assert [%{"key" => "toi-100-01", "disposition" => "planet_candidate"} = summary, _] =
+             host.facts["candidates"]
+
+    assert Map.keys(summary) |> Enum.sort() ==
+             ~w(disposition key name period_days semi_major_axis_au)
+
+    assert host.search_text =~ "toi-100.01"
+    assert host.search_text =~ "toi100"
+    assert host.search_text =~ "tic111"
+
+    assert [first, second] =
+             system
+             |> RowMapper.exoplanet_candidate_entries(system)
+             |> Enum.map(&Importer.attrs_for_entry!({:exoplanet_candidate, &1}))
+
+    assert first.key == "toi-100-01"
+    assert first.name == "TOI-100.01"
+    assert first.object_type == "planet_candidate"
+    assert first.catalog_group == "exoplanet_candidates"
+    assert first.source_type == "tess_toi_candidate"
+    assert first.position_model == "tess_toi_host_relative_orbit"
+    assert first.parent_key == "toi-100"
+    assert first.aliases == ["TOI-100.01", "TOI 100.01"]
+    assert first.external_ids == %{"toi" => "100.01", "tic" => "TIC 111"}
+    assert {first.x_au, first.y_au, first.z_au} == {host.x_au, host.y_au, host.z_au}
+    assert first.facts["disposition"] == "planet_candidate"
+    assert first.facts["tfopwg_disposition"] == "PC"
+    assert first.facts["host_key"] == "toi-100"
+    assert first.facts["host_name"] == "TOI-100"
+    assert first.facts["semi_major_axis_atlas_calculated"] == true
+    assert first.facts["ephemeris_reference_type"] == "conjunction"
+    assert first.facts["ephemeris_reference_time_jd_err_plus"] == 0.002
+    assert first.facts["why_interesting"] =~ "not a confirmed planet"
+    assert first.search_text =~ "planet candidate"
+    refute Map.has_key?(first.facts, "candidates")
+
+    assert second.position_model == "tess_toi_host_coordinates"
+    refute Map.has_key?(second.facts, "semi_major_axis_au")
+  end
+
+  test "import_all puts a candidate at the confirmed host with the same TIC number" do
+    data_dir = tmp_catalog_dir()
+    File.write!(Path.join(data_dir, "deep_sky_catalog.json"), Jason.encode!(%{"objects" => []}))
+
+    File.write!(
+      Path.join(data_dir, "exoplanet_systems.json"),
+      Jason.encode!(%{
+        "systems" => [
+          %{
+            "key" => "exosys-test",
+            "name" => "Test Host",
+            "aliases" => ["HD 1", "TIC 111"],
+            "ra_deg" => 1.0,
+            "dec_deg" => 2.0,
+            "distance_pc" => 3.0,
+            "planets" => [%{"name" => "Test Host b"}]
+          }
+        ]
+      })
+    )
+
+    File.write!(
+      Path.join(data_dir, "exoplanet_candidates.json"),
+      Jason.encode!(%{
+        "schema_version" => 1,
+        "source" => %{"table" => "toi"},
+        "systems" => [
+          candidate_system("100", "111", [candidate("100", "03")]),
+          candidate_system("200", "222", [candidate("200", "01")])
+        ]
+      })
+    )
+
+    assert {:ok, %{total: 5, counts: counts, report: report, source_table_counts: tables}} =
+             Importer.import_all(data_dir: data_dir)
+
+    assert counts == %{
+             "exoplanet_systems" => 1,
+             "exoplanets" => 1,
+             "exoplanet_candidate_hosts" => 1,
+             "exoplanet_candidates" => 2
+           }
+
+    assert report[:valid?] == true
+    assert report.source_types["tess_toi_host"].rows == 1
+    assert report.source_types["tess_toi_candidate"].rows == 2
+    assert tables == %{"catalog_exoplanet_objects" => 5}
+    assert count_source_table("catalog_exoplanet_objects") == 5
+
+    # The star with TIC 111 is the confirmed host: it keeps its one row.
+    assert {:error, :not_found} = PublicObjects.get_by_key("toi-100")
+    assert {:ok, confirmed} = PublicObjects.get_by_key("exosys-test")
+    assert confirmed.facts["candidate_count"] == 1
+    assert [%{"key" => "toi-100-03", "name" => "TOI-100.03"}] = confirmed.facts["candidates"]
+    assert [%{"name" => "Test Host b"}] = confirmed.facts["planets"]
+
+    assert {:ok, at_confirmed} = PublicObjects.get_by_key("toi-100-03")
+    assert at_confirmed.object_type == "planet_candidate"
+    assert at_confirmed.parent_key == "exosys-test"
+    assert at_confirmed.facts["host_name"] == "Test Host"
+    assert at_confirmed.position == confirmed.position
+    assert at_confirmed.source["catalog"] == "exoplanet_candidate_system"
+
+    assert {:ok, toi_host} = PublicObjects.get_by_key("toi-200")
+    assert toi_host.catalog_group == "exoplanet_candidate_hosts"
+
+    assert {:ok, %{parent_key: "toi-200", position: position}} =
+             PublicObjects.get_by_key("toi-200-01")
+
+    assert position == toi_host.position
+    refute position == confirmed.position
+
+    # A second import replaces the rows and adds none.
+    assert {:ok, %{total: 5}} = Importer.import_all(data_dir: data_dir)
+    assert Repo.aggregate(CatalogSourceObject, :count, :id) == 5
+  end
+
+  defp candidate_system(star, tic_id, candidates) do
+    %{
+      "key" => "toi-#{star}",
+      "name" => "TOI-#{star}",
+      "aliases" => ["TOI-#{star}", "TIC #{tic_id}"],
+      "tic_id" => tic_id,
+      "ra_deg" => 40.0,
+      "dec_deg" => -10.0,
+      "distance_pc" => 50.0,
+      "stellar_radius_solar" => 1.0,
+      "stellar_mass_solar" => 1.0,
+      "stellar_mass_atlas_calculated" => true,
+      "candidate_count" => length(candidates),
+      "candidates" => candidates
+    }
+  end
+
+  defp candidate(star, number, values \\ %{}) do
+    Map.merge(
+      %{
+        "key" => "toi-#{star}-#{number}",
+        "name" => "TOI-#{star}.#{number}",
+        "toi" => "#{star}.#{number}",
+        "disposition" => "planet_candidate",
+        "tfopwg_disposition" => "PC",
+        "period_days" => 10.0,
+        "semi_major_axis_au" => 0.09,
+        "semi_major_axis_atlas_calculated" => true,
+        "orbit_display_state" => "position",
+        "ephemeris_reference_type" => "conjunction",
+        "ephemeris_time_system" => "BJD-TDB",
+        "ephemeris_period_days" => 10.0,
+        "ephemeris_reference_time_jd" => 2_460_000.5,
+        "ephemeris_reference_time_jd_err_plus" => 0.002
+      },
+      values
+    )
   end
 
   defp tmp_catalog_dir do

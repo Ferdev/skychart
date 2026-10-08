@@ -1,16 +1,16 @@
+import { isExoplanetHostStar } from "../catalog/exoplanetGroups.ts";
 import type { Vector3 } from "../sky/skyProjection";
 import type { UniversePoint } from "./universePointModel";
 
 type HostPosition = { x_au: number; y_au: number; z_au: number };
 
-const HOST_STAR_GROUPS = new Set(["exoplanet_systems", "nearby_exoplanet_systems"]);
 // Planets load for the nearest host stars inside this distance. From farther
 // away an orbit is less than one pixel wide and the star represents the system.
 const SYSTEM_LOAD_DISTANCE_AU = 50_000;
 const MAX_SYSTEMS_PER_UPDATE = 3;
 
 /**
- * Loads the planets of the host stars near the 3D observer. The 3D catalog
+ * Loads the planets and the planet candidates of the host stars near the 3D observer. The 3D catalog
  * endpoint keeps each planet at its host star; the loaded bodies carry the
  * orbit offset for the atlas time and replace those points.
  */
@@ -31,7 +31,7 @@ export class UniverseExoplanetSystems {
 
   update(points: readonly UniversePoint[], observer: Vector3): void {
     const hosts = points
-      .filter((point) => HOST_STAR_GROUPS.has(point.catalog_group ?? ""))
+      .filter((point) => isExoplanetHostStar(point))
       .map((point) => ({ point, distance: Math.hypot(point.position.x - observer.x, point.position.y - observer.y, point.position.z - observer.z) }))
       .filter(({ distance }) => distance <= SYSTEM_LOAD_DISTANCE_AU)
       .sort((left, right) => left.distance - right.distance)

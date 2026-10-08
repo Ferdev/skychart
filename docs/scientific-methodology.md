@@ -231,10 +231,71 @@ AU.
   and 1,666 AU for one Hipparcos record. At the scale of a close-in system
   that record is out of view. For a system some hundred AU wide it can show
   as a second star marker; the orbits are around the archive record.
-- Planet candidates (for example TESS objects of interest) are not in this
-  table and are not shown.
+- Planet candidates are not in this table. They are a separate layer; see
+  [Planet candidates](#planet-candidates).
 - The 3D view uses the same positions. It lights each exoplanet from its host
   star and uses one neutral material; see `docs/universe-appearance.md`.
+
+## Planet candidates
+
+The atlas shows the planet candidates of the NASA Exoplanet Archive TESS
+Objects of Interest (TOI) table. A candidate is not a confirmed planet: TESS
+found a signal that looks like a transit, and follow-up observations show
+that many such signals have a different cause, for example an eclipsing
+binary star. The inspector, the search result, the candidate list of a star,
+and the map note each say that a candidate is not confirmed.
+
+Selection (`scripts/build_exoplanet_candidate_catalog.py`):
+
+- Rows with the TFOPWG disposition `PC` (planet candidate) or `APC` (ambiguous
+  planet candidate). Confirmed planets (`CP`), known planets (`KP`), false
+  positives (`FP`), and false alarms (`FA`) are not in the layer.
+- Rows with a star distance. A star with no distance has no place in the
+  atlas and the builder counts it in `coverage.excluded_no_distance`.
+- A candidate that is not in the TOI table (for example a community candidate
+  with no TOI number) is not in the layer.
+
+Catalog records:
+
+- A candidate has the object type `planet_candidate`, the group
+  `exoplanet_candidates`, and the key `toi-<star number>-<candidate number>`.
+  The confirmed planet count of a star does not include candidates.
+- A star with the same TIC number as a confirmed-planet host is that host:
+  its candidates are attached to the host record and use its coordinates.
+  Each other star gets a record in the group `exoplanet_candidate_hosts`, at
+  the coordinates and the distance of the TOI table (position model
+  `tess_toi_coordinates`).
+
+Orbit:
+
+- The TOI table gives the period and the transit midpoint (BJD in TDB). It
+  gives no orbit size and no star mass. The builder calculates the star mass
+  from the surface gravity and the radius, `M = g R^2 / G`, and the orbit size
+  from Kepler's third law, `a^3 = M P^2` (solar masses, years, AU). The facts
+  `stellar_mass_atlas_calculated` and `semi_major_axis_atlas_calculated` mark
+  these values, and the inspector says "calculated by the atlas".
+- The uncertainty of the orbit size comes from the published uncertainties of
+  the surface gravity and the radius, where the table has them. A mass below
+  0.05 or above 5 solar masses, or with an uncertainty as large as the mass,
+  gives no orbit.
+- The position rules are those of a confirmed planet: the transit midpoint is
+  the conjunction time, the orbit is a circle that is drawn edge-on, the node
+  angle is the same display convention, and a phase uncertainty above 0.25
+  orbit gives a ring and no marker. A candidate with no period, or with no
+  usable star data, has the model `tess_toi_host_coordinates`: no ring and no
+  marker.
+- A candidate ring is violet and dotted. A confirmed-planet ring is blue and
+  dashed. With a candidate ring in view, the map note says that candidates
+  are not confirmed planets and that the atlas calculates their orbit size.
+
+Limits:
+
+- The map loads the stars of candidates only at view widths below 40
+  light-years. No tile layer contains them, so a wide view does not show them.
+- The Gaia or Hipparcos record of the same star uses its own astrometry, so
+  it can show as a second star marker, as for a confirmed-planet host.
+- The dispositions change when the TESS follow-up working group reviews a
+  candidate. The snapshot shows the state at its generation time.
 
 ## Distance evidence
 
@@ -307,6 +368,7 @@ instead of leaving a broken image or pretending the fallback is DR11.
 - [NASA/JPL Small-Body Database](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html)
 - [IAU Resolution B5 and dwarf-planet classifications](https://www.iau.org/static/resolutions/Resolution_GA26-5-6.pdf)
 - [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/)
+- [NASA Exoplanet Archive TESS Objects of Interest table](https://exoplanetarchive.ipac.caltech.edu/docs/API_TOI_columns.html)
 - [BASS Data Release 2](https://www.bass-survey.com/dr2.html)
 - [BASS DR2 black-hole mass catalog at VizieR](https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2)
 - [DESI Data Release 1](https://data.desi.lbl.gov/doc/releases/dr1/)

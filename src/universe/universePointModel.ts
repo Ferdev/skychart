@@ -1,4 +1,5 @@
 import type { Body } from "../atlas/contracts.ts";
+import { orbitsHostStar } from "../catalog/exoplanetGroups.ts";
 import { bodyCanObserveSky, bodyVector, isDynamicBody } from "../sky/skyBody.ts";
 import type { Vector3 } from "../sky/skyProjection.ts";
 
@@ -29,11 +30,9 @@ export type UniversePoint = Omit<CatalogUniversePoint, "distance_au" | "directio
   hostBound?: boolean;
 };
 
-const EXOPLANET_GROUP = "exoplanets";
-
-/** The 3D catalog endpoint keeps each exoplanet at its host star and sends no orbit facts. */
+/** The 3D catalog endpoint keeps each exoplanet and each planet candidate at its host star and sends no orbit facts. */
 export function catalogPointIsHostBound(point: Pick<CatalogUniversePoint, "catalog_group">): boolean {
-  return point.catalog_group === EXOPLANET_GROUP;
+  return orbitsHostStar(point);
 }
 
 export function validCatalogPoint(point: CatalogUniversePoint): boolean {
@@ -63,7 +62,7 @@ export function bodyToUniversePoint(body: Body | null): UniversePoint | null {
     body.catalog?.position_model === "catalog_sky_position_reference_shell" ||
     body.catalog?.facts?.distance_unknown === true) return null;
   const host = body.exoplanet_orbit?.host_position;
-  const hostBound = body.catalog_group === EXOPLANET_GROUP && body.exoplanet_orbit?.display_state !== "position";
+  const hostBound = orbitsHostStar(body) && body.exoplanet_orbit?.display_state !== "position";
   return {
     key: body.key,
     name: body.name,

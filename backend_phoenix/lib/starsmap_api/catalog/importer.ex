@@ -28,7 +28,7 @@ defmodule StarsmapApi.Catalog.Importer do
 
   def import_all(opts) do
     data_dir = Keyword.fetch!(opts, :data_dir)
-    rows = data_dir |> catalog_files() |> Enum.flat_map(&rows_for_file/1)
+    rows = rows(data_dir)
     report = import_report(rows)
     {count, _} = SnapshotStore.replace_snapshot_objects(rows)
     source_table_counts = source_table_counts(rows)
@@ -48,6 +48,7 @@ defmodule StarsmapApi.Catalog.Importer do
     root_path
     |> catalog_files()
     |> Enum.flat_map(&rows_for_file/1)
+    |> with_exoplanet_candidates(Path.join(catalog_dir(root_path), "exoplanet_candidates.json"))
   end
 
   def attrs_for_entry!({type, entry}) do
@@ -119,6 +120,81 @@ defmodule StarsmapApi.Catalog.Importer do
     |> entries(data)
     |> Enum.map(&RowMapper.map(type, &1, source_meta))
   end
+
+  # The candidates come last, because a candidate can belong to a star that
+  # another file gives: a confirmed-planet host with the same TIC number.
+  # Such a star keeps its one row, and the candidates take its coordinates.
+  defp with_exoplanet_candidates(rows, path) do
+    if File.exists?(path) do
+      type = :exoplanet_candidate_system
+      data = path |> File.read!() |> Jason.decode!()
+      source_meta = source_meta(type, data, path)
+      confirmed_hosts = confirmed_hosts_by_tic(rows)
+
+      {hosts, candidates, summaries} =
+        data
+        |> Map.fetch!("systems")
+        |> Enum.reduce({[], [], %{}}, fn system, {hosts, candidates, summaries} ->
+          case Map.get(confirmed_hosts, system["tic_id"]) do
+            nil ->
+              host = RowMapper.map(type, system, source_meta)
+
+              {[host | hosts], [candidates_of(system, system, source_meta) | candidates],
+               summaries}
+
+            confirmed ->
+              summary = Enum.map(system["candidates"], &RowMapper.exoplanet_candidate_summary/1)
+              host = host_entry(confirmed)
+
+              {hosts, [candidates_of(system, host, source_meta) | candidates],
+               Map.update(summaries, confirmed.key, summary, &(&1 ++ summary))}
+          end
+        end)
+
+      Enum.map(rows, &put_candidate_summary(&1, summaries)) ++
+        Enum.reverse(hosts) ++ (candidates |> Enum.reverse() |> Enum.concat())
+    else
+      rows
+    end
+  end
+
+  defp candidates_of(system, host, source_meta) do
+    system
+    |> RowMapper.exoplanet_candidate_entries(host)
+    |> Enum.map(&RowMapper.map(:exoplanet_candidate, &1, source_meta))
+  end
+
+  defp confirmed_hosts_by_tic(rows) do
+    for %{source_type: "exoplanet_archive_system"} = row <- rows,
+        "TIC " <> tic_id <- row.aliases,
+        into: %{},
+        do: {tic_id, row}
+  end
+
+  defp host_entry(row) do
+    %{
+      "key" => row.key,
+      "name" => row.name,
+      "ra_deg" => row.ra_deg,
+      "dec_deg" => row.dec_deg,
+      "distance_pc" => row.distance_pc
+    }
+  end
+
+  defp put_candidate_summary(%{key: key, facts: facts} = row, summaries)
+       when is_map_key(summaries, key) do
+    candidates = Map.fetch!(summaries, key)
+
+    %{
+      row
+      | facts:
+          facts
+          |> Map.put("candidates", candidates)
+          |> Map.put("candidate_count", length(candidates))
+    }
+  end
+
+  defp put_candidate_summary(row, _summaries), do: row
 
   defp source_type_reports(rows) do
     rows
@@ -243,13 +319,16 @@ defmodule StarsmapApi.Catalog.Importer do
     }
   end
 
+  defp catalog_dir(root_path) do
+    if File.exists?(Path.join(root_path, "deep_sky_catalog.json")) do
+      root_path
+    else
+      Path.join(root_path, "data/catalogs")
+    end
+  end
+
   defp catalog_files(root_path) do
-    catalog_dir =
-      if File.exists?(Path.join(root_path, "deep_sky_catalog.json")) do
-        root_path
-      else
-        Path.join(root_path, "data/catalogs")
-      end
+    catalog_dir = catalog_dir(root_path)
 
     [
       {:exoplanet_system, Path.join(catalog_dir, "exoplanet_systems.json")},
@@ -287,6 +366,10 @@ defmodule StarsmapApi.Catalog.Importer do
 
   defp source_table_for_row(%{source_type: "exoplanet_archive_planet"}),
     do: "catalog_exoplanet_objects"
+
+  defp source_table_for_row(%{source_type: source_type})
+       when source_type in ["tess_toi_host", "tess_toi_candidate"],
+       do: "catalog_exoplanet_objects"
 
   defp source_table_for_row(%{source_type: "simbad_tap"}), do: "catalog_simbad_objects"
 
