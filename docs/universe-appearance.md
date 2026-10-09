@@ -40,8 +40,24 @@ shadows. The rings are not a particle simulation. Earth uses separate cloud
 opacity, approximate ocean highlights, and a thin blue limb. The Moon and other
 rocky bodies use matte lighting. Sun/stars are emissive with limb darkening and
 a restrained halo; catalog stellar color is retained where available. Unknown
-small-body, dwarf-planet, moon, and exoplanet surfaces use rough procedural
-materials rather than copying another planet's observed map.
+small-body, dwarf-planet, and moon surfaces use rough procedural materials
+rather than copying another planet's observed map.
+
+## Exoplanets
+
+No surface map exists for an exoplanet. Each exoplanet uses one neutral matte
+material: a uniform gray sphere with no relief, no bands, no atmosphere, and
+no texture. The material is not selected from the mass, the radius, or the
+temperature, so that a planet does not look like a known world. The sphere
+uses the catalog radius; the target panel says when the archive calculated
+that radius and did not measure it.
+
+An exoplanet is lit from the position of its host star, not from the Sun. A
+sphere is drawn only for a planet with a calculated position on its orbit
+(see [Exoplanet orbits](scientific-methodology.md#exoplanet-orbits)). A planet
+with an orbit only, or with no orbit, has no sphere: its catalog record is at
+the host star, and a sphere at the center of the star would be false. The
+planets of a host star load when the observer is within 50,000 AU of it.
 
 ## Deep-sky reconstructions
 

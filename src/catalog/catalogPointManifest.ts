@@ -10,6 +10,7 @@ type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 const DESTINATION_BODY_TYPES = new Set<DestinationBodyType>([
   "star",
   "planet",
+  "planet_candidate",
   "moon",
   "dwarf_planet",
   "galaxy",

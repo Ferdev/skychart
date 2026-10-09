@@ -1,3 +1,5 @@
+import { createSkyProjector } from "./skyProjection";
+import { community } from "../community/communityController";
 import type { Body, Ephemeris } from "../atlas/contracts";
 import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
@@ -379,6 +381,8 @@ export class SkyViewController {
     if (!context) return;
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.renderScene(context, width, height, this.camera, true);
+    community.drawFootprints(context, createSkyProjector(this.camera, width, height), observer.key);
+    community.render("sky", this.options.root, this.renderedHits.map(h => ({key: h.point.key, x: h.x, y: h.y})), community.showMarkers);
     this.updateSelectionConnector();
   }
 

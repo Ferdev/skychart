@@ -71,6 +71,9 @@ config :starsmap_api, StarsmapApiWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :starsmap_api, dev_routes: true
 
+# Community media and plate-solve scripts run from this checkout
+config :starsmap_api, community_backend_root: Path.expand("../../backend", __DIR__)
+
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
 

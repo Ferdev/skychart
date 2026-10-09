@@ -4,6 +4,9 @@ export type PointLayerSource =
       signature: string;
       vertices: Float32Array;
       count: number;
+      // Vertices are offsets from this origin. Absolute AU values in Float32
+      // cannot separate the bodies of a distant planetary system.
+      origin?: { x: number; y: number };
     }
   | {
       kind: "compact";
@@ -54,8 +57,8 @@ type PointLayer = PointLayerSource & {
 
 function countLayerPointsInViewport(layer: PointLayer, count: number, options: PointRenderOptions) {
   const stride = layer.kind === "rich" ? 6 : layer.format === "SMP3" ? 4 : 3;
-  const originX = layer.kind === "compact" ? layer.origin.x : 0;
-  const originY = layer.kind === "compact" ? layer.origin.y : 0;
+  const originX = layer.origin?.x ?? 0;
+  const originY = layer.origin?.y ?? 0;
   let visible = 0;
   for (let index = 0; index < count; index += 1) {
     const offset = index * stride;
@@ -243,8 +246,9 @@ export class WebglPointRenderer {
       if (pointsDrawn >= MAX_WEBGL_POINTS_PER_FRAME) break;
       const drawCount = Math.min(layer.count, MAX_WEBGL_POINTS_PER_FRAME - pointsDrawn);
       if (measureViewport) pointsInViewport += countLayerPointsInViewport(layer, drawCount, options);
-      const originX = layer.kind === "compact" ? layer.origin.x : 0;
-      const originY = layer.kind === "compact" ? layer.origin.y : 0;
+      // The subtraction is in 64-bit numbers; the shader gets a small offset.
+      const originX = layer.origin?.x ?? 0;
+      const originY = layer.origin?.y ?? 0;
       gl.uniform2f(this.offsetLocation, originX - options.camera.xAu, originY - options.camera.yAu);
       if (layer.vao && gl instanceof WebGL2RenderingContext) gl.bindVertexArray(layer.vao);
       else this.configureVertexAttributes(gl, layer, layer.buffer);

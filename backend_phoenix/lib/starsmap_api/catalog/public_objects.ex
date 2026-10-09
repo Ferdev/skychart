@@ -14,6 +14,10 @@ defmodule StarsmapApi.Catalog.PublicObjects do
 
   @summary_timeout 120_000
 
+  def get_by_key(key)
+      when key in ~w(sun mercury venus earth moon mars jupiter saturn uranus neptune pluto phobos deimos io europa ganymede callisto titan rhea iapetus dione tethys enceladus mimas),
+      do: StarsmapApi.Community.CoreObjects.get(key)
+
   def get_by_key("spacecraft-" <> _ = key), do: StarsmapApi.Spacecraft.get(key)
 
   def get_by_key(key) when is_binary(key) do
@@ -52,6 +56,10 @@ defmodule StarsmapApi.Catalog.PublicObjects do
   end
 
   def public_observer(_), do: {:error, :not_found}
+
+  def public_object(key)
+      when key in ~w(sun mercury venus earth moon mars jupiter saturn uranus neptune pluto phobos deimos io europa ganymede callisto titan rhea iapetus dione tethys enceladus mimas),
+      do: StarsmapApi.Community.CoreObjects.get(key)
 
   def public_object("spacecraft-" <> _ = key) do
     with {:ok, object} <- StarsmapApi.Spacecraft.get(key) do

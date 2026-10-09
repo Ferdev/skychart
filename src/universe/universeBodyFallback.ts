@@ -3,6 +3,7 @@ import type { SkyCamera, Vector3 } from "../sky/skyProjection";
 import { AU_KM, type PhysicalBody, type ProjectedBody } from "./universeBodyGeometry";
 import { appearanceRotation, bodyAppearance, resolvedBodyWeight } from "./universeAppearanceProfiles";
 import type { UniverseTextureCache } from "./universeTextureCache";
+import { lightDirection } from "./universeExoplanets";
 
 const pixels = new WeakMap<HTMLImageElement, ImageData>();
 const norm = (v: number[]) => { const l = Math.hypot(...v) || 1; return v.map((x) => x / l); };
@@ -25,7 +26,7 @@ export function renderBodyFallback(context: CanvasRenderingContext2D,
   for (const { body, projected } of bodies) {
     const profile = bodyAppearance(body), m = appearanceRotation(profile), r = Number(body.radiusKm) / AU_KM;
     const center = rotate(m, [(body.position.x - observer.x) / r, (body.position.y - observer.y) / r, (body.position.z - observer.z) / r]);
-    const sun = rotate(m, norm([-body.position.x, -body.position.y, -body.position.z]));
+    const light = lightDirection(body), sun = rotate(m, [light.x, light.y, light.z]);
     const entry = projected.radiusPx >= 12 ? cache.get(profile.map) : null;
     let map = entry ? pixels.get(entry.image) : undefined;
     if (entry && !map) {

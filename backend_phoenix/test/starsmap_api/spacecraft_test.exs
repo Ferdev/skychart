@@ -3,6 +3,11 @@ defmodule StarsmapApi.SpacecraftTest do
   alias StarsmapApi.Spacecraft
   alias StarsmapApi.Catalog.PublicObjects
 
+  setup do
+    StarsmapApi.DataCase.setup_sandbox(%{async: false})
+    :ok
+  end
+
   test "mission metadata is searchable by alias without a database or current position" do
     [webb] = Spacecraft.search("JWST", [], [])
     assert webb.key == "spacecraft-170"

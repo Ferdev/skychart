@@ -4,7 +4,7 @@ defmodule StarsmapApiWeb.ObjectPageController do
   alias StarsmapApi.Catalog.PublicObjects
   alias StarsmapApiWeb.JsonLd
 
-  @image_types ~w(star planet moon dwarf_planet asteroid comet galaxy quasar star_cluster nebula active_galaxy black_hole pulsar unknown)
+  @image_types ~w(star planet planet_candidate moon dwarf_planet asteroid comet galaxy quasar star_cluster nebula active_galaxy black_hole pulsar unknown)
   def show(conn, %{"key" => key}) do
     case PublicObjects.public_object(key) do
       {:ok, object} -> conn |> put_resp_content_type("text/html") |> send_resp(200, page(object))
@@ -103,7 +103,7 @@ defmodule StarsmapApiWeb.ObjectPageController do
     catalog_source = catalog_source(catalog, o)
 
     """
-    <article class="object-page" data-object-key="#{h(o.key)}"><nav aria-label="Breadcrumb"><a href="/">Cosmic Atlas</a> / <span>#{h(o.name)}</span></nav><header><p>Cosmic Atlas object record</p><h1>#{h(o.name)}</h1><p>#{aliases}</p><p class="object-record-summary">#{h(description)}</p></header>#{media(o)}
+    <article class="object-page" data-object-key="#{h(o.key)}"><nav aria-label="Breadcrumb"><a href="/">Cosmic Atlas</a> / <span>#{h(o.name)}</span></nav><header><p>Cosmic Atlas object record</p><h1>#{h(o.name)}</h1><p>#{aliases}</p><p class="object-record-summary">#{h(description)}</p></header>#{media(o)}#{StarsmapApiWeb.CommunityPageController.object_gallery(o.key)}
     <dl><dt>Object type</dt><dd>#{value(o.object_type)}</dd><dt>Constellation</dt><dd>#{value(Map.get(o.facts || %{}, "constellation"))}</dd>
     <dt>Right ascension</dt><dd>#{value(o.astrometry.ra_deg, "°")}</dd><dt>Declination</dt><dd>#{value(o.astrometry.dec_deg, "°")}</dd>
     <dt>Reference frame</dt><dd>#{semantic(o.semantics.reference_frame)}</dd><dt>Distance</dt><dd>#{distance(o.astrometry.distance_ly)}</dd>

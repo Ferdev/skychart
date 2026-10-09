@@ -3,6 +3,7 @@ import type { DisplayLayer } from "../viewState";
 
 export function createDefaultDisplayLayers(): Record<DisplayLayer, boolean> {
   return {
+    photos: false,
     labels: true,
     orbits: true,
     grid: true,

@@ -15,6 +15,8 @@ export const atlasDom = {
   ctx: context,
   universeView: requiredElement<HTMLElement>("#universe-view"),
   universeEntryMarker: requiredElement<HTMLElement>("#universe-entry-marker"),
+  exoplanetOrbitNote: requiredElement<HTMLElement>("#exoplanet-orbit-note"),
+  atlasToolbar: requiredElement<HTMLElement>(".atlas-toolbar"),
   universeCanvas: requiredElement<HTMLCanvasElement>("#universe-map"),
   universePoints: requiredElement<HTMLCanvasElement>("#universe-points"),
   universeDeepSky: requiredElement<HTMLCanvasElement>("#universe-deep-sky"),

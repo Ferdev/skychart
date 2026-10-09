@@ -55,9 +55,12 @@ catalog_tile_s3_prefix="${catalog_tile_s3_prefix#/}"
 catalog_tile_s3_prefix="${catalog_tile_s3_prefix%/}"
 catalog_tile_s3_region="${CATALOG_TILE_S3_REGION:-${AWS_DEFAULT_REGION:-}}"
 nice_level="${CATALOG_TILE_NICE:-15}"
-aws_cmd="$repo_root/.venv/bin/aws"
+aws_cmd="${AWS_CLI:-}"
+if [ -z "$aws_cmd" ] && [ -x "$repo_root/.venv/bin/aws" ]; then
+  aws_cmd="$repo_root/.venv/bin/aws"
+fi
 
-if [ ! -x "$aws_cmd" ]; then
+if [ -z "$aws_cmd" ]; then
   aws_cmd="$(command -v aws || true)"
 fi
 

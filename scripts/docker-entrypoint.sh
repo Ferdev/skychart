@@ -3,6 +3,10 @@ set -Eeuo pipefail
 
 export PYTHONUNBUFFERED=1
 
+if [[ "${COMMUNITY_ENABLED:-false}" == "true" ]]; then
+  /app/bin/starsmap_api eval 'StarsmapApi.Release.migrate_community()'
+fi
+
 /app/.venv/bin/python /app/backend/server.py &
 python_pid=$!
 

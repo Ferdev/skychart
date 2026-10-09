@@ -7,10 +7,13 @@ export const AU_KM = 149_597_870.7;
 export type PhysicalBody = {
   key: string;
   object_type?: string | null;
+  catalog_group?: string | null;
   color?: string | null;
   position: Vector3;
   radiusKm?: number | null;
   temperatureK?: number | null;
+  /** Position of the star that lights this body. The Sun at the origin when absent. */
+  lightSource?: Vector3 | null;
 };
 
 export type ProjectedBody = {
@@ -25,7 +28,7 @@ export type ProjectedBody = {
 /** Only measured solid radii get geometric disks; galaxies remain catalog symbols. */
 export function hasRenderableRadius(body: PhysicalBody): boolean {
   return typeof body.radiusKm === "number" && Number.isFinite(body.radiusKm) && body.radiusKm > 0 &&
-    (body.key === "sun" || ["star", "planet", "moon", "dwarf_planet", "asteroid", "small_body", "comet"].includes(body.object_type ?? ""));
+    (body.key === "sun" || ["star", "planet", "planet_candidate", "moon", "dwarf_planet", "asteroid", "small_body", "comet"].includes(body.object_type ?? ""));
 }
 
 const LIGHT_YEAR_AU = 63_241.077;
@@ -38,7 +41,7 @@ const VOLUME_FRAME = 0.5;
  * 1,000 km for small bodies, 150,000 km for planets, and typical object
  * scales for deep-sky records. Anything else is treated like a star, at 1 AU. */
 const NOMINAL_APPROACH_AU: Record<string, number> = {
-  planet: 1e-3, moon: 6.7e-6, dwarf_planet: 6.7e-6, asteroid: 6.7e-6, small_body: 6.7e-6, comet: 6.7e-6, spacecraft: 6.7e-6,
+  planet: 1e-3, planet_candidate: 1e-3, moon: 6.7e-6, dwarf_planet: 6.7e-6, asteroid: 6.7e-6, small_body: 6.7e-6, comet: 6.7e-6, spacecraft: 6.7e-6,
   nebula: 30 * LIGHT_YEAR_AU, star_cluster: 100 * LIGHT_YEAR_AU, deep_sky_object: 100 * LIGHT_YEAR_AU,
   asterism: 100 * LIGHT_YEAR_AU, milky_way_patch: 100 * LIGHT_YEAR_AU,
   galaxy: 150_000 * LIGHT_YEAR_AU, active_galaxy: 150_000 * LIGHT_YEAR_AU, quasar: 150_000 * LIGHT_YEAR_AU,

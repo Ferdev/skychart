@@ -11,6 +11,8 @@ export type ScienceSemantics = {
   cosmology: { name: string; parameters: string } | null;
   source: { label: string; url: string; doi_url?: string; release: string };
   selection_caveat: string;
+  /** Display conventions that stand in for values the source does not give. */
+  conventions?: Record<string, string>;
 };
 export type ScienceRecord = { position_model?: string | null; facts?: Record<string, unknown> | null };
 
@@ -37,6 +39,7 @@ export function uncertaintySummary(record: ScienceRecord): string {
   if (finite("redshift_error")) return `${semantics.distance_kind === "inferred_redshift_comoving" ? "Inferred" : "Spectroscopic"} redshift uncertainty: ${value("redshift_error")}.`;
   if (finite("redshift_uncertainty")) return `Inferred redshift uncertainty: ${value("redshift_uncertainty")}.`;
   if (typeof value("orbit_uncertainty") === "string") return `Orbit uncertainty: ${value("orbit_uncertainty")}.`;
+  if (finite("semi_major_axis_au_err_plus") && finite("semi_major_axis_au_err_minus")) return `Published orbit-size uncertainty: +${value("semi_major_axis_au_err_plus")} / −${value("semi_major_axis_au_err_minus")} AU.`;
   return "Uncertainty not supplied by this atlas source.";
 }
 

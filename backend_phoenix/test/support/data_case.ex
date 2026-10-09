@@ -36,8 +36,14 @@ defmodule StarsmapApi.DataCase do
   Sets up the sandbox based on the test tags.
   """
   def setup_sandbox(tags) do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(StarsmapApi.Repo, shared: not tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    repos =
+      [StarsmapApi.Repo] ++
+        if StarsmapApi.Community.enabled?(), do: [StarsmapApi.CommunityRepo], else: []
+
+    for repo <- repos do
+      pid = Ecto.Adapters.SQL.Sandbox.start_owner!(repo, shared: not tags[:async])
+      on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+    end
   end
 
   @doc """
