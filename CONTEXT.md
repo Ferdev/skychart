@@ -94,3 +94,9 @@ point-layer manifests and containers.
 - Source-specific behavior stays with the source adapter that owns it.
 - A source file may be large when it is cohesive data, but orchestration must
   live behind a small interface with focused tests.
+
+Community terminology: a **photo subject** links reviewed catalog identities for
+one target; a **community photo** is a credited author image, not a catalog
+measurement; a **cover photo** is the current ranked image for that subject.
+Community publishing is disabled by default. Its data uses a separate writable
+repo, and photos never change measured coordinates, size, or source provenance.

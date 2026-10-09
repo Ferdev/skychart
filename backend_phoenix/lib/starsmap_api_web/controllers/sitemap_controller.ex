@@ -10,10 +10,14 @@ defmodule StarsmapApiWeb.SitemapController do
   def catalog(conn, %{"catalog" => filename}) do
     group = String.replace_suffix(filename, ".xml", "")
 
-    if valid_group?(filename, group) do
-      xml(conn, cached({:catalog, group}, fn -> catalog_xml(group) end))
+    if group == "community" and filename == "community.xml" and StarsmapApi.Community.enabled?() do
+      xml(conn, community_xml())
     else
-      send_resp(conn, 404, "Not found")
+      if valid_group?(filename, group) do
+        xml(conn, cached({:catalog, group}, fn -> catalog_xml(group) end))
+      else
+        send_resp(conn, 404, "Not found")
+      end
     end
   end
 
@@ -35,7 +39,35 @@ defmodule StarsmapApiWeb.SitemapController do
     pages =
       "<sitemap><loc>#{x(base <> "/sitemaps/pages.xml")}</loc><lastmod>#{Date.to_iso8601(@pages_lastmod)}</lastmod></sitemap>"
 
+    pages =
+      pages <>
+        if(StarsmapApi.Community.enabled?(),
+          do: "<sitemap><loc>#{x(base <> "/sitemaps/community.xml")}</loc></sitemap>",
+          else: ""
+        )
+
     ~s(<?xml version="1.0" encoding="UTF-8"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">#{pages}#{catalog_entries}</sitemapindex>)
+  end
+
+  defp community_xml do
+    import Ecto.Query
+
+    photos =
+      StarsmapApi.CommunityRepo.all(
+        from [p, _] in StarsmapApi.Community.Photos.published(),
+          order_by: [desc: p.published_at],
+          limit: 5000,
+          select: {p.id, p.updated_at}
+      )
+
+    base = StarsmapApiWeb.Endpoint.url()
+
+    entries =
+      Enum.map_join(photos, "", fn {id, at} ->
+        "<url><loc>#{x(base <> "/photos/" <> id)}</loc><lastmod>#{date(at)}</lastmod></url>"
+      end)
+
+    ~s(<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">#{entries}</urlset>)
   end
 
   defp catalog_xml("pages") do

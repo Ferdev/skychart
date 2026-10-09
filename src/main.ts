@@ -1,3 +1,5 @@
+import { AU_KM_FALLBACK, MIN_ZOOM, MAX_ZOOM, ZOOM_SLIDER_STEPS, LOCAL_ZOOM_DURATION_MS, CAMERA_DATA_REFRESH_DEBOUNCE_MS, SEARCH_INPUT_DEBOUNCE_MS } from "./atlas/atlasConstants";
+import { community } from "./community/communityController";
 import { SpacecraftLoader } from "./catalog/spacecraftCatalog";
 import { loadAtlasEphemeris } from "./atlas/atlasEphemerisLoader";
 import "./destinationPicker.css";
@@ -69,13 +71,6 @@ import type {
 initializeErrorReporting();
 installAnalytics();
 
-const AU_KM_FALLBACK = 149_597_870.7;
-const MIN_ZOOM = 1e-14;
-const MAX_ZOOM = 50_000_000;
-const ZOOM_SLIDER_STEPS = 1000;
-const LOCAL_ZOOM_DURATION_MS = 1100;
-const CAMERA_DATA_REFRESH_DEBOUNCE_MS = 180;
-const SEARCH_INPUT_DEBOUNCE_MS = 180;
 const catalogPointManifest = CatalogPointManifestRepository.fromBrowser();
 const catalogPointPlanner = new CatalogPointPlanner(catalogPointManifest);
 const catalogPointDecoder = new CatalogPointDecoder();
@@ -774,7 +769,7 @@ function updateAllUi() {
   updateCompareFilters();
   updateBodyPicker();
   updateGuidedSets();
-  objectInspection.update();
+  objectInspection.update(); if (selectedBody()) community.mount(bodyInfo, selectedBody()!.key, selectedBody()!.name);
   updateCompareUi();
   updateTimeSummary();
   updateTimeStepUi();
@@ -817,6 +812,7 @@ function render() { if (universeView?.active) { renderFrameId = null; return; }
   } finally {
     atlasViewport.endFrame();
   }
+  community.render("map", canvas.parentElement!, (ephemeris?.bodies ?? []).filter(body => bodyMatchesActiveFilter(body)).map(body => ({key: body.key, ...bodyToScreen(body)})), displayLayers.photos);
   perfDrawMs = performance.now() - frameStartedAt;
   updatePerfHud();
   objectInspection.updateScienceLayerDisclosure();

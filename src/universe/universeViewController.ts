@@ -1,3 +1,4 @@
+import { community } from "../community/communityController";
 import type { Body } from "../atlas/contracts";
 import { GUIDED_DEEP_SKY_KEYS } from "../atlas/atlasDefinitions";
 import type { atlasDom } from "../atlas/atlasDom";
@@ -422,6 +423,8 @@ export class UniverseViewController {
       this.baseRenderKey = baseKey;
     }
     this.updateSelectionConnector();
+    community.render("universe", this.options.root, this.renderedHits.map(h => ({key: h.point.key, x: h.x, y: h.y})), community.showMarkers && !this.flying);
+    community.renderPlane(this.options.root, this.target, framePoints.find(p => p.key === "earth")?.position ?? {x:0,y:0,z:0}, this.position, project, this.flying);
     if (this.collectPerformance) {
       const debug = window as Window & { __universePerf?: Array<{ base: number; points: number; labels: number; webgl: boolean }> };
       const samples = debug.__universePerf ??= [];

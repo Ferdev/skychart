@@ -284,3 +284,8 @@ and the provenance embedded in each generated catalog.
 Spacecraft are searchable atlas objects with dated JPL Horizons positions. See [the spacecraft catalog and maintenance guide](docs/spacecraft.md) for coverage, exclusions, caching and validation.
 
 3D appearance uses locally served planetary maps, geometric lighting and rings, and illustrative gas/dust/star volumes for deep-sky objects with a catalog morphology class and size. See [appearance sources and limits](docs/universe-appearance.md).
+
+Community photo publishing is available behind `COMMUNITY_ENABLED` (disabled by
+default). It adds credited object galleries, map/Sky/3D photo cards, email-code
+accounts, direct uploads, moderation, votes, rankings and optional TAN astrometry.
+See [community setup and recovery](docs/community-photos.md) before activation.

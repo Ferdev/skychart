@@ -55,3 +55,9 @@ and links each cutout back to the DR11 viewer and release documentation. It
 also requests DSS2 all-sky context and, only when DR11 fails, a labeled
 AllWISE infrared fallback from the CDS/Aladin HiPS image service; those images keep
 their upstream terms and attribution.
+
+Community photos retain each photographer's copyright and selected licence.
+The source-code MIT licence does not grant permission to reuse an author image.
+Each public photo identifies the photographer, capture date, and reuse licence.
+Uploads require a publishing-rights confirmation. Test fixtures are not public
+astronomy content.

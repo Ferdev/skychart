@@ -1,0 +1,954 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "keys": [
+        "m1",
+        "ngc-1952"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m2",
+        "ngc-7089"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m3",
+        "ngc-5272"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m4",
+        "ngc-6121"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m5",
+        "ngc-5904"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m6",
+        "ngc-6405"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m7",
+        "ngc-6475"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m8",
+        "ngc-6523"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m9",
+        "ngc-6333"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m10",
+        "ngc-6254"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m11",
+        "ngc-6705"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m12",
+        "ngc-6218"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m13",
+        "ngc-6205"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m14",
+        "ngc-6402"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m15",
+        "ngc-7078"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m16",
+        "ngc-6611"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m17",
+        "ngc-6618"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m18",
+        "ngc-6613"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m19",
+        "ngc-6273"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m20",
+        "ngc-6514"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m21",
+        "ngc-6531"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m22",
+        "ngc-6656"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m23",
+        "ngc-6494"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m26",
+        "ngc-6694"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m27",
+        "ngc-6853"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m28",
+        "ngc-6626"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m29",
+        "ngc-6913"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m30",
+        "ngc-7099"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m31",
+        "ngc-224",
+        "local-volume-andromeda"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m32",
+        "ngc-221"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m33",
+        "ngc-598"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m34",
+        "ngc-1039"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m35",
+        "ngc-2168"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m36",
+        "ngc-1960"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m37",
+        "ngc-2099"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m38",
+        "ngc-1912"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m39",
+        "ngc-7092"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m41",
+        "ngc-2287"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m42",
+        "ngc-1976"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m43",
+        "ngc-1982"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m46",
+        "ngc-2437"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m47",
+        "ngc-2422"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m48",
+        "ngc-2548"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m49",
+        "ngc-4472"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m50",
+        "ngc-2323"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m51",
+        "ngc-5194"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m52",
+        "ngc-7654"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m53",
+        "ngc-5024"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m54",
+        "ngc-6715"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m55",
+        "ngc-6809"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m56",
+        "ngc-6779"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m57",
+        "ngc-6720"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m58",
+        "ngc-4579"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m59",
+        "ngc-4621"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m60",
+        "ngc-4649"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m61",
+        "ngc-4303"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m62",
+        "ngc-6266"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m63",
+        "ngc-5055"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m64",
+        "ngc-4826"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m65",
+        "ngc-3623"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m66",
+        "ngc-3627"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m67",
+        "ngc-2682"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m68",
+        "ngc-4590"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m69",
+        "ngc-6637"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m70",
+        "ngc-6681"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m71",
+        "ngc-6838"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m72",
+        "ngc-6981"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m73",
+        "ngc-6994"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m74",
+        "ngc-628"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m75",
+        "ngc-6864"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m76",
+        "ngc-650"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m77",
+        "ngc-1068"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m78",
+        "ngc-2068"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m79",
+        "ngc-1904"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m80",
+        "ngc-6093"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m81",
+        "ngc-3031"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m82",
+        "ngc-3034"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m83",
+        "ngc-5236"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m84",
+        "ngc-4374"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m85",
+        "ngc-4382"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m86",
+        "ngc-4406"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m87",
+        "ngc-4486",
+        "virgo-m87",
+        "simbad-m-87"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m88",
+        "ngc-4501"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m89",
+        "ngc-4552"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m90",
+        "ngc-4569"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m91",
+        "ngc-4548"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m92",
+        "ngc-6341"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m93",
+        "ngc-2447"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m94",
+        "ngc-4736"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m95",
+        "ngc-3351"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m96",
+        "ngc-3368"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m97",
+        "ngc-3587"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m98",
+        "ngc-4192"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m99",
+        "ngc-4254"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m100",
+        "ngc-4321"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m101",
+        "ngc-5457"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m103",
+        "ngc-581"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m104",
+        "ngc-4594"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m105",
+        "ngc-3379"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m106",
+        "ngc-4258"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m107",
+        "ngc-6171"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m108",
+        "ngc-3556"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m109",
+        "ngc-3992"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    },
+    {
+      "keys": [
+        "m110",
+        "ngc-205"
+      ],
+      "evidence": "Reciprocal Messier NGC/IC identifiers; rounded catalog coordinates agree within 0.3 degree"
+    }
+  ],
+  "core": [
+    {
+      "key": "sun",
+      "name": "Sun",
+      "object_type": "star",
+      "parent_key": null,
+      "radius_km": 695700,
+      "color": "#ffd166",
+      "catalog_group": "core"
+    },
+    {
+      "key": "mercury",
+      "name": "Mercury",
+      "object_type": "planet",
+      "parent_key": "sun",
+      "radius_km": 2439.7,
+      "color": "#b8a48a",
+      "catalog_group": "core"
+    },
+    {
+      "key": "venus",
+      "name": "Venus",
+      "object_type": "planet",
+      "parent_key": "sun",
+      "radius_km": 6051.8,
+      "color": "#d8b26f",
+      "catalog_group": "core"
+    },
+    {
+      "key": "earth",
+      "name": "Earth",
+      "object_type": "planet",
+      "parent_key": "sun",
+      "radius_km": 6371.0,
+      "color": "#62a8ff",
+      "catalog_group": "core"
+    },
+    {
+      "key": "moon",
+      "name": "Moon",
+      "object_type": "moon",
+      "parent_key": "earth",
+      "radius_km": 1737.4,
+      "color": "#c8c8c8",
+      "catalog_group": "core"
+    },
+    {
+      "key": "mars",
+      "name": "Mars",
+      "object_type": "planet",
+      "parent_key": "sun",
+      "radius_km": 3389.5,
+      "color": "#df6b43",
+      "catalog_group": "core"
+    },
+    {
+      "key": "jupiter",
+      "name": "Jupiter",
+      "object_type": "planet",
+      "parent_key": "sun",
+      "radius_km": 69911,
+      "color": "#d9b382",
+      "catalog_group": "core"
+    },
+    {
+      "key": "saturn",
+      "name": "Saturn",
+      "object_type": "planet",
+      "parent_key": "sun",
+      "radius_km": 58232,
+      "color": "#d8c28a",
+      "catalog_group": "core"
+    },
+    {
+      "key": "uranus",
+      "name": "Uranus",
+      "object_type": "planet",
+      "parent_key": "sun",
+      "radius_km": 25362,
+      "color": "#83d8d8",
+      "catalog_group": "core"
+    },
+    {
+      "key": "neptune",
+      "name": "Neptune",
+      "object_type": "planet",
+      "parent_key": "sun",
+      "radius_km": 24622,
+      "color": "#6f8cff",
+      "catalog_group": "core"
+    },
+    {
+      "key": "pluto",
+      "name": "Pluto",
+      "object_type": "dwarf_planet",
+      "parent_key": "sun",
+      "radius_km": 1188.3,
+      "color": "#c9a27c",
+      "catalog_group": "core"
+    },
+    {
+      "key": "phobos",
+      "name": "Phobos",
+      "object_type": "moon",
+      "parent_key": "mars",
+      "radius_km": 11.27,
+      "color": "#9b8066",
+      "catalog_group": "mars_moons"
+    },
+    {
+      "key": "deimos",
+      "name": "Deimos",
+      "object_type": "moon",
+      "parent_key": "mars",
+      "radius_km": 6.2,
+      "color": "#b19a82",
+      "catalog_group": "mars_moons"
+    },
+    {
+      "key": "io",
+      "name": "Io",
+      "object_type": "moon",
+      "parent_key": "jupiter",
+      "radius_km": 1821.6,
+      "color": "#e5c45f",
+      "catalog_group": "jupiter_major_moons"
+    },
+    {
+      "key": "europa",
+      "name": "Europa",
+      "object_type": "moon",
+      "parent_key": "jupiter",
+      "radius_km": 1560.8,
+      "color": "#d8c7a8",
+      "catalog_group": "jupiter_major_moons"
+    },
+    {
+      "key": "ganymede",
+      "name": "Ganymede",
+      "object_type": "moon",
+      "parent_key": "jupiter",
+      "radius_km": 2634.1,
+      "color": "#a89980",
+      "catalog_group": "jupiter_major_moons"
+    },
+    {
+      "key": "callisto",
+      "name": "Callisto",
+      "object_type": "moon",
+      "parent_key": "jupiter",
+      "radius_km": 2410.3,
+      "color": "#7b6a58",
+      "catalog_group": "jupiter_major_moons"
+    },
+    {
+      "key": "mimas",
+      "name": "Mimas",
+      "object_type": "moon",
+      "parent_key": "saturn",
+      "radius_km": 198.2,
+      "color": "#b9b7ad",
+      "catalog_group": "saturn_major_moons"
+    },
+    {
+      "key": "enceladus",
+      "name": "Enceladus",
+      "object_type": "moon",
+      "parent_key": "saturn",
+      "radius_km": 252.1,
+      "color": "#dfe9ef",
+      "catalog_group": "saturn_major_moons"
+    },
+    {
+      "key": "tethys",
+      "name": "Tethys",
+      "object_type": "moon",
+      "parent_key": "saturn",
+      "radius_km": 531.1,
+      "color": "#c9c7bd",
+      "catalog_group": "saturn_major_moons"
+    },
+    {
+      "key": "dione",
+      "name": "Dione",
+      "object_type": "moon",
+      "parent_key": "saturn",
+      "radius_km": 561.4,
+      "color": "#c6c7c2",
+      "catalog_group": "saturn_major_moons"
+    },
+    {
+      "key": "rhea",
+      "name": "Rhea",
+      "object_type": "moon",
+      "parent_key": "saturn",
+      "radius_km": 763.8,
+      "color": "#b9b5aa",
+      "catalog_group": "saturn_major_moons"
+    },
+    {
+      "key": "titan",
+      "name": "Titan",
+      "object_type": "moon",
+      "parent_key": "saturn",
+      "radius_km": 2574.73,
+      "color": "#d6a657",
+      "catalog_group": "saturn_major_moons"
+    },
+    {
+      "key": "iapetus",
+      "name": "Iapetus",
+      "object_type": "moon",
+      "parent_key": "saturn",
+      "radius_km": 734.5,
+      "color": "#8d8070",
+      "catalog_group": "saturn_major_moons"
+    }
+  ]
+}
