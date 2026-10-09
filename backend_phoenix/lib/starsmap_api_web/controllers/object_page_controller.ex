@@ -4,7 +4,7 @@ defmodule StarsmapApiWeb.ObjectPageController do
   alias StarsmapApi.Catalog.PublicObjects
   alias StarsmapApiWeb.JsonLd
 
-  @image_types ~w(star planet moon dwarf_planet asteroid comet galaxy quasar star_cluster nebula active_galaxy black_hole pulsar unknown)
+  @image_types ~w(star planet planet_candidate moon dwarf_planet asteroid comet galaxy quasar star_cluster nebula active_galaxy black_hole pulsar unknown)
   def show(conn, %{"key" => key}) do
     case PublicObjects.public_object(key) do
       {:ok, object} -> conn |> put_resp_content_type("text/html") |> send_resp(200, page(object))

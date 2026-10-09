@@ -232,7 +232,8 @@ function isPosition(position: Body["position"] | undefined): position is Body["p
   ].every((value) => Number.isFinite(value));
 }
 
-function solveKepler(meanAnomaly: number, eccentricity: number): number {
+/** Solves Kepler's equation for the eccentric anomaly, in radians. */
+export function solveKepler(meanAnomaly: number, eccentricity: number): number {
   let eccentricAnomaly = eccentricity < 0.8 ? meanAnomaly : Math.PI;
   for (let iteration = 0; iteration < 24; iteration += 1) {
     const delta = (

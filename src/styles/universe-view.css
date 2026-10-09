@@ -393,3 +393,21 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
 .universe-entry-marker path { fill: none; stroke: #82cbb3; stroke-width: 1.5; stroke-linecap: round; opacity: 0.9; }
 .universe-entry-marker text { fill: #82cbb3; font: 700 9px system-ui, sans-serif; paint-order: stroke; stroke: rgba(2, 5, 6, 0.85); stroke-width: 2.5px; }
 body[data-atlas-mode="embed"] .universe-entry-marker { display: none; }
+/* States that an exoplanet ring direction is a convention. It sits above the toolbar, which covers the canvas scale bar. */
+.exoplanet-orbit-note {
+  position: fixed;
+  z-index: 2;
+  left: 18px;
+  bottom: 140px;
+  max-width: min(600px, calc(100vw - 36px));
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid rgba(137, 214, 255, 0.24);
+  border-radius: 6px;
+  color: rgba(205, 233, 246, 0.92);
+  background: rgba(8, 10, 9, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+body[data-atlas-mode="embed"] .exoplanet-orbit-note { display: none; }

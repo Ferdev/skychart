@@ -42,6 +42,7 @@
     "test:catalog-point-stream": "node --experimental-transform-types tests/catalogPointStream.test.ts",
     "test:small-body-propagation": "node --experimental-strip-types tests/smallBodyPropagation.test.ts",
     "test:small-body-orbit": "node --experimental-strip-types tests/smallBodyOrbit.test.ts",
+    "test:exoplanet-orbit": "node --experimental-strip-types tests/exoplanetOrbit.test.ts",
     "validate:tours": "node scripts/validate_tours.mjs"
   },
   "devDependencies": {

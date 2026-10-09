@@ -1,4 +1,5 @@
 import type { Body } from "../atlas/contracts.ts";
+import { orbitsHostStar } from "../catalog/exoplanetGroups.ts";
 import { bodyCanObserveSky, bodyVector, isDynamicBody } from "../sky/skyBody.ts";
 import type { Vector3 } from "../sky/skyProjection.ts";
 
@@ -23,7 +24,16 @@ export type UniversePoint = Omit<CatalogUniversePoint, "distance_au" | "directio
   radiusKm?: number | null;
   temperatureK?: number | null;
   deepSkyType?: string | null;
+  /** Position of the host star that lights an exoplanet. */
+  lightSource?: Vector3 | null;
+  /** An exoplanet with no calculated position. Its record is at the host star, so it has no sphere. */
+  hostBound?: boolean;
 };
+
+/** The 3D catalog endpoint keeps each exoplanet and each planet candidate at its host star and sends no orbit facts. */
+export function catalogPointIsHostBound(point: Pick<CatalogUniversePoint, "catalog_group">): boolean {
+  return orbitsHostStar(point);
+}
 
 export function validCatalogPoint(point: CatalogUniversePoint): boolean {
   return Boolean(point?.key && point.name && point.direction &&
@@ -51,6 +61,8 @@ export function bodyToUniversePoint(body: Body | null): UniversePoint | null {
   if (!body || !bodyCanObserveSky(body) ||
     body.catalog?.position_model === "catalog_sky_position_reference_shell" ||
     body.catalog?.facts?.distance_unknown === true) return null;
+  const host = body.exoplanet_orbit?.host_position;
+  const hostBound = orbitsHostStar(body) && body.exoplanet_orbit?.display_state !== "position";
   return {
     key: body.key,
     name: body.name,
@@ -63,7 +75,9 @@ export function bodyToUniversePoint(body: Body | null): UniversePoint | null {
     absoluteMagnitudeH: body.small_body?.h_absolute_magnitude
       ?? (typeof body.catalog?.facts?.h_absolute_magnitude === "number" ? body.catalog.facts.h_absolute_magnitude : null),
     position: bodyVector(body),
-    radiusKm: body.radius_km,
+    radiusKm: hostBound ? null : body.radius_km,
+    lightSource: host ? { x: host.x_au, y: host.y_au, z: host.z_au } : null,
+    hostBound,
     deepSkyType: typeof body.catalog?.facts?.deep_sky_type === "string" ? body.catalog.facts.deep_sky_type : null,
     temperatureK: body.stellar?.stellar_teff_k,
     dynamic: isDynamicBody(body),

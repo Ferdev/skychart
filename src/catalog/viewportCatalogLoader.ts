@@ -1,5 +1,6 @@
 import type { BodyFilterDefinition, CatalogViewportPayload } from "../atlas/contracts";
 import type { CatalogObjectMapper } from "./catalogObjectMapper";
+import { EXOPLANET_VIEWPORT_GROUPS } from "./exoplanetGroups";
 
 type Bounds = { minXAu: number; maxXAu: number; minYAu: number; maxYAu: number };
 
@@ -97,7 +98,7 @@ export class ViewportCatalogLoader {
     if (!Number.isFinite(width) || width > MAX_WIDTH_LY) return null;
     const bounds = this.options.worldBounds(0.35);
     const filter = this.options.filter();
-    const groups = filter.key === "all" || !filter.groups ? catalogGroups(width) : filter.groups;
+    const groups = filter.key === "all" || !filter.groups ? catalogGroups(width, bounds) : filter.groups;
     const types = filter.key === "all" ? [] : (filter.types ?? []);
     const limit = catalogLimit(width);
     const params = new URLSearchParams({
@@ -110,12 +111,32 @@ export class ViewportCatalogLoader {
   }
 }
 
-function catalogGroups(viewWidthLy: number) {
-  if (viewWidthLy < 0.08) return ["jpl_small_bodies"];
-  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", "exoplanet_systems", "exoplanets"];
+// The map is a top-down projection, so a host star near an ecliptic pole can
+// be near the Sun on the map. Inside the Solar System radius a view has small
+// bodies only: no host star projects there. Outside the small-body reach a
+// view has no small bodies (no star is that near: Proxima Centauri is at
+// 268,000 AU).
+const SOLAR_SYSTEM_RADIUS_AU = 2_000;
+const SMALL_BODY_REACH_AU = 200_000;
+
+function catalogGroups(viewWidthLy: number, bounds: Bounds) {
+  if (viewWidthLy < 0.08) {
+    // Exoplanet orbits are visible only at this scale, so the hosts and their planets load here.
+    const sunDistanceAu = Math.hypot(distanceFromZero(bounds.minXAu, bounds.maxXAu), distanceFromZero(bounds.minYAu, bounds.maxYAu));
+    if (sunDistanceAu < SOLAR_SYSTEM_RADIUS_AU) return ["jpl_small_bodies"];
+    if (sunDistanceAu < SMALL_BODY_REACH_AU) return ["jpl_small_bodies", ...EXOPLANET_VIEWPORT_GROUPS];
+    return [...EXOPLANET_VIEWPORT_GROUPS];
+  }
+  // The stars with planet candidates load only below this width: no tile layer has them.
+  if (viewWidthLy < 40) return ["jpl_small_bodies", "bright_stars", "gaia_local_stars", ...EXOPLANET_VIEWPORT_GROUPS];
   if (viewWidthLy < 6_000) return ["bright_stars", "gaia_local_stars", "gaia_500pc_stars", "exoplanet_systems", "exoplanets", "simbad_compact_objects"];
   if (viewWidthLy < 25_000) return ["bright_stars", "simbad_compact_objects"];
   return ["simbad_extragalactic", "simbad_compact_objects", "messier_deep_sky"];
+}
+
+/** Distance from zero to the nearest value of an interval. */
+function distanceFromZero(minimum: number, maximum: number) {
+  return minimum <= 0 && maximum >= 0 ? 0 : Math.min(Math.abs(minimum), Math.abs(maximum));
 }
 
 function catalogLimit(viewWidthLy: number) {

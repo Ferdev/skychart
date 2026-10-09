@@ -20,6 +20,18 @@ export interface AtlasDiagnostics {
   selectionGeometry(): { selected: ScreenPoint | null; usable: Rect; workspaceTop: number | null; camera: Camera };
   bodyScreen(key: string): ScreenPoint | null;
   gestureState(): { activePointerIds: number[]; hadPinch: boolean };
+  /** Bodies with a marker, bodies with a label, and exoplanet rings in the current frame. */
+  visibleBodyKeys(): string[];
+  labelBodyKeys(): string[];
+  exoplanetOrbits(): {
+    key: string;
+    displayState: string;
+    marker: string;
+    phaseUncertaintyOrbits: number | null;
+    semiMajorAxisAu: number | null;
+    host: ScreenPoint;
+    position: ScreenPoint;
+  }[];
 }
 
 declare global {
@@ -38,6 +50,7 @@ interface InstallDiagnosticsOptions {
   workspacePanel: HTMLElement;
   camera: () => Camera;
   gestureState: () => { activePointerIds: number[]; hadPinch: boolean };
+  visibility: () => { visibleBodies(): Body[]; prioritizedLabelBodies(): Body[]; resolvedExoplanets(): Body[] };
 }
 
 export function installAtlasDiagnostics(options: InstallDiagnosticsOptions): void {
@@ -60,6 +73,21 @@ export function installAtlasDiagnostics(options: InstallDiagnosticsOptions): voi
       return body ? options.bodyToScreen(body) : null;
     },
     gestureState: options.gestureState,
+    visibleBodyKeys: () => options.visibility().visibleBodies().map((body) => body.key),
+    labelBodyKeys: () => options.visibility().prioritizedLabelBodies().map((body) => body.key),
+    exoplanetOrbits: () => options.visibility().resolvedExoplanets().map((body) => {
+      const orbit = body.exoplanet_orbit!;
+      const host = { ...body, position: { ...body.position, x_au: orbit.host_position.x_au, y_au: orbit.host_position.y_au } };
+      return {
+        key: body.key,
+        displayState: orbit.display_state,
+        marker: orbit.marker,
+        phaseUncertaintyOrbits: orbit.phase_uncertainty_orbits,
+        semiMajorAxisAu: orbit.semi_major_axis_au,
+        host: options.bodyToScreen(host),
+        position: options.bodyToScreen(body),
+      };
+    }),
   };
 }
 

@@ -1,6 +1,7 @@
 import { DEFERRED_EPHEMERIS_GROUPS, STARTUP_EPHEMERIS_GROUPS } from "./atlasDefinitions";
 import { mergeBodyList } from "./atlasState";
 import type { Body, Ephemeris } from "./contracts";
+import { positionExoplanet } from "../catalog/exoplanetOrbit";
 import { resolveSmallBodyPosition } from "../catalog/smallBodyPropagation";
 import { spacecraftBodies } from "../catalog/spacecraftCatalog";
 
@@ -25,6 +26,7 @@ export async function loadAtlasEphemeris(
   // their positions. Carrying a previous position across dates would be invalid.
   const propagatedBodies = await Promise.all(preservedBodies
     .filter((body) => body.object_type !== "spacecraft")
+    .map((body) => positionExoplanet(body, payload.timestamp_utc, payload.au_km, earth))
     .map((body) => resolveSmallBodyPosition(body, payload.timestamp_utc, payload.au_km, earth)));
   const bodies = mergeBodyList([...payload.bodies, ...spacecraftBodies(payload.timestamp_utc)], propagatedBodies);
   return { payload, bodies };

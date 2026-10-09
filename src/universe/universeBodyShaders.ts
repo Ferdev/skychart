@@ -58,6 +58,8 @@ vec3 albedo(vec3 n) {
     return uBase * (.72+.28*band) * (.94+.12*t);
   }
   if (uMaterial > 4.5 && uMaterial < 6.5) return uBase*(.94+.09*t);
+  // Material 9: an exoplanet. No surface is known, so the sphere is uniform.
+  if (uMaterial > 8.5) return uBase;
   return uBase*(.65+.55*t);
 }
 vec3 shade(vec3 n, vec3 view, vec3 sun) {
@@ -80,7 +82,7 @@ vec3 shade(vec3 n, vec3 view, vec3 sun) {
   }
   // Decode the display map, shade in linear light, then encode for the canvas.
   vec3 linear = pow(max(color,vec3(0)),vec3(2.2));
-  float diffuse = uMaterial > 6.5 ? light/(max(.18,light+mu)) : light;
+  float diffuse = uMaterial > 6.5 && uMaterial < 8.5 ? light/(max(.18,light+mu)) : light;
   linear *= .009 + .99*diffuse*shadow;
   if (uMaterial > 2.5 && uMaterial < 3.5) {
     float cloud = uHasDetail > .5 ? texture2D(uDetail,uvFor(n)).r : 0.0;

@@ -124,6 +124,225 @@ are distinct concepts.
 The machine-readable position-model registry is checked in at
 `backend_phoenix/priv/science_semantics.json`.
 
+## Exoplanet orbits
+
+The atlas shows each confirmed exoplanet of the NASA Exoplanet Archive table
+`pscomppars` on an orbit around its host star, at true scale, at the atlas
+time. The catalog stores a planet at the coordinates of its host. The browser
+adds the orbit offset (`src/catalog/exoplanetOrbit.ts`).
+
+### What is measured and what is a convention
+
+| Quantity | Source | Display |
+| --- | --- | --- |
+| Orbit size (semi-major axis) | Archive | True scale. A flag shows when the archive calculated the value. |
+| Orbit shape (eccentricity, argument of periastron) | Archive, when the two values are measured | Ellipse. If a value is absent or is only a limit: a circle, with a flag. |
+| Position on the orbit (phase) | Period and conjunction time, or period and periastron time | Calculated for the atlas time, with its uncertainty. |
+| Inclination to the sky plane | Archive, when measured | Measured value. If absent or only a limit: 90 degrees (edge-on), with a flag. |
+| Node angle | Not in the table | Display convention for each planet. |
+
+The archive gives no node angle. This is the direction of the orbit around the
+line of sight. The atlas puts the line of nodes at 90 degrees to the line of
+sight and parallel to the ecliptic plane. The top-down map then shows an
+edge-on orbit as open as possible. For a host at an ecliptic pole the node is
+the x axis. A ring on the map is thus correct in size and in the timing of the
+planet, and is not a measurement of the orbit direction. The map states this in
+one line near the scale bar when a ring is in view, the rings use a dashed line
+style that Solar System orbits do not use, and the object inspector lists each
+convention in use.
+
+An edge-on orbit for an unmeasured inclination agrees with the minimum mass
+(`M sin i`) that the archive gives for those planets.
+
+### Frame and offset
+
+`s` is the unit vector from the Sun to the host. `n` is the unit vector of
+`k x s`, where `k` is the ecliptic north. `m` is `s x n`. With the angle `u`
+from the node, the inclination `i`, and the distance `r` from the host, the
+offset of the planet is
+
+`r * [cos(u) * n + sin(u) * (cos(i) * m - sin(i) * s)]`.
+
+`u` is 90 degrees at conjunction, where the planet is between the Sun and the
+host. With an argument of periastron `w` and a true anomaly `f`, `u = w + f`.
+
+### Phase and its uncertainty
+
+- A conjunction time is preferred to a periastron time, because it does not
+  depend on the argument of periastron. A periastron time is used only with
+  the argument of periastron of the same solution.
+- The composite table takes each value from the paper that the archive
+  prefers for that value. A period and a reference time from two papers are
+  not one ephemeris. The builder then reads the per-paper table `ps` and
+  selects one row that has the two values: the archive default row first, then
+  the newest paper. If no such row exists, the mixed values stay, a flag is
+  set, and the marker is hollow.
+- The phase is the phase that an observer in the Solar System sees at the
+  atlas time. The light travel time is not removed; star positions use the
+  same rule. A reference time in TDB or TT gets the 69.184 s offset from UTC.
+  Barycentric, heliocentric, and unlabelled Julian dates are used as given.
+- The 1-sigma phase uncertainty in orbits is
+  `sqrt(sigma_T^2 + (N * sigma_P)^2) / P`. `N` is the number of orbits from the
+  reference time to the atlas time. The larger of the two published
+  uncertainties is used for each value. The uncertainty is "not available"
+  when the archive gives no uncertainty for the period or for the time.
+- A reference time more than one period after the snapshot date is not a
+  measured epoch and is not used. The archive has such records with a wrong
+  Julian-day offset.
+
+### Display states
+
+1. **Position calculated.** Orbit ring, planet marker, and an arc for the
+   1-sigma phase interval. The marker is hollow when the uncertainty is 0.05
+   to 0.25 orbit, when it is not available, or when the papers are mixed.
+2. **Orbit only.** Orbit ring and no marker: there is no usable timing, or the
+   uncertainty is more than 0.25 orbit at the atlas time. The atlas does not
+   put the planet at an arbitrary point.
+3. **No orbit.** No ring and no marker: the archive gives no orbit size. The
+   planet stays a fact on its host star.
+
+A planet has its own marker only when its orbit is at least 4 pixels wide. At
+a smaller scale the host star represents the system. The snapshot of
+2026-10-09 has 6,417 planets in 4,814 systems: 5,358 with a calculated
+position, 568 with an orbit only, and 491 with no orbit.
+
+### Precision
+
+A tile quantizes each position to 1/65,535 of the tile span, which is 256 AU
+at the finest exoplanet level. From one pixel of that step, the host stars and
+planets draw from the viewport-object path with their 64-bit coordinates. The
+WebGL body layer subtracts an origin near the camera before the Float32
+conversion: absolute Float32 AU values have a step of 0.25 AU at 2.5 million
+AU.
+
+### Limits
+
+- Papers do not use one convention for the argument of periastron. An
+  eccentric ellipse can point the wrong way by 180 degrees, and a position
+  from a periastron time can be wrong by the same angle.
+- Transit timing variations make the true transit times deviate from a
+  constant period (the inspector shows the archive flag).
+- For a circumbinary planet the ring center is not one star (flag in the
+  inspector).
+- The curated nearby host stars and their archive records have the same
+  coordinates (16 pairs, 0.0 AU apart on 2026-10-08) and draw as one marker.
+  The Gaia or Hipparcos record of the same star uses its own astrometry and
+  epoch: measured offsets from the archive record are 30 to 880 AU for Gaia
+  and 1,666 AU for one Hipparcos record. At the scale of a close-in system
+  that record is out of view. For a system some hundred AU wide it can show
+  as a second star marker; the orbits are around the archive record.
+- Planet candidates are not in this table. They are a separate layer; see
+  [Planet candidates](#planet-candidates).
+- The 3D view uses the same positions. It lights each exoplanet from its host
+  star and uses one neutral material; see `docs/universe-appearance.md`.
+
+## Planet candidates
+
+The atlas shows planet candidates from three tables of the NASA Exoplanet
+Archive and from community reports. A candidate is not a confirmed planet:
+the source reports a signal that looks like a transit, and follow-up
+observations show that many such signals have a different cause, for example
+an eclipsing binary star. The inspector, the search result, the candidate
+list of a star, and the map note each say that a candidate is not confirmed.
+
+Sources (`scripts/build_exoplanet_candidate_catalog.py`, snapshot
+`data/catalogs/exoplanet_candidates.json`, schema version 2):
+
+| Catalog | Source | Rows that the atlas keeps |
+| --- | --- | --- |
+| `toi` | TESS Objects of Interest table | TFOPWG disposition `PC` or `APC` |
+| `koi` | Kepler Objects of Interest, cumulative table | disposition `CANDIDATE` |
+| `k2` | K2 Planets and Candidates table | disposition `CANDIDATE`, default row |
+| `community` | Reports in `COMMUNITY_REPORTS` of the builder | each listed signal |
+
+- Confirmed planets, known planets, false positives, and false alarms of
+  these tables are not in the layer.
+- A star with no distance has no place in the atlas. The builder counts the
+  rows that it does not keep in `coverage.<catalog>.excluded_no_distance`.
+- The KOI table gives no star distance. The distance is that of Berger et al.
+  (2020), the Gaia-Kepler Stellar Properties Catalog (VizieR `J/AJ/159/280`),
+  by exact KIC number.
+- A candidate table can keep a candidate after the archive confirms it. The
+  importer does not import a candidate that has the period of a confirmed
+  planet of the same star (difference below 0.1 %): the confirmed catalog has
+  that planet.
+
+Community reports:
+
+- A report goes in the list only with a public, citable record and a
+  published ephemeris. The record names the report and links to it.
+- No mission team reviewed such a report. The status in the inspector says
+  "Community report, not reviewed by a mission team", and the note of the
+  report gives the limits that its author states.
+- The list has one report now: Rabtsevich (2026), two transit-like signals in
+  TESS photometry of TIC 4206066 (3.18 d and 11.13 d), preprint
+  doi:10.5281/zenodo.22967456. The report claims no statistical validation,
+  and it calls the 11.13 d signal tentative.
+
+Catalog records:
+
+- A candidate has the object type `planet_candidate` and the group
+  `exoplanet_candidates`. Keys: `toi-<star>-<number>`, `koi-<star>-<number>`,
+  `epic-<star>-<number>`, and the key of the report for a community signal.
+  The confirmed planet count of a star does not include candidates.
+- Each star has a list of identifiers (TIC, KIC, EPIC, Gaia DR3, HD, HIP, or
+  the name of its confirmed host). A star with an identifier of a
+  confirmed-planet host is that host: its candidates are attached to the host
+  record and use its coordinates.
+- Each other star gets a record in the group `exoplanet_candidate_hosts`. If a
+  Gaia local star has the TIC number or the Gaia DR3 name of the star, the
+  record has the position and the position model of that Gaia record
+  (`facts.position_source_key`), so the two records of one star are at one
+  place. If not, the record has the coordinates and the distance of its
+  source (position models `tess_toi_coordinates`, `kepler_koi_coordinates`,
+  `k2_pandc_coordinates`, `community_report_coordinates`).
+
+Orbit size:
+
+- TESS: the table gives no orbit size and no star mass. The builder
+  calculates the star mass from the surface gravity and the radius,
+  `M = g R^2 / G`, and the orbit size from Kepler's third law, `a^3 = M P^2`
+  (solar masses, years, AU).
+- Kepler: the orbit size is the value of the Kepler pipeline (`koi_sma`). The
+  inspector says "calculated by the archive". The table gives no uncertainty
+  for it.
+- K2: a published orbit size is used where the default row gives one. If not,
+  the builder calculates it from the period and the star mass of the same
+  row: the published mass, or the mass from the surface gravity and the
+  radius. Many K2 rows have no star mass, so those candidates have no orbit.
+- Community report: the builder calculates the orbit size from the period and
+  the star mass of the report.
+- The facts `stellar_mass_atlas_calculated` and
+  `semi_major_axis_atlas_calculated` mark the atlas calculations, and the
+  inspector says "calculated by the atlas". A mass below 0.05 or above 5
+  solar masses, or with an uncertainty as large as the mass, gives no orbit.
+
+Position:
+
+- The rules are those of a confirmed planet: the transit midpoint is the
+  conjunction time, the orbit is a circle, the node angle is the same display
+  convention, and a phase uncertainty above 0.25 orbit gives a ring and no
+  marker. The orbit is drawn edge-on, except for a Kepler candidate, which
+  has the inclination of its transit fit.
+- Most K2 ephemerides are some years old. Their phase uncertainty at the
+  atlas time is often above 0.25 orbit, and then the candidate has a ring and
+  no marker.
+- A candidate with no orbit size has the model
+  `<catalog prefix>_host_coordinates`: no ring and no marker.
+- A candidate ring is violet and dotted. A confirmed-planet ring is blue and
+  dashed. With a candidate ring in view, the map note says that candidates
+  are not confirmed planets.
+
+Limits:
+
+- The map loads the stars of candidates only at view widths below 40
+  light-years. No tile layer contains them, so a wide view does not show them.
+- The Gaia or Hipparcos record of the same star can show as a second star
+  marker near a candidate star that is not in the Gaia local catalog, as for
+  a confirmed-planet host.
+- The dispositions change when a follow-up group reviews a candidate. The
+  snapshot shows the state at its generation time.
+
 ## Distance evidence
 
 The atlas distinguishes the evidence behind a distance:
@@ -195,6 +414,11 @@ instead of leaving a broken image or pretending the fallback is DR11.
 - [NASA/JPL Small-Body Database](https://ssd.jpl.nasa.gov/tools/sbdb_lookup.html)
 - [IAU Resolution B5 and dwarf-planet classifications](https://www.iau.org/static/resolutions/Resolution_GA26-5-6.pdf)
 - [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/)
+- [NASA Exoplanet Archive TESS Objects of Interest table](https://exoplanetarchive.ipac.caltech.edu/docs/API_TOI_columns.html)
+- [NASA Exoplanet Archive Kepler Objects of Interest table](https://exoplanetarchive.ipac.caltech.edu/docs/API_kepcandidate_columns.html)
+- [NASA Exoplanet Archive K2 Planets and Candidates table](https://exoplanetarchive.ipac.caltech.edu/docs/API_k2pandc_columns.html)
+- [Berger et al. 2020, Gaia-Kepler Stellar Properties Catalog](https://doi.org/10.3847/1538-3881/159/6/280)
+- [Rabtsevich 2026, two transit-like signals in TESS photometry of TIC 4206066 (preprint)](https://doi.org/10.5281/zenodo.22967456)
 - [BASS Data Release 2](https://www.bass-survey.com/dr2.html)
 - [BASS DR2 black-hole mass catalog at VizieR](https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2)
 - [DESI Data Release 1](https://data.desi.lbl.gov/doc/releases/dr1/)

@@ -30,6 +30,33 @@ products should review the upstream terms and cite:
 - the SDSS DR20 paper (arXiv `2607.26149`) and the SPIDERS DL1 value-added
   catalog (`DL1_SDSS_eROSITA` v1.1.0; Aydar, Merloni, Dwelly et al.).
 
+The other names of the Gaia local stars (`name`, `aliases`, and
+`simbad_main_id` in `data/catalogs/gaia_local_stars.json`) come from the SIMBAD
+database, operated at CDS, Strasbourg, France. Users who redistribute them
+should acknowledge SIMBAD and cite Wenger et al. (2000), *The SIMBAD
+astronomical database*, DOI `10.1051/aas:2000332`.
+
+The planet candidates (`data/catalogs/exoplanet_candidates.json`) come from
+three tables of the NASA Exoplanet Archive, which is operated by the
+California Institute of Technology under contract with NASA: TESS Objects of
+Interest, Kepler Objects of Interest (cumulative table), and K2 Planets and
+Candidates. Users who redistribute them should acknowledge the archive and
+cite Guerrero et al. (2021), *The TESS Objects of Interest Catalog from the
+TESS Prime Mission*, DOI `10.3847/1538-4365/abefe1`, and Thompson et al.
+(2018), *Planetary Candidates Observed by Kepler. VIII.*, DOI
+`10.3847/1538-4365/aab4f9`. The K2 records name the paper of each candidate.
+The distances of the Kepler stars come from Berger et al. (2020), *The
+Gaia-Kepler Stellar Properties Catalog. I.*, DOI
+`10.3847/1538-3881/159/6/280`, through the VizieR service of CDS. A value
+with the fact `semi_major_axis_atlas_calculated` or
+`stellar_mass_atlas_calculated` is an atlas calculation, not a source value.
+
+The same snapshot has the two transit-like signals at TIC 4206066 of
+Rabtsevich (2026), *Two Transit-like Signals in TESS Photometry of the Nearby
+K Dwarf TIC 4206066*, a preprint with the license CC BY 4.0, DOI
+`10.5281/zenodo.22967456`. It is a community report: no mission team reviewed
+it, and it claims no statistical validation.
+
 Other generated snapshots identify their originating archives and source URLs
 inside each JSON file. The `/about` page and
 [`docs/scientific-methodology.md`](docs/scientific-methodology.md) provide the
