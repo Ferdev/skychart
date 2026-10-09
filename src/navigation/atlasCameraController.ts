@@ -48,7 +48,7 @@ export class AtlasCameraController {
     const classification = classifyBody(body);
     const rect = this.options.viewport();
     const diameterAu = Math.max((body.radius_km * 2) / this.options.auKm(), 1e-9);
-    const targetDiameterPx = ["moon", "planet", "dwarf_planet"].includes(classification.type) ? LOCAL_DIAMETER_PX : LOCAL_DIAMETER_PX * 0.72;
+    const targetDiameterPx = ["moon", "planet", "planet_candidate", "dwarf_planet"].includes(classification.type) ? LOCAL_DIAMETER_PX : LOCAL_DIAMETER_PX * 0.72;
     const pxPerAu = body.catalog?.source_type === "deep_sky_catalog"
       ? clamp(rect.width / Math.max(body.distance_from_earth_km / this.options.auKm() / 40, 1000), MIN_ZOOM, MAX_ZOOM)
       : clamp(targetDiameterPx / diameterAu, MIN_ZOOM, MAX_ZOOM);

@@ -98,3 +98,11 @@ the immutable manifest path.
 
 Scientific conventions used by these pipelines are summarized in
 [Scientific Methodology](scientific-methodology.md).
+
+## Community photos
+
+`CommunityRepo` owns accounts, subject identities, photos, votes and audit records
+in a separate writable database. It does not write through the catalog union view
+or staging's read-only catalog role. Oban runs bounded image/solver jobs in the
+community worker. S3 holds private sources and masters and approved derivatives.
+See [community photos](community-photos.md) for configuration and recovery.

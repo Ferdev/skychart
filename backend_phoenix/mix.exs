@@ -49,7 +49,11 @@ defmodule StarsmapApi.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:hackney, "~> 4.5"},
-      {:sentry, "~> 13.3"}
+      {:sentry, "~> 13.3"},
+      {:oban, "~> 2.18.3"},
+      {:ex_aws, "~> 2.5"},
+      {:ex_aws_s3, "~> 2.5"},
+      {:sweet_xml, "~> 0.7"}
     ]
   end
 

@@ -1,3 +1,4 @@
+import { community } from "../community/communityController";
 import type { Body } from "../atlas/contracts";
 import { GUIDED_DEEP_SKY_KEYS } from "../atlas/atlasDefinitions";
 import type { atlasDom } from "../atlas/atlasDom";
@@ -31,7 +32,8 @@ import { resolvedBodyWeight } from "./universeAppearanceProfiles";
 import { UniverseBodyRenderer } from "./universeBodyRenderer";
 import { deepSkyModel } from "./universeDeepSkyModel";
 import { UniverseDeepSkyRenderer } from "./universeDeepSkyRenderer";
-import { bodyToUniversePoint, sampleDuringFlight, validCatalogPoint, type CatalogUniversePoint, type UniversePoint } from "./universePointModel";
+import { bodyToUniversePoint, catalogPointIsHostBound, sampleDuringFlight, validCatalogPoint, type CatalogUniversePoint, type UniversePoint } from "./universePointModel";
+import { UniverseExoplanetSystems } from "./universeExoplanets";
 
 type Projector = ReturnType<typeof createSkyProjector>;
 
@@ -75,6 +77,8 @@ type UniverseViewOptions = {
   selectBody: (key: string) => Promise<void>;
   inspectInAtlas: (key: string) => void;
   searchDestinations: (query: string, signal: AbortSignal) => Promise<Body[]>;
+  /** Loads the planets of the host star at this position into the atlas body list. */
+  loadPlanetarySystem: (host: { x_au: number; y_au: number; z_au: number }) => Promise<void>;
   openSky: (body: Body) => Promise<void>;
   stateChanged: (mode: "push" | "replace") => void;
   closeSky: () => void;
@@ -83,7 +87,7 @@ type UniverseViewOptions = {
 };
 
 type UniverseIntegrationOptions = Pick<UniverseViewOptions,
-  "bodyByKey" | "selectedBody" | "translate" | "selectBody" | "inspectInAtlas" | "searchDestinations" | "openSky" | "stateChanged" | "closeSky" | "resumeAtlas" | "initialState">;
+  "bodyByKey" | "selectedBody" | "translate" | "selectBody" | "inspectInAtlas" | "searchDestinations" | "loadPlanetarySystem" | "openSky" | "stateChanged" | "closeSky" | "resumeAtlas" | "initialState">;
 
 const DEFAULT_CAMERA: SkyCamera = { yawDeg: 180, pitchDeg: 0, fovDeg: 72 };
 const CATALOG_LIMIT = 12_000;
@@ -139,8 +143,16 @@ export class UniverseViewController {
   private readonly speedGauge: UniverseSpeedGauge;
   private readonly quality: UniverseRenderQuality;
   private readonly selectionConnector: SkySelectionConnectorView;
+  private readonly exoplanetSystems: UniverseExoplanetSystems;
 
   constructor(private readonly options: UniverseViewOptions) {
+    this.exoplanetSystems = new UniverseExoplanetSystems(options.loadPlanetarySystem, () => {
+      const targetKey = this.target?.key ?? this.targetKey;
+      if (targetKey) this.target = bodyToUniversePoint(options.bodyByKey().get(targetKey) ?? null) ?? this.target;
+      this.baseRenderKey = "";
+      this.updateTarget();
+      this.requestRender();
+    });
     this.pointRenderer = new UniversePointRenderer(options.pointsCanvas, () => this.requestRender());
     this.quality = new UniverseRenderQuality(this.pointRenderer.software);
     this.bodyRenderer = new UniverseBodyRenderer(options.bodiesCanvas, () => this.requestRender());
@@ -272,6 +284,7 @@ export class UniverseViewController {
   refreshForTime(): void {
     if (!this.active) return;
     if (this.target?.dynamic) this.target = bodyToUniversePoint(this.options.bodyByKey().get(this.target.key) ?? null);
+    this.exoplanetSystems.reset();
     this.requestRender();
     void this.loadCatalog();
   }
@@ -319,7 +332,9 @@ export class UniverseViewController {
           z: requestPosition.z + point.direction.z * Number(point.distance_au),
         },
         dynamic: false,
-        radiusKm: point.radius_km,
+        // A planet record from this endpoint is at its host star: no sphere at the star center.
+        radiusKm: catalogPointIsHostBound(point) ? null : point.radius_km,
+        hostBound: catalogPointIsHostBound(point),
       }));
       const nearbyCount = Math.min(loaded.length, Math.max(0, payload.nearby_returned ?? loaded.length));
       if (!localOnly) {
@@ -346,15 +361,21 @@ export class UniverseViewController {
     this.baseRenderKey = "";
     this.updateTarget();
     this.requestRender();
+    this.exoplanetSystems.update(this.points(), this.position);
   }
 
+  /**
+   * Catalog points, then the target, then the loaded bodies: a loaded body
+   * replaces the catalog point with the same key. A planet with no calculated
+   * position is at its host star, so only a selected one stays in the list.
+   */
   private points(): UniversePoint[] {
     const catalog = this.flying ? this.flightCatalogPoints : this.catalogPoints;
-    const points = new Map<string, UniversePoint>(catalog.map((point) => [point.key, point]));
+    const points = new Map<string, UniversePoint>(catalog.filter((point) => !point.hostBound).map((point) => [point.key, point]));
     if (this.target) points.set(this.target.key, this.target);
     for (const body of this.options.bodyByKey().values()) {
       const point = bodyToUniversePoint(body);
-      if (point) points.set(body.key, point);
+      if (point && (!point.hostBound || point.key === this.target?.key)) points.set(body.key, point);
     }
     return [...points.values()];
   }
@@ -422,6 +443,8 @@ export class UniverseViewController {
       this.baseRenderKey = baseKey;
     }
     this.updateSelectionConnector();
+    community.render("universe", this.options.root, this.renderedHits.map(h => ({key: h.point.key, x: h.x, y: h.y})), community.showMarkers && !this.flying);
+    community.renderPlane(this.options.root, this.target, framePoints.find(p => p.key === "earth")?.position ?? {x:0,y:0,z:0}, this.position, project, this.flying);
     if (this.collectPerformance) {
       const debug = window as Window & { __universePerf?: Array<{ base: number; points: number; labels: number; webgl: boolean }> };
       const samples = debug.__universePerf ??= [];
@@ -587,9 +610,10 @@ export class UniverseViewController {
         ? this.options.translate("universe3d.insideSurface")
         : this.options.translate("universe3d.aboveSurface", { distance: formatDistanceAu(distance - target.radiusKm / AU_KM) })
       : "";
+    const targetBody = this.options.bodyByKey().get(target.key);
     this.options.targetMeta.textContent = this.options.translate("universe3d.targetMeta", {
       type: (target.object_type ?? "Object").replace(/_/g, " "), distance: formatDistanceAu(distance), surface,
-    });
+    }) + (targetBody?.catalog?.facts?.radius_calculated === true && surface ? ` · ${this.options.translate("exoplanet.radiusCalculated")}` : "");
     const magnitude = observerApparentMagnitude(target, this.position);
     this.options.targetMagnitude.textContent = magnitude === null
       ? this.options.translate("universe3d.unknownMagnitude")

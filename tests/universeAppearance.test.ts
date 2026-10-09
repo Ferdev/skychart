@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { appearanceRotation, bodyAppearance, resolvedBodyWeight, stellarDisplayColor } from "../src/universe/universeAppearanceProfiles.ts";
+import { appearanceRotation, bodyAppearance, EXOPLANET_COLOR, EXOPLANET_MATERIAL, parseBodyColor, resolvedBodyWeight, stellarDisplayColor } from "../src/universe/universeAppearanceProfiles.ts";
+import { lightDirection, UniverseExoplanetSystems } from "../src/universe/universeExoplanets.ts";
 import { bodyOccluders, occludedByBody, saturnRingOpacity, ringTransmission } from "../src/universe/universeOcclusion.ts";
 import { makeDeepSkyCloud } from "../src/universe/universeCloudGeometry.ts";
 import { messierTypeCode } from "../src/universe/universeDeepSkyProfiles.ts";
@@ -37,6 +38,58 @@ for (let px = 1.5; px < 6; px += .1) assert.ok(resolvedBodyWeight(px + .1) >= re
 assert.ok(stellarDisplayColor(3000)[0] > stellarDisplayColor(3000)[2]);
 assert.ok(stellarDisplayColor(15000)[2] > stellarDisplayColor(15000)[0]);
 assert.equal(bodyAppearance({ ...body, key: "unknown-exoplanet" }).map, undefined);
+
+// Each exoplanet has one neutral material. The mass, the radius, the
+// temperature, and the catalog color do not select a surface.
+const hotGiant = bodyAppearance({ key: "exoplanet-51-peg-b", object_type: "planet", catalog_group: "exoplanets",
+  position: body.position, radiusKm: 90_000, temperatureK: 1_300, color: "#89d6ff" });
+const smallWorld = bodyAppearance({ key: "exoplanet-trappist-1-e", object_type: "planet", catalog_group: "exoplanets",
+  position: body.position, radiusKm: 5_861, temperatureK: 250, color: "#ff0000" });
+assert.deepEqual(hotGiant, smallWorld);
+assert.equal(hotGiant.material, EXOPLANET_MATERIAL);
+assert.deepEqual(hotGiant.color, parseBodyColor(EXOPLANET_COLOR));
+assert.equal(new Set(hotGiant.color).size, 1, "the neutral color is a gray");
+assert.equal(hotGiant.map, undefined);
+assert.equal(hotGiant.detail, undefined);
+assert.equal(hotGiant.relief, 0);
+assert.equal(hotGiant.atmosphere, 0);
+assert.equal(hotGiant.tilt, 0);
+for (const key of ["earth", "mars", "jupiter", "moon", "titan"]) {
+  assert.notEqual(bodyAppearance({ ...body, key }).material, EXOPLANET_MATERIAL, `${key} keeps its own material`);
+}
+// A name does not make an exoplanet look like a Solar System planet.
+assert.deepEqual(bodyAppearance({ ...body, key: "earth", catalog_group: "exoplanets" }), hotGiant);
+
+// An exoplanet is lit from its host star. Each other body is lit from the Sun at the origin.
+const host = { x: 2_484_666.23, y: -631_632.11, z: 28_182.95 };
+const planetLight = lightDirection({ position: { x: host.x + 0.03, y: host.y, z: host.z }, lightSource: host });
+assert.ok(Math.abs(planetLight.x + 1) < 1e-6 && Math.abs(planetLight.y) < 1e-6 && Math.abs(planetLight.z) < 1e-6);
+const sunLight = lightDirection({ position: { x: 5, y: 0, z: 0 } });
+assert.deepEqual(sunLight, { x: -1, y: 0, z: 0 });
+assert.notDeepEqual(planetLight, lightDirection({ position: { x: host.x + 0.03, y: host.y, z: host.z } }));
+
+// The planets of the host stars near the 3D observer load once for each star.
+{
+  const requests: { x_au: number; y_au: number; z_au: number }[] = [];
+  let loaded = 0;
+  const systems = new UniverseExoplanetSystems(async (position) => { requests.push(position); }, () => { loaded += 1; });
+  const point = (key: string, catalog_group: string, x: number) => ({ key, name: key, catalog_group, position: { x, y: 0, z: 0 }, dynamic: false });
+  const points = [
+    point("exosys-near", "exoplanet_systems", 100),
+    point("near-twin", "nearby_exoplanet_systems", 100),
+    point("exosys-far", "exoplanet_systems", 1_000_000),
+    point("hip-1", "bright_stars", 10),
+  ];
+  systems.update(points, { x: 0, y: 0, z: 0 });
+  systems.update(points, { x: 1, y: 0, z: 0 });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.deepEqual(requests, [{ x_au: 100, y_au: 0, z_au: 0 }], "one request for one star; a far host and a plain star get none");
+  assert.equal(loaded, 1);
+  systems.reset();
+  systems.update(points, { x: 0, y: 0, z: 0 });
+  assert.equal(requests.length, 2, "a time change loads the planets again");
+}
 
 const m87 = makeDeepSkyCloud("m87", "elliptical");
 assert.deepEqual(m87, makeDeepSkyCloud("simbad-m-87", "elliptical"), "M87 aliases have identical material-space geometry");

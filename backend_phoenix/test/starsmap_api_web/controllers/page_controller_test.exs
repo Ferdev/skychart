@@ -30,7 +30,10 @@ defmodule StarsmapApiWeb.PageControllerTest do
     html = html_response(conn, 200)
 
     assert html =~ ~s(<meta name="cosmic-atlas-boot-mode" content="embed">)
-    assert get_resp_header(conn, "content-security-policy") == ["frame-ancestors *"]
+    [policy] = get_resp_header(conn, "content-security-policy")
+    assert policy =~ "frame-ancestors *"
+    assert policy =~ "script-src 'self'"
+    assert policy =~ "object-src 'none'"
     assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
     assert get_resp_header(conn, "referrer-policy") == ["strict-origin-when-cross-origin"]
     assert get_resp_header(conn, "x-frame-options") == []
@@ -38,7 +41,10 @@ defmodule StarsmapApiWeb.PageControllerTest do
 
   test "normal pages remain same-origin frame protected", %{conn: conn} do
     conn = get(conn, ~p"/")
-    assert get_resp_header(conn, "content-security-policy") == ["frame-ancestors 'self'"]
+    [policy] = get_resp_header(conn, "content-security-policy")
+    assert policy =~ "frame-ancestors 'self'"
+    assert policy =~ "script-src 'self'"
+    assert policy =~ "base-uri 'self'"
     assert get_resp_header(conn, "x-content-type-options") == ["nosniff"]
     assert get_resp_header(conn, "x-frame-options") == ["SAMEORIGIN"]
   end

@@ -288,6 +288,7 @@ class StaticTileDefaultsTest(unittest.TestCase):
                     **os.environ,
                     "PATH": f"{root}:{os.environ['PATH']}",
                     "AWS_ACCESS_KEY_ID": "test",
+                    "AWS_CLI": str(aws),
                     "AWS_SECRET_ACCESS_KEY": "test",
                     "CATALOG_TILE_PUBLIC_BASE_URL": "https://tiles.example/catalog-tiles/v-test",
                     "CATALOG_TILE_CARRY_FORWARD_MANIFEST_URL": "https://tiles.example/catalog-tiles/v-bulk/manifest.json",

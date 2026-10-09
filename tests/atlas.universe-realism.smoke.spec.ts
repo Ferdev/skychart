@@ -48,6 +48,30 @@ async function installRendererScene(page: Page) {
           { key: "m13", object_type: "star_cluster", position: { x: foreground ? -98 : -110, y: 0, z: 0 }, radiusKm: 149597870.7 * .25 }];
         render();
       },
+      // One exoplanet at the fixture position. `hostOffsetY` puts its host star at one side; null gives no host.
+      exoplanetScene(hostOffsetY: number | null, key = "exoplanet-fixture-b", color = "#89d6ff") {
+        bodies.release();
+        observer = { x: -97, y: 0, z: 0 }; moving = false;
+        scene = [{ key, object_type: "planet", catalog_group: "exoplanets", position: { x: -100, y: 0, z: 0 }, radiusKm: 149597870.7, color,
+          temperatureK: 1300, lightSource: hostOffsetY === null ? null : { x: -100, y: hostOffsetY, z: 0 } }];
+        render();
+      },
+      // Brightness of the two halves of the body disc, and the largest difference between color channels.
+      halves() {
+        render(); const gl = bodyCanvas.getContext("webgl");
+        const data = new Uint8Array(800*560*4);
+        if (gl) gl.readPixels(0,0,800,560,gl.RGBA,gl.UNSIGNED_BYTE,data);
+        else data.set(bodyCanvas.getContext("2d")!.getImageData(0,0,800,560).data);
+        let left = 0, right = 0, opaque = 0, tint = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i+3]! <= 240) continue;
+          opaque++;
+          const light = data[i]! + data[i+1]! + data[i+2]!;
+          if ((i / 4) % 800 < 400) left += light; else right += light;
+          tint = Math.max(tint, Math.abs(data[i]! - data[i+1]!), Math.abs(data[i+1]! - data[i+2]!));
+        }
+        return { left, right, opaque, tint };
+      },
       cloudChecksum() {
         render(); const gl = cloudCanvas.getContext("webgl");
         if (!gl) return 0;
@@ -210,4 +234,72 @@ test("failed maps and no WebGL retain a visible navigable surface", async ({ pag
   await page.evaluate(() => (window as any).realism.show("jupiter", "planet", [1+30/69911,0,0]));
   expect((await page.evaluate(() => (window as any).realism.pixels())).opaque).toBeGreaterThan(400_000);
   expect(errors).toEqual([]);
+});
+
+test("an exoplanet is one neutral sphere with light from its host star", async ({ page }) => {
+  test.setTimeout(120_000);
+  const issues = collectBrowserIssues(page);
+  await installRendererScene(page);
+  const halves = (hostOffsetY: number | null, key?: string, color?: string) => page.evaluate(([offset, key, color]) => {
+    (window as any).realism.exoplanetScene(offset, key ?? undefined, color ?? undefined);
+    return (window as any).realism.halves() as { left: number; right: number; opaque: number; tint: number };
+  }, [hostOffsetY, key ?? null, color ?? null] as const);
+
+  // Host star at one side: that half of the disc is lit and the other half is dark.
+  const hostAtOneSide = await halves(1_000);
+  const hostAtOtherSide = await halves(-1_000);
+  expect(hostAtOneSide.opaque).toBeGreaterThan(10_000);
+  const bright = (state: { left: number; right: number }) => Math.max(state.left, state.right) / Math.max(1, Math.min(state.left, state.right));
+  expect(bright(hostAtOneSide)).toBeGreaterThan(3);
+  expect(bright(hostAtOtherSide)).toBeGreaterThan(3);
+  expect(hostAtOneSide.left > hostAtOneSide.right, "the lit half follows the host star").not.toBe(hostAtOtherSide.left > hostAtOtherSide.right);
+  // With the Sun as the light (behind this camera), the two halves are equal: the host changes the light.
+  const sunLit = await halves(null);
+  expect(bright(sunLit)).toBeLessThan(1.25);
+
+  // The material is a neutral gray for each planet: the catalog color, the key, and the temperature select nothing.
+  expect(hostAtOneSide.tint).toBeLessThanOrEqual(2);
+  const otherPlanet = await halves(1_000, "earth", "#ff0000");
+  expect(otherPlanet.tint).toBeLessThanOrEqual(2);
+  expect(otherPlanet.left).toBe(hostAtOneSide.left);
+  expect(otherPlanet.right).toBe(hostAtOneSide.right);
+  await expect(page.locator("#bodies")).toHaveAttribute("data-loaded-textures", "");
+  issues.assertClean();
+});
+
+test("the 3D point list keeps a planet off its star and drops a planet with no position", async ({ page }) => {
+  await installRendererScene(page);
+  const result = await page.evaluate(async () => {
+    const { bodyToUniversePoint, catalogPointIsHostBound } = await import("/src/universe/universePointModel.ts");
+    const { positionExoplanet } = await import("/src/catalog/exoplanetOrbit.ts");
+    const host = { x_au: 2_484_666.23, y_au: -631_632.11, z_au: 28_182.95 };
+    const planet = (facts: Record<string, unknown>) => positionExoplanet({
+      key: "exoplanet-fixture-b", name: "Fixture b", object_type: "planet", catalog_group: "exoplanets", radius_km: 6_371, color: "#89d6ff",
+      catalog: { facts }, distance_from_earth_km: 0,
+      position: { ...host, x_km: 0, y_km: 0, z_km: 0, heliocentric_distance_km: 0 },
+    } as never, "2026-10-08T12:00:00.000Z", 149_597_870.7);
+    const placed = bodyToUniversePoint(planet({
+      orbit_display_state: "position", semi_major_axis_au: 0.03, ephemeris_reference_type: "conjunction",
+      ephemeris_reference_time_jd: 2_460_000.5, ephemeris_period_days: 6.1,
+      ephemeris_reference_time_jd_err_plus: 0.0001, ephemeris_period_days_err_plus: 0.00001,
+    }))!;
+    const ringOnly = bodyToUniversePoint(planet({ orbit_display_state: "orbit_only", semi_major_axis_au: 40 }))!;
+    const noOrbit = bodyToUniversePoint(planet({ orbit_display_state: "none" }))!;
+    const separation = Math.hypot(placed.position.x - host.x_au, placed.position.y - host.y_au, placed.position.z - host.z_au);
+    return {
+      separation,
+      placed: { hostBound: placed.hostBound, radiusKm: placed.radiusKm, lightSource: placed.lightSource, dynamic: placed.dynamic },
+      ringOnly: { hostBound: ringOnly.hostBound, radiusKm: ringOnly.radiusKm },
+      noOrbit: { hostBound: noOrbit.hostBound, radiusKm: noOrbit.radiusKm },
+      catalogPlanet: catalogPointIsHostBound({ catalog_group: "exoplanets" }),
+      catalogStar: catalogPointIsHostBound({ catalog_group: "exoplanet_systems" }),
+    };
+  });
+  expect(Math.abs(result.separation - 0.03)).toBeLessThan(1e-6);
+  expect(result.placed).toEqual({ hostBound: false, radiusKm: 6_371, lightSource: { x: 2_484_666.23, y: -631_632.11, z: 28_182.95 }, dynamic: true });
+  // No sphere at the center of the star for a planet with no calculated position.
+  expect(result.ringOnly).toEqual({ hostBound: true, radiusKm: null });
+  expect(result.noOrbit).toEqual({ hostBound: true, radiusKm: null });
+  expect(result.catalogPlanet).toBe(true);
+  expect(result.catalogStar).toBe(false);
 });

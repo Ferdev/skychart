@@ -58,7 +58,7 @@ ENV PORT=4000
 ENV PYTHON_BACKEND_URL=http://127.0.0.1:8765
 
 RUN apt-get update -y && \
-  apt-get install -y libstdc++6 openssl libncurses6 locales ca-certificates curl python3 python3-venv postgresql-client \
+  apt-get install -y libstdc++6 openssl libncurses6 locales ca-certificates curl python3 python3-venv postgresql-client libvips-tools gnupg \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
@@ -76,6 +76,8 @@ COPY --chown=app:app backend_phoenix/priv/spacecraft.json backend_phoenix/priv/s
 COPY --chown=app:app data data
 COPY --chown=app:app requirements.txt requirements.txt
 COPY --chown=app:app scripts/docker-entrypoint.sh scripts/docker-entrypoint.sh
+COPY --chown=app:app scripts/community-worker.sh scripts/community-worker.sh
+COPY --chown=app:app scripts/community-backup.sh scripts/community-backup.sh
 COPY --chown=app:app scripts/import_catalogs_if_needed.sh scripts/import_catalogs_if_needed.sh
 COPY --chown=app:app scripts/import_gaia_bulk_catalog.py scripts/import_gaia_bulk_catalog.py
 COPY --chown=app:app scripts/catalog_pg_import.py scripts/catalog_pg_import.py
@@ -96,6 +98,8 @@ RUN python3 -m venv /app/.venv && \
   ln -s /app/erts-*/bin/epmd /usr/local/bin/epmd
 
 USER app
+
+RUN chmod +x /app/scripts/community-worker.sh
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -f http://localhost:4000/api/health || exit 1

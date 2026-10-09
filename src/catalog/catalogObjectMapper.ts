@@ -3,10 +3,12 @@ import type { DestinationBodyType } from "../destinationPicker";
 import type {
   Body,
   BodyExoplanet,
+  BodyPlanetCandidate,
   CatalogObjectPayload,
   ExternalLink,
 } from "../atlas/contracts";
 import { smallBodyPositionAt } from "./smallBodyPropagation";
+import { positionExoplanet } from "./exoplanetOrbit";
 
 export type CatalogMappingContext = {
   auKm: number;
@@ -62,7 +64,7 @@ export class CatalogObjectMapper {
       ? context.normalizeExternalLinks(object.external_links ?? [])
       : [...(object.external_links ?? [])];
 
-    return {
+    const body: Body = {
       key: object.key,
       name: object.name,
       radius_km: finiteNumber(object.radius_km, 0),
@@ -128,6 +130,7 @@ export class CatalogObjectMapper {
             why_interesting: stringFact(facts.why_interesting),
           }
         : null,
+      planet_candidates: Array.isArray(facts.candidates) ? facts.candidates as BodyPlanetCandidate[] : null,
       small_body: isSmallBodyLike
         ? {
             orbit_class: stringFact(facts.orbit_class),
@@ -156,6 +159,9 @@ export class CatalogObjectMapper {
       },
       distance_from_earth_km: distanceFromEarthKm,
     };
+    // The catalog stores an exoplanet at its host star. The orbit offset for
+    // the atlas time is added here, as the small-body position is above.
+    return positionExoplanet(body, context.timestamp ?? new Date().toISOString(), context.auKm, context.earth);
   }
 }
 
@@ -170,6 +176,7 @@ function isExoplanetObject(object: CatalogObjectPayload): boolean {
 function catalogObjectToExoplanet(object: CatalogObjectPayload): BodyExoplanet {
   const facts = object.facts ?? {};
   return {
+    key: object.key,
     name: object.name,
     radius_earth: finiteOptionalNumber(facts.radius_earth),
     mass_earth: finiteOptionalNumber(facts.mass_earth),
@@ -182,7 +189,7 @@ function catalogObjectToExoplanet(object: CatalogObjectPayload): BodyExoplanet {
 
 function normalizeDestinationType(type: string | null | undefined): DestinationBodyType {
   const allowed = new Set<DestinationBodyType>([
-    "star", "planet", "moon", "dwarf_planet", "galaxy", "quasar",
+    "star", "planet", "planet_candidate", "moon", "dwarf_planet", "galaxy", "quasar",
     "active_galaxy", "black_hole", "pulsar", "nebula", "star_cluster",
     "xray_source", "xray_extended",
     "spacecraft", "asterism", "milky_way_patch", "asteroid", "comet", "small_body", "unknown",

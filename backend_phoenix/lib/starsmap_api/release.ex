@@ -39,6 +39,26 @@ defmodule StarsmapApi.Release do
     end
   end
 
+  # This never migrates the read-only catalog database used by staging.
+  def migrate_community do
+    load_app()
+
+    if StarsmapApi.Community.enabled?() do
+      {:ok, _, _} =
+        Ecto.Migrator.with_repo(StarsmapApi.CommunityRepo, &Ecto.Migrator.run(&1, :up, all: true))
+    end
+  end
+
+  def community_role(handle, role) when role in ["member", "moderator", "admin"] do
+    {:ok, _} = Application.ensure_all_started(@app)
+    StarsmapApi.Community.Operations.role(handle, role)
+  end
+
+  def import_community(path, moderator_handle) do
+    {:ok, _} = Application.ensure_all_started(@app)
+    StarsmapApi.Community.Operations.import_manifest(path, moderator_handle)
+  end
+
   def refresh_catalog_summary_counts do
     load_app()
 

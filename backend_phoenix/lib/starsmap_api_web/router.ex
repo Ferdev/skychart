@@ -60,6 +60,7 @@ defmodule StarsmapApiWeb.Router do
   scope "/api", StarsmapApiWeb do
     pipe_through :api
 
+    get "/community/config", CommunityController, :config
     get "/survey-image", SurveyImageController, :show
     get "/now", NowController, :index
     post "/events", EventController, :create
@@ -85,5 +86,71 @@ defmodule StarsmapApiWeb.Router do
     get "/agent/v1/objects/:key", AgentApiController, :object
     get "/agent/v1/catalogs", AgentApiController, :catalogs
     get "/agent/v1/view-link", AgentApiController, :view_link
+  end
+
+  pipeline :community_public do
+    plug :accepts, ["json"]
+    plug StarsmapApiWeb.Plugs.CommunityAccess
+  end
+
+  pipeline :community_html do
+    plug StarsmapApiWeb.Plugs.CommunityAccess
+    plug StarsmapApiWeb.Plugs.FramePolicy
+  end
+
+  scope "/", StarsmapApiWeb do
+    pipe_through :community_html
+    get "/community/:page", CommunityPolicyController, :show
+    get "/photos/:id", CommunityPageController, :photo
+    get "/u/:handle", CommunityPageController, :profile
+  end
+
+  pipeline :community_session do
+    plug StarsmapApiWeb.Plugs.CommunityAccess, session: true, required: true
+  end
+
+  pipeline :community_media do
+    plug StarsmapApiWeb.Plugs.CommunityAccess, session: true
+  end
+
+  scope "/api", StarsmapApiWeb do
+    pipe_through :community_public
+    get "/photos/index", CommunityController, :index
+    get "/objects/:key/photos", CommunityController, :gallery
+    get "/photos/:id", CommunityController, :show
+    get "/community/rankings", CommunityController, :rankings
+    get "/community/photographers", CommunityController, :photographers
+    get "/community/coverage", CommunityController, :coverage
+    post "/community/code", CommunityController, :code
+    post "/community/verify", CommunityController, :verify
+    post "/photos/:id/report", CommunityController, :report
+    put "/community/upload/:id", CommunityController, :upload
+  end
+
+  scope "/api/community", StarsmapApiWeb do
+    pipe_through :community_session
+    get "/me", CommunityController, :me
+    get "/export", CommunityController, :export
+    delete "/account", CommunityController, :erase
+    post "/logout", CommunityController, :logout
+    patch "/profile", CommunityController, :profile
+    post "/uploads", CommunityController, :intent
+    post "/photos/:id/solve", CommunityController, :solve
+    post "/photos/:id/wcs", CommunityController, :wcs
+    post "/photos/:id/complete", CommunityController, :complete
+    post "/photos/:id/vote", CommunityController, :vote
+    get "/photos/:id/vote", CommunityController, :vote_state
+    delete "/photos/:id/vote", CommunityController, :vote
+    delete "/photos/:id", CommunityController, :remove
+    get "/review", CommunityController, :review_queue
+    post "/photos/:id/review", CommunityController, :review
+    post "/users/:handle/suspension", CommunityController, :suspend
+    post "/users/:handle/cancel-votes", CommunityController, :cancel_votes
+  end
+
+  scope "/api/community", StarsmapApiWeb do
+    pipe_through :community_media
+    get "/session", CommunityController, :me
+    get "/media/:id/:size", CommunityController, :media
   end
 end

@@ -6,6 +6,7 @@ import { BODY_VERTEX_SHADER, BODY_FRAGMENT_SHADER } from "./universeBodyShaders"
 import { appearanceRotation, bodyAppearance, resolvedBodyWeight } from "./universeAppearanceProfiles";
 import { UniverseTextureCache } from "./universeTextureCache";
 import { renderBodyFallback } from "./universeBodyFallback";
+import { lightDirection } from "./universeExoplanets";
 
 export class UniverseBodyRenderer {
   private readonly gl: WebGLRenderingContext | null;
@@ -118,7 +119,8 @@ export class UniverseBodyRenderer {
       const radiusAu = Number(body.radiusKm) / AU_KM;
       gl.uniform3f(this.uniforms.uCenter, (body.position.x - observer.x) / radiusAu,
         (body.position.y - observer.y) / radiusAu, (body.position.z - observer.z) / radiusAu);
-      const light = normalized({ x: -body.position.x, y: -body.position.y, z: -body.position.z });
+      // An exoplanet is lit by its host star. Each other body is lit by the Sun at the origin.
+      const light = lightDirection(body);
       gl.uniform3f(this.uniforms.uSun, light.x, light.y, light.z);
       const profile = bodyAppearance(body);
       const map = projected.radiusPx >= 12 ? this.textures.get(profile.map) : null;
@@ -145,11 +147,6 @@ export class UniverseBodyRenderer {
   release(): void {
     this.textures.clear(); this.canvas.dataset.textureBytes = "0"; this.canvas.dataset.loadedTextures = "";
   }
-}
-
-function normalized(value: Vector3): Vector3 {
-  const length = Math.hypot(value.x, value.y, value.z);
-  return length > 0 ? { x: value.x / length, y: value.y / length, z: value.z / length } : { x: 1, y: 0, z: 0 };
 }
 
 function buildProgram(gl: WebGLRenderingContext): WebGLProgram | null {

@@ -30,6 +30,7 @@
       <div id="universe-entry-marker" class="universe-entry-marker" aria-hidden="true" hidden>
         <svg viewBox="-22 -22 44 44" width="44" height="44"><path d="M-16 0H-6M6 0H16M0-16V-6M0 6V16" /><text x="7" y="-8">3D</text></svg>
       </div>
+      <p id="exoplanet-orbit-note" class="exoplanet-orbit-note" role="note" data-i18n="exoplanet.mapNote" hidden>Exoplanet orbits: size and timing from the NASA Exoplanet Archive. The orbit direction is a display convention.</p>
       <section id="universe-view" class="universe-view" aria-label="3D universe navigator" data-i18n-attrs="aria-label:universe3d.label" hidden>
         <canvas id="universe-map" class="universe-view__canvas" tabindex="0" aria-label="Navigable 3D universe" data-i18n-attrs="aria-label:universe3d.canvasLabel"></canvas>
         <canvas id="universe-points" class="universe-view__points" aria-hidden="true"></canvas>
@@ -242,6 +243,7 @@
             <div class="toolbar-quick-layers" role="group" aria-label="Display toggles" data-i18n-attrs="aria-label:scale.displayToggles">
               <label title="Connect constellation stars at their catalog distances in the heliocentric plane." data-i18n-attrs="title:scale.constellationsHelp"><input type="checkbox" data-layer="constellations" /><span data-i18n="toolbar.constellations">Constellations</span></label>
               <label><input type="checkbox" data-layer="labels" checked /><span data-i18n="scale.labels">Labels</span></label>
+              <label class="community-toggle" hidden><input type="checkbox" data-layer="photos"><span>Photos</span></label>
               <label><input type="checkbox" data-layer="grid" checked /><span data-i18n="scale.grid">Grid</span></label>
             </div>
             <div class="zoom-presets" id="zoom-presets" role="group" aria-label="Scale landmarks" data-i18n-attrs="aria-label:scale.landmarks">

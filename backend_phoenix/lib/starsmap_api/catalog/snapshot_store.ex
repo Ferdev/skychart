@@ -301,7 +301,13 @@ defmodule StarsmapApi.Catalog.SnapshotStore do
        do: "catalog_deep_sky_objects"
 
   defp source_table_for(%{catalog_group: group})
-       when group in ["nearby_exoplanet_systems", "exoplanet_systems", "exoplanets"],
+       when group in [
+              "nearby_exoplanet_systems",
+              "exoplanet_systems",
+              "exoplanets",
+              "exoplanet_candidate_hosts",
+              "exoplanet_candidates"
+            ],
        do: "catalog_exoplanet_objects"
 
   defp source_table_for(%{catalog_group: "bass_dr2_black_holes"}),

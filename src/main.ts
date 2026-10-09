@@ -1,3 +1,5 @@
+import { AU_KM_FALLBACK, MIN_ZOOM, MAX_ZOOM, ZOOM_SLIDER_STEPS, LOCAL_ZOOM_DURATION_MS, CAMERA_DATA_REFRESH_DEBOUNCE_MS, SEARCH_INPUT_DEBOUNCE_MS } from "./atlas/atlasConstants";
+import { community } from "./community/communityController";
 import { SpacecraftLoader } from "./catalog/spacecraftCatalog";
 import { loadAtlasEphemeris } from "./atlas/atlasEphemerisLoader";
 import "./destinationPicker.css";
@@ -53,12 +55,8 @@ import { AtlasEmbedController } from "./atlas/atlasEmbedController";
 import { AtlasTimeController } from "./atlas/atlasTimeController";
 import { AtlasLoadingView } from "./atlas/atlasLoadingView";
 import { AtlasDeferredEphemerisController } from "./atlas/atlasDeferredEphemerisController";
-import {
-  catalogSummaryFromEphemeris,
-  createDefaultDisplayLayers,
-  mergeBodyList,
-  replaceBodyList,
-} from "./atlas/atlasState";
+import { catalogSummaryFromEphemeris, createDefaultDisplayLayers, mergeBodyList, replaceBodyList } from "./atlas/atlasState";
+import { ExoplanetSystemNavigator } from "./object/exoplanetSystemNavigator";
 import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController"; import { createUniverseViewController, initialUniverseState, UniverseViewController } from "./universe/universeViewController";
 import type {
   ActiveAtlasTab, SizeMode, ZoomPreset, Body, Ephemeris, CatalogSummary, ObjectDetailHydrationState,
@@ -69,13 +67,6 @@ import type {
 initializeErrorReporting();
 installAnalytics();
 
-const AU_KM_FALLBACK = 149_597_870.7;
-const MIN_ZOOM = 1e-14;
-const MAX_ZOOM = 50_000_000;
-const ZOOM_SLIDER_STEPS = 1000;
-const LOCAL_ZOOM_DURATION_MS = 1100;
-const CAMERA_DATA_REFRESH_DEBOUNCE_MS = 180;
-const SEARCH_INPUT_DEBOUNCE_MS = 180;
 const catalogPointManifest = CatalogPointManifestRepository.fromBrowser();
 const catalogPointPlanner = new CatalogPointPlanner(catalogPointManifest);
 const catalogPointDecoder = new CatalogPointDecoder();
@@ -209,7 +200,7 @@ const viewportCatalogLoader = new ViewportCatalogLoader({
     updateStats();
     updateGuidedSets();
     if (activeTab === "catalog" && !bodySearch.value.trim()) void updateBodyPicker();
-    requestRender();
+    requestRender({ data: true }); // New planets can move a system to the object path, so the tile plan runs again.
   },
   recordLoad: (milliseconds) => {
     perfLastViewportMs = milliseconds;
@@ -337,9 +328,9 @@ const atlasOverlay = new AtlasOverlayRenderer({
     renderViewport: atlasViewport.renderRect(),
     visibleBodies: visibleBodies(),
     labelBodies: prioritizedLabelBodies(),
-    edgeBodies: edgeReferenceBodies(),
+    edgeBodies: edgeReferenceBodies(), exoplanetOrbits: atlasVisibility.resolvedExoplanets(),
   }),
-  bodyByKey: () => bodyByKey, universeEntryMarker: atlasDom.universeEntryMarker,
+  bodyByKey: () => bodyByKey, universeEntryMarker: atlasDom.universeEntryMarker, exoplanetOrbitNote: atlasDom.exoplanetOrbitNote, toolbar: atlasDom.atlasToolbar,
   bodyToScreen,
   worldToScreen,
   screenToWorld,
@@ -393,6 +384,10 @@ const objectHydrator = new CatalogObjectHydrator({
   },
   detailError: () => t("object.detailErrorBody"),
 });
+const exoplanetSystems = new ExoplanetSystemNavigator({
+  root: bodyInfo, mapper: catalogObjectMapper, body: (key) => bodyByKey.get(key), bodies: () => ephemeris?.bodies ?? [], mergeBodies, viewport: usableViewportRect, maximumZoom: MAX_ZOOM,
+  animateCameraTo: (target) => { activeZoomPreset = null; updateZoomPresetButtons(); animateCameraTo(target, LOCAL_ZOOM_DURATION_MS, scheduleViewStateReplace); },
+});
 const tourPlayer = new TourPlayer({ navigate: navigateTourStep, prewarm: prewarmTourStep, track: (event, properties) => trackEvent(event, properties) });
 const objectInspection: ObjectInspectionView = new ObjectInspectionView({
   bodyInfo,
@@ -436,7 +431,7 @@ const selectionConnector = new SelectionConnectorView({
   workspacePanel,
   bodyInfo,
   selectedBody,
-  active: () => activeTab === "object" && !selectedObjectPanel.hidden,
+  active: () => activeTab === "object" && !selectedObjectPanel.hidden && atlasVisibility.hasMapMarker(selectedBody()),
   viewport: usableViewportRect,
   bodyToScreen,
 });
@@ -556,7 +551,7 @@ skyView = createSkyViewController(atlasDom, {
   catalogRelease: () => catalogPointManifest.value?.version,
   locale,
 });
-universeView = createUniverseViewController(atlasDom, { bodyByKey: () => bodyByKey, selectedBody, translate: t, selectBody: selectBodyByKey, inspectInAtlas: (key) => { const body = bodyByKey.get(key); if (body) { centerOnBody(body, false); requestRender({ data: true }); } }, searchDestinations: async (query, signal) => (await catalogSearchGateway.search({ query, limit: 12, signal })).bodies, openSky: (body) => skyView?.open(body) ?? Promise.resolve(), stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), closeSky: () => skyView?.close({ updateHistory: false }), resumeAtlas: () => requestRender(), initialState: () => initialUniverseState({ x: camera.xAu, y: camera.yAu }, usableViewportRect().width / camera.pxPerAu / 12, selectedBody()) });
+universeView = createUniverseViewController(atlasDom, { bodyByKey: () => bodyByKey, selectedBody, translate: t, selectBody: selectBodyByKey, inspectInAtlas: (key) => { const body = bodyByKey.get(key); if (body) { centerOnBody(body, false); requestRender({ data: true }); } }, searchDestinations: async (query, signal) => (await catalogSearchGateway.search({ query, limit: 12, signal })).bodies, loadPlanetarySystem: (host) => exoplanetSystems.load(host), openSky: (body) => skyView?.open(body) ?? Promise.resolve(), stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), closeSky: () => skyView?.close({ updateHistory: false }), resumeAtlas: () => requestRender(), initialState: () => initialUniverseState({ x: camera.xAu, y: camera.yAu }, usableViewportRect().width / camera.pxPerAu / 12, selectedBody()) });
 const embedController: AtlasEmbedController = new AtlasEmbedController({
   enabled: isEmbedMode,
   canvas,
@@ -582,7 +577,7 @@ installAtlasDiagnostics({
   viewport: () => atlasViewport.rect(),
   workspacePanel,
   camera: () => camera,
-  gestureState: () => mapInteraction.diagnostics(),
+  gestureState: () => mapInteraction.diagnostics(), visibility: () => atlasVisibility,
 });
 
 const spacecraftLoader = new SpacecraftLoader((bodies) => {
@@ -774,7 +769,7 @@ function updateAllUi() {
   updateCompareFilters();
   updateBodyPicker();
   updateGuidedSets();
-  objectInspection.update();
+  objectInspection.update(); if (selectedBody()) community.mount(bodyInfo, selectedBody()!.key, selectedBody()!.name);
   updateCompareUi();
   updateTimeSummary();
   updateTimeStepUi();
@@ -817,6 +812,7 @@ function render() { if (universeView?.active) { renderFrameId = null; return; }
   } finally {
     atlasViewport.endFrame();
   }
+  community.render("map", canvas.parentElement!, (ephemeris?.bodies ?? []).filter(body => bodyMatchesActiveFilter(body)).map(body => ({key: body.key, ...bodyToScreen(body)})), displayLayers.photos);
   perfDrawMs = performance.now() - frameStartedAt;
   updatePerfHud();
   objectInspection.updateScienceLayerDisclosure();
@@ -916,7 +912,7 @@ function catalogPointViewport(): CatalogPointViewport {
     viewWidthLy: currentViewWidthLy(),
     visibleBounds: viewportCatalogLoader.bounds(0),
     filter: activeBodyFilterDefinition(),
-    embed: isEmbedMode
+    embed: isEmbedMode, resolvedExoplanetOrbits: (atlasVisibility?.resolvedExoplanets().length ?? 0) > 0,
   };
 }
 

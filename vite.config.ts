@@ -14,6 +14,11 @@ export default defineConfig({
     port: Number(process.env.PORT ?? "5173"),
     strictPort: true,
     proxy: {
+      "/api/community": "http://127.0.0.1:4020",
+      "/api/photos": "http://127.0.0.1:4020",
+      "/photos/": "http://127.0.0.1:4020",
+      "/u/": "http://127.0.0.1:4020",
+      "/community/": "http://127.0.0.1:4020",
       "/api/catalog": "http://127.0.0.1:4020",
       "/api/agent": "http://127.0.0.1:4020",
       "/api/objects": "http://127.0.0.1:4020",

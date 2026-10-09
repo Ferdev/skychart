@@ -95,6 +95,7 @@ export type DestinationExoplanetSystemInfo = {
 export type DestinationBodyType =
   | "star"
   | "planet"
+  | "planet_candidate"
   | "moon"
   | "dwarf_planet"
   | "galaxy"
@@ -259,6 +260,7 @@ const SOLAR_ORDER = new Map<string, number>([
 const TYPE_LABEL_KEYS: Record<DestinationBodyType, string> = {
   star: "type.star",
   planet: "type.planet",
+  planet_candidate: "exoplanet.typeCandidate",
   moon: "type.moon",
   dwarf_planet: "type.dwarfPlanet",
   galaxy: "type.galaxy",
@@ -282,6 +284,7 @@ const TYPE_LABEL_KEYS: Record<DestinationBodyType, string> = {
 const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
   star: "sun",
   planet: "planet",
+  planet_candidate: "planet",
   moon: "moon",
   dwarf_planet: "dwarf",
   galaxy: "galaxy",
@@ -305,6 +308,7 @@ const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
 const TYPE_SORT_GROUPS: Record<DestinationBodyType, number> = {
   star: 0,
   planet: 1,
+  planet_candidate: 1,
   moon: 2,
   dwarf_planet: 3,
   galaxy: 4,
