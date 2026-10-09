@@ -13,6 +13,11 @@ defmodule StarsmapApi.Community do
 
   def now, do: DateTime.utc_now()
 
+  # The default is the production image layout; source checkouts configure their own root.
+  def backend_script(name) do
+    Path.join(Application.get_env(:starsmap_api, :community_backend_root, "/app/backend"), name)
+  end
+
   def uuid(value) do
     case Ecto.UUID.cast(value) do
       {:ok, id} -> id

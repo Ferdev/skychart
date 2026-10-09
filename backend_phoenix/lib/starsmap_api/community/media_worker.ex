@@ -84,7 +84,7 @@ defmodule StarsmapApi.Community.MediaWorker do
 
   defp decode(source, scratch) do
     case System.cmd("python3", [
-           "/app/backend/community_media.py",
+           StarsmapApi.Community.backend_script("community_media.py"),
            source,
            Path.join(scratch, "output")
          ]) do

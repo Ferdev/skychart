@@ -57,6 +57,7 @@ config :starsmap_api,
   community_mailer: StarsmapApi.Community.Mailer.Test,
   community_storage: StarsmapApi.Community.Storage.Local,
   community_media_root: "/tmp/cosmic-atlas-community-test",
+  community_backend_root: Path.expand("../../backend", __DIR__),
   community_media_url: "/api/community/media"
 
 config :starsmap_api, StarsmapApi.CommunityRepo,

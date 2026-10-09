@@ -30,7 +30,11 @@ defmodule StarsmapApi.Community.SolverWorker do
 
         with :ok <- Storage.adapter().get("masters/#{id}/1600.webp", image),
              {json, 0} <-
-               System.cmd("python3", ["/app/backend/community_solve.py", image, scratch]),
+               System.cmd("python3", [
+                 StarsmapApi.Community.backend_script("community_solve.py"),
+                 image,
+                 scratch
+               ]),
              {:ok, attrs} <- Jason.decode(json),
              {:ok, wcs} <- Astrometry.validate(attrs) do
           StarsmapApi.Community.transaction(fn ->

@@ -146,6 +146,14 @@ defmodule StarsmapApi.CommunityTest do
     File.rm(source)
   end
 
+  test "media and solver scripts resolve inside this checkout" do
+    for script <- ["community_media.py", "community_solve.py"] do
+      path = StarsmapApi.Community.backend_script(script)
+      assert Path.dirname(path) == Path.expand("../../../backend", __DIR__)
+      assert File.regular?(path)
+    end
+  end
+
   test "fourth approved-author photo publishes through a durable job", %{
     user: user,
     subject: subject
