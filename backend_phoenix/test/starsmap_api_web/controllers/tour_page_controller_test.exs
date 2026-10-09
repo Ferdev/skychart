@@ -12,6 +12,10 @@ defmodule StarsmapApiWeb.TourPageControllerTest do
 
     assert index =~ ~s(<link rel="canonical" href="#{site_url}/tours">)
     refute index =~ ~s(<link rel="canonical" href="https://skychart.org/">)
+    # The tour pages are standalone static pages: no application shell and no map below the list.
+    refute index =~ ~s(id="app")
+    refute index =~ "<canvas"
+    assert index =~ ~s(<a class="back" href="/">← Back to the atlas</a>)
 
     page = conn |> recycle() |> get(~p"/tours/near-the-sun") |> html_response(200)
     assert page =~ "Positions move with time"
@@ -23,6 +27,8 @@ defmodule StarsmapApiWeb.TourPageControllerTest do
 
     assert page =~ ~s(<link rel="canonical" href="#{site_url}/tours/near-the-sun">)
     refute page =~ ~s(<link rel="canonical" href="https://skychart.org/">)
+    refute page =~ ~s(id="app")
+    assert page =~ ~s(href="/?tour=near-the-sun&amp;step=0")
   end
 
   test "allowlist rejects unknown and traversal slugs", %{conn: conn} do

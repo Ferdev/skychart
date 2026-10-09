@@ -1,4 +1,7 @@
 import { trackAnalytics } from "../analytics";
+import { bindHeaderSearch } from "./headerSearch";
+import { bindSearchPanel } from "./searchPanelBindings";
+import { requestObservation } from "../object/observePanel";
 import type { Body } from "../atlas/contracts";
 import { GUIDED_SETS } from "../atlas/atlasDefinitions";
 import type { CatalogPointStream } from "../catalog/catalogPointStream";
@@ -50,6 +53,8 @@ type DestinationEventBindingsOptions = {
   updateScale: () => void;
   requestRender: (withData?: boolean) => void;
   pushViewState: () => void;
+  startTour: (slug: string) => void;
+  setComparisonMode: (open: boolean) => void;
 };
 
 /** Binds all search, destination, comparison, and guided-set interactions. */
@@ -79,7 +84,7 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
   dom.bodyInfo.addEventListener("click", (event) => {
     if (options.inspection.handleViewClick(event.target)) return;
     const observe = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-observe-location]");
-    if (observe) { void options.inspection.requestObservation(observe.dataset.observeLocation === "browser"); return; }
+    if (observe) { void requestObservation(dom.bodyInfo, observe.dataset.observeLocation === "browser"); return; }
     const citation = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-copy-citation]");
     if (citation) {
       const body = options.bodyByKey().get(citation.dataset.copyCitation ?? "");
@@ -96,14 +101,17 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
     const tab = (button.dataset.tab as "catalog" | "object") ?? "catalog";
     options.setActiveTab(options.state.activeTab === tab && tab !== "catalog" ? null : tab);
   }));
+  bindHeaderSearch({
+    field: dom.headerSearch,
+    panelField: dom.bodySearch,
+    openSearch: () => options.setActiveTab("catalog"),
+    shortcutsEnabled: () => document.body.dataset.skyView !== "true" && document.body.dataset.universeView !== "true" && document.body.dataset.atlasMode !== "embed",
+  });
   dom.closePanel.addEventListener("click", () => options.state.activeTab === "object" ? options.clearSelectedObject() : options.setActiveTab(null));
   dom.workspaceSearchLink.addEventListener("click", () => options.setActiveTab("catalog"));
 
-  const filterClick = (event: Event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
-    if (!button) return;
-    options.state.activeFilter = (button.dataset.bodyFilter as BodyFilter) ?? "all";
-    const focusMap = event.currentTarget === dom.mapFilterButtons;
+  const applyFilter = (filter: BodyFilter, focusMap: boolean) => {
+    options.state.activeFilter = filter;
     trackAnalytics("filter", { filter: options.state.activeFilter });
     options.state.activeGuidedSetId = null;
     dom.bodySearch.value = "";
@@ -116,8 +124,16 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
     options.requestRender(true);
     options.pushViewState();
   };
+  const filterClick = (event: Event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
+    if (button) applyFilter((button.dataset.bodyFilter as BodyFilter) ?? "all", event.currentTarget === dom.mapFilterButtons);
+  };
   dom.bodyFilterButtons.addEventListener("click", filterClick);
   dom.mapFilterButtons.addEventListener("click", filterClick);
+  bindSearchPanel({
+    filterButtons: dom.bodyFilterButtons, picker: dom.bodyPicker, searchField: dom.bodySearch, guidedTourList: dom.guidedTourList,
+    applyFilter: (filter) => applyFilter(filter, false), pickerConfig: options.bodyPickerConfig, startTour: options.startTour,
+  });
   dom.exploreDomains.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-explore-domain]");
     if (button) void options.applyExploreDomain(button.dataset.exploreDomain ?? "");
@@ -149,10 +165,7 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
   dom.zoomSelected.addEventListener("click", () => options.centerOnSelected(true));
   dom.compareSelected.addEventListener("click", () => {
     const open = dom.selectionCompare.hidden;
-    dom.bodyInfo.hidden = open;
-    dom.selectionCompare.hidden = !open;
-    dom.selectedObjectPanel.classList.toggle("is-comparing", open);
-    dom.compareSelected.setAttribute("aria-expanded", String(open));
+    options.setComparisonMode(open);
     if (open) dom.compareSearch.focus();
     options.requestRender();
   });
@@ -170,14 +183,20 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
     })) event.preventDefault();
   });
   dom.compareFocus.addEventListener("click", () => void options.focusCompareResult());
-  dom.compareFilterButtons.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
-    if (!button) return;
-    options.state.activeCompareFilter = (button.dataset.bodyFilter as BodyFilter) ?? "all";
+  const applyCompareFilter = (filter: BodyFilter) => {
+    options.state.activeCompareFilter = filter;
     trackAnalytics("filter", { filter: options.state.activeCompareFilter });
     dom.compareSearch.value = "";
     options.searchView.reset(options.compareSearchState, { preserveActiveOption: true });
     options.updateCompareFilters(); void options.updateComparePicker();
+  };
+  dom.compareFilterButtons.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-body-filter]");
+    if (button) applyCompareFilter((button.dataset.bodyFilter as BodyFilter) ?? "all");
+  });
+  dom.compareFilterButtons.addEventListener("change", (event) => {
+    const menu = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-body-filter-menu]");
+    if (menu?.value) applyCompareFilter(menu.value as BodyFilter);
   });
   dom.comparePicker.addEventListener("click", (event) => {
     if ((event.target as HTMLElement).closest("[data-picker-load-more]")) {

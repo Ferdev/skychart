@@ -97,10 +97,8 @@ test("time changes remain responsive while positions update", async ({ page, req
   });
 
   await openAtlas(page);
-  await page.locator("#map-settings-toggle").click();
-  const timeToggle = page.locator('[aria-controls="scale-time-controls"]');
-  if (await timeToggle.getAttribute("aria-expanded") !== "true") await timeToggle.click();
-
+  // The time bar is always on the screen: no panel must open first.
+  await expect(page.locator("#time-step-forward")).toBeVisible();
   await page.locator("#time-step-forward").click();
   await expect(page.locator("#time-busy")).toContainText("Updating positions");
   await expect(page.locator("#time-busy")).toBeVisible();
@@ -153,7 +151,9 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(overviewTab).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("#object-view-panel-overview")).toBeVisible();
     await expect(page.locator('#selection-connector[data-visible="true"]')).toBeVisible();
-    await expect(page.locator("#selection-connector .selection-connector__leader")).toHaveAttribute("d", /^M /);
+    // The selection has a ring on the object. It has no line to the inspector.
+    await expect(page.locator("#selection-connector .selection-connector__source")).toBeVisible();
+    await expect(page.locator("#selection-connector .selection-connector__leader")).toHaveCount(0);
 
     await positionTab.click();
     await expect(positionTab).toHaveAttribute("aria-selected", "true");
@@ -635,10 +635,12 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await page.locator("#compare-search").fill("SlowCompare");
     await expect(page.locator("#compare-picker .picker-status--loading")).toContainText("Searching catalog");
     releaseSearch?.();
-    await expect(page.locator("#compare-picker .empty-state")).toContainText("No comparison matches");
+    // The empty result shows the query and three example queries.
+    await expect(page.locator("#compare-picker .empty-state")).toContainText("SlowCompare");
+    await expect(page.locator("#compare-picker .empty-state [data-search-example]")).toHaveText(["Mars", "M31", "Sirius"]);
 
     await page.locator("#compare-search").fill("EmptyCompare");
-    await expect(page.locator("#compare-picker .empty-state")).toContainText("No comparison matches");
+    await expect(page.locator("#compare-picker .empty-state")).toContainText("EmptyCompare");
 
     await page.locator("#compare-search").fill("FailCompare");
     await expect(page.locator("#compare-picker .picker-status--fallback")).toContainText("Live catalog search is unavailable");
@@ -652,8 +654,9 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await page.locator("#locale-select").selectOption("es");
 
     await expect(page.locator("html")).toHaveAttribute("lang", "es");
-    await expect(page.locator('[data-tab="catalog"]')).toHaveText("Buscar");
-    await expect(page.locator("#focus-body")).toHaveText("Enfocar");
+    // The header search field opens the Search panel. Its text is the placeholder.
+    await expect(page.locator('[data-tab="catalog"]')).toHaveAttribute("placeholder", "Buscar objetos");
+    await expect(page.locator("#focus-body")).toHaveText("Ir");
     await expect(page.locator("#body-search")).toHaveAttribute("placeholder", "Nombre del objeto o designación de catálogo");
 
     issues.assertClean();
@@ -784,7 +787,9 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator("#body-picker .picker-load-more")).toContainText("1 of 2 loaded");
     await page.locator("#body-picker [data-picker-load-more]").click();
     await expect(page.locator('#body-picker [data-body-key="paged-beta"]')).toBeVisible();
-    expect(searchOffsets).toEqual(["0", "1"]);
+    // A background position update can ask for the first page again. The second page is asked for one time.
+    expect(searchOffsets[0]).toBe("0");
+    expect(searchOffsets.filter((offset) => offset !== "0")).toEqual(["1"]);
 
     await page.locator("#body-search").press("Home");
     await page.locator("#body-search").press("ArrowDown");
@@ -809,6 +814,10 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator('#body-picker [data-body-key="m31"]')).toBeVisible();
     await expect(page.locator('#body-picker [data-body-key="jupiter"]')).toHaveCount(0);
 
+    // The results replace the Explore cards. `All` shows the cards again.
+    await expect(page.locator('[data-explore-domain="small-bodies"]')).toBeHidden();
+    await page.locator('#body-filter-buttons [data-body-filter="all"]').click();
+    await expect(page.locator('[data-explore-domain="small-bodies"]')).toBeVisible();
     await page.locator('[data-explore-domain="small-bodies"]').press("Enter");
 
     await expect(page.locator('[data-explore-domain="small-bodies"]')).toHaveAttribute("aria-pressed", "true");

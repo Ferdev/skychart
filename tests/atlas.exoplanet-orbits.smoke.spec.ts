@@ -143,12 +143,9 @@ test.describe("exoplanet orbits on the 2D map", () => {
     await expect(page.locator("#exoplanet-orbit-note")).toContainText("display convention");
     const before = await rings(page);
 
-    await page.evaluate(() => {
-      const slider = document.querySelector<HTMLInputElement>("#time-step-slider")!;
-      slider.value = "0";
-      slider.dispatchEvent(new Event("input", { bubbles: true }));
-      document.querySelector<HTMLButtonElement>("#time-step-forward")!.click();
-    });
+    await page.locator("#time-step-size").selectOption({ label: "1 day" });
+    await expect(page.locator("#time-step-forward")).toHaveAccessibleName("Step forward 1 day");
+    await page.locator("#time-step-forward").click();
     await expect.poll(async () => {
       const now = await rings(page);
       const moved = now.find((ring) => ring.key === "exoplanet-trappist-1-b");

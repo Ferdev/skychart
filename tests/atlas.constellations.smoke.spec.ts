@@ -126,7 +126,7 @@ test("heliocentric constellation lines toggle, retain missing-star gaps, and rep
   await expect(toggle).toBeChecked();
   await page.keyboard.press("Escape");
   expect(constellationRequests).toBe(2); // One request per page load.
-  await page.locator('input[data-layer="labels"]').uncheck();
+  await page.locator('.toolbar-quick-layers input[data-layer="labels"]').uncheck();
   await expect.poll(async () => (await drawing()).labels).not.toContain("Orion");
   expect((await drawing()).segments).toBe(2);
   await toggle.uncheck();

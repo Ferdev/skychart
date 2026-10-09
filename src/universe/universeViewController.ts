@@ -1,12 +1,13 @@
 import { community } from "../community/communityController";
-import type { Body } from "../atlas/contracts";
 import { GUIDED_DEEP_SKY_KEYS } from "../atlas/atlasDefinitions";
-import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
-import { universeEntryState, type UniverseMove } from "../navigation/universeNavigation";
+import type { UniverseMove } from "../navigation/universeNavigation";
 import { autopilotTravel, thrustScale, turnCameraToward, UniverseFlight } from "../navigation/universeFlight";
 import { gravityBodies, planTransfer, playbackTimeFraction, transferPosition, transferSpeed, TRANSFER_PLAYBACK_SECONDS, type TransferResult } from "../navigation/universeTransfer";
-import { drawOrientationGrid, drawReticle, drawUniverseLabels, type RenderedHit, type RenderedLabel } from "./universeBackdrop";
+import { formatCount } from "../format/quantity";
+import { drawOrientationGrid, drawReticle, drawUniverseLabels, type DrawnUniverseLabel, type RenderedHit, type RenderedLabel } from "./universeBackdrop";
+import { autopilotControlState, isAtTarget, isAtViewingDistance, StatusMessageHold } from "./universeFlightStatus";
+import { UniversePinch } from "./universeTouchControls";
 import { formatCoordinate, formatDistanceAu, formatDuration } from "./universeFormat";
 import { UniverseRenderQuality } from "./universeRenderQuality";
 import { UniverseSpeedGauge } from "./universeSpeedGauge";
@@ -26,7 +27,7 @@ import { normalizeUniverseViewState, type UniverseViewState } from "../viewState
 import { UniversePointRenderer, type UniverseScreenPoint } from "./universePointRenderer";
 import { observerApparentMagnitude } from "./universePhotometry";
 import { UniverseDestinationSearch } from "./universeDestinationSearch";
-import { approachDistance, AU_KM, hasRenderableRadius, projectPhysicalBody, projectSphericalExtent, safeUniverseEntryPosition } from "./universeBodyGeometry";
+import { approachDistance, hasRenderableRadius, projectPhysicalBody, projectSphericalExtent, safeUniverseEntryPosition } from "./universeBodyGeometry";
 import { bodyOccluders, occludedByBody, ringTransmission, type BodyOccluder } from "./universeOcclusion";
 import { resolvedBodyWeight } from "./universeAppearanceProfiles";
 import { UniverseBodyRenderer } from "./universeBodyRenderer";
@@ -34,60 +35,13 @@ import { deepSkyModel } from "./universeDeepSkyModel";
 import { UniverseDeepSkyRenderer } from "./universeDeepSkyRenderer";
 import { bodyToUniversePoint, catalogPointIsHostBound, sampleDuringFlight, validCatalogPoint, type CatalogUniversePoint, type UniversePoint } from "./universePointModel";
 import { UniverseExoplanetSystems } from "./universeExoplanets";
+import { universeTargetCardText } from "./universeTargetCard";
+import { UniverseCameraTurn } from "./universeCameraTurn";
+import { EXIT_CONFIRM_WINDOW_MS, ExitConfirmation, universeEscapeAction } from "./universeEscape";
+import type { Body } from "../atlas/contracts";
+import type { UniverseViewOptions } from "./universeViewOptions";
 
 type Projector = ReturnType<typeof createSkyProjector>;
-
-type UniverseViewOptions = {
-  root: HTMLElement;
-  canvas: HTMLCanvasElement;
-  pointsCanvas: HTMLCanvasElement;
-  deepSkyCanvas: HTMLCanvasElement;
-  bodiesCanvas: HTMLCanvasElement;
-  toggleButton: HTMLButtonElement;
-  closeButton: HTMLButtonElement;
-  resetButton: HTMLButtonElement;
-  findButton: HTMLButtonElement;
-  searchDialog: HTMLDialogElement;
-  searchCloseButton: HTMLButtonElement;
-  searchInput: HTMLInputElement;
-  searchResults: HTMLElement;
-  positionLabel: HTMLElement;
-  selectionSummary: HTMLElement;
-  speedLabel: HTMLOutputElement;
-  speedGauge: HTMLElement;
-  autopilotButton: HTMLButtonElement;
-  gravityButton: HTMLButtonElement;
-  minimapCanvas: HTMLCanvasElement;
-  routeLabel: HTMLElement;
-  selectionConnector: SVGSVGElement;
-  workspacePanel: HTMLElement;
-  selectedObjectPanel: HTMLElement;
-  status: HTMLElement;
-  tooltip: HTMLElement;
-  targetPanel: HTMLElement;
-  targetName: HTMLElement;
-  targetMeta: HTMLElement;
-  targetMagnitude: HTMLElement;
-  focusButton: HTMLButtonElement;
-  inspectButton: HTMLButtonElement;
-  skyButton: HTMLButtonElement;
-  bodyByKey: () => ReadonlyMap<string, Body>;
-  selectedBody: () => Body | null;
-  translate: (key: string, params?: Record<string, string | number>) => string;
-  selectBody: (key: string) => Promise<void>;
-  inspectInAtlas: (key: string) => void;
-  searchDestinations: (query: string, signal: AbortSignal) => Promise<Body[]>;
-  /** Loads the planets of the host star at this position into the atlas body list. */
-  loadPlanetarySystem: (host: { x_au: number; y_au: number; z_au: number }) => Promise<void>;
-  openSky: (body: Body) => Promise<void>;
-  stateChanged: (mode: "push" | "replace") => void;
-  closeSky: () => void;
-  resumeAtlas: () => void;
-  initialState: () => UniverseViewState;
-};
-
-type UniverseIntegrationOptions = Pick<UniverseViewOptions,
-  "bodyByKey" | "selectedBody" | "translate" | "selectBody" | "inspectInAtlas" | "searchDestinations" | "loadPlanetarySystem" | "openSky" | "stateChanged" | "closeSky" | "resumeAtlas" | "initialState">;
 
 const DEFAULT_CAMERA: SkyCamera = { yawDeg: 180, pitchDeg: 0, fovDeg: 72 };
 const CATALOG_LIMIT = 12_000;
@@ -108,6 +62,9 @@ export class UniverseViewController {
   private target: UniversePoint | null = null;
   private targetKey: string | null = null;
   private renderedHits: RenderedHit[] = [];
+  private drawnLabels: DrawnUniverseLabel[] = [];
+  private readonly statusHold = new StatusMessageHold();
+  private readonly pinch = new UniversePinch();
   private pointers = new Map<number, { x: number; y: number }>();
   private lastPointer: { x: number; y: number } | null = null;
   private dragMoved = false;
@@ -144,6 +101,8 @@ export class UniverseViewController {
   private readonly quality: UniverseRenderQuality;
   private readonly selectionConnector: SkySelectionConnectorView;
   private readonly exoplanetSystems: UniverseExoplanetSystems;
+  private readonly cameraTurn: UniverseCameraTurn;
+  private readonly exitConfirmation = new ExitConfirmation();
 
   constructor(private readonly options: UniverseViewOptions) {
     this.exoplanetSystems = new UniverseExoplanetSystems(options.loadPlanetarySystem, () => {
@@ -174,12 +133,25 @@ export class UniverseViewController {
       findButton: options.findButton, dialog: options.searchDialog, closeButton: options.searchCloseButton,
       input: options.searchInput, results: options.searchResults, active: () => this.active,
       translate: options.translate, search: options.searchDestinations,
+      suggestions: () => {
+        const placed = (bodies: Body[]) => bodies.filter((body) => bodyToUniversePoint(body) !== null);
+        const { suggested, recent } = options.destinationSuggestions();
+        return { suggested: placed(suggested), recent: placed(recent) };
+      },
       eligible: (body) => bodyToUniversePoint(body) !== null,
-      choose: (body) => { const point = bodyToUniversePoint(body); if (point) void this.chooseDestination(point); },
+      choose: (body) => { const point = bodyToUniversePoint(body); if (point) this.chooseDestination(point); },
     });
+    this.cameraTurn = new UniverseCameraTurn({
+      camera: () => this.camera,
+      setCamera: (camera) => { this.camera = camera; },
+      direction: () => this.active && this.target ? relativeDirection(this.position, this.target.position) : null,
+      afterFrame: () => this.afterNavigation(),
+    });
+    options.flyButton.addEventListener("click", () => this.flyToSelectedTarget());
     options.focusButton.addEventListener("click", () => this.focusTarget());
-    options.inspectButton.addEventListener("click", () => this.inspectInAtlas());
-    options.skyButton.addEventListener("click", () => this.skyFromTarget());
+    options.inspectButton.addEventListener("click", () => void this.inspectInAtlas());
+    options.detailsButton.addEventListener("click", () => void this.showDetails());
+    options.skyButton.addEventListener("click", () => void this.skyFromTarget());
     options.autopilotButton.addEventListener("click", () => this.toggleAutopilot());
     options.root.addEventListener("click", (event) => this.controlClick(event));
     options.root.addEventListener("pointerdown", (event) => this.controlPointerDown(event));
@@ -198,7 +170,11 @@ export class UniverseViewController {
     new MutationObserver(() => {
       if (options.workspacePanel.hidden) this.hideObjectInspector();
     }).observe(options.workspacePanel, { attributes: true, attributeFilter: ["hidden"] });
-    window.addEventListener("cosmic-atlas:locale-change", () => this.updateChrome());
+    window.addEventListener("cosmic-atlas:locale-change", () => {
+      this.updateChrome();
+      // The status line is text of a past event. Show the usual line in the new language.
+      if (this.active && !this.catalogAbort) this.options.status.textContent = options.translate("universe3d.ready", { count: formatCount(this.catalogPoints.length) });
+    });
   }
 
   get active(): boolean { return !this.options.root.hidden; }
@@ -230,8 +206,10 @@ export class UniverseViewController {
     this.autopilot = false;
     this.landmarkPoints = [];
     this.landmarksLoaded = false;
-    if (this.target && !this.options.selectedObjectPanel.hidden) this.options.root.dataset.objectInspector = "true";
-    else delete this.options.root.dataset.objectInspector;
+    // The 3D view starts with the target card only. `Details` opens the inspector.
+    this.hideObjectInspector();
+    this.options.closeInspector();
+    this.statusHold.release();
     this.initialState = { ...normalized, positionAu: { ...this.position } };
     this.minimap.restart(this.position);
     this.options.root.hidden = false;
@@ -239,6 +217,7 @@ export class UniverseViewController {
     this.updateChrome();
     this.options.status.textContent = this.options.translate("universe3d.loading");
     this.options.canvas.focus({ preventScroll: true });
+    this.options.hintCard.showOnce();
     this.requestRender();
     this.options.stateChanged(historyMode);
     trackEvent("universe_3d_opened", { source: historyMode === "push" ? "atlas" : "history" });
@@ -262,6 +241,7 @@ export class UniverseViewController {
     this.catalogAbort = null;
     this.stopFlight();
     this.hideObjectInspector();
+    this.options.hintCard.hide();
     if (this.reloadTimer !== null) window.clearTimeout(this.reloadTimer);
     this.reloadTimer = null;
     this.options.root.hidden = true;
@@ -349,9 +329,9 @@ export class UniverseViewController {
       if (this.targetKey) this.target = this.options.bodyByKey().has(this.targetKey)
         ? bodyToUniversePoint(this.options.bodyByKey().get(this.targetKey) ?? null)
         : this.catalogPoints.find((point) => point.key === this.targetKey) ?? null;
-      this.options.status.textContent = this.targetKey && !this.target
-        ? this.options.translate("universe3d.targetUnavailable", { key: this.targetKey })
-        : this.options.translate("universe3d.ready", { count: this.catalogPoints.length });
+      // An arrival message stays for some seconds: a routine load message does not replace it.
+      if (this.targetKey && !this.target) this.options.status.textContent = this.options.translate("universe3d.targetUnavailable", { key: this.targetKey });
+      else if (this.statusHold.canReplace()) this.options.status.textContent = this.options.translate("universe3d.ready", { count: formatCount(this.catalogPoints.length) });
     } catch {
       if (abort.signal.aborted) return;
       if (requestId !== this.requestId || !this.active) return;
@@ -438,7 +418,7 @@ export class UniverseViewController {
     this.bodyRenderer.render(framePoints, this.position, this.camera, width, height, dpr, quality);
     const pointsDone = performance.now();
     if (redrawBase) {
-      drawUniverseLabels(context, labels, this.renderedHits, this.position, this.target?.key, width, height);
+      this.drawnLabels = drawUniverseLabels(context, labels, this.renderedHits, this.position, this.target?.key, this.options.labelAreas.get());
       drawReticle(context, width, height);
       this.baseRenderKey = baseKey;
     }
@@ -561,10 +541,21 @@ export class UniverseViewController {
       x: formatCoordinate(this.position.x), y: formatCoordinate(this.position.y), z: formatCoordinate(this.position.z),
     });
     this.speedGauge.show(this.flying ? this.speedAu : 0);
+    this.speedGauge.localize(this.options.translate);
     this.options.gravityButton.setAttribute("aria-pressed", String(this.gravityRoute));
+    const control = autopilotControlState({ hasTarget: this.target !== null, active: this.autopilot, atTarget: this.atTarget() });
     this.options.autopilotButton.setAttribute("aria-pressed", String(this.autopilot));
-    this.options.autopilotButton.textContent = this.options.translate(this.autopilot ? "universe3d.autopilotStop" : "universe3d.autopilotStart");
+    this.options.autopilotButton.textContent = this.options.translate(control.labelKey);
+    this.options.autopilotButton.disabled = control.disabled;
+    this.options.flightNote.textContent = control.noteKey ? this.options.translate(control.noteKey) : "";
     this.updateTarget();
+  }
+
+  /** True when the craft is at the standoff distance of the target: the flight buttons have nothing to do. */
+  private atTarget(): boolean {
+    const target = this.target;
+    return target !== null && isAtTarget(Math.hypot(target.position.x - this.position.x, target.position.y - this.position.y,
+      target.position.z - this.position.z), this.autopilotStandoff());
   }
 
   /** Plan the gravity route, if enabled, from here to the selected object. */
@@ -595,35 +586,18 @@ export class UniverseViewController {
     this.updateRoute();
     const target = this.target;
     this.options.targetPanel.hidden = !target;
-    if (!target) { this.options.selectionSummary.textContent = ""; return; }
-    const distance = Math.hypot(
-      target.position.x - this.position.x,
-      target.position.y - this.position.y,
-      target.position.z - this.position.z,
-    );
+    if (!target) return;
+    const arrived = this.atTarget() && !this.autopilot;
+    const card = universeTargetCardText(target, this.position, this.options.bodyByKey().get(target.key), this.options.translate, arrived);
     this.options.targetName.textContent = target.name;
-    const deepSky = deepSkyModel(target);
-    const surface = deepSky
-      ? this.options.translate(deepSky.schematicSize ? "universe3d.schematicVolume" : "universe3d.illustrativeVolume")
-      : hasRenderableRadius(target) && target.radiusKm && target.radiusKm > 0
-      ? distance <= target.radiusKm / AU_KM
-        ? this.options.translate("universe3d.insideSurface")
-        : this.options.translate("universe3d.aboveSurface", { distance: formatDistanceAu(distance - target.radiusKm / AU_KM) })
-      : "";
-    const targetBody = this.options.bodyByKey().get(target.key);
-    this.options.targetMeta.textContent = this.options.translate("universe3d.targetMeta", {
-      type: (target.object_type ?? "Object").replace(/_/g, " "), distance: formatDistanceAu(distance), surface,
-    }) + (targetBody?.catalog?.facts?.radius_calculated === true && surface ? ` · ${this.options.translate("exoplanet.radiusCalculated")}` : "");
-    const magnitude = observerApparentMagnitude(target, this.position);
-    this.options.targetMagnitude.textContent = magnitude === null
-      ? this.options.translate("universe3d.unknownMagnitude")
-      : this.options.translate("universe3d.estimatedMagnitude", { magnitude: magnitude.toFixed(1) });
-    this.options.selectionSummary.textContent = this.options.translate("universe3d.selectionSummary", {
-      name: target.name, distance: formatDistanceAu(distance), magnitude: this.options.targetMagnitude.textContent,
-    });
-    const body = this.options.bodyByKey().get(target.key) ?? this.options.selectedBody();
-    this.options.skyButton.disabled = !body || body.key !== target.key || !bodyCanObserveSky(body);
-    this.options.focusButton.disabled = distance <= 1e-12;
+    this.options.targetMeta.textContent = card.meta;
+    this.options.targetMagnitude.textContent = card.magnitude;
+    // The body of a catalog point loads with `Details` or `Sky from object`. Before that, Sky is not ruled out.
+    const body = this.options.bodyByKey().get(target.key);
+    this.options.skyButton.disabled = body ? !bodyCanObserveSky(body) : false;
+    // Inside the standoff distance a jump moves the craft out to the distance that shows the object.
+    this.options.focusButton.disabled = card.distanceAu <= 1e-12 || isAtViewingDistance(card.distanceAu, this.autopilotStandoff());
+    this.options.flyButton.disabled = arrived;
   }
 
   private focusTarget(): void {
@@ -645,16 +619,29 @@ export class UniverseViewController {
     this.options.canvas.focus({ preventScroll: true });
   }
 
-  private async chooseDestination(point: UniversePoint): Promise<void> {
+  /** A destination from the search becomes the target, and the camera turns to it. The position does not change. */
+  private chooseDestination(point: UniversePoint): void {
     this.options.searchDialog.close();
+    this.stopFlight();
     this.target = point;
     this.targetKey = point.key;
+    this.autopilotStandoffAu = this.autopilotStandoff();
+    this.baseRenderKey = "";
     this.updateTarget();
-    this.focusTarget();
+    this.cameraTurn.start();
+    this.options.stateChanged("push");
+    this.options.canvas.focus({ preventScroll: true });
+  }
+
+  /** `Details`: opens the object inspector for the target. The target card stays. */
+  private async showDetails(): Promise<void> {
+    const key = this.target?.key;
+    if (!key) return;
     try {
-      await this.options.selectBody(point.key);
-      if (this.active && !this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === point.key) {
+      await this.options.selectBody(key);
+      if (this.active && !this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === key) {
         this.options.root.dataset.objectInspector = "true";
+        this.options.labelAreas.invalidate();
         this.updateSelectionConnector();
       }
     } catch {
@@ -662,8 +649,16 @@ export class UniverseViewController {
     }
   }
 
-  private inspectInAtlas(): void {
+  /** `Fly there`: the autopilot flies to the target. */
+  private flyToSelectedTarget(): void {
+    if (!this.target) return;
+    if (!this.autopilot) this.toggleAutopilot();
+  }
+
+  private async inspectInAtlas(): Promise<void> {
     const key = this.target?.key;
+    // The 2D map shows the object in the inspector, so the object must be the selection.
+    if (key) await this.options.selectBody(key).catch(() => undefined);
     this.close({ updateHistory: false });
     if (key) this.options.inspectInAtlas(key);
     this.options.stateChanged("push");
@@ -698,12 +693,22 @@ export class UniverseViewController {
       positionPrecisionStep(target.position) * 10);
   }
 
-  private skyFromTarget(): void {
-    if (!this.target) return;
-    const body = this.options.bodyByKey().get(this.target.key) ?? this.options.selectedBody();
-    if (!body || body.key !== this.target.key || !bodyCanObserveSky(body)) return;
+  private async skyFromTarget(): Promise<void> {
+    const key = this.target?.key;
+    if (!key) return;
+    // A catalog point has no loaded body before the first `Details`: load it now.
+    if (!this.options.bodyByKey().has(key)) {
+      await this.options.selectBody(key).catch(() => undefined);
+      this.options.closeInspector();
+    }
+    const body = this.options.bodyByKey().get(key) ?? this.options.selectedBody();
+    if (!this.active || !body || body.key !== key || !bodyCanObserveSky(body)) {
+      if (this.active) this.options.status.textContent = this.options.translate("universe3d.detailsUnavailable");
+      return;
+    }
+    const origin = this.state();
     this.close({ updateHistory: false });
-    void this.options.openSky(body);
+    void this.options.openSky(body, origin);
   }
 
   private controlClick(event: MouseEvent): void {
@@ -793,6 +798,7 @@ export class UniverseViewController {
     this.moveStepAu = clamp(Math.max(this.autopilotStandoffAu * 0.25, positionPrecisionStep(this.position)), MIN_MOVE_STEP_AU, MAX_MOVE_STEP_AU);
     this.options.status.textContent = this.options.translate("universe3d.transferArrived", {
       name: this.target!.name, duration: formatDuration(plan.durationSeconds), center: plan.center.name });
+    this.statusHold.hold();
   }
 
   /** Arrival: a forward or back control still held to set the pace must be
@@ -820,9 +826,10 @@ export class UniverseViewController {
     }
     this.endAutopilot();
     if (direction) this.camera = cameraForDirection(direction, this.camera.fovDeg);
-    // Leave the thrusters scaled to the destination, as "Go to object" does.
+    // Leave the thrusters scaled to the destination, as "Jump there" does.
     this.moveStepAu = clamp(Math.max(this.autopilotStandoffAu * 0.25, precision), MIN_MOVE_STEP_AU, MAX_MOVE_STEP_AU);
     this.options.status.textContent = this.options.translate("universe3d.autopilotArrived", { name: target.name });
+    this.statusHold.hold();
   }
 
   private endFlight(): void {
@@ -846,6 +853,8 @@ export class UniverseViewController {
   private pointerDown(event: PointerEvent): void {
     if (!this.active) return;
     const point = this.canvasPoint(event);
+    this.cameraTurn.cancel();
+    this.exitConfirmation.reset();
     this.pointers.set(event.pointerId, point);
     this.lastPointer = point;
     this.dragMoved = false;
@@ -857,6 +866,14 @@ export class UniverseViewController {
     const point = this.canvasPoint(event);
     if (!this.pointers.has(event.pointerId) || !this.lastPointer) {
       this.showTooltip(point);
+      return;
+    }
+    if (this.pointers.size >= 2) {
+      // Two fingers: a pinch goes forward or back, and the view does not turn.
+      this.pointers.set(event.pointerId, point);
+      const step = this.pinch.update([...this.pointers.values()]);
+      if (step) this.nudge(step.move, step.multiplier);
+      this.dragMoved = true;
       return;
     }
     const dx = point.x - this.lastPointer.x;
@@ -871,9 +888,10 @@ export class UniverseViewController {
   private pointerUp(event: PointerEvent): void {
     const point = this.canvasPoint(event);
     const wasActive = this.pointers.delete(event.pointerId);
+    this.pinch.reset();
     try { this.options.canvas.releasePointerCapture(event.pointerId); } catch { /* Capture may already be gone. */ }
     if (!wasActive) return;
-    if (!this.dragMoved && event.type === "pointerup") void this.selectAt(point);
+    if (!this.dragMoved && event.type === "pointerup") this.selectAt(point);
     this.lastPointer = null;
     this.options.canvas.style.cursor = "grab";
   }
@@ -902,12 +920,35 @@ export class UniverseViewController {
     else if (event.key === "ArrowRight") this.camera.yawDeg += event.shiftKey ? 10 : 3;
     else if (event.key === "ArrowUp") this.camera.pitchDeg += event.shiftKey ? 10 : 3;
     else if (event.key === "ArrowDown") this.camera.pitchDeg -= event.shiftKey ? 10 : 3;
-    else if (event.key === "Escape") { this.close(); return; }
+    else if (event.key === "Escape") { event.preventDefault(); this.escape(); return; }
     else return;
     event.preventDefault();
+    this.exitConfirmation.reset();
     if (!movement) {
+      this.cameraTurn.cancel();
       this.camera = normalizeCamera(this.camera);
       this.afterNavigation();
+    }
+  }
+
+  /** One Escape press closes the inspector or stops the flight. The exit needs a second press in 2 s. */
+  private escape(): void {
+    const action = universeEscapeAction({ inspectorOpen: !this.options.workspacePanel.hidden, flying: this.flying });
+    if (action === "close-inspector") {
+      this.exitConfirmation.reset();
+      this.options.closeInspector();
+      this.options.canvas.focus({ preventScroll: true });
+    } else if (action === "stop-flight") {
+      this.exitConfirmation.reset();
+      this.stopFlight();
+      this.updateChrome();
+    } else if (this.exitConfirmation.press()) {
+      this.close();
+    } else {
+      this.options.status.textContent = this.options.translate("universe3d.escapeAgain");
+      window.setTimeout(() => {
+        if (this.active && !this.exitConfirmation.armed && this.options.status.textContent === this.options.translate("universe3d.escapeAgain")) this.options.status.textContent = "";
+      }, EXIT_CONFIRM_WINDOW_MS + 50);
     }
   }
 
@@ -917,7 +958,7 @@ export class UniverseViewController {
     if (movement) this.heldMoves.delete(movement);
   }
 
-  private async selectAt(point: { x: number; y: number }): Promise<void> {
+  private selectAt(point: { x: number; y: number }): void {
     const hit = nearestHit(this.renderedHits, point);
     if (!hit) return;
     this.target = hit.point;
@@ -926,20 +967,27 @@ export class UniverseViewController {
     this.baseRenderKey = "";
     this.requestRender();
     this.updateTarget();
-    this.options.status.textContent = this.options.translate("universe3d.selecting", { name: hit.point.name });
-    try { await this.options.selectBody(hit.point.key); }
-    catch {
-      if (this.active) this.options.status.textContent = this.options.translate("universe3d.detailsUnavailable");
-      return;
-    }
-    if (this.active) {
-      if (!this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === hit.point.key) {
-        this.options.root.dataset.objectInspector = "true";
-        this.updateSelectionConnector();
-      }
-      this.options.status.textContent = this.options.translate("universe3d.selected", { name: hit.point.name });
-      this.updateTarget();
-    }
+    // A selection shows the target card only, so that no panel covers the object. `Details` opens the inspector.
+    this.hideObjectInspector();
+    this.options.closeInspector();
+    this.options.status.textContent = this.options.translate("universe3d.selected", { name: hit.point.name });
+    this.options.stateChanged("push");
+  }
+
+  /** The touch joystick holds a move, as a held key does. */
+  holdMove(movement: UniverseMove): void {
+    if (!this.active) return;
+    this.nudge(movement);
+    this.heldMoves.add(movement);
+  }
+
+  releaseMove(movement: UniverseMove): void {
+    this.heldMoves.delete(movement);
+  }
+
+  /** The labels of the last frame. Tests read this list. */
+  labels(): readonly DrawnUniverseLabel[] {
+    return this.drawnLabels;
   }
 
   private hideObjectInspector(): void {
@@ -948,9 +996,10 @@ export class UniverseViewController {
   }
 
   private updateSelectionConnector(): void {
-    if (this.options.root.dataset.objectInspector !== "true") { this.selectionConnector.hide(); return; }
     const hit = this.renderedHits.find((candidate) => candidate.point.key === this.target?.key);
     this.options.selectionConnector.dataset.sphere = String((hit?.radius ?? 0) > 24);
+    // The ring of the connector shows with the inspector. The target card has the ring that the canvas draws.
+    if (this.options.root.dataset.objectInspector !== "true") { this.selectionConnector.hide(); return; }
     this.selectionConnector.update(hit ? { key: hit.point.key, x: hit.x, y: hit.y } : null);
   }
 
@@ -973,49 +1022,6 @@ export class UniverseViewController {
     const rect = this.options.canvas.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
-}
-
-export function createUniverseViewController(dom: typeof atlasDom, options: UniverseIntegrationOptions): UniverseViewController {
-  return new UniverseViewController({
-    ...options,
-    root: dom.universeView,
-    canvas: dom.universeCanvas,
-    pointsCanvas: dom.universePoints,
-    deepSkyCanvas: dom.universeDeepSky,
-    bodiesCanvas: dom.universeBodies,
-    toggleButton: dom.universeToggle,
-    closeButton: dom.universeClose,
-    resetButton: dom.universeReset,
-    findButton: dom.universeFind,
-    searchDialog: dom.universeSearchDialog,
-    searchCloseButton: dom.universeSearchClose,
-    searchInput: dom.universeSearchInput,
-    searchResults: dom.universeSearchResults,
-    positionLabel: dom.universePosition,
-    selectionSummary: dom.universeSelectionSummary,
-    speedLabel: dom.universeSpeed,
-    speedGauge: dom.universeSpeedGauge,
-    autopilotButton: dom.universeAutopilot,
-    gravityButton: dom.universeGravity,
-    minimapCanvas: dom.universeMinimap,
-    routeLabel: dom.universeRoute,
-    selectionConnector: dom.universeSelectionConnector,
-    workspacePanel: dom.workspacePanel,
-    selectedObjectPanel: dom.selectedObjectPanel,
-    status: dom.universeStatus,
-    tooltip: dom.universeTooltip,
-    targetPanel: dom.universeTarget,
-    targetName: dom.universeTargetName,
-    targetMeta: dom.universeTargetMeta,
-    targetMagnitude: dom.universeTargetMagnitude,
-    focusButton: dom.universeFocus,
-    inspectButton: dom.universeInspect,
-    skyButton: dom.universeSky,
-  });
-}
-
-export function initialUniverseState(center: { x: number; y: number }, moveStepAu: number, selected: Body | null): UniverseViewState {
-  return universeEntryState(center, moveStepAu, bodyToUniversePoint(selected)?.position);
 }
 
 function keyMovement(key: string): UniverseMove | undefined {

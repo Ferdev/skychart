@@ -1,6 +1,7 @@
 @import "./styles/foundations.css";
 @import "./styles/atlas-shell.css";
 @import "./styles/destination-discovery.css";
+@import "./styles/search-panel.css";
 @import "./styles/object-inspection.css";
 @import "./styles/comparison.css";
 @import "./styles/controls.css";
@@ -12,5 +13,7 @@
 @import "./styles/sky-view.css";
 @import "./styles/universe-view.css";
 @import "./styles/map-toolbar.css";
+@import "./styles/time-bar.css";
+@import "./styles/tour-player.css";
 
 @import "./styles/community.css";

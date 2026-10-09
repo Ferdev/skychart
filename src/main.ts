@@ -13,6 +13,7 @@ import { initializeErrorReporting } from "./errorReporting";
 import { decodeSkyPermalink, decodeViewState, skyPermalinkToViewState, type BodyFilter, type DisplayLayer, type ViewState } from "./viewState";
 import { TourPlayer } from "./tourPlayer";
 import { bodyDistanceKm as calculateBodyDistanceKm, formatLightYears, formatNumber } from "./atlasFormatting";
+import { formatDateTime } from "./format/quantity";
 import { isPresent, type Rect, type ScreenPoint } from "./geometry";
 import { CatalogPointDecoder } from "./catalog/catalogPointDecoder";
 import { CatalogPointManifestRepository } from "./catalog/catalogPointManifest";
@@ -31,8 +32,12 @@ import { ObjectComparisonView } from "./object/objectComparisonView";
 import { AtlasOverlayRenderer } from "./rendering/atlasOverlayRenderer";
 import { AtlasVisibilityModel, isSolarSystemBody } from "./rendering/atlasVisibilityModel";
 import { atlasDom } from "./atlas/atlasDom";
+import { AtlasRefreshScheduler } from "./atlas/atlasRefreshScheduler";
+import { UniverseEntryMarker } from "./atlas/universeEntryMarker";
+import { loadNowEvents } from "./atlas/nowEventsView";
+import { updateScienceLayerDisclosure } from "./atlas/scienceLayerDisclosure";
 import { FEATURED_KEYS, TIME_STEPS, universeShellForRadius, zoomPresetBodies } from "./atlas/atlasDefinitions";
-import { CURATED_OBJECT_SUMMARIES } from "./object/curatedObjectSummaries";
+import { followCuratedSummaryLocale } from "./object/curatedSummaryLocales";
 import { ScientificValueFormatter, formatFullDate, toDatetimeLocalValue } from "./object/scientificValueFormatter";
 import { ViewportCatalogLoader } from "./catalog/viewportCatalogLoader";
 import { AtlasCameraController } from "./navigation/atlasCameraController";
@@ -51,13 +56,14 @@ import { bindAtlasEvents } from "./atlas/atlasEventBindings";
 import { AtlasViewport } from "./rendering/atlasViewport";
 import { DestinationCatalogController } from "./destination/destinationCatalogController";
 import { installAtlasDiagnostics } from "./atlas/atlasDiagnostics";
+import { pickMapTarget } from "./rendering/bodyPick";
 import { AtlasEmbedController } from "./atlas/atlasEmbedController";
 import { AtlasTimeController } from "./atlas/atlasTimeController";
 import { AtlasLoadingView } from "./atlas/atlasLoadingView";
 import { AtlasDeferredEphemerisController } from "./atlas/atlasDeferredEphemerisController";
-import { catalogSummaryFromEphemeris, createDefaultDisplayLayers, mergeBodyList, replaceBodyList } from "./atlas/atlasState";
+import { catalogSummaryFromEphemeris, createDefaultDisplayLayers, fetchCatalogSummary, mergeBodyList, replaceBodyList } from "./atlas/atlasState";
 import { ExoplanetSystemNavigator } from "./object/exoplanetSystemNavigator";
-import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController"; import { createUniverseViewController, initialUniverseState, UniverseViewController } from "./universe/universeViewController";
+import { bodyCanObserveSky, createSkyViewController, SkyViewController } from "./sky/skyViewController"; import type { UniverseViewController } from "./universe/universeViewController"; import { createUniverseViewController, initialUniverseState } from "./universe/universeViewFactory";
 import type {
   ActiveAtlasTab, SizeMode, ZoomPreset, Body, Ephemeris, CatalogSummary, ObjectDetailHydrationState,
   Camera, LoadingStep, RenderRequestOptions, SelectBodyOptions, DataRefreshOptions, CatalogPointHitEntry,
@@ -99,9 +105,9 @@ const destinationSearchView = new DestinationSearchView({
 });
 const {
   pointCanvas, canvas, ctx, catalogPointHover, loadingScreen, loadingDetail, loadingFill, loadingProgressLabel,
-  loadingStepLabel, loadingElapsed, loadState, selectedObjectPanel, mapHud, workspacePanel, bodySearch, bodyPicker,
+  loadingStepLabel, loadingElapsed, loadState, selectedObjectPanel, workspacePanel, bodySearch, bodyPicker,
   bodyInfo, nowStatus, nowEvents, compareHeading, compareSearch, comparePicker, comparePanel, timeSummary, timeInput,
-  timeStepLabel, timeStepSlider, zoomScaleSlider, scienceLayerDisclosure, errorPanel, embedActivation, embedAttribution,
+  zoomScaleSlider, scienceLayerDisclosure, errorPanel, embedActivation, embedAttribution,
 } = atlasDom;
 const loadingView = new AtlasLoadingView({
   detail: loadingDetail, fill: loadingFill, progressLabel: loadingProgressLabel,
@@ -113,7 +119,6 @@ const atlasViewport = new AtlasViewport({
   pointRenderer,
   camera: () => camera,
   activeTab: () => activeTab,
-  selectedObjectPanel,
 });
 const catalogPointStream: CatalogPointStream = new CatalogPointStream({
   manifest: catalogPointManifest,
@@ -169,8 +174,6 @@ let compareTargetKey: string | null = null;
 let recentDestinations: RecentDestination[] = readRecentDestinations();
 const catalogSearchState: DestinationSearchState = { requestId: 0, latestBodies: [], activeOptionKey: null };
 const compareSearchState: DestinationSearchState = { requestId: 0, latestBodies: [], activeOptionKey: null };
-let renderFrameId: number | null = null;
-let cameraDataRefreshTimer: number | null = null;
 let catalogSummary: CatalogSummary | null = null;
 const objectDetailHydrationStates = new Map<string, ObjectDetailHydrationState>();
 let perfEnabled = new URLSearchParams(window.location.search).has("perf") || window.localStorage.getItem("starsmap:perf") === "1";
@@ -182,12 +185,23 @@ let perfLastViewportMs = 0;
 let perfMilkyWayMs = 0;
 let perfViewportLoads = 0; let skyView: SkyViewController | null = null; let universeView: UniverseViewController | null = null;
 
-const {
-  formatDistance, nullableDistance, nullableNumber, nullableDegrees, nullableDays, nullableLightYears,
-  formatRightAscensionForBody, formatDeclinationForBody, formatRaDecDecimal, formatGalacticLongitude,
-  formatGalacticLatitude, formatEclipticLongitude, formatEclipticLatitude, formatEclipticRadius,
-  formatAuCoordinate, readableOptionalModel, readableCatalogGroup, readablePositionModel,
-} = new ScientificValueFormatter(auKm);
+const atlasState = {
+  get selectedKey() { return selectedKey; }, set selectedKey(value) { selectedKey = value; },
+  get compareTargetKey() { return compareTargetKey; }, set compareTargetKey(value) { compareTargetKey = value; },
+  get activeTab() { return activeTab; }, set activeTab(value) { activeTab = value; },
+  get activeFilter() { return activeFilter; }, set activeFilter(value) { activeFilter = value; },
+  get activeCompareFilter() { return activeCompareFilter; }, set activeCompareFilter(value) { activeCompareFilter = value; },
+  get activeGuidedSetId() { return activeGuidedSetId; }, set activeGuidedSetId(value) { activeGuidedSetId = value; },
+  get recentDestinations() { return recentDestinations; }, set recentDestinations(value) { recentDestinations = value; },
+  get camera() { return camera; }, set camera(value) { camera = value; },
+  get viewTime() { return viewTime; }, set viewTime(value) { viewTime = value; },
+  get activeZoomPreset() { return activeZoomPreset; }, set activeZoomPreset(value) { activeZoomPreset = value; },
+  get displayLayers() { return displayLayers; }, set displayLayers(value) { displayLayers = value; },
+  get sizeMode() { return sizeMode; }, set sizeMode(value) { sizeMode = value; },
+  get performanceEnabled() { return perfEnabled; }, set performanceEnabled(value) { perfEnabled = value; },
+};
+const scientificFormat = new ScientificValueFormatter(auKm);
+const { formatDistance } = scientificFormat;
 const viewportCatalogLoader = new ViewportCatalogLoader({
   mapper: catalogObjectMapper,
   canLoad: () => Boolean(ephemeris),
@@ -207,6 +221,16 @@ const viewportCatalogLoader = new ViewportCatalogLoader({
     perfViewportLoads += 1;
     updatePerfHud();
   },
+});
+const refreshScheduler = new AtlasRefreshScheduler({
+  canRender: () => !universeView?.active && (!isEmbedMode || embedController.visible),
+  canLoadData: () => !isEmbedMode || embedController.visible,
+  render,
+  invalidate: () => atlasVisibility.invalidate(),
+  viewportLoader: viewportCatalogLoader,
+  pointStream: catalogPointStream,
+  viewStateChanged: scheduleViewStateReplace,
+  cameraDebounceMs: CAMERA_DATA_REFRESH_DEBOUNCE_MS,
 });
 const cameraController = new AtlasCameraController({
   camera: () => camera,
@@ -232,24 +256,24 @@ const mapInteraction = new MapInteractionController({
   hoverKey: () => hoverKey,
   setHoverKey: (key) => { hoverKey = key; },
   cancelCameraAnimation,
-  zoomAt,
+  zoomAt: (x, y, factor, clearPreset, dataMode) => cameraController.zoomAt(x, y, factor, clearPreset, dataMode),
   edgeReferenceAt,
   nearestBodyAt,
   nearestCatalogPointAt: nearestCatalogTilePointAt,
-  handleClick: handleMapClick,
+  handleClick: (point) => mapSelection.handleClick(point),
   requestRender: (withData = false) => requestRender(withData ? { data: true } : {}),
   scheduleViewStateReplace,
 });
 const sharingController = new AtlasSharingController({
   isEmbedMode,
-  viewState: currentViewState,
+  viewState: () => viewStateController.current(),
   selectedBody,
-  camera: () => camera,
+  camera: () => camera, viewportRect: usableViewportRect,
   ephemeris: () => ephemeris,
   pointRenderer,
   manifest: catalogPointManifest,
   preparePointLayers: () => catalogLayerRenderer.prepare(),
-  replaceViewState: replaceCurrentViewState,
+  replaceViewState: () => viewStateController.replace(),
   requestRender: () => requestRender(),
 });
 atlasVisibility = new AtlasVisibilityModel({
@@ -288,8 +312,8 @@ const catalogLayerRenderer = new CatalogLayerRenderer({
   selectedBody,
   selectedKey: () => selectedKey,
   hoverKey: () => hoverKey,
-  isDuplicateBody: isPointLayerDuplicateBody,
-  bodyRadiusAu,
+  isDuplicateBody: (body) => atlasVisibility.isPointLayerDuplicateBody(body),
+  bodyRadiusAu: (body) => atlasVisibility.bodyRadiusAu(body),
   performanceEnabled: () => perfEnabled,
   afterViewportMeasurement: updateStats,
 });
@@ -308,11 +332,18 @@ const statsView = new AtlasStatsView({
   }),
 });
 const controlView = new AtlasControlView();
-const timeController = new AtlasTimeController({
-  timeSummary, timeInput, timeStepLabel, timeStepSlider, steps: TIME_STEPS,
-  ephemeris: () => ephemeris, formatDate: formatFullDate, toLocalInput: toDatetimeLocalValue,
-  translate: t, loadAtlas: (timestamp) => { void loadAtlas(timestamp); },
-  busyStatus: atlasDom.timeBusy, busyControls: [atlasDom.timeNow, atlasDom.applyTime, atlasDom.timeStepBack, atlasDom.timeStepForward, atlasDom.skyTimeBack, atlasDom.skyTimeForward],
+const timeController: AtlasTimeController = new AtlasTimeController({
+  bars: [
+    { root: atlasDom.timeBar, ids: { back: "time-step-back", forward: "time-step-forward", date: "time-date", stepSize: "time-step-size", play: "time-play", now: "time-now", busy: "time-busy" } },
+    { root: atlasDom.skyTimeBar, ids: { back: "sky-time-back", forward: "sky-time-forward" } },
+    { root: atlasDom.universeTimeBar },
+  ],
+  popover: atlasDom.timePopover, timeSummary, timeInput, applyButton: atlasDom.applyTime, popoverStepSize: atlasDom.timePopoverStepSize, popoverPlay: atlasDom.timePopoverPlay, popoverNow: atlasDom.timePopoverNow, steps: TIME_STEPS, defaultStepIndex: 2,
+  ephemeris: () => ephemeris, isNow: () => viewTime === "now", formatDate: formatFullDate, toLocalInput: toDatetimeLocalValue,
+  formatBarDate: (timestamp, timeZone) => formatDateTime(timestamp, { dateStyle: "medium", timeStyle: "short", timeZone }),
+  translate: t, loadAtlas: (timestamp) => { if (!timestamp) viewTime = "now"; void loadAtlas(timestamp); },
+  // Play loads the core bodies only for each step. The moons of Jupiter and Saturn come at the pause.
+  playbackChanged: (state) => { if (!state.playing && ephemeris) deferredEphemerisLoader.load(ephemeris.timestamp_utc, null); },
 });
 const atlasOverlay = new AtlasOverlayRenderer({
   context: ctx,
@@ -327,14 +358,14 @@ const atlasOverlay = new AtlasOverlayRenderer({
     viewport: usableViewportRect(),
     renderViewport: atlasViewport.renderRect(),
     visibleBodies: visibleBodies(),
-    labelBodies: prioritizedLabelBodies(),
-    edgeBodies: edgeReferenceBodies(), exoplanetOrbits: atlasVisibility.resolvedExoplanets(),
+    labelBodies: atlasVisibility.prioritizedLabelBodies(),
+    edgeBodies: atlasVisibility.edgeReferenceBodies(), exoplanetOrbits: atlasVisibility.resolvedExoplanets(), solarSystemCollapsed: atlasVisibility.solarSystemCollapsed(), scaleBarOrigin: atlasViewport.scaleBarOrigin(),
   }),
-  bodyByKey: () => bodyByKey, universeEntryMarker: atlasDom.universeEntryMarker, exoplanetOrbitNote: atlasDom.exoplanetOrbitNote, toolbar: atlasDom.atlasToolbar,
+  bodyByKey: () => bodyByKey, universeEntryMarker: new UniverseEntryMarker(atlasDom.universeEntryMarker, atlasDom.universeToggle), exoplanetOrbitNote: atlasDom.exoplanetOrbitNote, toolbar: atlasDom.atlasToolbar,
   bodyToScreen,
   worldToScreen,
   screenToWorld,
-  bodyDisplayRadiusPx,
+  bodyDisplayRadiusPx: (body) => atlasVisibility.bodyDisplayRadiusPx(body),
   bodyMatchesActiveFilter,
   isSolarSystemBody,
   currentViewWidthAu,
@@ -362,11 +393,10 @@ const constellationRenderer = new ConstellationOverlay({
 });
 const objectComparison = new ObjectComparisonView({
   heading: compareHeading,
-  panel: comparePanel,
+  panel: comparePanel, actions: atlasDom.compareActions,
   auKm,
   distanceKm: bodyDistanceKm,
   formatDistance,
-  afterRender: updateSelectedPanelMetrics,
 });
 const objectHydrator = new CatalogObjectHydrator({
   mapper: catalogObjectMapper,
@@ -388,39 +418,19 @@ const exoplanetSystems = new ExoplanetSystemNavigator({
   root: bodyInfo, mapper: catalogObjectMapper, body: (key) => bodyByKey.get(key), bodies: () => ephemeris?.bodies ?? [], mergeBodies, viewport: usableViewportRect, maximumZoom: MAX_ZOOM,
   animateCameraTo: (target) => { activeZoomPreset = null; updateZoomPresetButtons(); animateCameraTo(target, LOCAL_ZOOM_DURATION_MS, scheduleViewStateReplace); },
 });
-const tourPlayer = new TourPlayer({ navigate: navigateTourStep, prewarm: prewarmTourStep, track: (event, properties) => trackEvent(event, properties) });
+const tourPlayer = new TourPlayer({ navigate: (state, options) => viewStateController.navigateTour(state, options), prewarm: (state) => viewStateController.prewarmTour(state), track: (event, properties) => trackEvent(event, properties), translate: t, closed: () => viewStateController.endTour() });
 const objectInspection: ObjectInspectionView = new ObjectInspectionView({
   bodyInfo,
-  nowStatus,
-  nowEvents,
-  scienceLayerDisclosure,
   hydrationStates: objectDetailHydrationStates,
   manifest: catalogPointManifest,
-  curatedSummaries: CURATED_OBJECT_SUMMARIES,
+  curatedSummaries: followCuratedSummaryLocale(locale, () => { if (ephemeris) updateAllUi(); }),
   selectedBody,
   bodyByKey: () => bodyByKey,
   ephemeris: () => ephemeris,
   currentViewWidthLy,
   universeShellForRadius,
   formatLightYears,
-  formatRightAscensionForBody,
-  formatDeclinationForBody,
-  formatRaDecDecimal,
-  formatGalacticLongitude,
-  formatGalacticLatitude,
-  formatEclipticLongitude,
-  formatEclipticLatitude,
-  formatEclipticRadius,
-  formatAuCoordinate,
-  formatDistance,
-  nullableDistance,
-  nullableNumber,
-  nullableDegrees,
-  nullableDays,
-  nullableLightYears,
-  readablePositionModel,
-  readableOptionalModel,
-  readableCatalogGroup,
+  ...scientificFormat,
   formatFullDate,
   bodyDistanceKm,
   usableViewportRect,
@@ -450,13 +460,7 @@ const mapSelection: CatalogMapSelectionController = new CatalogMapSelectionContr
   detailError: () => t("object.detailErrorBody"),
 });
 const objectSelection: ObjectSelectionController = new ObjectSelectionController({
-  state: {
-    get selectedKey() { return selectedKey; }, set selectedKey(value) { selectedKey = value; },
-    get compareTargetKey() { return compareTargetKey; }, set compareTargetKey(value) { compareTargetKey = value; },
-    get activeTab() { return activeTab; }, set activeTab(value) { activeTab = value; },
-    get activeGuidedSetId() { return activeGuidedSetId; }, set activeGuidedSetId(value) { activeGuidedSetId = value; },
-    get recentDestinations() { return recentDestinations; }, set recentDestinations(value) { recentDestinations = value; },
-  },
+  state: atlasState,
   bodyByKey: () => bodyByKey,
   catalogSearchState,
   compareSearchState,
@@ -476,13 +480,7 @@ const objectSelection: ObjectSelectionController = new ObjectSelectionController
   pushViewState: pushCurrentViewState,
 });
 const destinationController = new DestinationCatalogController({
-  state: {
-    get activeFilter() { return activeFilter; }, set activeFilter(value) { activeFilter = value; },
-    get activeCompareFilter() { return activeCompareFilter; }, set activeCompareFilter(value) { activeCompareFilter = value; },
-    get activeGuidedSetId() { return activeGuidedSetId; }, set activeGuidedSetId(value) { activeGuidedSetId = value; },
-    get selectedKey() { return selectedKey; }, set selectedKey(value) { selectedKey = value; },
-    get compareTargetKey() { return compareTargetKey; }, set compareTargetKey(value) { compareTargetKey = value; },
-  },
+  state: atlasState,
   model: destinationCatalog,
   controlView,
   searchView: destinationSearchView,
@@ -506,23 +504,13 @@ const destinationController = new DestinationCatalogController({
   applyZoomPreset,
   setActiveTab,
   updateStats,
-  updateSelectedPanelMetrics,
   requestRender: (withData = false) => requestRender(withData ? { data: true } : {}),
   translate: t,
   searchDebounceMs: SEARCH_INPUT_DEBOUNCE_MS,
 });
 const viewStateController = new AtlasViewStateController({
   constellations: constellationRenderer,
-  state: {
-    get camera() { return camera; }, set camera(value) { camera = value; },
-    get viewTime() { return viewTime; }, set viewTime(value) { viewTime = value; },
-    get activeZoomPreset() { return activeZoomPreset; }, set activeZoomPreset(value) { activeZoomPreset = value; },
-    get displayLayers() { return displayLayers; }, set displayLayers(value) { displayLayers = value; },
-    get activeFilter() { return activeFilter; }, set activeFilter(value) { activeFilter = value; },
-    get activeCompareFilter() { return activeCompareFilter; }, set activeCompareFilter(value) { activeCompareFilter = value; },
-    get selectedKey() { return selectedKey; }, set selectedKey(value) { selectedKey = value; },
-    get compareTargetKey() { return compareTargetKey; }, set compareTargetKey(value) { compareTargetKey = value; },
-  },
+  state: atlasState,
   manifest: catalogPointManifest,
   pointStream: catalogPointStream,
   minimumZoom: MIN_ZOOM,
@@ -533,6 +521,7 @@ const viewStateController = new AtlasViewStateController({
   transientSelectedKey: () => mapSelection.transientKey,
   selectBodyByKey,
   setCompareTargetByKey,
+  dismissSelection: () => objectSelection.dismiss(),
   updateAllUi,
   updateScale: updateScaleUi,
   requestRender: (withData = false) => requestRender(withData ? { data: true } : {}),
@@ -549,9 +538,9 @@ skyView = createSkyViewController(atlasDom, {
   stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(),
   resolveObserver: async (key) => bodyByKey.get(key) ?? (await objectHydrator.hydrateMany([key]))[0] ?? null,
   catalogRelease: () => catalogPointManifest.value?.version,
-  locale,
+  locale, closeInspector: () => setActiveTab(null),
 });
-universeView = createUniverseViewController(atlasDom, { bodyByKey: () => bodyByKey, selectedBody, translate: t, selectBody: selectBodyByKey, inspectInAtlas: (key) => { const body = bodyByKey.get(key); if (body) { centerOnBody(body, false); requestRender({ data: true }); } }, searchDestinations: async (query, signal) => (await catalogSearchGateway.search({ query, limit: 12, signal })).bodies, loadPlanetarySystem: (host) => exoplanetSystems.load(host), openSky: (body) => skyView?.open(body) ?? Promise.resolve(), stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), closeSky: () => skyView?.close({ updateHistory: false }), resumeAtlas: () => requestRender(), initialState: () => initialUniverseState({ x: camera.xAu, y: camera.yAu }, usableViewportRect().width / camera.pxPerAu / 12, selectedBody()) });
+universeView = createUniverseViewController(atlasDom, { bodyByKey: () => bodyByKey, selectedBody, translate: t, selectBody: selectBodyByKey, inspectInAtlas: (key) => { const body = bodyByKey.get(key); if (body) { centerOnBody(body, false); requestRender({ data: true }); } }, searchDestinations: async (query, signal) => (await catalogSearchGateway.search({ query, limit: 12, signal })).bodies, loadPlanetarySystem: (host) => exoplanetSystems.load(host), openSky: (body, origin) => skyView?.open(body, undefined, skyReturnTo3d(origin)) ?? Promise.resolve(), closeInspector: () => setActiveTab(null), destinationSuggestions: () => ({ suggested: FEATURED_KEYS.flatMap((key) => bodyByKey.get(key) ?? []), recent: recentDestinations.slice(0, 6).flatMap((recent) => bodyByKey.get(recent.key) ?? []) }), stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(), closeSky: () => skyView?.close({ updateHistory: false }), resumeAtlas: () => requestRender(), initialState: () => initialUniverseState({ x: camera.xAu, y: camera.yAu }, usableViewportRect().width / camera.pxPerAu / 12, selectedBody(), bodyByKey.values()) });
 const embedController: AtlasEmbedController = new AtlasEmbedController({
   enabled: isEmbedMode,
   canvas,
@@ -561,12 +550,7 @@ const embedController: AtlasEmbedController = new AtlasEmbedController({
   viewportLoader: viewportCatalogLoader,
   updateAttribution: () => sharingController.updateEmbedAttribution(),
   cancelCameraAnimation,
-  suspendRendering: () => {
-    if (cameraDataRefreshTimer !== null) window.clearTimeout(cameraDataRefreshTimer);
-    cameraDataRefreshTimer = null;
-    if (renderFrameId !== null) cancelAnimationFrame(renderFrameId);
-    renderFrameId = null;
-  },
+  suspendRendering: () => refreshScheduler.suspend(),
   requestRender: () => requestRender({ data: true }),
 });
 installAtlasDiagnostics({
@@ -577,7 +561,7 @@ installAtlasDiagnostics({
   viewport: () => atlasViewport.rect(),
   workspacePanel,
   camera: () => camera,
-  gestureState: () => mapInteraction.diagnostics(), visibility: () => atlasVisibility,
+  gestureState: () => mapInteraction.diagnostics(), visibility: () => atlasVisibility, drawnLabels: () => [...atlasOverlay.drawnLabels()], drawnEdgePointers: () => [...atlasOverlay.drawnEdgeReferences()], skyLabels: () => skyView?.labels() ?? [], universeLabels: () => universeView?.labels() ?? [],
 });
 
 const spacecraftLoader = new SpacecraftLoader((bodies) => {
@@ -591,7 +575,7 @@ const spacecraftLoader = new SpacecraftLoader((bodies) => {
 }, () => selectedKey);
 const deferredEphemerisLoader = new AtlasDeferredEphemerisController({
   serverBootObjectKey, hasBody: (key) => bodyByKey.has(key), restoreSelection: restoreSelectionFromViewState,
-  selectServerBoot: (key) => selectBodyByKey(key, { center: true }),
+  selectServerBoot: (key) => selectBodyByKey(key, { center: true, zoom: "local" }),
   applyBodies: (bodies) => {
     if (!ephemeris) return;
     ephemeris = { ...ephemeris, bodies: replaceBodyList(ephemeris.bodies, bodies) };
@@ -600,15 +584,15 @@ const deferredEphemerisLoader = new AtlasDeferredEphemerisController({
   },
 });
 
-if (bootViewState) applyDecodedViewStateFields(bootViewState);
-if (isEmbedMode) initializeEmbedMode();
+if (bootViewState) viewStateController.applyFields(bootViewState);
+if (isEmbedMode) embedController.initialize();
 
 resizeCanvas();
-initI18n();
+document.body.classList.add("app-started"); initI18n();
 bindEvents();
 initializeUi();
 void loadCatalogTileManifest();
-void objectInspection.loadNowEvents();
+void loadNowEvents(nowStatus, nowEvents, atlasDom.nowShowAll);
 loadAtlas(viewTime === "now" ? undefined : viewTime);
 requestRender({ data: true });
 
@@ -650,7 +634,7 @@ async function loadAtlas(timestampIso?: string) {
     }
     const selectionState = viewStateController.takePendingSelection();
     if (selectionState) await restoreSelectionFromViewState(selectionState);
-    else if (serverBootObjectKey) await selectBodyByKey(serverBootObjectKey, { center: true });
+    else if (serverBootObjectKey) await selectBodyByKey(serverBootObjectKey, { center: true, zoom: "local" });
     else if (invalidSkyRoute) skyView?.showUnavailable(t("sky.invalidLink"));
     if (skyView?.active && !selectionState?.sky) await skyView.refreshForTime(); if (universeView?.active && !selectionState?.universe) universeView.refreshForTime();
     requestDataRefresh({ immediate: true });
@@ -660,74 +644,64 @@ async function loadAtlas(timestampIso?: string) {
     scheduleViewStateReplace();
     startBootTour();
     spacecraftLoader.start(payload.timestamp_utc);
-    deferredEphemerisLoader.load(payload.timestamp_utc, selectionState);
+    if (!timeController.playing) deferredEphemerisLoader.load(payload.timestamp_utc, selectionState);
+    timeController.loadCompleted();
   } catch (error) {
     if (loadId !== loadSequence) return; // A newer load owns the UI state now.
     loadState.textContent = t("status.error");
     setError(error instanceof Error ? error.message : String(error));
     loadingDetail.textContent = t("error.unableLoad");
     loadingProgressLabel.textContent = t("status.error");
+    timeController.loadFailed();
   } finally {
     if (showTimeBusy && loadId === loadSequence) setTimeBusy(false);
   }
 }
 
 function setTimeBusy(busy: boolean): void { timeController.setBusy(busy); }
+/** Sky view that opens from 3D mode goes back to the same 3D position and target. */
+function skyReturnTo3d(origin: ViewState["universe"]) { return origin ? { labelKey: "sky.backTo3d", restore: () => universeView?.restore(origin) } : undefined; }
 
 function bindEvents() {
   bindAtlasEvents({
     dom: atlasDom,
-    state: {
-      get viewTime() { return viewTime; }, set viewTime(value) { viewTime = value; },
-      get sizeMode() { return sizeMode; }, set sizeMode(value) { sizeMode = value; },
-      get displayLayers() { return displayLayers; }, set displayLayers(value) { displayLayers = value; },
-      get performanceEnabled() { return perfEnabled; }, set performanceEnabled(value) { perfEnabled = value; },
-    },
+    state: atlasState,
     mapInteraction,
     bindDestinations: () => bindDestinationEvents({
-      state: {
-        get activeGuidedSetId() { return activeGuidedSetId; }, set activeGuidedSetId(value) { activeGuidedSetId = value; },
-        get activeFilter() { return activeFilter; }, set activeFilter(value) { activeFilter = value; },
-        get activeCompareFilter() { return activeCompareFilter; }, set activeCompareFilter(value) { activeCompareFilter = value; },
-        get activeTab() { return activeTab; }, set activeTab(value) { activeTab = value; },
-        get compareTargetKey() { return compareTargetKey; }, set compareTargetKey(value) { compareTargetKey = value; },
-      },
+      state: atlasState,
       catalogSearchState, compareSearchState, searchView: destinationSearchView, pointStream: catalogPointStream,
-      inspection: objectInspection, bodyByKey: () => bodyByKey, bodyPickerConfig, comparePickerConfig,
-      scheduleBodyPickerUpdate, scheduleComparePickerUpdate, updateBodyPicker, updateComparePicker,
-      updateExploreDomains, updateGuidedSets, updateBodyFilters, updateCompareFilters, updateStats, updateComparePanel,
-      focusSearchResult, focusCompareResult, selectBodyByKey, selectBody, setCompareTargetByKey, clearSelectedObject,
-      setActiveTab, focusMapFilter, applyExploreDomain, fitBodies, centerOnSelected, updateScale: updateScaleUi,
+      inspection: objectInspection, bodyByKey: () => bodyByKey,
+      bodyPickerConfig: () => destinationController.bodyPickerConfig(), comparePickerConfig: () => destinationController.comparePickerConfig(),
+      scheduleBodyPickerUpdate: () => destinationController.scheduleBodyPicker(), scheduleComparePickerUpdate: () => destinationController.scheduleComparePicker(), updateBodyPicker, updateComparePicker,
+      updateExploreDomains, updateGuidedSets, updateBodyFilters, updateCompareFilters, updateStats, updateComparePanel: () => destinationController.updateComparePanel(),
+      focusSearchResult: () => destinationController.focusPrimaryResult(), focusCompareResult: () => destinationController.focusCompareResult(),
+      selectBodyByKey, selectBody, setCompareTargetByKey, clearSelectedObject,
+      setActiveTab, focusMapFilter: (filterKey) => destinationController.focusMapFilter(filterKey),
+      applyExploreDomain: (domainId) => { void destinationController.applyExploreDomain(domainId); }, fitBodies, centerOnSelected, updateScale: updateScaleUi,
       requestRender: (withData = false) => requestRender(withData ? { data: true } : {}), pushViewState: pushCurrentViewState,
+      startTour: (slug) => { setActiveTab(null); void tourPlayer.start(slug); }, setComparisonMode: (open) => controlView.setComparisonMode(open),
     }),
     restoreTourStep: (step) => { void tourPlayer.restoreStep(step); },
-    restoreViewState: (state) => { void restoreViewState(state); },
+    restoreViewState: (state) => { void viewStateController.restore(state); },
     exportCurrentView: () => { void exportCurrentView(); },
-    shareCurrentView: (native) => { void shareCurrentView(native); },
+    shareCurrentView: (native, feedback) => { void sharingController.share(native, feedback); },
     copyEmbedSnippet: () => { void copyEmbedSnippet(); },
-    activateEmbedInteraction,
-    loadAtlas: (timestamp) => { void loadAtlas(timestamp); },
-    dateFromInput,
-    updateTimeSummary, updateTimeStepUi, stepTime, applyZoomPreset, zoomViewportCenter, setZoomFromSlider,
+    activateEmbedInteraction: () => embedController.activate(),
+    applyZoomPreset, zoomViewportCenter: (factor) => cameraController.zoomViewportCenter(factor),
+    setZoomFromSlider: () => cameraController.setFromSlider(Number(zoomScaleSlider.value)),
     updateSizeModes, updateDisplayToggles, updatePerformanceHud: updatePerfHud, updateAllUi, resizeCanvas,
-    updateSelectedPanelMetrics, requestRender: (data = false) => requestRender(data ? { data: true } : {}),
+    requestRender: (data = false) => requestRender(data ? { data: true } : {}),
     scheduleViewStateReplace, translate: t,
-    viewSkySelected: () => { const body = selectedBody(); if (body && bodyCanObserveSky(body)) { universeView?.close({ updateHistory: false }); void skyView?.open(body); } },
+    viewSkySelected: () => { const body = selectedBody(); if (body && bodyCanObserveSky(body)) { const origin = universeView?.state(); universeView?.close({ updateHistory: false }); void skyView?.open(body, undefined, skyReturnTo3d(origin)); } },
   });
 }
 
-function initializeEmbedMode() { embedController.initialize(); }
-function activateEmbedInteraction() { embedController.activate(); }
 function updateEmbedAttribution() { sharingController.updateEmbedAttribution(); }
 async function copyEmbedSnippet() { await sharingController.copyEmbedSnippet(); }
 async function exportCurrentView() { await sharingController.exportCurrentView(); }
-function applyDecodedViewStateFields(state: ViewState) { viewStateController.applyFields(state); }
-function currentViewState(): ViewState { return viewStateController.current(); }
-function replaceCurrentViewState() { viewStateController.replace(); }
 function scheduleViewStateReplace() { viewStateController.scheduleReplace(); }
 function pushCurrentViewState() { viewStateController.push(); }
 async function restoreSelectionFromViewState(state: ViewState) { await viewStateController.restoreSelection(state); }
-async function restoreViewState(state: ViewState) { await viewStateController.restore(state); }
 
 function startBootTour() {
   if (tourBootHandled || isEmbedMode) return;
@@ -738,31 +712,23 @@ function startBootTour() {
   void tourPlayer.start(slug, Number.isSafeInteger(step) && step >= 0 ? step : 0);
 }
 
-async function navigateTourStep(state: ViewState, options: { animate: boolean; slug: string; step: number; restoring: boolean; signal: AbortSignal }) { await viewStateController.navigateTour(state, options); }
-function prewarmTourStep(state: ViewState) { viewStateController.prewarmTour(state); }
-async function shareCurrentView(preferNative: boolean) { await sharingController.share(preferNative); }
 
 function initializeUi() {
-  bodySearch.setAttribute("aria-controls", bodyPicker.id);
-  bodySearch.setAttribute("aria-autocomplete", "list");
-  compareSearch.setAttribute("aria-controls", comparePicker.id);
-  compareSearch.setAttribute("aria-autocomplete", "list");
   updateTabs();
   updateExploreDomains();
   updateBodyFilters();
   updateCompareFilters();
   updateSizeModes();
   updateDisplayToggles();
-  updateContextModeStatus();
   updateCompareUi();
-  updateTimeStepUi();
+  timeController.update();
   updateScaleUi();
 }
 
 function updateAllUi() {
   updateStats();
-  updateSelectedSummary();
-  updateQuickFocus();
+  controlView.updateSelectedSummary(selectedBody(), formatDistance, bodyCanObserveSky);
+  controlView.updateQuickFocus(bodyByKey);
   updateTabs();
   updateExploreDomains();
   updateBodyFilters();
@@ -771,23 +737,20 @@ function updateAllUi() {
   updateGuidedSets();
   objectInspection.update(); if (selectedBody()) community.mount(bodyInfo, selectedBody()!.key, selectedBody()!.name);
   updateCompareUi();
-  updateTimeSummary();
-  updateTimeStepUi();
+  timeController.update();
   updateSizeModes();
   updateDisplayToggles();
-  updateContextModeStatus();
   updateScaleUi();
-  updateSelectedPanelMetrics();
   selectionConnector.update();
   updateEmbedAttribution();
 }
 
-function render() { if (universeView?.active) { renderFrameId = null; return; }
+function render() {
+  if (universeView?.active) return;
   const frameStartedAt = performance.now();
   const previousFrameAt = perfLastFrameAt;
   perfLastFrameAt = frameStartedAt;
   perfFrameMs = frameStartedAt - previousFrameAt;
-  renderFrameId = null;
   atlasVisibility.invalidate();
   resizeCanvas();
   selectionConnector.update();
@@ -798,13 +761,13 @@ function render() { if (universeView?.active) { renderFrameId = null; return; }
   try {
     if (ephemeris) {
       catalogLayerRenderer.prepare();
-      if (displayLayers.milkyWay) drawMilkyWayLayer();
+      if (displayLayers.milkyWay) perfMilkyWayMs = milkyWayRenderer.draw(perfMilkyWayMs);
       if (displayLayers.grid) atlasOverlay.drawGrid();
       if (displayLayers.orbits) atlasOverlay.drawOrbitGuides();
-      if (displayLayers.constellations) constellationRenderer.draw(displayLayers.labels);
+      if (displayLayers.constellations) { constellationRenderer.draw(displayLayers.labels); atlasOverlay.addNote(t("constellations.mapNote")); }
       atlasOverlay.drawComparisonGuide();
-      atlasOverlay.drawBodies(); atlasOverlay.placeUniverseEntryMarker();
-      if (displayLayers.labels) atlasOverlay.drawLabels();
+      atlasOverlay.drawBodies(); atlasOverlay.finishFrame();
+      if (displayLayers.labels) atlasOverlay.drawLabels(); else atlasOverlay.clearLabels();
       if (displayLayers.references) atlasOverlay.drawEdgeReferences();
     } else {
       pointRenderer.clear();
@@ -815,61 +778,24 @@ function render() { if (universeView?.active) { renderFrameId = null; return; }
   community.render("map", canvas.parentElement!, (ephemeris?.bodies ?? []).filter(body => bodyMatchesActiveFilter(body)).map(body => ({key: body.key, ...bodyToScreen(body)})), displayLayers.photos);
   perfDrawMs = performance.now() - frameStartedAt;
   updatePerfHud();
-  objectInspection.updateScienceLayerDisclosure();
+  updateScienceLayerDisclosure(scienceLayerDisclosure, catalogPointManifest, currentViewWidthLy());
 }
 
-function requestRender(options: RenderRequestOptions = {}) { if (universeView?.active) return;
-  if (isEmbedMode && !embedController.visible) return;
-  atlasVisibility.invalidate();
-  if (options.data) requestDataRefresh();
-  if (renderFrameId !== null) return;
-  renderFrameId = requestAnimationFrame(render);
-}
+function requestRender(options: RenderRequestOptions = {}) { refreshScheduler.requestRender(options); }
+function requestDataRefresh(options: DataRefreshOptions = {}) { refreshScheduler.requestDataRefresh(options); }
+function scheduleCameraDataRefresh() { refreshScheduler.scheduleCameraDataRefresh(); }
 
-function requestDataRefresh(options: DataRefreshOptions = {}) {
-  if (isEmbedMode && !embedController.visible) return;
-  if (cameraDataRefreshTimer !== null) {
-    window.clearTimeout(cameraDataRefreshTimer);
-    cameraDataRefreshTimer = null;
-  }
-  viewportCatalogLoader.schedule(options);
-  catalogPointStream.schedule(options);
-}
-
-function scheduleCameraDataRefresh() {
-  if (cameraDataRefreshTimer !== null) window.clearTimeout(cameraDataRefreshTimer);
-  cameraDataRefreshTimer = window.setTimeout(() => {
-    cameraDataRefreshTimer = null;
-    requestDataRefresh();
-  }, CAMERA_DATA_REFRESH_DEBOUNCE_MS);
-  scheduleViewStateReplace();
-}
-
-function drawMilkyWayLayer() { perfMilkyWayMs = milkyWayRenderer.draw(perfMilkyWayMs); }
 function updateStats() { statsView.updateStats(); }
 function updatePerfHud() { statsView.updatePerfHud(); }
 
 async function refreshCatalogSummary() {
-  try {
-    const response = await fetch("/api/catalog");
-    if (!response.ok) throw new Error(`Catalog summary failed with ${response.status}`);
-    catalogSummary = (await response.json()) as CatalogSummary;
-    updateStats();
-    updateExploreDomains();
-    updateBodyFilters();
-  } catch (error) {
-    console.warn("Phoenix catalog summary unavailable.", error);
-  }
+  const summary = await fetchCatalogSummary();
+  if (!summary) return;
+  catalogSummary = summary;
+  updateStats();
+  updateExploreDomains();
+  updateBodyFilters();
 }
-
-function updateSelectedSummary() { controlView.updateSelectedSummary(selectedBody(), formatDistance, bodyCanObserveSky); }
-
-function updateSelectedPanelMetrics() {
-  mapHud.classList.remove("has-selected-object");
-  mapHud.style.removeProperty("--selected-panel-bottom");
-}
-
-function updateQuickFocus() { controlView.updateQuickFocus(bodyByKey); }
 
 function updateTabs() {
   activeTab = controlView.updateTabs(activeTab, Boolean(selectedBody()));
@@ -890,12 +816,9 @@ function setActiveTab(tab: ActiveAtlasTab) {
 
 function updateBodyFilters() { destinationController.updateBodyFilters(); }
 function updateExploreDomains() { destinationController.updateExploreDomains(); }
-function applyExploreDomain(domainId: string) { void destinationController.applyExploreDomain(domainId); }
 function updateCompareFilters() { destinationController.updateCompareFilters(); }
-function focusMapFilter(filterKey: BodyFilter) { destinationController.focusMapFilter(filterKey); }
 function activeBodyFilterDefinition() { return destinationCatalog.activeFilter(); }
-function bodyMatchesActiveFilter(body: Body) { return bodyMatchesFilter(body, activeBodyFilterDefinition()); }
-function bodyMatchesFilter(body: Body, filter: BodyFilterDefinition) { return destinationCatalog.matches(body, filter); }
+function bodyMatchesActiveFilter(body: Body) { return destinationCatalog.matches(body, activeBodyFilterDefinition()); }
 
 async function loadCatalogTileManifest() {
   await catalogPointManifest.load();
@@ -917,34 +840,23 @@ function catalogPointViewport(): CatalogPointViewport {
 }
 
 async function updateBodyPicker() { await destinationController.updateBodyPicker(); }
-function bodyPickerConfig(): DestinationSearchConfig | null { return destinationController.bodyPickerConfig(); }
-function scheduleBodyPickerUpdate() { destinationController.scheduleBodyPicker(); }
-function scheduleComparePickerUpdate() { destinationController.scheduleComparePicker(); }
 function updateGuidedSets() { destinationController.updateGuidedSets(); }
 function updateCompareUi() { destinationController.updateCompareUi(); }
 async function updateComparePicker() { await destinationController.updateComparePicker(); }
-function comparePickerConfig(): DestinationSearchConfig | null { return destinationController.comparePickerConfig(); }
-function updateComparePanel() { destinationController.updateComparePanel(); }
 
-function updateTimeSummary() { timeController.updateSummary(); }
-function updateTimeStepUi() { timeController.updateStep(); }
-function stepTime(direction: -1 | 1) { timeController.step(direction); }
 
 function updateSizeModes() { controlView.updateSizeModes(sizeMode); }
 function updateDisplayToggles() { controlView.updateDisplayToggles(displayLayers, perfEnabled); }
-function updateContextModeStatus() { updateScaleUi(); }
 
 function updateScaleUi() {
   const scaleAu = currentViewWidthAu();
-  const zoomLevel = zoomToSliderValue(camera.pxPerAu);
+  const zoomLevel = cameraController.zoomToSliderValue(camera.pxPerAu);
   controlView.updateScale({ viewWidthAu: scaleAu, viewWidthLy: scaleAu / AU_PER_LIGHT_YEAR, pxPerAu: camera.pxPerAu, auKm: auKm(), zoomLevel, sliderSteps: ZOOM_SLIDER_STEPS, formatDistance, displayLayers });
 }
 
 function currentViewWidthAu() { return Math.max(0.000001, usableViewportRect().width / camera.pxPerAu); }
 
 function currentViewWidthLy() { return currentViewWidthAu() / AU_PER_LIGHT_YEAR; }
-async function focusSearchResult() { await destinationController.focusPrimaryResult(); }
-async function focusCompareResult() { await destinationController.focusCompareResult(); }
 async function setCompareTargetByKey(key: string) { await objectSelection.setCompareTargetByKey(key); }
 async function selectBodyByKey(key: string, options: SelectBodyOptions = {}) { await objectSelection.selectByKey(key, options); }
 function selectBody(key: string, options: SelectBodyOptions = {}) { objectSelection.select(key, options); }
@@ -1000,11 +912,6 @@ function fitMilkyWayModel(paddingRatio: number) {
 }
 
 function fitPhysicalScale(widthLy: number, paddingRatio: number) { cameraController.fitPhysicalScale(widthLy, paddingRatio); }
-function zoomViewportCenter(factor: number) { cameraController.zoomViewportCenter(factor); }
-function setZoomFromSlider() { cameraController.setFromSlider(Number(zoomScaleSlider.value)); }
-function zoomToSliderValue(pxPerAu: number) { return cameraController.zoomToSliderValue(pxPerAu); }
-function zoomAt(x: number, y: number, factor: number, clearPreset = false, dataMode: "immediate" | "deferred" | "none" = "immediate") { cameraController.zoomAt(x, y, factor, clearPreset, dataMode); }
-async function handleMapClick(point: ScreenPoint) { await mapSelection.handleClick(point); }
 
 function removeMergedBody(key: string) {
   if (ephemeris) ephemeris = { ...ephemeris, bodies: ephemeris.bodies.filter((body) => body.key !== key) };
@@ -1014,7 +921,8 @@ function removeMergedBody(key: string) {
   requestRender();
 }
 
-function nearestBodyAt(x: number, y: number) { return atlasVisibility.nearestBody(x, y); }
+// A drawn label reacts like its object. The label is on top of the markers, so it is first.
+function nearestBodyAt(x: number, y: number) { const point = atlasVisibility.nearestCatalogPoint(x, y); return pickMapTarget({ marker: atlasVisibility.nearestBody(x, y), labelled: atlasOverlay.labelAt(x, y), catalogPointDistancePx: point ? Math.hypot(point.x - x, point.y - y) : null }); }
 function nearestCatalogTilePointAt(x: number, y: number): CatalogPointHitEntry | null { return atlasVisibility.nearestCatalogPoint(x, y); }
 
 function edgeReferenceAt(x: number, y: number) {
@@ -1023,11 +931,6 @@ function edgeReferenceAt(x: number, y: number) {
 }
 
 function visibleBodies() { return atlasVisibility.visibleBodies(); }
-function prioritizedLabelBodies() { return atlasVisibility.prioritizedLabelBodies(); }
-function edgeReferenceBodies() { return atlasVisibility.edgeReferenceBodies(); }
-function bodyDisplayRadiusPx(body: Body) { return atlasVisibility.bodyDisplayRadiusPx(body); }
-function bodyRadiusAu(body: Body) { return atlasVisibility.bodyRadiusAu(body); }
-function isPointLayerDuplicateBody(body: Body) { return atlasVisibility.isPointLayerDuplicateBody(body); }
 function selectedBody(): Body | null { return objectSelection.selectedBody(); }
 function compareTarget(): Body | null { return objectSelection.compareTarget(); }
 function ensureCompareTarget() { objectSelection.ensureCompareTarget(); }
@@ -1044,6 +947,5 @@ function resizeCanvas() { atlasViewport.resize(); }
 function setLoading(step: LoadingStep, progress: number, detail: string) { loadingView.update(step, progress, detail); }
 function setError(message: string) { loadingView.setError(message); }
 
-function dateFromInput() { return timeController.dateFromInput(); }
 
 function auKm() { return ephemeris?.au_km ?? AU_KM_FALLBACK; }

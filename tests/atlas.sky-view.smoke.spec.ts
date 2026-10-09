@@ -157,7 +157,9 @@ test("selected objects open and replay a shareable object-centered sky view", as
   await expect(layerControls).toHaveAttribute("open", "");
   await expect(layerControls.locator(".sky-view__filters-hint--close")).toBeVisible();
   await expect(page.locator("#sky-constellations-toggle")).toBeChecked();
-  await expect(page.locator('#sky-object-type-filters input[value="planet"]')).toBeChecked();
+  // A type with no object in this sky has no row.
+  await expect(page.locator('#sky-object-type-filters input[value="planet"]')).toHaveCount(0);
+  await expect(page.locator('#sky-object-type-filters input[value="star"]')).toBeChecked();
   const asteroidToggle = page.locator('#sky-object-type-filters input[value="asteroid"]');
   await expect(asteroidToggle).toBeChecked();
   await asteroidToggle.uncheck();
@@ -180,7 +182,8 @@ test("selected objects open and replay a shareable object-centered sky view", as
   const skyConnector = page.locator("#sky-selection-connector");
   await expect(skyConnector).toBeVisible();
   await expect(skyConnector).toHaveAttribute("data-source-key", "hip-25336");
-  await expect(skyConnector.locator(".sky-selection-connector__leader")).toHaveAttribute("d", /^M .+ C .+$/);
+  // The selection has a ring on the object. It has no line to the inspector.
+  await expect(skyConnector.locator(".sky-selection-connector__leader")).toHaveCount(0);
   const connectorSource = skyConnector.locator(".sky-selection-connector__source");
   const sourceX = Number(await connectorSource.getAttribute("cx"));
   await page.locator("#sky-map").focus();
@@ -202,9 +205,14 @@ test("selected objects open and replay a shareable object-centered sky view", as
   await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
   await expect.poll(canvasHash).not.toBe(withConstellations);
 
+  // The step button names its step, and the Sky header shows the new date after one click.
+  await expect(page.locator("#sky-time-forward")).toHaveAccessibleName("Step forward 1 month");
+  const dateBeforeStep = await page.locator("#sky-time-bar .time-bar__date-text").textContent();
   await page.locator("#sky-time-forward").click();
   await expect(page.locator("#sky-view")).toBeVisible();
   await expect.poll(() => skyRequests).toBeGreaterThan(1);
+  await expect(page.locator("#sky-time-bar .time-bar__date-text")).not.toHaveText(dateBeforeStep!);
+  await expect(page.locator("#sky-time-bar")).toHaveAttribute("data-time-state", "not-now");
   await expect(page.locator("#sky-view-title")).toContainText("Earth");
 
   await page.locator("#sky-map").focus();

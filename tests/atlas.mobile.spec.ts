@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
+import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
 
 test.describe("Cosmic Atlas mobile layout", () => {
   test.beforeEach(async ({ page, request }) => {
@@ -8,15 +8,25 @@ test.describe("Cosmic Atlas mobile layout", () => {
   });
 
   test("centers the map in the space between top controls and the bottom scale sheet", async ({ page }) => {
+    // `perf=1` gives the diagnostics with the free map area.
+    await openAtlas(page, "/?perf=1");
     const issues = collectBrowserIssues(page);
+
+    // The map centre is the middle of the free area between the header card and the toolbar.
+    const centre = await page.evaluate(() => {
+      const headerBottom = document.querySelector<HTMLElement>(".atlas-bar")!.getBoundingClientRect().bottom;
+      const scaleTop = document.querySelector<HTMLElement>(".scale-rail")!.getBoundingClientRect().top;
+      const { usable } = window.__ATLAS_DIAGNOSTICS__!.selectionGeometry();
+      return { free: (headerBottom + 8 + scaleTop - 10) / 2, map: usable.top + usable.height / 2, usableTop: usable.top, usableBottom: usable.top + usable.height, headerBottom, scaleTop };
+    });
+    expect(Math.abs(centre.map - centre.free), "map centre is the middle of the free area").toBeLessThanOrEqual(2);
+    expect(centre.usableTop).toBeGreaterThanOrEqual(centre.headerBottom);
+    expect(centre.usableBottom).toBeLessThanOrEqual(centre.scaleTop);
 
     const balance = await page.evaluate(() => {
       const canvas = document.querySelector<HTMLCanvasElement>("#map");
       const context = canvas?.getContext("2d");
-      const headerBottom = Math.max(
-        document.querySelector<HTMLElement>(".atlas-bar")?.getBoundingClientRect().bottom ?? 0,
-        document.querySelector<HTMLElement>(".mode-rail:not([hidden])")?.getBoundingClientRect().bottom ?? 0
-      );
+      const headerBottom = document.querySelector<HTMLElement>(".atlas-bar")?.getBoundingClientRect().bottom ?? 0;
       const scaleTop = document.querySelector<HTMLElement>(".scale-rail")?.getBoundingClientRect().top ?? window.innerHeight;
       if (!canvas || !context) return { topPixels: 0, bottomPixels: 0, usableHeight: 0, ratio: 0 };
 
@@ -53,7 +63,9 @@ test.describe("Cosmic Atlas mobile layout", () => {
     expect(balance.usableHeight, "mobile usable map height").toBeGreaterThan(500);
     expect(balance.topPixels, "map content in upper half").toBeGreaterThan(1_000);
     expect(balance.bottomPixels, "map content in lower half").toBeGreaterThan(1_000);
-    expect(balance.ratio, "lower-half map content should not collapse after header controls").toBeGreaterThan(0.35);
+    // The labels of the inner planets are near the Sun, which is above the centre in the first view.
+    // The lower half has map content also: it does not collapse.
+    expect(balance.ratio, "lower-half map content should not collapse after header controls").toBeGreaterThan(0.2);
 
     issues.assertClean();
   });
@@ -101,8 +113,9 @@ test.describe("Cosmic Atlas mobile layout", () => {
       const intersects = (left: NonNullable<ReturnType<typeof rect>>, right: NonNullable<ReturnType<typeof rect>>) =>
         left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
 
+      // On a phone the Share button is a part of the header card, in the row of the search button and the time bar.
       const shareTrigger = rect("#share-menu-button");
-      const protectedSurfaces = [".atlas-bar", ".mode-rail:not([hidden])", ".scale-rail", ".atlas-footer"]
+      const protectedSurfaces = [".header-search", "#time-bar", "#locale-select", ".scale-rail", ".atlas-footer"]
         .map((selector) => ({ selector, bounds: rect(selector) }))
         .filter((entry): entry is { selector: string; bounds: NonNullable<ReturnType<typeof rect>> } => entry.bounds !== null);
 
@@ -117,6 +130,9 @@ test.describe("Cosmic Atlas mobile layout", () => {
     expect(geometry.shareTrigger, "mobile share trigger bounds").not.toBeNull();
     expect(geometry.shareTrigger?.height, "compact share trigger height").toBeLessThanOrEqual(46);
     expect(geometry.collisions, "share trigger must not cover mobile controls or footer").toEqual([]);
+    await expect(page.locator(".atlas-bar #share-menu-button")).toHaveCount(1);
+    expect(geometry.shareTrigger!.width, "44 px touch target").toBeGreaterThanOrEqual(44);
+    expect(geometry.shareTrigger!.height, "44 px touch target").toBeGreaterThanOrEqual(44);
 
     await page.locator("#share-menu-button").click();
     await expect(page.locator("#share-popover")).toBeVisible();
@@ -154,6 +170,11 @@ test.describe("Cosmic Atlas mobile layout", () => {
     }));
     await openAtlas(page, "/sky/earth?v=1&t=2026-08-26T12%3A00%3A00.000Z&sc=0%2C0%2C72&lang=en");
     await expect(page.locator("#sky-view")).toBeVisible();
+    // On a narrow window Share is in the More menu. The keyboard opens the menu and then the dialog.
+    await expect(page.locator("#sky-share-button")).toBeHidden();
+    await page.locator("#sky-more-button").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#sky-more-button")).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator("#sky-share-button")).toBeVisible();
     await page.locator("#sky-share-button").focus();
     await page.keyboard.press("Enter");
@@ -212,6 +233,52 @@ test.describe("Cosmic Atlas mobile layout", () => {
     expect(landscape.workspaceTop, "landscape object sheet top").not.toBeNull();
     expect(landscape.usable.bottom, "usable map must stop above the sheet even when less than 160px tall").toBeLessThanOrEqual(landscape.workspaceTop! - 10);
     expect(landscape.selected!.y).toBeLessThan(landscape.workspaceTop! - 10);
+    issues.assertClean();
+  });
+
+  test("scrolls the object sheet by touch and keeps each detail tab in reach", async ({ page }) => {
+    await openAtlas(page, "/?perf=1");
+    const issues = collectBrowserIssues(page);
+    await selectCatalogObject(page, "Mars", "mars");
+    const bodyInfo = page.locator("#body-info");
+    const metrics = () => bodyInfo.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { scrollTop: element.scrollTop, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight, top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
+    });
+    const initial = await metrics();
+    expect(initial.scrollHeight, "the Mars overview must be longer than the sheet").toBeGreaterThan(initial.clientHeight + 40);
+    expect(initial.scrollTop).toBe(0);
+
+    const client = await page.context().newCDPSession(page);
+    const x = (initial.left + initial.right) / 2;
+    const startY = initial.bottom - 30;
+    const touch = (y: number) => [{ id: 1, x, y, radiusX: 4, radiusY: 4, force: 1 }];
+    await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: touch(startY) });
+    for (let step = 1; step <= 8; step += 1) {
+      await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touch(startY - step * 30) });
+    }
+    await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await expect.poll(async () => (await metrics()).scrollTop, { message: "one swipe must scroll the sheet content" }).toBeGreaterThan(0);
+
+    // After one swipe the sticky tab row is inside the sheet, and each tab opens its view.
+    const afterSwipe = await metrics();
+    const tabRow = await page.locator("#body-info .object-view-tabs").boundingBox();
+    expect(tabRow, "detail tab row").not.toBeNull();
+    expect(tabRow!.y).toBeGreaterThanOrEqual(afterSwipe.top - 1);
+    expect(tabRow!.y + tabRow!.height).toBeLessThanOrEqual(afterSwipe.bottom + 1);
+    const views = await page.locator("#body-info [data-object-view]").evaluateAll((tabs) => tabs.map((tab) => (tab as HTMLElement).dataset.objectView ?? ""));
+    expect(views.length).toBeGreaterThanOrEqual(4);
+    for (const view of views) {
+      const tab = page.locator(`#body-info [data-object-view="${view}"]`);
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+      await expect(page.locator(`#object-view-panel-${view}`)).toBeVisible();
+      const box = await tab.boundingBox();
+      expect(box!.height, `${view} tab touch target`).toBeGreaterThanOrEqual(44);
+    }
+
+    const geometry = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry());
+    expect(geometry.workspaceTop!, "object sheet should leave a meaningful map region visible").toBeGreaterThan(320);
     issues.assertClean();
   });
 

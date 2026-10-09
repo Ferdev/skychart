@@ -1,3 +1,5 @@
+import { formatDuration as formatQuantityDuration, formatQuantity } from "./format/quantity";
+
 export const DEFAULT_AU_KM = 149_597_870.7;
 export const LIGHT_SPEED_KM_PER_SECOND = 299_792.458;
 export const EARTH_MOON_AVERAGE_KM = 384_400;
@@ -21,6 +23,8 @@ export type Point3AuInput = Point3Au | EphemerisPoint3Au;
 
 export type EducationalComparison = {
   key: string;
+  /** Translation key of the label. `label` is the English text. */
+  labelKey: string;
   label: string;
   value: number;
   unit: string;
@@ -54,6 +58,7 @@ export function educationalComparisons(
   const comparisons: EducationalComparison[] = [
     {
       key: "light_time",
+      labelKey: "compare.metric.lightTime",
       label: "Light time",
       value: lightSeconds,
       unit: "seconds",
@@ -61,27 +66,21 @@ export function educationalComparisons(
       description: `Light crosses this distance in ${formatDuration(lightSeconds)}.`
     },
     {
-      key: "astronomical_units",
-      label: "Astronomical units",
-      value: distanceKmValue / auKm,
-      unit: "AU",
-      displayValue: `${formatRatio(distanceKmValue / auKm)} AU`,
-      description: "Distance expressed in Earth-Sun average distances."
-    },
-    {
       key: "earth_moon",
+      labelKey: "compare.metric.earthMoon",
       label: "Earth-Moon spans",
       value: distanceKmValue / EARTH_MOON_AVERAGE_KM,
       unit: "Earth-Moon distances",
-      displayValue: `${formatRatio(distanceKmValue / EARTH_MOON_AVERAGE_KM)}x`,
+      displayValue: `${formatRatio(distanceKmValue / EARTH_MOON_AVERAGE_KM)}×`,
       description: "Compared with the average Earth-Moon distance."
     },
     {
       key: "earth_circumference",
+      labelKey: "compare.metric.earthCircumference",
       label: "Earth circumferences",
       value: distanceKmValue / EARTH_EQUATORIAL_CIRCUMFERENCE_KM,
       unit: "Earth circumferences",
-      displayValue: `${formatRatio(distanceKmValue / EARTH_EQUATORIAL_CIRCUMFERENCE_KM)}x`,
+      displayValue: `${formatRatio(distanceKmValue / EARTH_EQUATORIAL_CIRCUMFERENCE_KM)}×`,
       description: "Compared with Earth's equatorial circumference."
     }
   ];
@@ -89,6 +88,7 @@ export function educationalComparisons(
   if (Math.abs(distanceKmValue) >= LIGHT_YEAR_KM * 0.001) {
     comparisons.push({
       key: "light_years",
+      labelKey: "compare.metric.lightYears",
       label: "Light-years",
       value: distanceKmValue / LIGHT_YEAR_KM,
       unit: "ly",
@@ -100,10 +100,11 @@ export function educationalComparisons(
   if (options.includeMissionComparisons !== false) {
     comparisons.push({
       key: "mars_close_approach",
+      labelKey: "compare.metric.marsApproach",
       label: "Mars close approaches",
       value: distanceKmValue / MARS_CLOSE_APPROACH_KM,
       unit: "Mars close approaches",
-      displayValue: `${formatRatio(distanceKmValue / MARS_CLOSE_APPROACH_KM)}x`,
+      displayValue: `${formatRatio(distanceKmValue / MARS_CLOSE_APPROACH_KM)}×`,
       description: "Compared with a favorable Earth-Mars close approach."
     });
   }
@@ -111,28 +112,9 @@ export function educationalComparisons(
   return comparisons;
 }
 
-export function formatDuration(seconds: number): string {
-  if (!Number.isFinite(seconds)) return "unknown";
-  const abs = Math.abs(seconds);
-  if (abs < 1) return `${(seconds * 1000).toFixed(0)} ms`;
-  if (abs < 60) return `${seconds.toFixed(1)} s`;
-  if (abs < 3600) return `${(seconds / 60).toFixed(1)} min`;
-  if (abs < 86_400) return `${(seconds / 3600).toFixed(1)} h`;
-  if (abs < 31_557_600) return `${(seconds / 86_400).toFixed(1)} d`;
-  return `${(seconds / 31_557_600).toFixed(2)} yr`;
-}
+export function formatDuration(seconds: number): string { return formatQuantityDuration(seconds); }
 
-export function formatRatio(value: number): string {
-  const abs = Math.abs(value);
-  if (!Number.isFinite(value)) return "unknown";
-  if (abs >= 1_000_000) return value.toExponential(2);
-  if (abs >= 1000) return Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
-  if (abs >= 100) return value.toFixed(1);
-  if (abs >= 10) return value.toFixed(2);
-  if (abs >= 1) return value.toFixed(3);
-  if (abs >= 0.001) return value.toPrecision(3);
-  return value.toExponential(2);
-}
+export function formatRatio(value: number): string { return formatQuantity(value); }
 
 function pointFrom(point: Point3AuInput): Point3Au {
   if ("xAu" in point) return point;

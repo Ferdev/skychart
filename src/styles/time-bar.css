@@ -1,0 +1,169 @@
+/*
+ * The time bar shows the one global atlas time. The 2D header, the Sky header, and the 3D header each have one.
+ * A compact bar (narrow window) shows the step size in the date button, and the popover has step size and play.
+ */
+.time-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.time-bar button,
+.time-bar select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--panel-ink);
+  background: rgba(12, 16, 13, 0.82);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.time-bar button:hover:not(:disabled),
+.time-bar select:hover:not(:disabled) {
+  border-color: rgba(239, 196, 104, 0.5);
+  background: rgba(36, 40, 32, 0.92);
+}
+
+.time-bar__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.time-bar__date {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-bar__date-text {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+.time-bar__step-note {
+  display: none;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+/* The time is not the current time: the date and the Now button show it in gold. */
+.time-bar[data-time-state="not-now"] .time-bar__date {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+}
+
+.time-bar[data-time-state="not-now"] .time-bar__now {
+  border-color: var(--accent-strong);
+  color: #17130c;
+  background: var(--accent-strong);
+}
+
+.time-bar[data-time-state="now"] .time-bar__now {
+  color: var(--panel-ink-muted);
+}
+
+.time-bar__play[aria-pressed="true"] {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  background: rgba(239, 196, 104, 0.14);
+}
+
+.time-bar__busy {
+  display: inline-flex;
+  align-items: center;
+}
+
+.time-bar__busy[hidden] {
+  display: none;
+}
+
+.time-popover {
+  position: fixed;
+  inset: auto;
+  width: min(340px, calc(100vw - 16px));
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--panel-ink);
+  background: #141a16;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+}
+
+.time-popover h2 {
+  margin: 0 0 4px;
+  font-size: var(--text-md);
+}
+
+.time-popover > strong {
+  display: block;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.time-popover__compact {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: var(--text-sm);
+}
+
+.time-popover__help {
+  margin: 0;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* Compact bar: the 2D header on a narrow window, and the Sky and 3D headers below 1280 px. */
+@media (max-width: 899px) {
+  .atlas-bar .time-bar__size,
+  .atlas-bar .time-bar__play,
+  .atlas-bar .time-bar__step-label {
+    display: none;
+  }
+
+  .atlas-bar .time-bar__step-note {
+    display: block;
+  }
+}
+
+@media (max-width: 1279px) {
+  .sky-view .time-bar__size,
+  .sky-view .time-bar__play,
+  .sky-view .time-bar__step-label,
+  .universe-view .time-bar__size,
+  .universe-view .time-bar__play,
+  .universe-view .time-bar__step-label {
+    display: none;
+  }
+
+  .sky-view .time-bar__step-note,
+  .universe-view .time-bar__step-note {
+    display: block;
+  }
+
+  .time-popover__compact {
+    display: flex;
+  }
+}
+
+@media (max-width: 899px) {
+  .time-bar button {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+}

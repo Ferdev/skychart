@@ -1,7 +1,7 @@
 /* Common map actions stay visible; detailed controls open above the toolbar. */
 .scale-rail.atlas-toolbar {
   container-type: inline-size;
-  width: min(620px, calc(100vw - 32px));
+  width: min(620px, calc(100vw - 32px), calc(100vw - var(--workspace-width) - 48px));
   padding: 10px 12px;
   gap: 8px;
   border-radius: 14px;
@@ -13,8 +13,8 @@
 
 .toolbar-zoom {
   display: grid;
-  grid-template-columns: auto 36px minmax(0, 1fr) 36px auto;
-  gap: 12px;
+  grid-template-columns: auto 36px minmax(0, 1fr) 36px auto auto;
+  gap: 10px;
   align-items: center;
 }
 
@@ -44,12 +44,16 @@
   margin: 0;
 }
 
+/* One line always: a text that wraps changes the toolbar height. */
 .toolbar-scale-summary {
+  overflow: hidden;
   color: var(--map-ink);
   font-size: 12px;
   font-weight: 650;
   line-height: 18px;
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .atlas-toolbar .zoom-scale-control input {
@@ -61,7 +65,8 @@
   cursor: pointer;
 }
 
-.toolbar-settings-button {
+.toolbar-settings-button,
+.share-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -117,7 +122,8 @@
 }
 
 .toolbar-quick-layers label:has(:checked),
-.toolbar-settings-button[aria-expanded="true"] {
+.toolbar-settings-button[aria-expanded="true"],
+.share-trigger[aria-expanded="true"] {
   color: #f6d58b;
   border-color: rgba(239, 196, 104, 0.28);
   background: rgba(239, 196, 104, 0.1);
@@ -205,7 +211,7 @@
 
 .map-settings .map-frame-status {
   border: 0;
-  font-size: 11px;
+  font-size: var(--text-xs);
   margin-bottom: 8px;
 }
 
@@ -234,53 +240,51 @@
   .scale-rail.atlas-toolbar {
     width: auto;
     max-height: none;
-    padding: 8px 10px;
+    padding: 6px 10px;
+    gap: 5px;
     border-radius: 14px;
     overflow: visible;
   }
 
-  .toolbar-zoom { grid-template-columns: auto 36px minmax(0, 1fr) 36px auto; gap: 6px; }
-  .toolbar-3d-button { min-height: 44px; padding: 0 9px; }
-  .toolbar-settings-button { padding: 0 8px; min-height: 44px; }
-  .atlas-toolbar .icon-button { min-height: 44px; }
+  .toolbar-zoom { grid-template-columns: auto 44px minmax(0, 1fr) 44px auto; gap: 6px; }
+  .toolbar-3d-button { min-height: 44px; padding: 0 10px; }
+  .toolbar-settings-button, .share-trigger { padding: 0 9px; min-height: 44px; }
+  .atlas-toolbar .icon-button { width: 44px; min-height: 44px; }
   .toolbar-settings-button svg { display: none; }
-  .toolbar-bottom { flex-wrap: wrap; gap: 5px; padding-top: 6px; }
+  .share-trigger span { display: none; }
+  .share-trigger { min-width: 44px; }
+  .toolbar-bottom { flex-wrap: wrap; gap: 5px; padding-top: 4px; }
   .toolbar-quick-layers { width: 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); }
   .toolbar-quick-layers label { min-height: 44px; }
-  .atlas-toolbar .zoom-presets { width: 100%; flex: auto; border: 0; padding: 0; }
-  .atlas-toolbar .zoom-presets button { flex: 1; min-height: 44px; padding: 0 4px; }
+  /* The four presets are one row of equal width. */
+  .atlas-toolbar .zoom-presets { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 0; padding: 0; }
+  .atlas-toolbar .zoom-presets button { min-width: 0; min-height: 44px; padding: 0 4px; }
+  .atlas-toolbar .zoom-presets button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .map-settings { width: calc(100vw - 20px); border-radius: 16px; padding: 12px; }
   .map-settings .scale-collapse__toggle { min-height: 44px; }
-  .atlas-footer { bottom: calc(var(--atlas-toolbar-height, 150px) + max(10px, env(safe-area-inset-bottom)) + 10px); }
 }
 
-@media (min-width: 900px) {
-  .atlas-footer { left: 652px; }
-}
-
-@media (min-width: 900px) {
-  .map-hud[data-workspace-tab="object"] .atlas-toolbar {
-    max-width: calc(100vw - min(555px, calc(100vw - 420px)) - 48px);
-  }
-}
-
+/* A narrow toolbar (an open panel on a small window): the quick layers and the presets each have a row. */
 @container (max-width: 550px) {
   .toolbar-bottom { flex-wrap: wrap; }
   .toolbar-quick-layers { width: 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); }
   .toolbar-quick-layers label { min-width: 0; gap: 4px; padding: 0 4px; }
-  .toolbar-quick-layers span { min-width: 0; overflow-wrap: anywhere; }
-  .atlas-toolbar .zoom-presets { width: 100%; flex: auto; border: 0; padding: 0; }
-  .atlas-toolbar .zoom-presets button { flex: 1; padding: 0 4px; }
-  .atlas-toolbar .zoom-presets button span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
-}
-
-@container (max-width: 300px) {
-  .atlas-toolbar .zoom-presets button span { font-size: 11px; white-space: nowrap; }
+  .toolbar-quick-layers span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .atlas-toolbar .zoom-presets { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 0; padding: 0; }
+  .atlas-toolbar .zoom-presets button { min-width: 0; padding: 0 4px; }
+  .atlas-toolbar .zoom-presets button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 }
 
 @media (max-width: 340px) {
   .scale-rail.atlas-toolbar { padding: 4px 8px; gap: 3px; }
   .toolbar-bottom { gap: 2px; padding-top: 2px; }
+}
+
+/* On a small phone the quick layer toggles are in Settings (Map overlays), so that the toolbar has two rows. */
+@media (max-width: 519px) {
+  .toolbar-quick-layers { display: none; }
+  /* The value only: "View =" has no room next to the slider. */
+  .zoom-view-words { display: none; }
 }
 
 #scale-constellations { font-size: 12px; }
@@ -330,4 +334,4 @@
 .constellation-actions button:hover { background: rgba(238, 230, 206, 0.14); }
 #constellation-search:focus-visible,
 .constellation-actions button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
-#constellation-count { font-size: 11px; color: var(--map-muted); }
+#constellation-count { font-size: var(--text-xs); color: var(--map-muted); }

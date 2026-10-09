@@ -153,4 +153,9 @@ defmodule StarsmapApiWeb.Router do
     get "/session", CommunityController, :me
     get "/media/:id/:size", CommunityController, :media
   end
+
+  # This scope is the last one: an API address that no route above has is not found.
+  scope "/api", StarsmapApiWeb do
+    match :*, "/*path", ApiFallbackController, :not_found
+  end
 end

@@ -2,6 +2,7 @@ import type { Camera } from "../atlas/contracts";
 import type { DisplayLayer } from "../viewState";
 import { clamp, expandedRect, pointInRect, pointRect, rectsOverlap, type Rect, type ScreenPoint } from "../geometry";
 import { lightYearsToAu, MILKY_WAY_MODEL, type GalacticModelFeature, type GalacticModelPoint } from "../galacticModel";
+import { canvasFont } from "../format/fonts";
 
 type HazeCache = {
   screenBlend: HTMLCanvasElement;
@@ -270,7 +271,7 @@ export class MilkyWayRenderer {
   private drawLabel(text: string, x: number, y: number, color: string, occupiedLabels: Rect[]) {
     const ctx = this.options.context;
     ctx.save();
-    ctx.font = "11px Inter, system-ui, sans-serif";
+    ctx.font = canvasFont(12);
     const width = ctx.measureText(text).width + 12;
     const rect = { left: x - 6, top: y - 15, right: x - 6 + width, bottom: y + 7, width, height: 22 };
     if (!pointInRect({ x, y }, this.options.usableViewport()) || occupiedLabels.some((item) => rectsOverlap(item, rect))) {

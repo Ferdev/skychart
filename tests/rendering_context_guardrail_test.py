@@ -8,7 +8,7 @@ PLANNER = (ROOT / "src" / "catalog" / "catalogPointPlanner.ts").read_text()
 STREAM = (ROOT / "src" / "catalog" / "catalogPointStream.ts").read_text()
 STATS = (ROOT / "src" / "atlas" / "atlasStatsView.ts").read_text()
 MILKY_WAY = (ROOT / "src" / "rendering" / "milkyWayRenderer.ts").read_text()
-INSPECTION = (ROOT / "src" / "object" / "objectInspectionView.ts").read_text()
+DISCLOSURE = (ROOT / "src" / "atlas" / "scienceLayerDisclosure.ts").read_text()
 INDEX = (ROOT / "index.html").read_text()
 GALACTIC = (ROOT / "src" / "galacticModel.ts").read_text()
 RENDERER = (ROOT / "src" / "webglPointRenderer.ts").read_text()
@@ -50,7 +50,7 @@ def test_models_document_projection_caveats_and_retained_depth():
     assert "frame: \"galactocentric-j2000-ecliptic\"" in GALACTIC
     assert "retained-depth" in GALACTIC
     assert not (ROOT / "src" / "universeModel.ts").exists()
-    assert "desi_dr1" in INSPECTION
+    assert "desi_dr1" in DISCLOSURE
     assert "Real DESI DR1 galaxy and quasar point tiles" in INDEX
 
 

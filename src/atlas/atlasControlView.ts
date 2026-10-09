@@ -1,9 +1,9 @@
 import { hasBodyPosition } from "../catalog/spacecraftCatalog";
-import { escapeHtml, formatCount, shortBodyName } from "../atlasFormatting";
+import { escapeHtml, formatCount, formatInteger, shortBodyName } from "../atlasFormatting";
 import type { ActiveAtlasTab, Body, BodyFilterDefinition, CatalogSummary, SizeMode, ZoomPreset } from "./contracts";
 import { BODY_FILTERS, EXPLORE_DOMAINS, FEATURED_KEYS, GUIDED_SETS, MAP_OBJECT_TYPE_FILTER_KEYS } from "./atlasDefinitions";
 import { classifyBody } from "../destinationPicker";
-import { locale, t } from "../i18n";
+import { t } from "../i18n";
 import type { BodyFilter, DisplayLayer } from "../viewState";
 import { atlasDom } from "./atlasDom";
 
@@ -28,20 +28,33 @@ export class AtlasControlView {
     atlasDom.selectedObjectPanel.dataset.selectedKey = body.key;
     atlasDom.selectedObjectPanel.hidden = false;
     atlasDom.selectedSummaryName.textContent = body.name;
-    atlasDom.selectedSummaryMeta.textContent = `${classifyBody(body).label} · ${formatDistance(body.distance_from_earth_km)} ${t("object.fromEarth")}`;
+    // The subtitle is one line. Its full text is in the title, for a narrow panel.
+    const meta = Number.isFinite(body.distance_from_earth_km)
+      ? `${classifyBody(body).label} · ${formatDistance(body.distance_from_earth_km)} ${t("object.fromEarth")}`
+      : classifyBody(body).label;
+    atlasDom.selectedSummaryMeta.textContent = meta;
+    atlasDom.selectedSummaryMeta.title = meta;
     atlasDom.selectedSummaryOrb.style.setProperty("--body-color", body.color || "#d8a23f");
     atlasDom.centerSelected.disabled = !hasBodyPosition(body);
     atlasDom.zoomSelected.disabled = !hasBodyPosition(body);
     atlasDom.viewSkySelected.disabled = !canViewSky(body);
     if (atlasDom.viewSkySelected.disabled) atlasDom.viewSkySelected.title = t("sky.positionUnavailable");
     else atlasDom.viewSkySelected.removeAttribute("title");
+    this.updateComparisonToggle();
   }
 
-  private setComparisonMode(open: boolean) {
+  /** Shows the comparison tool in place of the object details, or the details again. */
+  setComparisonMode(open: boolean) {
     atlasDom.bodyInfo.hidden = open;
     atlasDom.selectionCompare.hidden = !open;
     atlasDom.selectedObjectPanel.classList.toggle("is-comparing", open);
     atlasDom.compareSelected.setAttribute("aria-expanded", String(open));
+    this.updateComparisonToggle();
+  }
+
+  /** The footer button tells the user where it goes: to the comparison, or back to the details. */
+  updateComparisonToggle() {
+    atlasDom.compareSelectedLabel.textContent = t(atlasDom.selectionCompare.hidden ? "compare.eyebrow" : "compare.backToDetails");
   }
 
   updateQuickFocus(bodyByKey: ReadonlyMap<string, Body>) {
@@ -52,7 +65,6 @@ export class AtlasControlView {
   updateTabs(activeTab: ActiveAtlasTab, hasSelectedBody: boolean) {
     const tab = !hasSelectedBody && activeTab === "object" ? null : activeTab;
     const objectWorkspace = tab === "object" && hasSelectedBody;
-    atlasDom.modeRail.hidden = hasSelectedBody;
     atlasDom.workspacePanel.hidden = tab === null;
     atlasDom.mapHud.classList.toggle("workspace-open", tab !== null);
     if (tab) atlasDom.mapHud.dataset.workspaceTab = tab; else delete atlasDom.mapHud.dataset.workspaceTab;
@@ -65,27 +77,34 @@ export class AtlasControlView {
     if (objectWorkspace) atlasDom.closePanel.setAttribute("title", t("workspace.deselectCurrent")); else atlasDom.closePanel.removeAttribute("title");
     for (const button of atlasDom.tabButtons) {
       button.classList.toggle("active", button.dataset.tab === tab);
-      button.setAttribute("aria-pressed", String(button.dataset.tab === tab));
+      // The header search field opens a panel, so it has an expanded state. A tab button has a pressed state.
+      button.setAttribute(button instanceof HTMLInputElement ? "aria-expanded" : "aria-pressed", String(button.dataset.tab === tab));
     }
     for (const panel of atlasDom.tabPanels) panel.hidden = tab === null || panel.dataset.tabPanel !== tab;
     return tab;
   }
 
+  /** The Search panel shows its discovery blocks while the user browses, and the result list in other cases. */
+  showSearchDiscovery(browsing: boolean) {
+    atlasDom.searchDiscovery.hidden = !browsing;
+    atlasDom.searchResults.hidden = browsing;
+  }
+
   updateFilters(active: BodyFilter, mapCount: (filter: BodyFilterDefinition) => number) {
-    atlasDom.bodyFilterButtons.innerHTML = filterButtons(active);
+    atlasDom.bodyFilterButtons.innerHTML = searchFilterChips(active);
     atlasDom.mapFilterButtons.innerHTML = MAP_OBJECT_TYPE_FILTER_KEYS.map((key) => BODY_FILTERS.find((filter) => filter.key === key))
       .filter((filter): filter is BodyFilterDefinition => Boolean(filter))
       .map((filter) => {
         const count = filter.key === "all" ? null : mapCount(filter);
         const label = filter.key === "all" ? t("filters.allTypes") : t(filter.labelKey);
-        const countLabel = count === null ? "" : Intl.NumberFormat(locale(), { maximumFractionDigits: 0 }).format(count);
+        const countLabel = count === null ? "" : formatInteger(count);
         const accessible = count === null ? label : `${label}, ${t("filters.availableObjects", { count: countLabel })}`;
         return `<button type="button" data-body-filter="${filter.key}"${count === null ? "" : ` data-available-count="${count}"`} class="${filter.key === active ? "active" : ""}" aria-pressed="${filter.key === active}" aria-label="${escapeHtml(accessible)}"><span class="map-filter-label">${escapeHtml(label)}</span>${count === null ? "" : `<span class="map-filter-count" aria-hidden="true">${escapeHtml(countLabel)}</span>`}</button>`;
       }).join("");
   }
 
   updateCompareFilters(active: BodyFilter) {
-    atlasDom.compareFilterButtons.innerHTML = filterButtons(active);
+    atlasDom.compareFilterButtons.innerHTML = searchFilterChips(active);
   }
 
   updateExploreDomains(bodies: Body[], summary: CatalogSummary | null, activeGuidedSetId: string | null, activeFilter: BodyFilter) {
@@ -99,12 +118,15 @@ export class AtlasControlView {
   updateGuidedSets(bodyByKey: ReadonlyMap<string, Body>, activeId: string | null) {
     atlasDom.guidedTours.innerHTML = GUIDED_SETS.map((tour) => {
       const available = tour.keys.map((key) => bodyByKey.get(key)).filter(Boolean);
-      return available.length === 0 ? "" : `<button type="button" data-tour-id="${escapeHtml(tour.id)}" class="${tour.id === activeId ? "active" : ""}"><strong>${escapeHtml(t(tour.labelKey))}</strong><span>${escapeHtml(t("search.objectsCount", { count: available.length }))}</span></button>`;
+      return available.length === 0 ? "" : `<button type="button" data-tour-id="${escapeHtml(tour.id)}" class="${tour.id === activeId ? "active" : ""}" aria-pressed="${tour.id === activeId}"><strong>${escapeHtml(t(tour.labelKey))}</strong><span>${escapeHtml(t("search.objectsCount", { count: available.length }))}</span></button>`;
     }).join("");
   }
 
   updateSizeModes(sizeMode: SizeMode) {
-    for (const button of atlasDom.sizeModeButtons.querySelectorAll<HTMLButtonElement>("[data-size-mode]")) button.classList.toggle("active", button.dataset.sizeMode === sizeMode);
+    for (const button of atlasDom.sizeModeButtons.querySelectorAll<HTMLButtonElement>("[data-size-mode]")) {
+      button.classList.toggle("active", button.dataset.sizeMode === sizeMode);
+      button.setAttribute("aria-pressed", String(button.dataset.sizeMode === sizeMode));
+    }
   }
 
   updateDisplayToggles(displayLayers: Record<DisplayLayer, boolean>, perfEnabled: boolean) {
@@ -120,7 +142,7 @@ export class AtlasControlView {
     atlasDom.zoomScaleSlider.setAttribute("aria-valuetext", t("scale.perPixel", { value: pixelScale }));
     atlasDom.zoomScaleLabel.textContent = `${options.zoomLevel} / ${options.sliderSteps}`;
     atlasDom.zoomPixelScale.textContent = t("scale.pixelEquals", { value: pixelScale });
-    atlasDom.zoomViewScale.textContent = t("scale.viewEquals", { value: viewScale });
+    setZoomViewText(atlasDom.zoomViewScale, t("scale.viewEquals", { value: "\u0001" }), viewScale);
     const parts = [options.viewWidthLy < 250_000 ? t("contextMode.gaia") : t("contextMode.gaiaQuiet"), options.displayLayers.milkyWay ? t("contextMode.milkyWay") : t("contextMode.milkyWayOff"), options.viewWidthLy >= 1_000_000 ? t("contextMode.extragalactic") : t("contextMode.extragalacticQuiet")];
     atlasDom.contextModeStatus.textContent = parts.join(" · ");
   }
@@ -133,6 +155,35 @@ export class AtlasControlView {
   }
 }
 
-function filterButtons(active: BodyFilter) {
-  return BODY_FILTERS.map((filter) => `<button type="button" data-body-filter="${filter.key}" class="${filter.key === active ? "active" : ""}" aria-pressed="${filter.key === active}">${escapeHtml(t(filter.labelKey))}</button>`).join("");
+/** The type filters that the Search panel shows as chips. The others are in the `More types` menu. */
+const MAIN_SEARCH_FILTER_KEYS: readonly BodyFilter[] = ["all", "planet", "moon", "star", "exoplanet_system", "galaxy", "nebula", "star_cluster", "small_body"];
+
+/**
+ * One row of chips for the main types, and a menu for the other types.
+ * A filter from the menu (or from an Explore card) shows as an active chip in the row.
+ */
+function searchFilterChips(active: BodyFilter) {
+  const chip = (filter: BodyFilterDefinition) => `<button type="button" data-body-filter="${filter.key}" class="${filter.key === active ? "active" : ""}" aria-pressed="${filter.key === active}">${escapeHtml(t(filter.labelKey))}</button>`;
+  const main = BODY_FILTERS.filter((filter) => MAIN_SEARCH_FILTER_KEYS.includes(filter.key) || filter.key === active);
+  const more = BODY_FILTERS.filter((filter) => !MAIN_SEARCH_FILTER_KEYS.includes(filter.key));
+  const options = more.map((filter) => `<option value="${filter.key}"${filter.key === active ? " selected" : ""}>${escapeHtml(t(filter.labelKey))}</option>`).join("");
+  return `${main.map(chip).join("")}<select class="body-picker-filters__more" data-body-filter-menu aria-label="${escapeHtml(t("search.moreTypes"))}"><option value="">${escapeHtml(t("search.moreTypes"))}</option>${options}</select>`;
+}
+
+/**
+ * Shows "View = 44 AU" as three parts, so that a narrow toolbar can show the value only.
+ * The text of the element stays the full sentence.
+ */
+function setZoomViewText(target: HTMLElement, pattern: string, value: string): void {
+  const text = pattern.replace("\u0001", value);
+  if (target.dataset.text === text) return;
+  target.dataset.text = text;
+  const [before = "", after = ""] = pattern.split("\u0001");
+  const part = (className: string, content: string) => {
+    const span = document.createElement("span");
+    span.className = className;
+    span.textContent = content;
+    return span;
+  };
+  target.replaceChildren(part("zoom-view-words", before), part("zoom-view-value", value), part("zoom-view-words", after));
 }

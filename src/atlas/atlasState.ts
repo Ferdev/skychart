@@ -24,6 +24,18 @@ export function catalogSummaryFromEphemeris(payload: Ephemeris): CatalogSummary 
   };
 }
 
+/** Reads the catalog counts from the semantic index. Returns null when the service is not available. */
+export async function fetchCatalogSummary(): Promise<CatalogSummary | null> {
+  try {
+    const response = await fetch("/api/catalog");
+    if (!response.ok) throw new Error(`Catalog summary failed with ${response.status}`);
+    return (await response.json()) as CatalogSummary;
+  } catch (error) {
+    console.warn("Phoenix catalog summary unavailable.", error);
+    return null;
+  }
+}
+
 export function mergeBodyList(primaryBodies: readonly Body[], fallbackBodies: readonly Body[]): Body[] {
   const merged = new Map(primaryBodies.map((body) => [body.key, body]));
   for (const body of fallbackBodies) {

@@ -36,7 +36,7 @@ test("3D flight stays responsive with a full catalog sample", async ({ page, con
 
   await openAtlas(page, "/?perf=1");
   await page.locator("#universe-3d-toggle").click();
-  await expect(page.locator("#universe-status")).toHaveText(`${POINT_COUNT} sampled catalog positions loaded`, { timeout: 45_000 });
+  await expect(page.locator("#universe-status")).toHaveText(`${POINT_COUNT.toLocaleString("en-US")} sampled catalog positions loaded`, { timeout: 45_000 });
   const sharedUrl = new URL(page.url());
   const payloadBytes = new TextEncoder().encode(JSON.stringify({ returned: POINT_COUNT, nearby_returned: 0, points })).length;
   for (const scene of [
@@ -54,7 +54,7 @@ test("3D flight stays responsive with a full catalog sample", async ({ page, con
     await expect(page.locator("#load-state")).toHaveText("ready", { timeout: 45_000 });
     // Cold texture uploads and software-WebGL setup are outside the flight
     // sample; use the same readiness allowance as the initial atlas load.
-    await expect(page.locator("#universe-status")).toHaveText(`${POINT_COUNT} sampled catalog positions loaded`, { timeout: 45_000 });
+    await expect(page.locator("#universe-status")).toHaveText(`${POINT_COUNT.toLocaleString("en-US")} sampled catalog positions loaded`, { timeout: 45_000 });
     await page.waitForTimeout(250);
     await page.evaluate(() => { (window as Window & { __universePerf?: unknown[] }).__universePerf = []; });
     const initialPosition = await page.locator("#universe-position").textContent();

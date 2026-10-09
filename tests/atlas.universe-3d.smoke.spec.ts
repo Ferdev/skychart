@@ -71,23 +71,54 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
 
   // Begin between the Sun and Fixture A; the Sun now correctly occludes stars
   // behind its disk, so the old collinear Sun-origin fixture is not selectable.
-  await openAtlas(page, "/?v=1&c=-5,0&z=24&t=2026-08-26T12:00:00.000Z&L=");
+  await openAtlas(page, "/?v=1&c=-5,0&z=24&t=2026-08-26T12:00:00.000Z&L=&perf=1");
   await expect(page.locator("#universe-3d-toggle")).toHaveAccessibleName("Explore the universe in 3D");
   await page.locator("#universe-3d-toggle").click();
   await expect(page.locator("#universe-view")).toBeVisible();
   await expect(page.locator("#universe-map")).toBeFocused();
   await expect(page.locator("#universe-status")).toHaveText("2 sampled catalog positions loaded");
   await expect(page.locator("#universe-minimap")).toHaveAttribute("data-route", "none");
+  // With no selected object the view starts with the Sun in its centre, and the autopilot says that it has no target.
+  await expect(page.locator("#universe-autopilot")).toHaveText("Cruise forward");
+  await expect.poll(async () => (await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.universeLabels())).map((label) => label.name)).toContain("Sun");
   await page.locator("#universe-map").click({ position: { x: 720, y: 500 } });
   await expect(page.locator("#universe-target")).toBeVisible();
+  await expect(page.locator("#universe-target-name")).toHaveText("Sun");
+  // A destination from the search is the new target, and the view turns to it.
+  await page.locator("#universe-find").click();
+  await page.locator("#universe-search-input").fill("Fixture A");
+  await expect(page.locator("#universe-search-results [role=option]")).toContainText("Fixture A");
+  await page.locator("#universe-search-input").press("Enter");
   await expect(page.locator("#universe-target-name")).toHaveText("Fixture A");
+  await expect(page.locator("#universe-autopilot")).toHaveText("Start autopilot");
   // The trip map shows the route to a newly selected object at once.
   await expect(page.locator("#universe-minimap")).toHaveAttribute("data-route", "direct");
+  // A selection shows the target card only: no panel covers the object. `Details` opens the inspector.
+  await expect(page.locator("#selected-object-panel")).toBeHidden();
+  await expect(page.locator("#universe-selection-summary")).toHaveCount(0);
+  await expect(page.locator("#universe-target-magnitude")).toContainText("Brightness from here: magnitude");
+  await expect(page.locator("#universe-target-magnitude")).toContainText(/\((brighter than the full Moon|visible with the eye|visible with binoculars|needs a telescope)\)$/);
+  const flightBefore = await page.locator(".universe-view__flight").boundingBox();
+  await page.locator("#universe-details").click();
   await expect(page.locator("#selected-object-panel")).toBeVisible();
   await expect(page.locator("#body-info [data-object-view=\"science\"]")).toHaveCount(1);
   await expect(page.locator("#universe-selection-connector")).toBeVisible();
   await expect(page.locator("#universe-selection-connector")).toHaveAttribute("data-source-key", "fixture-a");
-  await expect(page.locator("#universe-target-magnitude")).toContainText("Estimated from here");
+  await expect(page.locator("#universe-target")).toBeVisible();
+  expect(await page.locator(".universe-view__flight").boundingBox(), "the flight panel does not move when the inspector opens").toEqual(flightBefore);
+  // The labels show names only, and no label is on a control.
+  const labels = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.universeLabels());
+  for (const label of labels) expect(label.name).not.toMatch(/ · -?\d/);
+  const controlBoxes = await page.locator(".universe-view__header, #universe-minimap-panel, .universe-view__flight, #universe-target").evaluateAll((controls) =>
+    controls.map((control) => control.getBoundingClientRect()).filter((box) => box.width > 0).map((box) => ({ left: box.left, top: box.top, right: box.right, bottom: box.bottom })));
+  for (const label of labels) {
+    for (const box of controlBoxes) {
+      expect(label.rect.left < box.right && box.left < label.rect.right && label.rect.top < box.bottom && box.top < label.rect.bottom, `${label.name} is on a control`).toBe(false);
+    }
+  }
+  await page.locator("#close-panel").click();
+  await expect(page.locator("#selected-object-panel")).toBeHidden();
+  await expect(page.locator("#universe-target-name")).toHaveText("Fixture A");
   await page.screenshot({ path: testInfo.outputPath("universe-3d.png") });
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileControlsInsideViewport = await page.locator("#universe-view button").evaluateAll((buttons) => buttons.every((button) => {
@@ -104,7 +135,8 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await page.screenshot({ path: testInfo.outputPath("universe-3d-mobile.png") });
   await expect.poll(() => new URL(page.url()).searchParams.has("u3")).toBe(true);
   await expect.poll(() => new URL(page.url()).searchParams.has("u3c")).toBe(true);
-  expect(observerRequests).toHaveLength(1);
+  // The full catalog sample loads one time. A new target or `Details` can ask for the nearby objects again.
+  expect(observerRequests.filter((request) => !request.localOnly)).toHaveLength(1);
 
   const initialPosition = await page.locator("#universe-position").textContent();
   await page.locator("#universe-map").press("w");
@@ -125,6 +157,9 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await expect(page.locator("#universe-speed-gauge")).toHaveAttribute("role", "meter");
   await expect(page.locator("#universe-speed")).toHaveText("0 km/s · 0 c", { timeout: 30_000 });
   await expect(page.locator("#universe-speed-gauge")).toHaveAttribute("aria-valuenow", "0.000");
+  // The flight above can end at the target, where the autopilot has nothing to do. Start again from the entry position.
+  await page.locator("#universe-reset").click();
+  await expect(page.locator("#universe-autopilot")).toBeEnabled();
   const beforeAutopilot = await page.locator("#universe-position").textContent();
   await page.locator("#universe-autopilot").click();
   await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
@@ -147,8 +182,6 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await expect.poll(() => new URL(page.url()).searchParams.has("u3")).toBe(false);
   await page.locator("#universe-3d-toggle").click();
   await expect(page.locator("#universe-view")).toBeVisible();
-  await expect(page.locator("#selected-object-panel")).toBeVisible();
-  await expect(page.locator("#universe-selection-connector")).toBeVisible();
   await page.locator("#universe-close").click();
 
   await page.goto(replayUrl, { waitUntil: "domcontentloaded" });
@@ -156,29 +189,114 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await expect(page.locator("#universe-view")).toBeVisible();
   await expect(page.locator("#universe-position")).not.toHaveText(initialPosition!);
   await expect(page.locator("#universe-sky")).toBeEnabled();
+
+  // Sky view that opens from 3D goes back to the same 3D position and target.
+  const beforeSky = { position: await page.locator("#universe-position").textContent(), target: await page.locator("#universe-target-name").textContent() };
+  await expect.poll(() => new URL(page.url()).searchParams.has("u3")).toBe(true);
+  const beforeSkyPositionParam = new URL(page.url()).searchParams.get("u3");
   await page.locator("#universe-sky").click();
   await expect(page.locator("#sky-view")).toBeVisible();
+  await expect(page.locator("#universe-view")).toBeHidden();
+  await expect(page.locator("#sky-view-close-label")).toHaveText("Back to 3D");
   await page.locator("#sky-view-close").click();
-  await page.locator("#universe-3d-toggle").click();
+  await expect(page.locator("#sky-view")).toBeHidden();
+  await expect(page.locator("#universe-view")).toBeVisible();
+  await expect(page.locator("#universe-position")).toHaveText(beforeSky.position!);
+  await expect(page.locator("#universe-target-name")).toHaveText(beforeSky.target!);
+  await expect.poll(() => new URL(page.url()).searchParams.get("u3")).toBe(beforeSkyPositionParam);
+  // The same return with the keyboard only.
+  await page.locator("#universe-sky").click();
+  await expect(page.locator("#sky-view")).toBeVisible();
+  await page.locator("#sky-map").press("Escape");
+  await expect(page.locator("#universe-view")).toBeVisible();
+  await expect(page.locator("#universe-position")).toHaveText(beforeSky.position!);
+
+  // The destination search works with the keyboard, and a destination does not move the observer.
   const beforeSearchPosition = await page.locator("#universe-position").textContent();
   await page.locator("#universe-find").click();
   await expect(page.locator("#universe-search-dialog")).toBeVisible();
+  await expect(page.locator("#universe-search-input")).toBeFocused();
+  await expect(page.locator("#universe-search-input")).toHaveAttribute("role", "combobox");
+  // With an empty field the dialog shows suggestions and recent destinations, with the type name of each object.
+  const suggestion = page.locator("#universe-search-results").getByRole("option", { name: /^Earth/ });
+  await expect(suggestion).toBeVisible();
+  await expect(suggestion).toContainText("Planet");
+  await expect(page.locator("#universe-search-results")).toContainText("Suggestions");
   await page.locator("#universe-search-input").fill("Shell");
-  await expect(page.locator("#universe-search-results button")).toBeDisabled();
+  await expect(page.locator("#universe-search-results")).toHaveAttribute("role", "listbox");
+  await expect(page.locator("#universe-search-results [role=option]")).toHaveAttribute("aria-disabled", "true");
+  await page.locator("#universe-search-input").press("Enter");
+  await expect(page.locator("#universe-search-dialog")).toBeVisible();
   await page.locator("#universe-search-input").fill("Fixture B");
-  await page.locator("#universe-search-results button").click();
+  await expect(page.locator("#universe-search-results [role=option]")).toContainText("Fixture B");
+  await expect(page.locator("#universe-search-results [role=option]")).toContainText("Galaxy");
+  // Enter with no active option selects the first result.
+  await page.locator("#universe-search-input").press("Enter");
+  await expect(page.locator("#universe-search-dialog")).toBeHidden();
   await expect(page.locator("#universe-target-name")).toHaveText("Fixture B");
+  await expect(page.locator("#universe-map")).toBeFocused();
+  await expect.poll(() => new URL(page.url()).searchParams.get("u3t")).toBe("fixture-b");
+  await page.waitForTimeout(400);
+  await expect(page.locator("#universe-position"), "a selected destination does not move the observer").toHaveText(beforeSearchPosition!);
+  // `Jump there` moves the observer to the destination.
+  await expect(page.locator("#universe-fly")).toHaveText("Fly there");
+  await expect(page.locator("#universe-focus")).toHaveText("Jump there");
+  await page.locator("#universe-focus").click();
+  await expect(page.locator("#universe-position")).not.toHaveText(beforeSearchPosition!);
+  const positionAtFixtureB = await page.locator("#universe-position").textContent();
+
   await page.locator("#universe-find").click();
   await expect(page.locator("#universe-search-dialog")).toBeVisible();
   await page.locator("#universe-search-input").fill("Fixture A");
-  await page.locator("#universe-search-results").getByRole("button", { name: /^Fixture A/ }).click();
+  const option = page.locator("#universe-search-results").getByRole("option", { name: /^Fixture A/ });
+  await expect(option).toBeVisible();
+  await page.locator("#universe-search-input").press("ArrowDown");
+  await expect(option).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#universe-search-input")).toHaveAttribute("aria-activedescendant", await option.getAttribute("id") ?? "");
+  await page.locator("#universe-search-input").press("Enter");
   await expect(page.locator("#universe-search-dialog")).toBeHidden();
   await expect(page.locator("#universe-target-name")).toHaveText("Fixture A");
-  await expect(page.locator("#universe-position")).not.toHaveText(beforeSearchPosition!);
   await expect.poll(() => new URL(page.url()).searchParams.get("u3t")).toBe("fixture-a");
-  await expect(page.locator("#selected-object-panel")).toHaveAttribute("data-selected-key", "fixture-a");
+  await page.waitForTimeout(400);
+  await expect(page.locator("#universe-position")).toHaveText(positionAtFixtureB!);
+
+  // One Escape press does not exit 3D during a flight. The exit needs a second press.
+  // The first press closes the inspector and keeps 3D and its target.
+  await page.locator("#universe-details").click();
+  await expect(page.locator("#workspace-panel")).toBeVisible();
+  await page.locator("#universe-map").press("Escape");
+  await expect(page.locator("#workspace-panel")).toBeHidden();
+  await expect(page.locator("#universe-view")).toBeVisible();
+  await expect(page.locator("#universe-target-name")).toHaveText("Fixture A");
+  await page.locator("#universe-fly").click();
+  await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
+  await page.locator("#universe-map").press("Escape");
+  await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#universe-view")).toBeVisible();
+  await page.locator("#universe-map").press("Escape");
+  await expect(page.locator("#universe-status")).toHaveText("Press Esc again to exit 3D");
+  await expect(page.locator("#universe-view")).toBeVisible();
+  await page.locator("#universe-map").press("Escape");
+  await expect(page.locator("#universe-view")).toBeHidden();
+  await page.locator("#universe-3d-toggle").click();
+  await expect(page.locator("#universe-view")).toBeVisible();
+  // After 2 s the first press does not count any more.
+  await page.locator("#universe-map").press("Escape");
+  await expect(page.locator("#universe-status")).toHaveText("Press Esc again to exit 3D");
+  await page.waitForTimeout(2_300);
+  await page.locator("#universe-map").press("Escape");
+  await expect(page.locator("#universe-view")).toBeVisible();
+  await page.locator("#universe-find").click();
+  await page.locator("#universe-search-input").fill("Fixture A");
+  await expect(page.locator("#universe-search-results [role=option]")).toContainText("Fixture A");
+  await page.locator("#universe-search-input").press("Enter");
+  await expect(page.locator("#universe-search-dialog")).toBeHidden();
+  await expect(page.locator("#universe-target-name")).toHaveText("Fixture A");
+  await expect.poll(() => new URL(page.url()).searchParams.get("u3t")).toBe("fixture-a");
+  // `Inspect in 2D` leaves 3D with the target as the selected object of the map.
   await page.locator("#universe-inspect").click();
   await expect(page.locator("#universe-view")).toBeHidden();
+  await expect(page.locator("#selected-object-panel")).toHaveAttribute("data-selected-key", "fixture-a");
   await expect.poll(() => new URL(page.url()).searchParams.get("c")).toBe("-10,0");
   await page.locator("#universe-3d-toggle").click();
   await expect(page.locator("#universe-view")).toBeVisible();

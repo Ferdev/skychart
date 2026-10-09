@@ -32,17 +32,32 @@ export type ObjectMediaStatus = {
   description: string;
 };
 
+/** A survey image with more than this share of pixels at the maximum of a channel shows no object. */
+const SATURATED_PIXEL_SHARE_LIMIT = 0.6;
+
+/**
+ * True when the pixels of a survey image show something that the user can read.
+ * An image of one colour has no data. An image that is mostly at the maximum of a colour channel
+ * (a bright star that fills the frame) shows a solid colour and is refused too.
+ */
 export function pixelBufferHasVisibleVariation(pixels: Uint8ClampedArray, tolerance = 2) {
   if (pixels.length < 8) return false;
   const [red, green, blue] = pixels;
-  for (let index = 4; index + 2 < pixels.length; index += 4) {
+  let varies = false;
+  let saturated = 0;
+  let count = 0;
+  for (let index = 0; index + 2 < pixels.length; index += 4) {
+    count += 1;
+    if (pixels[index] === 255 || pixels[index + 1] === 255 || pixels[index + 2] === 255) saturated += 1;
     if (
-      Math.abs(pixels[index] - red) > tolerance
-      || Math.abs(pixels[index + 1] - green) > tolerance
-      || Math.abs(pixels[index + 2] - blue) > tolerance
-    ) return true;
+      !varies && (
+        Math.abs(pixels[index] - red) > tolerance
+        || Math.abs(pixels[index + 1] - green) > tolerance
+        || Math.abs(pixels[index + 2] - blue) > tolerance
+      )
+    ) varies = true;
   }
-  return false;
+  return varies && saturated / count <= SATURATED_PIXEL_SHARE_LIMIT;
 }
 
 type MediaLookupBody = {

@@ -1,3 +1,4 @@
+import { formatFixed } from "../format/quantity";
 import type { LoadingStep } from "./contracts";
 
 interface AtlasLoadingViewOptions {
@@ -23,7 +24,7 @@ export class AtlasLoadingView {
     this.options.fill.style.width = `${progress}%`;
     this.options.progressLabel.textContent = `${progress}%`;
     this.options.stepLabel.textContent = step;
-    this.options.elapsed.textContent = `${((performance.now() - this.startedAt) / 1000).toFixed(1)}s`;
+    this.options.elapsed.textContent = `${formatFixed((performance.now() - this.startedAt) / 1000, 1)} s`;
     for (const item of document.querySelectorAll<HTMLElement>("[data-loading-step]")) {
       item.classList.toggle("active", item.dataset.loadingStep === step);
     }

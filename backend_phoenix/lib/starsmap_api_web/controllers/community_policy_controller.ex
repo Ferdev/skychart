@@ -18,15 +18,19 @@ defmodule StarsmapApiWeb.CommunityPolicyController do
   def show(conn, %{"page" => page}) do
     case @pages[page] do
       nil ->
-        send_resp(conn, 404, "Page not found")
+        conn |> put_status(:not_found) |> html(StarsmapApiWeb.StaticPage.not_found())
 
       {title, text} ->
+        # A policy page is a standalone static page, with no map below the text.
         html(
           conn,
-          StarsmapApiWeb.ServerShell.render!(
+          StarsmapApiWeb.StaticPage.document(
             title: title <> " — Cosmic Atlas",
+            description: text,
+            canonical: StarsmapApiWeb.Endpoint.url() <> "/community/" <> page,
             body:
-              "<article class=\"object-page\"><a href=\"/\">Cosmic Atlas</a><h1>#{title}</h1><p>#{text}</p></article>"
+              "<nav aria-label=\"Site\">#{StarsmapApiWeb.StaticPage.back_link()}</nav>" <>
+                "<article><p class=\"eyebrow\">Community photos</p><h1>#{title}</h1><p class=\"lede\">#{text}</p></article>"
           )
         )
     end

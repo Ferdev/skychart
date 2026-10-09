@@ -4,7 +4,6 @@ import type { Body } from "../atlas/contracts";
 import { classifyBody } from "../destinationPicker";
 import { t } from "../i18n";
 import { educationalComparisons } from "../navigationMetrics";
-import { uncertaintySummary } from "../scienceSemantics";
 
 type SizeVisual = {
   diameterPx: number;
@@ -15,10 +14,11 @@ type SizeVisual = {
 type ObjectComparisonViewOptions = {
   heading: HTMLElement;
   panel: HTMLElement;
+  /** The actions that need an object B (copy link, clear). They are hidden until object B exists. */
+  actions: HTMLElement;
   auKm: () => number;
   distanceKm: (left: Body, right: Body) => number;
   formatDistance: (kilometers: number) => string;
-  afterRender: () => void;
 };
 
 const MAX_DIAMETER_PX = 112;
@@ -28,17 +28,16 @@ export class ObjectComparisonView {
   constructor(private readonly options: ObjectComparisonViewOptions) {}
 
   update(selected: Body | null, target: Body | null) {
+    this.options.actions.hidden = !selected || !target;
     if (!selected) {
       this.options.heading.textContent = t("compare.heading");
       this.options.panel.innerHTML = "";
-      this.options.afterRender();
       return;
     }
 
     this.options.heading.textContent = t("compare.compareObject", { name: selected.name });
     if (!hasBodyPosition(selected) || (target && !hasBodyPosition(target))) {
       this.options.panel.textContent = t("sky.positionUnavailable");
-      this.options.afterRender();
       return;
     }
     if (!target) {
@@ -56,26 +55,28 @@ export class ObjectComparisonView {
           </div>
         </section>
       `;
-      this.options.afterRender();
       return;
     }
 
     const distanceKm = this.options.distanceKm(selected, target);
     const comparisons = educationalComparisons(distanceKm, { auKm: this.options.auKm(), includeMissionComparisons: false }).slice(0, 4);
     const sizeComparison = this.sizeModel(selected, target);
+    // The distance shows one time. The value in AU is an extra only when the main unit is not AU.
+    const distanceLabel = this.options.formatDistance(distanceKm);
+    const auLabel = `${formatNumber(distanceKm / this.options.auKm())} AU`;
     this.options.panel.innerHTML = `
       <section class="compare-card">
         <div class="compare-distance compare-distance--hero">
           <span>${escapeHtml(t("compare.currentDistance"))}</span>
-          <strong>${escapeHtml(this.options.formatDistance(distanceKm))}</strong>
-          <small>${escapeHtml(formatNumber(distanceKm / this.options.auKm()))} AU</small>
+          <strong>${escapeHtml(distanceLabel)}</strong>
+          ${auLabel === distanceLabel ? "" : `<small>${escapeHtml(auLabel)}</small>`}
         </div>
         <div class="compare-pair">
           ${this.renderObject(selected, "A")}
           ${this.renderObject(target, "B")}
         </div>
         <dl class="comparison-list">
-          ${comparisons.map((comparison) => `<dt>${escapeHtml(comparison.label)}</dt><dd>${escapeHtml(comparison.displayValue)}</dd>`).join("")}
+          ${comparisons.map((comparison) => `<dt>${escapeHtml(t(comparison.labelKey))}</dt><dd>${escapeHtml(comparison.displayValue)}</dd>`).join("")}
         </dl>
         <a href="/methodology" data-analytics-event="methodology">${escapeHtml(t("launch.distanceMethodology"))}</a>
       </section>
@@ -84,7 +85,7 @@ export class ObjectComparisonView {
           <div>
             <p class="eyebrow">${escapeHtml(t("compare.trueDiameterRatio"))}</p>
             <h3>${escapeHtml(sizeComparison.ratioLabel)}</h3>
-            <small>${escapeHtml(sizeComparison.scaleLabel)}</small>
+            ${sizeComparison.scaleLabel ? `<small>${escapeHtml(sizeComparison.scaleLabel)}</small>` : ""}
           </div>
         </div>
         <div class="size-stage">
@@ -93,19 +94,19 @@ export class ObjectComparisonView {
         </div>
       </section>
     `;
-    this.options.afterRender();
   }
 
   private renderObject(body: Body, label: string) {
     const classification = classifyBody(body);
-    const radiusLabel = body.radius_km > 0 ? `${this.options.formatDistance(body.radius_km)} ${t("picker.radius")}` : t("compare.radiusUnknown");
+    // A card shows only what the catalog has. The inspector tells the user when a value or its uncertainty is unknown.
+    const details = [classification.label, body.radius_km > 0 ? `${this.options.formatDistance(body.radius_km)} ${t("picker.radius")}` : null]
+      .filter((detail): detail is string => Boolean(detail));
     return `
       <article class="compare-object" style="--body-color: ${escapeHtml(body.color)}">
         <span>${label}</span>
         <div>
           <strong>${escapeHtml(body.name)}</strong>
-          <small>${escapeHtml(classification.label)} · ${escapeHtml(radiusLabel)}</small>
-          <small>${escapeHtml(uncertaintySummary({ position_model: body.catalog?.position_model, facts: body.catalog?.facts }))}</small>
+          <small>${escapeHtml(details.join(" · "))}</small>
         </div>
       </article>
     `;
@@ -120,7 +121,7 @@ export class ObjectComparisonView {
         <div class="size-disk-slot">${diskMarkup}</div>
         <figcaption>
           <strong>${escapeHtml(body.name)}</strong>
-          <span>${escapeHtml(this.options.formatDistance(body.radius_km * 2))} ${escapeHtml(t("field.diameter"))}</span>
+          ${body.radius_km > 0 ? `<span>${escapeHtml(this.options.formatDistance(body.radius_km * 2))} ${escapeHtml(t("field.diameter"))}</span>` : ""}
           ${visual.isSubpixel ? `<span class="size-subpixel-note">${escapeHtml(t("compare.subpixel"))}</span>` : ""}
         </figcaption>
       </figure>
@@ -136,14 +137,17 @@ export class ObjectComparisonView {
       return { diameterPx, isSubpixel: diameterKm > 0 && diameterPx < 1, visualType: classifyBody(body).type };
     };
     const ratio = diameterB / Math.max(diameterA, 1);
-    const ratioLabel = ratio >= 1
-      ? `${right.name} is ${formatRatio(ratio)}x ${left.name}`
-      : `${left.name} is ${formatRatio(1 / Math.max(ratio, 1e-9))}x ${right.name}`;
+    const unknown = diameterA <= 0 ? left : diameterB <= 0 ? right : null;
+    const ratioLabel = unknown
+      ? t("compare.sizeUnknown", { name: unknown.name })
+      : ratio >= 1
+        ? t("compare.sizeRatio", { name: right.name, ratio: formatRatio(ratio), other: left.name })
+        : t("compare.sizeRatio", { name: left.name, ratio: formatRatio(1 / Math.max(ratio, 1e-9)), other: right.name });
     return {
       a: visual(left, diameterA),
       b: visual(right, diameterB),
       ratioLabel,
-      scaleLabel: `Scale: ${this.options.formatDistance(maxDiameter / MAX_DIAMETER_PX)} per screen pixel`,
+      scaleLabel: unknown ? "" : t("compare.sizeScale", { distance: this.options.formatDistance(maxDiameter / MAX_DIAMETER_PX) }),
     };
   }
 }

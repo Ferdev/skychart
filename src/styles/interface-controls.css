@@ -1,13 +1,5 @@
-/* Atlas UI v3: different control families get different physical shapes. */
-.atlas-bar {
-  width: min(620px, calc(100vw - 472px));
-  grid-template-columns: auto minmax(0, 1fr);
-  border-color: rgba(242, 237, 223, 0.1);
-  border-radius: 2px;
-  background: rgba(10, 12, 10, 0.72);
-}
 
-.selection-strip,
+
 .scale-rail,
 .workspace-panel {
   border-color: rgba(242, 237, 223, 0.12);
@@ -15,31 +7,6 @@
   color: var(--map-ink);
   background: rgba(12, 14, 12, 0.86);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.38);
-}
-
-.selection-strip {
-  width: min(560px, calc(100vw - 508px));
-  max-height: min(430px, calc(100vh - 32px));
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  background:
-    linear-gradient(90deg, rgba(239, 196, 104, 0.16), transparent 18%),
-    rgba(12, 14, 12, 0.88);
-}
-
-.selection-strip[hidden] {
-  display: none;
-}
-
-.selected-object-header {
-  flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(242, 237, 223, 0.1);
 }
 
 .object-dismiss {
@@ -81,11 +48,41 @@
   padding: 12px 14px 14px;
 }
 
+/* Comparison header: the title has its own row. The actions are in a second row that can wrap. */
 .selection-compare-head {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.selection-compare-actions {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.selection-compare-actions[hidden] {
+  display: none;
+}
+
+.selection-compare-actions .label-narrow {
+  display: none;
+}
+
+.compare-feedback {
+  color: var(--accent-strong);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 899px) {
+  .selection-compare-actions .label-wide {
+    display: none;
+  }
+
+  .selection-compare-actions .label-narrow {
+    display: inline;
+  }
 }
 
 .selection-compare h2 {
@@ -100,30 +97,12 @@
   margin: 0;
 }
 
-.selection-compare .compare-target-card {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.selection-compare .compare-picker {
-  max-height: 132px;
-}
-
 .object-command,
 .scale-command,
 .scale-rail.scale-command {
   background: transparent;
 }
 
-.selected-summary h2 {
-  color: var(--map-ink);
-  font-weight: 820;
-}
-
-.selected-summary span:last-child,
-.command-heading > span,
 .field-label {
   color: rgba(243, 238, 223, 0.64);
 }
@@ -148,102 +127,6 @@
   color: #17130c;
   background: var(--accent-strong);
 }
-.mode-rail {
-  top: 96px;
-  right: 16px;
-  bottom: auto;
-  left: auto;
-  width: min(220px, calc(100vw - 508px));
-  display: flex;
-  gap: 6px;
-  padding: 6px;
-  overflow: hidden;
-  border-color: rgba(242, 237, 223, 0.12);
-  border-radius: 2px;
-  background:
-    linear-gradient(180deg, rgba(242, 237, 223, 0.08), rgba(10, 12, 10, 0.9)),
-    rgba(10, 12, 10, 0.92);
-  box-shadow:
-    inset 0 1px 0 rgba(242, 237, 223, 0.12),
-    0 20px 58px rgba(0, 0, 0, 0.42);
-  transform: none;
-}
-
-.mode-rail[hidden] {
-  display: none;
-}
-
-.map-hud.workspace-open .mode-rail {
-  border-color: var(--workspace-border);
-  border-bottom-color: rgba(242, 237, 223, 0.1);
-  background:
-    linear-gradient(90deg, var(--workspace-accent-soft), transparent 38%),
-    linear-gradient(180deg, rgba(242, 237, 223, 0.1), rgba(10, 12, 10, 0.94)),
-    rgba(10, 12, 10, 0.94);
-  box-shadow:
-    inset 0 -4px 0 var(--workspace-accent),
-    inset 0 1px 0 rgba(242, 237, 223, 0.14),
-    0 24px 64px rgba(0, 0, 0, 0.38);
-}
-
-.mode-rail [data-tab="catalog"] {
-  --tab-accent: var(--tab-catalog);
-  --tab-accent-soft: rgba(239, 196, 104, 0.13);
-}
-
-.mode-rail button {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 66px;
-  padding: 15px 14px 13px;
-  border: 1px solid rgba(242, 237, 223, 0.08);
-  border-radius: 2px;
-  color: rgba(243, 238, 223, 0.78);
-  background: rgba(242, 237, 223, 0.035);
-  font-size: 0.94rem;
-  font-weight: 860;
-  line-height: 1.08;
-  text-align: left;
-  transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease,
-    transform 160ms ease;
-}
-
-.mode-rail button::before {
-  content: "";
-  display: block;
-  width: 30px;
-  height: 2px;
-  margin-bottom: 9px;
-  border-radius: 999px;
-  background: var(--tab-accent, var(--accent-strong));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tab-accent, var(--accent-strong)) 30%, transparent);
-}
-
-.mode-rail button + button {
-  border-left-color: rgba(242, 237, 223, 0.08);
-}
-
-.mode-rail button:hover,
-.mode-rail button.active {
-  color: var(--map-ink);
-  background: var(--tab-accent-soft, rgba(242, 237, 223, 0.06));
-  border-color: color-mix(in srgb, var(--tab-accent, var(--accent-strong)) 46%, rgba(242, 237, 223, 0.1));
-  box-shadow:
-    inset 0 -4px 0 var(--tab-accent, var(--accent-strong)),
-    inset 0 1px 0 rgba(242, 237, 223, 0.1);
-}
-
-.mode-rail button:hover {
-  transform: translateY(-1px);
-}
-
-.mode-rail button:active {
-  transform: translateY(1px);
-}
 
 .scale-rail {
   width: min(560px, calc(100vw - 32px));
@@ -256,7 +139,7 @@
   border-top: 1px solid rgba(242, 237, 223, 0.08);
   border-bottom: 1px solid rgba(242, 237, 223, 0.08);
   color: rgba(243, 238, 223, 0.5);
-  font-size: 0.66rem;
+  font-size: var(--text-xs);
   line-height: 1.3;
 }
 
@@ -304,7 +187,7 @@
   background: transparent;
   cursor: pointer;
   font: inherit;
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   font-weight: 840;
   text-align: left;
   text-transform: uppercase;
@@ -354,7 +237,7 @@
 .control-help {
   margin: 2px 0 9px;
   color: rgba(243, 238, 223, 0.58);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   line-height: 1.4;
 }
 
@@ -376,7 +259,7 @@
   color: rgba(164, 219, 201, 0.64);
   background: transparent;
   cursor: help;
-  font: 760 0.58rem/1 Georgia, serif;
+  font: 760 var(--text-xs)/1 var(--font-sans);
   text-transform: none;
 }
 
@@ -412,7 +295,7 @@
 
 .scale-options .map-tool-row > span {
   color: rgba(239, 196, 104, 0.74);
-  font-size: 0.68rem;
+  font-size: var(--text-xs);
   font-weight: 840;
   text-transform: uppercase;
 }
@@ -485,79 +368,9 @@
   font-weight: 760;
 }
 
-.scale-time {
-  display: grid;
-  gap: 8px;
-  padding-top: 0;
-  border-top: 0;
-}
-
-.scale-time > strong {
-  overflow: hidden;
-  color: rgba(243, 238, 223, 0.72);
-  font-size: 0.82rem;
-  font-weight: 780;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.scale-time .time-input-row {
-  grid-template-columns: minmax(0, 1fr) 72px;
-  gap: 6px;
-  margin: 0;
-}
-
-.scale-time .time-input-row input {
-  padding: 8px 9px;
-  font-size: 0.82rem;
-}
-
-.scale-time .primary-action {
-  padding: 8px 10px;
-}
-
-.scale-time .time-slider {
-  margin: 0;
-  padding: 8px;
-}
-
-.scale-time .time-step-row {
-  margin: 0;
-}
-
-.scale-time .time-step-row button {
-  border: 1px solid rgba(242, 237, 223, 0.12);
-  color: rgba(243, 238, 223, 0.78);
-  background: rgba(242, 237, 223, 0.055);
-}
-
-.scale-time .time-step-row button:hover {
-  color: #17130c;
-  background: var(--accent-strong);
-}
-
 .zoom-scale-control input {
   height: 3px;
   accent-color: var(--accent-strong);
-}
-
-.slider-head {
-  color: rgba(243, 238, 223, 0.58);
-}
-
-.slider-head strong,
-.slider-head output {
-  color: var(--map-ink);
-}
-
-.zoom-scale-meta {
-  grid-template-columns: 1fr auto;
-}
-
-.zoom-scale-meta span {
-  padding: 0;
-  color: rgba(243, 238, 223, 0.62);
-  background: transparent;
 }
 
 .scale-command .zoom-presets {
@@ -608,18 +421,22 @@
 }
 
 .scale-command .zoom-presets button span {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 820;
 }
 
 .scale-command .zoom-presets button small {
   margin-top: 1px;
   color: rgba(243, 238, 223, 0.38);
-  font-size: 0.61rem;
+  font-size: var(--text-xs);
   font-weight: 700;
 }
 
-.scale-command .zoom-presets button:hover,
+.scale-command .zoom-presets button:hover {
+  color: var(--map-ink);
+  background: transparent;
+}
+
 .scale-command .zoom-presets button.active {
   color: var(--accent-strong);
   background: transparent;
