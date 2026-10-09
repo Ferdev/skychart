@@ -4,21 +4,21 @@
    "true": 5
   },
   "ephemeris_reference_type": {
-   "conjunction": 4682,
+   "conjunction": 4688,
    "periastron": 670
   },
   "ephemeris_source_table": {
    "ps": 877,
-   "pscomppars": 4475
+   "pscomppars": 4481
   },
   "orbit_display_state": {
-   "none": 427,
+   "none": 491,
    "orbit_only": 568,
-   "position": 5352
+   "position": 5358
   }
  },
- "generated_at_utc": "2026-10-08T12:53:42.179227Z",
- "planet_count": 6347,
+ "generated_at_utc": "2026-10-09T08:00:40.842899Z",
+ "planet_count": 6417,
  "queries": {
   "ps": "select\n  pl_name,\n  default_flag,\n  pl_refname,\n  pl_pubdate,\n  pl_orbper,\n  pl_orbpererr1,\n  pl_orbpererr2,\n  pl_orbperlim,\n  pl_tranmid,\n  pl_tranmiderr1,\n  pl_tranmiderr2,\n  pl_tranmidlim,\n  pl_orbtper,\n  pl_orbtpererr1,\n  pl_orbtpererr2,\n  pl_orbtperlim,\n  pl_orblper,\n  pl_orblperlim,\n  pl_tsystemref\nfrom ps\nwhere pl_orbper is not null\n  and (pl_tranmid is not null or pl_orbtper is not null)\norder by pl_name",
   "pscomppars": "select\n  pl_name,\n  hostname,\n  hd_name,\n  hip_name,\n  tic_id,\n  ra,\n  dec,\n  sy_dist,\n  sy_pnum,\n  sy_snum,\n  sy_mnum,\n  st_rad,\n  st_teff,\n  st_mass,\n  st_spectype,\n  pl_rade,\n  pl_rade_reflink,\n  pl_bmasse,\n  pl_bmasse_reflink,\n  pl_bmassprov,\n  pl_eqt,\n  pl_insol,\n  pl_orbper,\n  pl_orbpererr1,\n  pl_orbpererr2,\n  pl_orbperlim,\n  pl_orbper_reflink,\n  pl_orbsmax,\n  pl_orbsmaxerr1,\n  pl_orbsmaxerr2,\n  pl_orbsmaxlim,\n  pl_orbsmax_reflink,\n  pl_orbeccen,\n  pl_orbeccenerr1,\n  pl_orbeccenerr2,\n  pl_orbeccenlim,\n  pl_orbincl,\n  pl_orbinclerr1,\n  pl_orbinclerr2,\n  pl_orbincllim,\n  pl_orblper,\n  pl_orblpererr1,\n  pl_orblpererr2,\n  pl_orblperlim,\n  pl_orblper_reflink,\n  pl_tranmid,\n  pl_tranmiderr1,\n  pl_tranmiderr2,\n  pl_tranmidlim,\n  pl_tranmid_systemref,\n  pl_tranmid_reflink,\n  pl_orbtper,\n  pl_orbtpererr1,\n  pl_orbtpererr2,\n  pl_orbtperlim,\n  pl_orbtper_systemref,\n  pl_orbtper_reflink,\n  tran_flag,\n  rv_flag,\n  ima_flag,\n  micro_flag,\n  ttv_flag,\n  cb_flag,\n  pl_controv_flag,\n  discoverymethod,\n  disc_year\nfrom pscomppars\nwhere hostname is not null\n  and ra is not null\n  and dec is not null\n  and sy_dist is not null\norder by hostname, pl_name"
@@ -31,7 +31,7 @@
   "table": "pscomppars",
   "tap_url": "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
  },
- "system_count": 4752,
+ "system_count": 4814,
  "systems": [
   {
    "aliases": [
@@ -329349,6 +329349,56 @@
   },
   {
    "aliases": [
+    "TIC 459970307",
+    "TOI-1154 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 64.6992141,
+   "distance_pc": 93.8819,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-1154",
+   "name": "TOI-1154",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 642.0,
+     "insolation_earth": 28.2504,
+     "key": "exoplanet-toi-1154-b",
+     "mass_calculated": true,
+     "mass_earth": 7.9,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1154 b",
+     "orbit_display_state": "none",
+     "period_days": 21.74549,
+     "period_days_err_minus": 1.6e-05,
+     "period_days_err_plus": 1.7e-05,
+     "radius_earth": 2.73,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 254.924043,
+   "stellar_mass_solar": 1.02,
+   "stellar_radius_solar": 0.928499,
+   "stellar_teff_k": 5704.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 232967440",
     "TOI-1173 b"
    ],
@@ -331066,6 +331116,56 @@
   },
   {
    "aliases": [
+    "TIC 229781583",
+    "TOI-1245 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": 69.6335338,
+   "distance_pc": 80.0982,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-1245",
+   "name": "TOI-1245",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 572.0,
+     "insolation_earth": 17.8782,
+     "key": "exoplanet-toi-1245-b",
+     "mass_calculated": true,
+     "mass_earth": 6.12,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1245 b",
+     "orbit_display_state": "none",
+     "period_days": 4.8204406,
+     "period_days_err_minus": 3.8e-06,
+     "period_days_err_plus": 3.6e-06,
+     "radius_earth": 2.35,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 283.5355298,
+   "stellar_mass_solar": 0.521792,
+   "stellar_radius_solar": 0.524555,
+   "stellar_teff_k": 3692.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 230127302",
     "TOI-1246 b",
     "TOI-1246 c",
@@ -331837,6 +331937,56 @@
   },
   {
    "aliases": [
+    "TIC 365938305",
+    "TOI-1262 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 74.0610093,
+   "distance_pc": 93.2276,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-1262",
+   "name": "TOI-1262",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 572.0,
+     "insolation_earth": 17.8402,
+     "key": "exoplanet-toi-1262-b",
+     "mass_calculated": true,
+     "mass_earth": 6.3,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1262 b",
+     "orbit_display_state": "none",
+     "period_days": 20.877835,
+     "period_days_err_minus": 7.6e-05,
+     "period_days_err_plus": 5.7e-05,
+     "radius_earth": 2.39,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 180.7265015,
+   "stellar_mass_solar": 0.94,
+   "stellar_radius_solar": 0.898076,
+   "stellar_teff_k": 5396.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 467179528",
     "TOI-1266 b",
     "TOI-1266 c",
@@ -332522,6 +332672,56 @@
    "stellar_mass_solar": 0.851969,
    "stellar_radius_solar": 1.13,
    "stellar_teff_k": 6086.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 232971294",
+    "TOI-1281 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 71.7210512,
+   "distance_pc": 178.259,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-1281",
+   "name": "TOI-1281",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1227.0,
+     "insolation_earth": 376.532,
+     "key": "exoplanet-toi-1281-b",
+     "mass_calculated": true,
+     "mass_earth": 7.65,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1281 b",
+     "orbit_display_state": "none",
+     "period_days": 6.390997,
+     "period_days_err_minus": 1.1e-05,
+     "period_days_err_plus": 1.2e-05,
+     "radius_earth": 2.68,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 199.4426447,
+   "stellar_mass_solar": 1.19,
+   "stellar_radius_solar": 1.32349,
+   "stellar_teff_k": 6191.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -334423,6 +334623,106 @@
   },
   {
    "aliases": [
+    "TIC 256783784",
+    "TOI-1432 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 36.321404,
+   "distance_pc": 95.1757,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-1432",
+   "name": "TOI-1432",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 916.0,
+     "insolation_earth": 117.102,
+     "key": "exoplanet-toi-1432-b",
+     "mass_calculated": true,
+     "mass_earth": 6.3,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1432 b",
+     "orbit_display_state": "none",
+     "period_days": 6.1094927,
+     "period_days_err_minus": 6.7e-06,
+     "period_days_err_plus": 6.4e-06,
+     "radius_earth": 2.39,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 329.401792,
+   "stellar_mass_solar": 0.99,
+   "stellar_radius_solar": 0.913321,
+   "stellar_teff_k": 5587.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 153976959",
+    "TOI-1435 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": 67.6212303,
+   "distance_pc": 92.8659,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-1435",
+   "name": "TOI-1435",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1707.74,
+     "insolation_earth": 2010.0397,
+     "key": "exoplanet-toi-1435-b",
+     "mass_calculated": true,
+     "mass_earth": 1.28,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1435 b",
+     "orbit_display_state": "none",
+     "period_days": 0.6858239,
+     "period_days_err_minus": 1.2e-06,
+     "period_days_err_plus": 0.0002692,
+     "radius_earth": 1.08,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 203.5379464,
+   "stellar_mass_solar": 0.87,
+   "stellar_radius_solar": 0.82354,
+   "stellar_teff_k": 5142.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 198356533",
     "TOI-1437 b"
    ],
@@ -334681,6 +334981,56 @@
    "stellar_mass_solar": 1.2313,
    "stellar_radius_solar": 1.6184,
    "stellar_teff_k": 5841.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 233951353",
+    "TOI-1441 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 58.1408282,
+   "distance_pc": 141.133,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-1441",
+   "name": "TOI-1441",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 790.0,
+     "insolation_earth": 64.932,
+     "key": "exoplanet-toi-1441-b",
+     "mass_calculated": true,
+     "mass_earth": 8.35,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1441 b",
+     "orbit_display_state": "none",
+     "period_days": 22.092958,
+     "period_days_err_minus": 4.9e-05,
+     "period_days_err_plus": 0.000143,
+     "radius_earth": 2.82,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 305.4129061,
+   "stellar_mass_solar": 1.067,
+   "stellar_radius_solar": 1.24225,
+   "stellar_teff_k": 5885.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -340691,12 +341041,14 @@
   {
    "aliases": [
     "TIC 166648874",
+    "TOI-1806 c",
+    "TOI-1806 d",
     "TOI-1806.01"
    ],
    "color": "#f08f6f",
    "dec_deg": 30.4585763,
    "distance_pc": 55.5211,
-   "exoplanet_count": 1,
+   "exoplanet_count": 3,
    "key": "exosys-toi-1806",
    "name": "TOI-1806",
    "planets": [
@@ -340737,14 +341089,70 @@
       }
      ],
      "semi_major_axis_au": 0.087735044
+    },
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 961.2,
+     "insolation_earth": 201.7325,
+     "key": "exoplanet-toi-1806-c",
+     "mass_calculated": true,
+     "mass_earth": 2.3,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1806 c",
+     "orbit_display_state": "none",
+     "period_days": 0.5018934,
+     "period_days_err_minus": 3.1e-06,
+     "period_days_err_plus": 2.5e-06,
+     "radius_earth": 1.32,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    },
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 378.87,
+     "insolation_earth": 4.8692,
+     "key": "exoplanet-toi-1806-d",
+     "mass_calculated": true,
+     "mass_earth": 8.65,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-1806 d",
+     "orbit_display_state": "none",
+     "period_days": 8.196064,
+     "period_days_err_minus": 4.4e-05,
+     "period_days_err_plus": 5e-05,
+     "radius_earth": 2.88,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
     }
    ],
    "ra_deg": 166.1181474,
-   "stellar_mass_solar": 0.392935,
+   "stellar_mass_solar": 0.393258,
    "stellar_radius_solar": 0.401575,
    "stellar_teff_k": 3272.0,
    "system_moon_count": 0,
-   "system_planet_count": 1,
+   "system_planet_count": 3,
    "system_star_count": 1,
    "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
@@ -345193,6 +345601,56 @@
   },
   {
    "aliases": [
+    "TIC 234345288",
+    "TOI-213 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -71.6242471,
+   "distance_pc": 54.3256,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-213",
+   "name": "TOI-213",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 345.41,
+     "insolation_earth": 3.3641,
+     "key": "exoplanet-toi-213-b",
+     "mass_calculated": true,
+     "mass_earth": 7.27,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-213 b",
+     "orbit_display_state": "none",
+     "period_days": 23.519904,
+     "period_days_err_minus": 1.1e-05,
+     "period_days_err_plus": 1.3e-05,
+     "radius_earth": 2.6,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 38.8872913,
+   "stellar_mass_solar": 0.72,
+   "stellar_radius_solar": 0.672062,
+   "stellar_teff_k": 4566.4,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 39200363",
     "TOI-2133 b"
    ],
@@ -347020,6 +347478,106 @@
   },
   {
    "aliases": [
+    "TIC 231077395",
+    "TOI-2238 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": -70.3549102,
+   "distance_pc": 285.78,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-2238",
+   "name": "TOI-2238",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1464.0,
+     "insolation_earth": 764.344,
+     "key": "exoplanet-toi-2238-b",
+     "mass_calculated": true,
+     "mass_earth": 7.27,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-2238 b",
+     "orbit_display_state": "none",
+     "period_days": 3.390463,
+     "period_days_err_minus": 1.2e-05,
+     "period_days_err_plus": 1.5e-05,
+     "radius_earth": 2.6,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 67.6578076,
+   "stellar_mass_solar": 1.15,
+   "stellar_radius_solar": 1.43087,
+   "stellar_teff_k": 6113.8,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 278415929",
+    "TOI-2245 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": -80.8938857,
+   "distance_pc": 264.842,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-2245",
+   "name": "TOI-2245",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1530.0,
+     "insolation_earth": 911.152,
+     "key": "exoplanet-toi-2245-b",
+     "mass_calculated": true,
+     "mass_earth": 21.2,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-2245 b",
+     "orbit_display_state": "none",
+     "period_days": 3.7980908,
+     "period_days_err_minus": 5.3e-06,
+     "period_days_err_plus": 5.2e-06,
+     "radius_earth": 4.89,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 117.2810113,
+   "stellar_mass_solar": 1.08,
+   "stellar_radius_solar": 1.51258,
+   "stellar_teff_k": 5918.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 198485881",
     "TOI-2257 b"
    ],
@@ -347547,6 +348105,106 @@
    "stellar_mass_solar": 0.454,
    "stellar_radius_solar": 0.464,
    "stellar_teff_k": 3491.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 160077104",
+    "TOI-2287 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 85.8953909,
+   "distance_pc": 94.9685,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-2287",
+   "name": "TOI-2287",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 898.93,
+     "insolation_earth": 154.32,
+     "key": "exoplanet-toi-2287-b",
+     "mass_calculated": true,
+     "mass_earth": 3.89,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-2287 b",
+     "orbit_display_state": "none",
+     "period_days": 11.812041,
+     "period_days_err_minus": 4.3e-05,
+     "period_days_err_plus": 3.9e-05,
+     "radius_earth": 1.8,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 222.7507902,
+   "stellar_mass_solar": 1.12,
+   "stellar_radius_solar": 1.20105,
+   "stellar_teff_k": 6037.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 71347873",
+    "TOI-2293 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": 70.4040765,
+   "distance_pc": 62.7576,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-2293",
+   "name": "TOI-2293",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 503.42,
+     "insolation_earth": 15.1794,
+     "key": "exoplanet-toi-2293-b",
+     "mass_calculated": true,
+     "mass_earth": 4.98,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-2293 b",
+     "orbit_display_state": "none",
+     "period_days": 6.068314,
+     "period_days_err_minus": 1.6e-05,
+     "period_days_err_plus": 1.7e-05,
+     "radius_earth": 2.08,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 115.5933766,
+   "stellar_mass_solar": 0.497439,
+   "stellar_radius_solar": 0.499376,
+   "stellar_teff_k": 3668.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -348923,6 +349581,56 @@
   },
   {
    "aliases": [
+    "TIC 149349867",
+    "TOI-2392 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": -64.1166204,
+   "distance_pc": 325.608,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-2392",
+   "name": "TOI-2392",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 2408.58,
+     "insolation_earth": 5586.9442,
+     "key": "exoplanet-toi-2392-b",
+     "mass_calculated": true,
+     "mass_earth": 6.21,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-2392 b",
+     "orbit_display_state": "none",
+     "period_days": 9.169362,
+     "period_days_err_minus": 6.5e-05,
+     "period_days_err_plus": 6.4e-05,
+     "radius_earth": 2.37,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 83.7837026,
+   "stellar_mass_solar": 1.21,
+   "stellar_radius_solar": 1.76167,
+   "stellar_teff_k": 6244.5,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 212957629",
     "TOI-2406 b"
    ],
@@ -349353,6 +350061,56 @@
   },
   {
    "aliases": [
+    "TIC 97486178",
+    "TOI-2426 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": -20.7812895,
+   "distance_pc": 138.301,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-2426",
+   "name": "TOI-2426",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1226.0,
+     "insolation_earth": 376.072,
+     "key": "exoplanet-toi-2426-b",
+     "mass_calculated": true,
+     "mass_earth": 6.17,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-2426 b",
+     "orbit_display_state": "none",
+     "period_days": 4.0812,
+     "period_days_err_minus": 0.0012,
+     "period_days_err_plus": 0.0011,
+     "radius_earth": 2.36,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 43.811698,
+   "stellar_mass_solar": 1.019,
+   "stellar_radius_solar": 1.02479,
+   "stellar_teff_k": 5716.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 142937186",
     "TOI-2427 b",
     "TOI-2427 c"
@@ -349612,6 +350370,56 @@
    "stellar_mass_solar": 0.428,
    "stellar_radius_solar": 0.426,
    "stellar_teff_k": 3433.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 219175972",
+    "TOI-2441 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": -51.6796138,
+   "distance_pc": 84.5243,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-2441",
+   "name": "TOI-2441",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 363.4,
+     "insolation_earth": 4.1214,
+     "key": "exoplanet-toi-2441-b",
+     "mass_calculated": true,
+     "mass_earth": 7.9,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-2441 b",
+     "orbit_display_state": "none",
+     "period_days": 12.890155,
+     "period_days_err_minus": 1.5e-05,
+     "period_days_err_plus": 1.5e-05,
+     "radius_earth": 2.73,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 91.4101516,
+   "stellar_mass_solar": 0.465235,
+   "stellar_radius_solar": 0.46769,
+   "stellar_teff_k": 3478.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -350129,6 +350937,56 @@
    "stellar_mass_solar": 0.66,
    "stellar_radius_solar": 0.6751,
    "stellar_teff_k": 4195.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 201793781",
+    "TOI-248 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": -54.8597252,
+   "distance_pc": 75.9529,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-248",
+   "name": "TOI-248",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1447.24,
+     "insolation_earth": 728.2554,
+     "key": "exoplanet-toi-248-b",
+     "mass_calculated": true,
+     "mass_earth": 6.21,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-248 b",
+     "orbit_display_state": "none",
+     "period_days": 5.9910723,
+     "period_days_err_minus": 3.1e-06,
+     "period_days_err_plus": 3.1e-06,
+     "radius_earth": 2.37,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 34.6842828,
+   "stellar_mass_solar": 1.02,
+   "stellar_radius_solar": 1.12148,
+   "stellar_teff_k": 5711.7,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -350870,6 +351728,59 @@
    "system_planet_count": 2,
    "system_star_count": 1,
    "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "HD 274255",
+    "HIP 25775",
+    "TIC 354518617",
+    "TOI-2540 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -42.6979461,
+   "distance_pc": 19.1419,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-2540",
+   "name": "TOI-2540",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 477.25,
+     "insolation_earth": 12.2599,
+     "key": "exoplanet-toi-2540-b",
+     "mass_calculated": true,
+     "mass_earth": 5.86,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-2540 b",
+     "orbit_display_state": "none",
+     "period_days": 12.718739,
+     "period_days_err_minus": 3.1e-05,
+     "period_days_err_plus": 2.9e-05,
+     "radius_earth": 2.29,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 82.5585484,
+   "spectral_type": "M0V",
+   "stellar_mass_solar": 0.63,
+   "stellar_radius_solar": 0.661076,
+   "stellar_teff_k": 4023.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A nearby confirmed exoplanet host system."
   },
   {
    "aliases": [
@@ -355126,6 +356037,56 @@
   },
   {
    "aliases": [
+    "TIC 287591638",
+    "TOI-3585 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": 34.646627,
+   "distance_pc": 130.802,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-3585",
+   "name": "TOI-3585",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 906.0,
+     "insolation_earth": 112.33,
+     "key": "exoplanet-toi-3585-b",
+     "mass_calculated": true,
+     "mass_earth": 16.8,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-3585 b",
+     "orbit_display_state": "none",
+     "period_days": 3.5410696,
+     "period_days_err_minus": 5.2e-06,
+     "period_days_err_plus": 5.1e-06,
+     "radius_earth": 4.26,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 326.8071379,
+   "stellar_mass_solar": 0.74,
+   "stellar_radius_solar": 0.818751,
+   "stellar_teff_k": 4652.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 162289289",
     "TOI-3593 b"
    ],
@@ -356147,6 +357108,56 @@
    "stellar_mass_solar": 0.89,
    "stellar_radius_solar": 1.2,
    "stellar_teff_k": 5905.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 142739544",
+    "TOI-3851 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 75.2118975,
+   "distance_pc": 298.349,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-3851",
+   "name": "TOI-3851",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1355.0,
+     "insolation_earth": 559.625,
+     "key": "exoplanet-toi-3851-b",
+     "mass_calculated": true,
+     "mass_earth": 20.3,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-3851 b",
+     "orbit_display_state": "none",
+     "period_days": 3.383445,
+     "period_days_err_minus": 1.2e-05,
+     "period_days_err_plus": 1.2e-05,
+     "radius_earth": 4.76,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 150.3804032,
+   "stellar_mass_solar": 1.05,
+   "stellar_radius_solar": 1.22827,
+   "stellar_teff_k": 5838.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -358396,6 +359407,56 @@
   },
   {
    "aliases": [
+    "TIC 141186075",
+    "TOI-4307 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": -75.6937336,
+   "distance_pc": 36.0469,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-4307",
+   "name": "TOI-4307",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 614.72,
+     "insolation_earth": 33.7476,
+     "key": "exoplanet-toi-4307-b",
+     "mass_calculated": true,
+     "mass_earth": 2.51,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4307 b",
+     "orbit_display_state": "none",
+     "period_days": 32.696842,
+     "period_days_err_minus": 5.8e-05,
+     "period_days_err_plus": 6.9e-05,
+     "radius_earth": 1.39,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 81.3274982,
+   "stellar_mass_solar": 1.14,
+   "stellar_radius_solar": 1.09843,
+   "stellar_teff_k": 6079.16,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 144193715",
     "TOI-4308 b"
    ],
@@ -358619,6 +359680,56 @@
   },
   {
    "aliases": [
+    "TIC 303317324",
+    "TOI-4310 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -25.5084621,
+   "distance_pc": 40.0268,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-4310",
+   "name": "TOI-4310",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 386.96,
+     "insolation_earth": 5.2988,
+     "key": "exoplanet-toi-4310-b",
+     "mass_calculated": true,
+     "mass_earth": 9.11,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4310 b",
+     "orbit_display_state": "none",
+     "period_days": 29.566602,
+     "period_days_err_minus": 6.3e-05,
+     "period_days_err_plus": 6.5e-05,
+     "radius_earth": 2.97,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 351.9035311,
+   "stellar_mass_solar": 0.65,
+   "stellar_radius_solar": 0.721084,
+   "stellar_teff_k": 4159.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 122617317",
     "TOI-4311 b",
     "TOI-4311 c"
@@ -358733,6 +359844,58 @@
    "system_planet_count": 2,
    "system_star_count": 1,
    "why_interesting": "Includes at least one very close-in confirmed planet."
+  },
+  {
+   "aliases": [
+    "HIP 47619",
+    "TIC 408416746",
+    "TOI-4324 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": -19.2356989,
+   "distance_pc": 17.038,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-4324",
+   "name": "TOI-4324",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 438.81,
+     "insolation_earth": 8.7624,
+     "key": "exoplanet-toi-4324-b",
+     "mass_calculated": true,
+     "mass_earth": 2.04,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4324 b",
+     "orbit_display_state": "none",
+     "period_days": 6.2509291,
+     "period_days_err_minus": 5.7e-06,
+     "period_days_err_plus": 6e-06,
+     "radius_earth": 1.23,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 145.6464731,
+   "spectral_type": "M2.5 V",
+   "stellar_mass_solar": 0.386274,
+   "stellar_radius_solar": 0.395397,
+   "stellar_teff_k": 3479.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A nearby confirmed exoplanet host system."
   },
   {
    "aliases": [
@@ -359027,6 +360190,56 @@
    "stellar_teff_k": 3866.0,
    "system_moon_count": 0,
    "system_planet_count": 2,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 44647437",
+    "TOI-435 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -25.1899379,
+   "distance_pc": 165.285,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-435",
+   "name": "TOI-435",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 753.66,
+     "insolation_earth": 76.2487,
+     "key": "exoplanet-toi-435-b",
+     "mass_calculated": true,
+     "mass_earth": 15.3,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-435 b",
+     "orbit_display_state": "none",
+     "period_days": 3.352919,
+     "period_days_err_minus": 1.3e-05,
+     "period_days_err_plus": 1.2e-05,
+     "radius_earth": 4.03,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 59.4105742,
+   "stellar_mass_solar": 0.632,
+   "stellar_radius_solar": 0.672832,
+   "stellar_teff_k": 4040.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
    "system_star_count": 1,
    "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
@@ -359687,12 +360900,13 @@
   {
    "aliases": [
     "TIC 158241252",
+    "TOI-4443 c",
     "TOI-4443.01"
    ],
    "color": "#ffd28c",
    "dec_deg": 21.9095459,
    "distance_pc": 56.0739,
-   "exoplanet_count": 1,
+   "exoplanet_count": 2,
    "key": "exosys-toi-4443",
    "name": "TOI-4443",
    "planets": [
@@ -359733,14 +360947,42 @@
       }
      ],
      "semi_major_axis_au": 0.029962645
+    },
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 845.67,
+     "insolation_earth": 120.8695,
+     "key": "exoplanet-toi-4443-c",
+     "mass_calculated": true,
+     "mass_earth": 5.56,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4443 c",
+     "orbit_display_state": "none",
+     "period_days": 10.308817,
+     "period_days_err_minus": 2.4e-05,
+     "period_days_err_plus": 2.2e-05,
+     "radius_earth": 2.22,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
     }
    ],
    "ra_deg": 274.2686643,
-   "stellar_mass_solar": 1.049133,
+   "stellar_mass_solar": 1.05,
    "stellar_radius_solar": 1.01733,
    "stellar_teff_k": 5834.0,
    "system_moon_count": 0,
-   "system_planet_count": 1,
+   "system_planet_count": 2,
    "system_star_count": 1,
    "why_interesting": "Includes at least one very close-in confirmed planet."
   },
@@ -359961,6 +361203,132 @@
    "system_planet_count": 1,
    "system_star_count": 1,
    "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 441763252",
+    "TOI-4468 b",
+    "TOI-4468 c"
+   ],
+   "color": "#f4a278",
+   "dec_deg": 72.6453728,
+   "distance_pc": 375.517,
+   "exoplanet_count": 2,
+   "key": "exosys-toi-4468",
+   "name": "TOI-4468",
+   "planets": [
+    {
+     "argument_of_periastron_deg": 46.0,
+     "argument_of_periastron_deg_err_minus": 47.0,
+     "argument_of_periastron_deg_err_plus": 45.0,
+     "detected_by_radial_velocity": true,
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.03,
+     "eccentricity_err_minus": 0.02,
+     "eccentricity_err_plus": 0.026,
+     "ephemeris_period_days": 2.77085931,
+     "ephemeris_period_days_err_minus": 3.6e-07,
+     "ephemeris_period_days_err_plus": 3.6e-07,
+     "ephemeris_reference_label": "Livesey et al. 2026",
+     "ephemeris_reference_time_jd": 2459848.554232,
+     "ephemeris_reference_time_jd_err_minus": 7.6e-05,
+     "ephemeris_reference_time_jd_err_plus": 7.7e-05,
+     "ephemeris_reference_type": "conjunction",
+     "ephemeris_reference_url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260825208L/abstract",
+     "ephemeris_source_table": "pscomppars",
+     "ephemeris_time_system": "BJD",
+     "equilibrium_temperature_k": 1153.0,
+     "inclination_deg": 89.35,
+     "inclination_deg_err_minus": 0.49,
+     "inclination_deg_err_plus": 0.44,
+     "insolation_earth": 295.0,
+     "key": "exoplanet-toi-4468-b",
+     "mass_earth": 170.1,
+     "mass_provenance": "Mass",
+     "name": "TOI-4468 b",
+     "orbit_display_state": "position",
+     "period_days": 2.77085931,
+     "period_days_err_minus": 3.6e-07,
+     "period_days_err_plus": 3.6e-07,
+     "radius_earth": 11.29,
+     "references": [
+      {
+       "label": "Livesey et al. 2026",
+       "quantities": [
+        "period",
+        "semi_major_axis",
+        "radius",
+        "mass"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260825208L/abstract"
+      }
+     ],
+     "semi_major_axis_au": 0.03592,
+     "semi_major_axis_au_err_minus": 0.00057,
+     "semi_major_axis_au_err_plus": 0.0006
+    },
+    {
+     "argument_of_periastron_deg": 170.0,
+     "argument_of_periastron_deg_err_minus": 140.0,
+     "argument_of_periastron_deg_err_plus": 120.0,
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.122,
+     "eccentricity_err_minus": 0.083,
+     "eccentricity_err_plus": 0.16,
+     "ephemeris_period_days": 7.0139,
+     "ephemeris_period_days_err_minus": 2e-05,
+     "ephemeris_period_days_err_plus": 2e-05,
+     "ephemeris_reference_label": "Livesey et al. 2026",
+     "ephemeris_reference_time_jd": 2459424.2354,
+     "ephemeris_reference_time_jd_err_minus": 0.0022,
+     "ephemeris_reference_time_jd_err_plus": 0.0025,
+     "ephemeris_reference_type": "conjunction",
+     "ephemeris_reference_url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260825208L/abstract",
+     "ephemeris_source_table": "pscomppars",
+     "ephemeris_time_system": "BJD",
+     "equilibrium_temperature_k": 846.0,
+     "inclination_deg": 88.95,
+     "inclination_deg_err_minus": 0.5,
+     "inclination_deg_err_plus": 0.66,
+     "insolation_earth": 83.1,
+     "key": "exoplanet-toi-4468-c",
+     "mass_calculated": true,
+     "mass_earth": 9.75,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4468 c",
+     "orbit_display_state": "position",
+     "period_days": 7.0139,
+     "period_days_err_minus": 2e-05,
+     "period_days_err_plus": 2e-05,
+     "radius_earth": 3.09,
+     "references": [
+      {
+       "label": "Livesey et al. 2026",
+       "quantities": [
+        "period",
+        "semi_major_axis",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260825208L/abstract"
+      }
+     ],
+     "semi_major_axis_au": 0.0667,
+     "semi_major_axis_au_err_minus": 0.0011,
+     "semi_major_axis_au_err_plus": 0.0011
+    }
+   ],
+   "ra_deg": 260.5750231,
+   "stellar_mass_solar": 0.805,
+   "stellar_radius_solar": 0.771,
+   "stellar_teff_k": 5170.0,
+   "system_moon_count": 0,
+   "system_planet_count": 2,
+   "system_star_count": 1,
+   "why_interesting": "Includes at least one very close-in confirmed planet."
   },
   {
    "aliases": [
@@ -360289,6 +361657,56 @@
    "system_planet_count": 2,
    "system_star_count": 1,
    "why_interesting": "Includes at least one very close-in confirmed planet."
+  },
+  {
+   "aliases": [
+    "TIC 120183168",
+    "TOI-4499 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 39.0761839,
+   "distance_pc": 175.743,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-4499",
+   "name": "TOI-4499",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1352.0,
+     "insolation_earth": 555.873,
+     "key": "exoplanet-toi-4499-b",
+     "mass_calculated": true,
+     "mass_earth": 5.22,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4499 b",
+     "orbit_display_state": "none",
+     "period_days": 5.53888,
+     "period_days_err_minus": 0.00018,
+     "period_days_err_plus": 0.00014,
+     "radius_earth": 2.14,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 284.3618873,
+   "stellar_mass_solar": 1.151,
+   "stellar_radius_solar": 1.0889,
+   "stellar_teff_k": 6111.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
   {
    "aliases": [
@@ -361378,6 +362796,56 @@
   },
   {
    "aliases": [
+    "TIC 307849973",
+    "TOI-4567 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -66.7685487,
+   "distance_pc": 91.313,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-4567",
+   "name": "TOI-4567",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1088.33,
+     "insolation_earth": 331.5614,
+     "key": "exoplanet-toi-4567-b",
+     "mass_calculated": true,
+     "mass_earth": 6.04,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4567 b",
+     "orbit_display_state": "none",
+     "period_days": 23.542503,
+     "period_days_err_minus": 8.5e-05,
+     "period_days_err_plus": 5.6e-05,
+     "radius_earth": 2.33,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 128.5065853,
+   "stellar_mass_solar": 0.594967,
+   "stellar_radius_solar": 0.608498,
+   "stellar_teff_k": 3830.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 154474036",
     "TOI-4578 b"
    ],
@@ -361827,6 +363295,58 @@
    "stellar_mass_solar": 1.765,
    "stellar_radius_solar": 2.738,
    "stellar_teff_k": 6264.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 258796169",
+    "TOI-4616 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": 13.8607948,
+   "distance_pc": 28.1016,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-4616",
+   "name": "TOI-4616",
+   "planets": [
+    {
+     "argument_of_periastron_deg": 90.0,
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 525.0,
+     "insolation_earth": 40.0,
+     "key": "exoplanet-toi-4616-b",
+     "mass_calculated": true,
+     "mass_earth": 1.98,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4616 b",
+     "orbit_display_state": "none",
+     "period_days": 1.55382,
+     "period_days_err_minus": 1e-05,
+     "period_days_err_plus": 1e-05,
+     "radius_earth": 1.22,
+     "references": [
+      {
+       "label": "Lang et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260310905L/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 14.8180883,
+   "spectral_type": "M4&plusmn;0.5",
+   "stellar_mass_solar": 0.1881,
+   "stellar_radius_solar": 0.1889,
+   "stellar_teff_k": 3150.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -362455,6 +363975,56 @@
   },
   {
    "aliases": [
+    "TIC 119638424",
+    "TOI-4724 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": -10.5841421,
+   "distance_pc": 225.229,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-4724",
+   "name": "TOI-4724",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1314.0,
+     "insolation_earth": 495.575,
+     "key": "exoplanet-toi-4724-b",
+     "mass_calculated": true,
+     "mass_earth": 10.3,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4724 b",
+     "orbit_display_state": "none",
+     "period_days": 3.5761,
+     "period_days_err_minus": 0.0012,
+     "period_days_err_plus": 0.0013,
+     "radius_earth": 3.2,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 100.9073254,
+   "stellar_mass_solar": 1.023,
+   "stellar_radius_solar": 0.923634,
+   "stellar_teff_k": 5730.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 97714451",
     "TOI-4734 b"
    ],
@@ -362926,6 +364496,56 @@
    "stellar_mass_solar": 1.14,
    "stellar_radius_solar": 1.66,
    "stellar_teff_k": 5735.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 60377863",
+    "TOI-4851 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": -44.139772,
+   "distance_pc": 125.772,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-4851",
+   "name": "TOI-4851",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 888.0,
+     "insolation_earth": 103.508,
+     "key": "exoplanet-toi-4851-b",
+     "mass_calculated": true,
+     "mass_earth": 8.1,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-4851 b",
+     "orbit_display_state": "none",
+     "period_days": 21.60913,
+     "period_days_err_minus": 6.7e-05,
+     "period_days_err_plus": 8.9e-05,
+     "radius_earth": 2.77,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 112.229289,
+   "stellar_mass_solar": 1.09,
+   "stellar_radius_solar": 1.14786,
+   "stellar_teff_k": 5967.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -364492,6 +366112,57 @@
   },
   {
    "aliases": [
+    "TIC 349986198",
+    "TOI-5165 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": 6.8664785,
+   "distance_pc": 245.302,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5165",
+   "name": "TOI-5165",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 870.0,
+     "insolation_earth": 95.4633,
+     "key": "exoplanet-toi-5165-b",
+     "mass_calculated": true,
+     "mass_earth": 11.0,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5165 b",
+     "orbit_display_state": "none",
+     "period_days": 3.577048,
+     "period_days_err_minus": 5.1e-05,
+     "period_days_err_plus": 4.3e-05,
+     "radius_earth": 3.32,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 154.2501533,
+   "spectral_type": "K4",
+   "stellar_mass_solar": 0.74,
+   "stellar_radius_solar": 0.871622,
+   "stellar_teff_k": 4642.1,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 49428710",
     "TOI-5174 b"
    ],
@@ -364532,6 +366203,56 @@
    "stellar_mass_solar": 1.0,
    "stellar_radius_solar": 1.09457,
    "stellar_teff_k": 5643.77,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 350033870",
+    "TOI-5177 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 7.273586,
+   "distance_pc": 154.965,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5177",
+   "name": "TOI-5177",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 2185.0,
+     "insolation_earth": 3785.82,
+     "key": "exoplanet-toi-5177-b",
+     "mass_calculated": true,
+     "mass_earth": 4.38,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5177 b",
+     "orbit_display_state": "none",
+     "period_days": 2.20864,
+     "period_days_err_minus": 2.7e-05,
+     "period_days_err_plus": 2.7e-05,
+     "radius_earth": 1.93,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 155.0725193,
+   "stellar_mass_solar": 1.18,
+   "stellar_radius_solar": 1.68027,
+   "stellar_teff_k": 6183.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -365153,6 +366874,56 @@
    "stellar_mass_solar": 1.037,
    "stellar_radius_solar": 1.021,
    "stellar_teff_k": 5790.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 176279915",
+    "TOI-5289 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": -7.7864163,
+   "distance_pc": 258.455,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5289",
+   "name": "TOI-5289",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1197.0,
+     "insolation_earth": 341.303,
+     "key": "exoplanet-toi-5289-b",
+     "mass_calculated": true,
+     "mass_earth": 17.6,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5289 b",
+     "orbit_display_state": "none",
+     "period_days": 3.441056,
+     "period_days_err_minus": 1.8e-05,
+     "period_days_err_plus": 2.1e-05,
+     "radius_earth": 4.38,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 0.7601042,
+   "stellar_mass_solar": 0.896,
+   "stellar_radius_solar": 0.941116,
+   "stellar_teff_k": 5244.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -366774,6 +368545,56 @@
   },
   {
    "aliases": [
+    "TIC 468979441",
+    "TOI-5493 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 9.0353805,
+   "distance_pc": 225.454,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5493",
+   "name": "TOI-5493",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 663.64,
+     "insolation_earth": 45.8414,
+     "key": "exoplanet-toi-5493-b",
+     "mass_calculated": true,
+     "mass_earth": 6.17,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5493 b",
+     "orbit_display_state": "none",
+     "period_days": 14.56485,
+     "period_days_err_minus": 0.00017,
+     "period_days_err_plus": 0.00013,
+     "radius_earth": 2.36,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 128.6401759,
+   "stellar_mass_solar": 1.168,
+   "stellar_radius_solar": 1.03824,
+   "stellar_teff_k": 6151.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 126322519",
     "TOI-5502 b"
    ],
@@ -366871,6 +368692,56 @@
    "stellar_mass_solar": 0.963,
    "stellar_radius_solar": 0.835682,
    "stellar_teff_k": 5483.65,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 88114177",
+    "TOI-5531 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 19.5943772,
+   "distance_pc": 80.6404,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5531",
+   "name": "TOI-5531",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1150.36,
+     "insolation_earth": 413.856,
+     "key": "exoplanet-toi-5531-b",
+     "mass_calculated": true,
+     "mass_earth": 2.73,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5531 b",
+     "orbit_display_state": "none",
+     "period_days": 4.535285,
+     "period_days_err_minus": 3.3e-05,
+     "period_days_err_plus": 4e-05,
+     "radius_earth": 1.46,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 148.4721661,
+   "stellar_mass_solar": 1.04,
+   "stellar_radius_solar": 1.10259,
+   "stellar_teff_k": 5788.42,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -366998,6 +368869,56 @@
    "stellar_mass_solar": 0.89,
    "stellar_radius_solar": 1.058,
    "stellar_teff_k": 5700.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 17385917",
+    "TOI-5543 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": 23.2707819,
+   "distance_pc": 125.194,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5543",
+   "name": "TOI-5543",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 994.02,
+     "insolation_earth": 230.7315,
+     "key": "exoplanet-toi-5543-b",
+     "mass_calculated": true,
+     "mass_earth": 13.7,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5543 b",
+     "orbit_display_state": "none",
+     "period_days": 3.5424576,
+     "period_days_err_minus": 4.9e-06,
+     "period_days_err_plus": 5.1e-06,
+     "radius_earth": 3.78,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 66.1421717,
+   "stellar_mass_solar": 0.845,
+   "stellar_radius_solar": 0.853329,
+   "stellar_teff_k": 5058.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -368336,6 +370257,77 @@
   },
   {
    "aliases": [
+    "TIC 366804698",
+    "TOI-5646 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 5.7021318,
+   "distance_pc": 429.221,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5646",
+   "name": "TOI-5646",
+   "planets": [
+    {
+     "detected_by_radial_velocity": true,
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.12,
+     "eccentricity_limit": 1,
+     "ephemeris_period_days": 2.4277027,
+     "ephemeris_period_days_err_minus": 2.5e-06,
+     "ephemeris_period_days_err_plus": 2.5e-06,
+     "ephemeris_reference_label": "Mancini et al. 2026",
+     "ephemeris_reference_time_jd": 2459687.3808,
+     "ephemeris_reference_time_jd_err_minus": 0.0011,
+     "ephemeris_reference_time_jd_err_plus": 0.0011,
+     "ephemeris_reference_type": "conjunction",
+     "ephemeris_reference_url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260824311M/abstract",
+     "ephemeris_source_table": "pscomppars",
+     "ephemeris_time_system": "BJD",
+     "equilibrium_temperature_k": 1935.0,
+     "inclination_deg": 84.77,
+     "inclination_deg_err_minus": 0.65,
+     "inclination_deg_err_plus": 0.51,
+     "insolation_earth": 2340.0,
+     "key": "exoplanet-toi-5646-b",
+     "mass_earth": 45.93,
+     "mass_provenance": "Mass",
+     "name": "TOI-5646 b",
+     "orbit_display_state": "position",
+     "period_days": 2.4277027,
+     "period_days_err_minus": 2.5e-06,
+     "period_days_err_plus": 2.5e-06,
+     "radius_earth": 6.61,
+     "references": [
+      {
+       "label": "Mancini et al. 2026",
+       "quantities": [
+        "period",
+        "semi_major_axis",
+        "radius",
+        "mass"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260824311M/abstract"
+      }
+     ],
+     "semi_major_axis_au": 0.0427,
+     "semi_major_axis_au_err_minus": 0.0019,
+     "semi_major_axis_au_err_plus": 0.0019
+    }
+   ],
+   "ra_deg": 198.4471387,
+   "spectral_type": "F8 IV-V",
+   "stellar_mass_solar": 1.418,
+   "stellar_radius_solar": 1.837,
+   "stellar_teff_k": 6136.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "Includes at least one very close-in confirmed planet."
+  },
+  {
+   "aliases": [
     "TIC 209464063",
     "TOI-5678 b"
    ],
@@ -368482,6 +370474,56 @@
    "system_planet_count": 1,
    "system_star_count": 2,
    "why_interesting": "Includes at least one very close-in confirmed planet."
+  },
+  {
+   "aliases": [
+    "TIC 393546540",
+    "TOI-5696 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 6.3334749,
+   "distance_pc": 66.4522,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5696",
+   "name": "TOI-5696",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 80.0,
+     "insolation_earth": 0.0068,
+     "key": "exoplanet-toi-5696-b",
+     "mass_calculated": true,
+     "mass_earth": 7.22,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5696 b",
+     "orbit_display_state": "none",
+     "period_days": 32.43016,
+     "period_days_err_minus": 0.00015,
+     "period_days_err_plus": 0.00012,
+     "radius_earth": 2.59,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 161.1569248,
+   "stellar_mass_solar": 0.9,
+   "stellar_radius_solar": 0.828003,
+   "stellar_teff_k": 5271.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
   {
    "aliases": [
@@ -368847,6 +370889,56 @@
   },
   {
    "aliases": [
+    "TIC 138820713",
+    "TOI-5730 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": 24.1924943,
+   "distance_pc": 40.9866,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5730",
+   "name": "TOI-5730",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 701.47,
+     "insolation_earth": 57.2228,
+     "key": "exoplanet-toi-5730-b",
+     "mass_calculated": true,
+     "mass_earth": 2.54,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5730 b",
+     "orbit_display_state": "none",
+     "period_days": 1.927107,
+     "period_days_err_minus": 5.9e-06,
+     "period_days_err_plus": 9.8e-06,
+     "radius_earth": 1.4,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 175.5654299,
+   "stellar_mass_solar": 0.461555,
+   "stellar_radius_solar": 0.464169,
+   "stellar_teff_k": 3572.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 9989136",
     "TOI-5734 b"
    ],
@@ -368961,6 +371053,56 @@
    "stellar_mass_solar": 0.57,
    "stellar_radius_solar": 0.58,
    "stellar_teff_k": 3949.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 328934980",
+    "TOI-5739 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 19.1998592,
+   "distance_pc": 61.8703,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5739",
+   "name": "TOI-5739",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1128.37,
+     "insolation_earth": 383.1101,
+     "key": "exoplanet-toi-5739-b",
+     "mass_calculated": true,
+     "mass_earth": 6.04,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5739 b",
+     "orbit_display_state": "none",
+     "period_days": 8.430524,
+     "period_days_err_minus": 5.8e-05,
+     "period_days_err_plus": 6.4e-05,
+     "radius_earth": 2.33,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 205.1695358,
+   "stellar_mass_solar": 1.15,
+   "stellar_radius_solar": 1.49138,
+   "stellar_teff_k": 6104.12,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -369809,6 +371951,56 @@
   },
   {
    "aliases": [
+    "TIC 188646744",
+    "TOI-5807 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 43.3606897,
+   "distance_pc": 72.9611,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5807",
+   "name": "TOI-5807",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1027.0,
+     "insolation_earth": 184.841,
+     "key": "exoplanet-toi-5807-b",
+     "mass_calculated": true,
+     "mass_earth": 8.15,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5807 b",
+     "orbit_display_state": "none",
+     "period_days": 14.241844,
+     "period_days_err_minus": 9.2e-05,
+     "period_days_err_plus": 8.7e-05,
+     "radius_earth": 2.78,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 308.5672242,
+   "stellar_mass_solar": 1.47,
+   "stellar_radius_solar": 1.64696,
+   "stellar_teff_k": 6815.85,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "HD 197518 B",
     "HIP 102295",
     "TIC 331484427",
@@ -370218,6 +372410,258 @@
    "system_planet_count": 1,
    "system_star_count": 1,
    "why_interesting": "Includes at least one very close-in confirmed planet."
+  },
+  {
+   "aliases": [
+    "TIC 331691841",
+    "TOI-5947 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 18.5834311,
+   "distance_pc": 57.6245,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5947",
+   "name": "TOI-5947",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 873.0,
+     "insolation_earth": 96.5124,
+     "key": "exoplanet-toi-5947-b",
+     "mass_calculated": true,
+     "mass_earth": 5.99,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5947 b",
+     "orbit_display_state": "none",
+     "period_days": 6.932019,
+     "period_days_err_minus": 2.8e-05,
+     "period_days_err_plus": 2.2e-05,
+     "radius_earth": 2.32,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 336.6946071,
+   "stellar_mass_solar": 0.95,
+   "stellar_radius_solar": 0.865864,
+   "stellar_teff_k": 5451.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 436764867",
+    "TOI-5958 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 24.2495703,
+   "distance_pc": 108.991,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5958",
+   "name": "TOI-5958",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1352.73,
+     "insolation_earth": 791.3346,
+     "key": "exoplanet-toi-5958-b",
+     "mass_calculated": true,
+     "mass_earth": 4.23,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5958 b",
+     "orbit_display_state": "none",
+     "period_days": 2.3061827,
+     "period_days_err_minus": 6.2e-06,
+     "period_days_err_plus": 9.9e-06,
+     "radius_earth": 1.89,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 345.6374497,
+   "stellar_mass_solar": 1.046,
+   "stellar_radius_solar": 0.963996,
+   "stellar_teff_k": 5816.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "HIP 114941",
+    "TIC 262689575",
+    "TOI-5961 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": 5.6958866,
+   "distance_pc": 26.2533,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5961",
+   "name": "TOI-5961",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 955.76,
+     "insolation_earth": 197.2075,
+     "key": "exoplanet-toi-5961-b",
+     "mass_calculated": true,
+     "mass_earth": 2.48,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5961 b",
+     "orbit_display_state": "none",
+     "period_days": 1.6175105,
+     "period_days_err_minus": 2.1e-06,
+     "period_days_err_plus": 2.8e-06,
+     "radius_earth": 1.38,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 349.2160437,
+   "spectral_type": "K7V:",
+   "stellar_mass_solar": 0.6,
+   "stellar_radius_solar": 0.70171,
+   "stellar_teff_k": 3900.68,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 431810418",
+    "TOI-5968 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 31.3539892,
+   "distance_pc": 122.831,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5968",
+   "name": "TOI-5968",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1180.0,
+     "insolation_earth": 322.574,
+     "key": "exoplanet-toi-5968-b",
+     "mass_calculated": true,
+     "mass_earth": 7.7,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5968 b",
+     "orbit_display_state": "none",
+     "period_days": 9.21504,
+     "period_days_err_minus": 7.6e-05,
+     "period_days_err_plus": 0.000164,
+     "radius_earth": 2.69,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 349.2675157,
+   "stellar_mass_solar": 1.085,
+   "stellar_radius_solar": 1.05723,
+   "stellar_teff_k": 5940.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 39516274",
+    "TOI-5997 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": 33.5705564,
+   "distance_pc": 46.521,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-5997",
+   "name": "TOI-5997",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 730.24,
+     "insolation_earth": 67.2014,
+     "key": "exoplanet-toi-5997-b",
+     "mass_calculated": true,
+     "mass_earth": 2.7,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-5997 b",
+     "orbit_display_state": "none",
+     "period_days": 5.655007,
+     "period_days_err_minus": 1.2e-05,
+     "period_days_err_plus": 1.2e-05,
+     "radius_earth": 1.45,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 263.1525777,
+   "stellar_mass_solar": 0.74,
+   "stellar_radius_solar": 0.704768,
+   "stellar_teff_k": 4674.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
   {
    "aliases": [
@@ -371172,6 +373616,56 @@
   },
   {
    "aliases": [
+    "TIC 269341832",
+    "TOI-6098 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": -48.0417719,
+   "distance_pc": 82.2325,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-6098",
+   "name": "TOI-6098",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1048.0,
+     "insolation_earth": 200.856,
+     "key": "exoplanet-toi-6098-b",
+     "mass_calculated": true,
+     "mass_earth": 5.9,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6098 b",
+     "orbit_display_state": "none",
+     "period_days": 2.72985,
+     "period_days_err_minus": 0.00012,
+     "period_days_err_plus": 0.00013,
+     "radius_earth": 2.3,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 118.9367947,
+   "stellar_mass_solar": 0.99,
+   "stellar_radius_solar": 1.07889,
+   "stellar_teff_k": 5599.26,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 384984325",
     "TOI-6109 b",
     "TOI-6109 c"
@@ -371503,6 +373997,56 @@
    "system_planet_count": 1,
    "system_star_count": 1,
    "why_interesting": "Includes at least one very close-in confirmed planet."
+  },
+  {
+   "aliases": [
+    "TIC 164280385",
+    "TOI-6174 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 32.5245356,
+   "distance_pc": 718.342,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-6174",
+   "name": "TOI-6174",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1490.0,
+     "insolation_earth": 819.047,
+     "key": "exoplanet-toi-6174-b",
+     "mass_calculated": true,
+     "mass_earth": 47.3,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6174 b",
+     "orbit_display_state": "none",
+     "period_days": 3.5247,
+     "period_days_err_minus": 0.0018,
+     "period_days_err_plus": 0.0016,
+     "radius_earth": 7.83,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 336.4000152,
+   "stellar_mass_solar": 1.0,
+   "stellar_radius_solar": 1.23261,
+   "stellar_teff_k": 5638.08,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
   {
    "aliases": [
@@ -371974,6 +374518,56 @@
   },
   {
    "aliases": [
+    "TIC 353893493",
+    "TOI-6310 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": 25.4132904,
+   "distance_pc": 96.6459,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-6310",
+   "name": "TOI-6310",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 836.0,
+     "insolation_earth": 81.3622,
+     "key": "exoplanet-toi-6310-b",
+     "mass_calculated": true,
+     "mass_earth": 9.85,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6310 b",
+     "orbit_display_state": "none",
+     "period_days": 3.352783,
+     "period_days_err_minus": 2.3e-05,
+     "period_days_err_plus": 2.6e-05,
+     "radius_earth": 3.11,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 37.7611169,
+   "stellar_mass_solar": 0.6,
+   "stellar_radius_solar": 0.71428,
+   "stellar_teff_k": 3896.76,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 372207328",
     "TOI-6324 b"
    ],
@@ -372382,6 +374976,56 @@
   },
   {
    "aliases": [
+    "TIC 32296259",
+    "TOI-6434 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -11.2423467,
+   "distance_pc": 128.006,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-6434",
+   "name": "TOI-6434",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 832.0,
+     "insolation_earth": 79.8073,
+     "key": "exoplanet-toi-6434-b",
+     "mass_calculated": true,
+     "mass_earth": 19.2,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6434 b",
+     "orbit_display_state": "none",
+     "period_days": 2.77791,
+     "period_days_err_minus": 0.00022,
+     "period_days_err_plus": 0.00022,
+     "radius_earth": 4.61,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 117.3287324,
+   "stellar_mass_solar": 0.631665,
+   "stellar_radius_solar": 0.656081,
+   "stellar_teff_k": 3982.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 320411045",
     "TOI-6448 b"
    ],
@@ -372448,6 +375092,56 @@
    "stellar_mass_solar": 1.03,
    "stellar_radius_solar": 0.897,
    "stellar_teff_k": 5910.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 47244580",
+    "TOI-6450 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -6.3138012,
+   "distance_pc": 296.583,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-6450",
+   "name": "TOI-6450",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 981.0,
+     "insolation_earth": 153.851,
+     "key": "exoplanet-toi-6450-b",
+     "mass_calculated": true,
+     "mass_earth": 42.5,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6450 b",
+     "orbit_display_state": "none",
+     "period_days": 3.6099,
+     "period_days_err_minus": 0.0004,
+     "period_days_err_plus": 0.00041,
+     "radius_earth": 7.36,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 134.6086213,
+   "stellar_mass_solar": 0.782,
+   "stellar_radius_solar": 0.794355,
+   "stellar_teff_k": 4823.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -372900,6 +375594,56 @@
   },
   {
    "aliases": [
+    "TIC 439943973",
+    "TOI-6647 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 42.8681961,
+   "distance_pc": 174.397,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-6647",
+   "name": "TOI-6647",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1451.0,
+     "insolation_earth": 736.757,
+     "key": "exoplanet-toi-6647-b",
+     "mass_calculated": true,
+     "mass_earth": 14.9,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6647 b",
+     "orbit_display_state": "none",
+     "period_days": 3.9992,
+     "period_days_err_minus": 0.0012,
+     "period_days_err_plus": 0.001,
+     "radius_earth": 3.97,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 1.2121501,
+   "stellar_mass_solar": 1.011,
+   "stellar_radius_solar": 1.52321,
+   "stellar_teff_k": 5684.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 174328045",
     "TOI-6651 b"
    ],
@@ -372967,6 +375711,56 @@
    "stellar_mass_solar": 1.323,
    "stellar_radius_solar": 1.721,
    "stellar_teff_k": 5940.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 418343229",
+    "TOI-6662 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": 74.7674107,
+   "distance_pc": 21.182,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-6662",
+   "name": "TOI-6662",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1113.59,
+     "insolation_earth": 363.4367,
+     "key": "exoplanet-toi-6662-b",
+     "mass_calculated": true,
+     "mass_earth": 0.779,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6662 b",
+     "orbit_display_state": "none",
+     "period_days": 0.29395013,
+     "period_days_err_minus": 5.5e-08,
+     "period_days_err_plus": 5.2e-08,
+     "radius_earth": 0.94,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 84.8560007,
+   "stellar_mass_solar": 0.313264,
+   "stellar_radius_solar": 0.33188,
+   "stellar_teff_k": 3359.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,
@@ -373529,6 +376323,85 @@
    "system_planet_count": 1,
    "system_star_count": 1,
    "why_interesting": "Includes at least one very close-in confirmed planet."
+  },
+  {
+   "aliases": [
+    "TIC 426032475",
+    "TOI-6729 b",
+    "TOI-6729 c"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": -75.2033076,
+   "distance_pc": 186.378,
+   "exoplanet_count": 2,
+   "key": "exosys-toi-6729",
+   "name": "TOI-6729",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1479.0,
+     "insolation_earth": 795.693,
+     "key": "exoplanet-toi-6729-b",
+     "mass_calculated": true,
+     "mass_earth": 3.22,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6729 b",
+     "orbit_display_state": "none",
+     "period_days": 3.863828,
+     "period_days_err_minus": 3.3e-05,
+     "period_days_err_plus": 3.8e-05,
+     "radius_earth": 1.61,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    },
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1682.59,
+     "insolation_earth": 1330.5937,
+     "key": "exoplanet-toi-6729-c",
+     "mass_calculated": true,
+     "mass_earth": 9.32,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-6729 c",
+     "orbit_display_state": "none",
+     "period_days": 7.837435,
+     "period_days_err_minus": 1.2e-05,
+     "period_days_err_plus": 1.5e-05,
+     "radius_earth": 3.01,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 45.3103823,
+   "stellar_mass_solar": 1.23,
+   "stellar_radius_solar": 1.86421,
+   "stellar_teff_k": 6289.7,
+   "system_moon_count": 0,
+   "system_planet_count": 2,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
   {
    "aliases": [
@@ -374962,6 +377835,56 @@
   },
   {
    "aliases": [
+    "TIC 408469564",
+    "TOI-7182 b"
+   ],
+   "color": "#fff1c1",
+   "dec_deg": 9.7846592,
+   "distance_pc": 91.8327,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-7182",
+   "name": "TOI-7182",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 818.0,
+     "insolation_earth": 74.4061,
+     "key": "exoplanet-toi-7182-b",
+     "mass_calculated": true,
+     "mass_earth": 4.98,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-7182 b",
+     "orbit_display_state": "none",
+     "period_days": 14.71272,
+     "period_days_err_minus": 0.00027,
+     "period_days_err_plus": 0.00023,
+     "radius_earth": 2.08,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 359.2621221,
+   "stellar_mass_solar": 1.17,
+   "stellar_radius_solar": 1.34051,
+   "stellar_teff_k": 6156.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 18885659",
     "TOI-7189 b"
    ],
@@ -375309,6 +378232,106 @@
   },
   {
    "aliases": [
+    "TIC 224603921",
+    "TOI-7389 b"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": 56.9881867,
+   "distance_pc": 100.677,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-7389",
+   "name": "TOI-7389",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1093.0,
+     "insolation_earth": 237.78,
+     "key": "exoplanet-toi-7389-b",
+     "mass_calculated": true,
+     "mass_earth": 2.39,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-7389 b",
+     "orbit_display_state": "none",
+     "period_days": 26.345368,
+     "period_days_err_minus": 0.000129,
+     "period_days_err_plus": 9.4e-05,
+     "radius_earth": 1.35,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 255.3362808,
+   "stellar_mass_solar": 1.07,
+   "stellar_radius_solar": 1.16261,
+   "stellar_teff_k": 5895.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 258776466",
+    "TOI-7391 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": 70.6374855,
+   "distance_pc": 73.2382,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-7391",
+   "name": "TOI-7391",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 433.38,
+     "insolation_earth": 8.337,
+     "key": "exoplanet-toi-7391-b",
+     "mass_calculated": true,
+     "mass_earth": 3.12,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-7391 b",
+     "orbit_display_state": "none",
+     "period_days": 7.4108814,
+     "period_days_err_minus": 9.2e-06,
+     "period_days_err_plus": 9.9e-06,
+     "radius_earth": 1.58,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 286.4690511,
+   "stellar_mass_solar": 0.410219,
+   "stellar_radius_solar": 0.416718,
+   "stellar_teff_k": 3578.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
     "TIC 165598669",
     "TOI-7393 b"
    ],
@@ -375619,6 +378642,56 @@
    "stellar_teff_k": 5720.0,
    "system_moon_count": 0,
    "system_planet_count": 3,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 220599411",
+    "TOI-7550 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -44.6745698,
+   "distance_pc": 103.36,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-7550",
+   "name": "TOI-7550",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 938.34,
+     "insolation_earth": 128.8611,
+     "key": "exoplanet-toi-7550-b",
+     "mass_calculated": true,
+     "mass_earth": 8.75,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-7550 b",
+     "orbit_display_state": "none",
+     "period_days": 4.984407,
+     "period_days_err_minus": 2.5e-05,
+     "period_days_err_plus": 1.8e-05,
+     "radius_earth": 2.9,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 83.0488162,
+   "stellar_mass_solar": 0.612794,
+   "stellar_radius_solar": 0.631148,
+   "stellar_teff_k": 3775.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
    "system_star_count": 1,
    "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
@@ -376415,6 +379488,292 @@
   },
   {
    "aliases": [
+    "TIC 451645081",
+    "TOI-783 b"
+   ],
+   "color": "#f4a278",
+   "dec_deg": -54.7842227,
+   "distance_pc": 55.3043,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-783",
+   "name": "TOI-783",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 611.12,
+     "insolation_earth": 32.9624,
+     "key": "exoplanet-toi-783-b",
+     "mass_calculated": true,
+     "mass_earth": 6.66,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-783 b",
+     "orbit_display_state": "none",
+     "period_days": 8.1125118,
+     "period_days_err_minus": 5.7e-06,
+     "period_days_err_plus": 5.6e-06,
+     "radius_earth": 2.47,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 172.1556368,
+   "stellar_mass_solar": 0.71,
+   "stellar_radius_solar": 0.668361,
+   "stellar_teff_k": 4498.94,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 375059587",
+    "TOI-786 b",
+    "TOI-786 c"
+   ],
+   "color": "#ffd28c",
+   "dec_deg": -63.3391076,
+   "distance_pc": 167.948,
+   "exoplanet_count": 2,
+   "key": "exosys-toi-786",
+   "name": "TOI-786",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 1172.12,
+     "insolation_earth": 313.3423,
+     "key": "exoplanet-toi-786-b",
+     "mass_calculated": true,
+     "mass_earth": 6.39,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-786 b",
+     "orbit_display_state": "none",
+     "period_days": 12.6694005,
+     "period_days_err_minus": 1.04e-05,
+     "period_days_err_plus": 9e-06,
+     "radius_earth": 2.41,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    },
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 780.65,
+     "insolation_earth": 61.6529,
+     "key": "exoplanet-toi-786-c",
+     "mass_calculated": true,
+     "mass_earth": 7.27,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-786 c",
+     "orbit_display_state": "none",
+     "period_days": 38.554097,
+     "period_days_err_minus": 0.000118,
+     "period_days_err_plus": 9.6e-05,
+     "radius_earth": 2.6,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 100.1042147,
+   "stellar_mass_solar": 1.06,
+   "stellar_radius_solar": 1.31434,
+   "stellar_teff_k": 5853.8,
+   "system_moon_count": 0,
+   "system_planet_count": 2,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 300710077",
+    "TOI-789 b",
+    "TOI-789 c",
+    "TOI-789 d"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": -71.303764,
+   "distance_pc": 43.407,
+   "exoplanet_count": 3,
+   "key": "exosys-toi-789",
+   "name": "TOI-789",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.05,
+     "eccentricity_limit": 1,
+     "ephemeris_period_days": 5.447034,
+     "ephemeris_period_days_err_minus": 5e-06,
+     "ephemeris_period_days_err_plus": 5e-06,
+     "ephemeris_reference_label": "Pag\u00e9s Navarrete 2026",
+     "ephemeris_reference_time_jd": 2458329.1067,
+     "ephemeris_reference_time_jd_err_minus": 0.0013,
+     "ephemeris_reference_time_jd_err_plus": 0.0013,
+     "ephemeris_reference_type": "conjunction",
+     "ephemeris_reference_url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260922945P/abstract",
+     "ephemeris_source_table": "pscomppars",
+     "ephemeris_time_system": "BJD",
+     "equilibrium_temperature_k": 448.0,
+     "insolation_earth": 9.5,
+     "key": "exoplanet-toi-789-b",
+     "mass_earth": 3.7,
+     "mass_provenance": "Mass",
+     "name": "TOI-789 b",
+     "orbit_display_state": "position",
+     "period_days": 5.447034,
+     "period_days_err_minus": 5e-06,
+     "period_days_err_plus": 5e-06,
+     "radius_earth": 1.18,
+     "references": [
+      {
+       "label": "Pag\u00e9s Navarrete 2026",
+       "quantities": [
+        "period",
+        "semi_major_axis",
+        "radius",
+        "mass"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260922945P/abstract"
+      }
+     ],
+     "semi_major_axis_au": 0.043,
+     "semi_major_axis_au_err_minus": 0.001,
+     "semi_major_axis_au_err_plus": 0.001
+    },
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.05,
+     "eccentricity_limit": 1,
+     "ephemeris_period_days": 8.0432344,
+     "ephemeris_period_days_err_minus": 1.23e-05,
+     "ephemeris_period_days_err_plus": 1.23e-05,
+     "ephemeris_reference_label": "Pag\u00e9s Navarrete 2026",
+     "ephemeris_reference_time_jd": 2458329.9785,
+     "ephemeris_reference_time_jd_err_minus": 0.0031,
+     "ephemeris_reference_time_jd_err_plus": 0.0031,
+     "ephemeris_reference_type": "conjunction",
+     "ephemeris_reference_url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260922945P/abstract",
+     "ephemeris_source_table": "pscomppars",
+     "ephemeris_time_system": "BJD",
+     "equilibrium_temperature_k": 394.0,
+     "insolation_earth": 5.7,
+     "key": "exoplanet-toi-789-c",
+     "mass_earth": 3.0,
+     "mass_provenance": "Mass",
+     "name": "TOI-789 c",
+     "orbit_display_state": "position",
+     "period_days": 8.0432344,
+     "period_days_err_minus": 1.23e-05,
+     "period_days_err_plus": 1.23e-05,
+     "radius_earth": 1.15,
+     "references": [
+      {
+       "label": "Pag\u00e9s Navarrete 2026",
+       "quantities": [
+        "period",
+        "semi_major_axis",
+        "radius",
+        "mass"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260922945P/abstract"
+      }
+     ],
+     "semi_major_axis_au": 0.056,
+     "semi_major_axis_au_err_minus": 0.002,
+     "semi_major_axis_au_err_plus": 0.002
+    },
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.05,
+     "eccentricity_limit": 1,
+     "ephemeris_period_days": 12.970689,
+     "ephemeris_period_days_err_minus": 1.53e-05,
+     "ephemeris_period_days_err_plus": 1.53e-05,
+     "ephemeris_reference_label": "Pag\u00e9s Navarrete 2026",
+     "ephemeris_reference_time_jd": 2458334.7672,
+     "ephemeris_reference_time_jd_err_minus": 0.0025,
+     "ephemeris_reference_time_jd_err_plus": 0.0025,
+     "ephemeris_reference_type": "conjunction",
+     "ephemeris_reference_url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260922945P/abstract",
+     "ephemeris_source_table": "pscomppars",
+     "ephemeris_time_system": "BJD",
+     "equilibrium_temperature_k": 336.0,
+     "insolation_earth": 3.0,
+     "key": "exoplanet-toi-789-d",
+     "mass_earth": 6.6,
+     "mass_provenance": "Mass",
+     "name": "TOI-789 d",
+     "orbit_display_state": "position",
+     "period_days": 12.970689,
+     "period_days_err_minus": 1.53e-05,
+     "period_days_err_plus": 1.53e-05,
+     "radius_earth": 1.4,
+     "references": [
+      {
+       "label": "Pag\u00e9s Navarrete 2026",
+       "quantities": [
+        "period",
+        "semi_major_axis",
+        "radius",
+        "mass"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260922945P/abstract"
+      }
+     ],
+     "semi_major_axis_au": 0.077,
+     "semi_major_axis_au_err_minus": 0.002,
+     "semi_major_axis_au_err_plus": 0.002
+    }
+   ],
+   "ra_deg": 115.2702252,
+   "spectral_type": "M3 V",
+   "stellar_mass_solar": 0.358,
+   "stellar_radius_solar": 0.371,
+   "stellar_teff_k": 3471.0,
+   "system_moon_count": 0,
+   "system_planet_count": 3,
+   "system_star_count": 1,
+   "why_interesting": "Includes at least one very close-in confirmed planet."
+  },
+  {
+   "aliases": [
     "TIC 306472057",
     "TOI-791 b",
     "TOI-791 c"
@@ -376532,6 +379891,56 @@
    "stellar_teff_k": 6294.0,
    "system_moon_count": 0,
    "system_planet_count": 2,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 271596225",
+    "TOI-797 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": -74.6030949,
+   "distance_pc": 56.1927,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-797",
+   "name": "TOI-797",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 729.35,
+     "insolation_earth": 66.8766,
+     "key": "exoplanet-toi-797-b",
+     "mass_calculated": true,
+     "mass_earth": 1.92,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-797 b",
+     "orbit_display_state": "none",
+     "period_days": 1.80079489,
+     "period_days_err_minus": 9.2e-07,
+     "period_days_err_plus": 8.1e-07,
+     "radius_earth": 1.21,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 108.5630862,
+   "stellar_mass_solar": 0.471474,
+   "stellar_radius_solar": 0.473702,
+   "stellar_teff_k": 3607.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
    "system_star_count": 1,
    "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
   },
@@ -377366,6 +380775,56 @@
    "stellar_mass_solar": 0.758,
    "stellar_radius_solar": 0.719,
    "stellar_teff_k": 4929.0,
+   "system_moon_count": 0,
+   "system_planet_count": 1,
+   "system_star_count": 1,
+   "why_interesting": "A confirmed exoplanet host system from the NASA Exoplanet Archive."
+  },
+  {
+   "aliases": [
+    "TIC 237920046",
+    "TOI-873 b"
+   ],
+   "color": "#f08f6f",
+   "dec_deg": -63.3368784,
+   "distance_pc": 76.9563,
+   "exoplanet_count": 1,
+   "key": "exosys-toi-873",
+   "name": "TOI-873",
+   "planets": [
+    {
+     "detected_by_transit": true,
+     "discovery_method": "Transit",
+     "discovery_year": 2026,
+     "eccentricity": 0.0,
+     "equilibrium_temperature_k": 518.03,
+     "insolation_earth": 17.019,
+     "key": "exoplanet-toi-873-b",
+     "mass_calculated": true,
+     "mass_earth": 3.36,
+     "mass_provenance": "M-R relationship",
+     "name": "TOI-873 b",
+     "orbit_display_state": "none",
+     "period_days": 5.9312268,
+     "period_days_err_minus": 8e-06,
+     "period_days_err_plus": 8.3e-06,
+     "radius_earth": 1.65,
+     "references": [
+      {
+       "label": "Collier et al. 2026",
+       "quantities": [
+        "period",
+        "radius"
+       ],
+       "url": "https://ui.adsabs.harvard.edu/abs/2026arXiv260821560C/abstract"
+      }
+     ]
+    }
+   ],
+   "ra_deg": 56.7366363,
+   "stellar_mass_solar": 0.517851,
+   "stellar_radius_solar": 0.5204,
+   "stellar_teff_k": 3694.0,
    "system_moon_count": 0,
    "system_planet_count": 1,
    "system_star_count": 1,

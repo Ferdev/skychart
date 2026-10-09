@@ -288,10 +288,6 @@ defmodule StarsmapApi.Catalog.SnapshotStore do
   defp source_table_for(%{source_type: "exoplanet_archive_planet"}),
     do: "catalog_exoplanet_objects"
 
-  defp source_table_for(%{source_type: source_type})
-       when source_type in ["tess_toi_host", "tess_toi_candidate"],
-       do: "catalog_exoplanet_objects"
-
   defp source_table_for(%{source_type: "simbad_tap"}), do: "catalog_simbad_objects"
 
   defp source_table_for(%{source_type: "curated_extragalactic_survey"}),

@@ -40,17 +40,26 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
                            )
   @exoplanet_orbit_display_states ~w(position orbit_only)
 
-  # A planet candidate is a row of the TESS Objects of Interest table. It
-  # has the orbit facts of a confirmed planet where the table gives them.
+  # A planet candidate is a row of a candidate table (TESS, Kepler, K2) or a
+  # signal of a community report. It has the orbit facts of a confirmed planet
+  # where the source gives them. The catalog of a candidate gives the prefix of
+  # its source types and of its position models.
+  @exoplanet_candidate_catalogs %{
+    "toi" => %{prefix: "tess_toi", label: "TESS"},
+    "koi" => %{prefix: "kepler_koi", label: "Kepler"},
+    "k2" => %{prefix: "k2_pandc", label: "K2"},
+    "community" => %{prefix: "community_report", label: "community-reported"}
+  }
   @exoplanet_candidate_summary_fields ~w(
     key name disposition radius_earth period_days semi_major_axis_au
   )
   @exoplanet_candidate_fact_fields ~w(
-    host_key host_name toi tic_id disposition tfopwg_disposition community_alias
-    equilibrium_temperature_k insolation_earth detected_by_transit transit_depth_ppm
-    transit_duration_hours toi_created toi_updated semi_major_axis_atlas_calculated
-    why_interesting orbit_display_state ephemeris_reference_type ephemeris_time_system
-    ephemeris_source_table
+    host_key host_name toi tic_id kic_id epic_id source_catalog disposition disposition_source
+    disposition_score tfopwg_disposition community_alias candidate_note equilibrium_temperature_k
+    insolation_earth detected_by_transit transit_depth_ppm transit_duration_hours toi_created
+    toi_updated inclination_deg semi_major_axis_atlas_calculated semi_major_axis_calculated
+    references why_interesting orbit_display_state ephemeris_reference_type
+    ephemeris_time_system ephemeris_source_table
   ) ++
                                      Enum.flat_map(
                                        ~w(radius_earth period_days semi_major_axis_au
@@ -125,21 +134,44 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
     base_row(entry, source_meta, position, %{
       object_type: "star",
       catalog_group: "exoplanet_candidate_hosts",
-      source_type: "tess_toi_host",
-      position_model: "tess_toi_coordinates",
+      source_type: "#{exoplanet_candidate_prefix(entry)}_host",
+      # A star that is also a Gaia local star has the position of that record.
+      position_model:
+        entry["position_model"] || "#{exoplanet_candidate_prefix(entry)}_coordinates",
       radius_km: solar_radius_to_km(entry["stellar_radius_solar"]),
       aliases: list(entry["aliases"]),
-      external_ids: external_ids_from_aliases(entry["aliases"]),
+      external_ids:
+        entry["aliases"]
+        |> external_ids_from_aliases()
+        |> Map.merge(exoplanet_candidate_ids(entry)),
       facts:
         take(entry, [
           "candidate_count",
           "tic_id",
+          "kic_id",
+          "epic_id",
           "tess_magnitude",
+          "kepler_magnitude",
           "stellar_radius_solar",
           "stellar_teff_k",
           "stellar_logg",
           "stellar_mass_solar",
           "stellar_mass_atlas_calculated",
+          "distance_source",
+          "distance_pc_err_plus",
+          "distance_pc_err_minus",
+          "report_label",
+          "report_url",
+          "position_source_key",
+          "parallax_mas",
+          "parallax_over_error",
+          "pmra_mas_yr",
+          "pmdec_mas_yr",
+          "source_epoch",
+          "position_epoch",
+          "catalog_ra_deg",
+          "catalog_dec_deg",
+          "proper_motion_note",
           "why_interesting"
         ])
         |> Map.put("candidates", Enum.map(candidates, &exoplanet_candidate_summary/1)),
@@ -158,13 +190,12 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
     base_row(entry, source_meta, position, %{
       object_type: "planet_candidate",
       catalog_group: "exoplanet_candidates",
-      source_type: "tess_toi_candidate",
+      source_type: "#{exoplanet_candidate_prefix(entry)}_candidate",
       position_model: exoplanet_candidate_position_model(entry),
       parent_key: entry["parent_key"],
       radius_km: earth_radius_to_km(entry["radius_earth"]),
       aliases: list(entry["aliases"]),
-      external_ids:
-        reject_nil_values(%{"toi" => entry["toi"], "tic" => prefixed_id("TIC", entry["tic_id"])}),
+      external_ids: Map.put(exoplanet_candidate_ids(entry), "toi", entry["toi"]),
       facts: take(entry, @exoplanet_candidate_fact_fields),
       search_values: [
         entry["host_name"],
@@ -561,7 +592,7 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
     names
     |> Enum.filter(&is_binary/1)
     |> Enum.flat_map(fn name ->
-      case Regex.run(~r/^(TIC|TOI|HD|HIP|HR|GJ|TYC|KIC|EPIC)[\s-]+(\S+)$/i, name) do
+      case Regex.run(~r/^(TIC|TOI|KOI|HD|HIP|HR|GJ|TYC|KIC|EPIC)[\s-]+(\S+)$/i, name) do
         [_match, prefix, number] -> [prefix <> number]
         _ -> []
       end
@@ -871,12 +902,14 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
   end
 
   @doc """
-  Candidate entries of one TOI star. `host` is the record that the candidates
-  belong to: the TOI star, or a confirmed-planet host that is the same star.
-  The candidates take the key, the name, and the coordinates of that record.
+  Candidate entries of one star. `host` is the record that the candidates
+  belong to: the star of the candidate catalog, or a confirmed-planet host
+  that is the same star. The candidates take the key, the name, and the
+  coordinates of that record.
   """
   def exoplanet_candidate_entries(system, host) do
     host_name = host["name"]
+    label = @exoplanet_candidate_catalogs[exoplanet_candidate_catalog(system)].label
 
     system
     |> Map.get("candidates", [])
@@ -886,14 +919,17 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
         "parent_key" => host["key"],
         "host_key" => host["key"],
         "host_name" => host_name,
+        "catalog" => system["catalog"],
         "tic_id" => system["tic_id"],
-        "aliases" => [candidate["name"], "TOI #{candidate["toi"]}"],
+        "kic_id" => system["kic_id"],
+        "epic_id" => system["epic_id"],
+        "aliases" => Enum.uniq([candidate["name"] | list(candidate["aliases"])]),
         "ra_deg" => host["ra_deg"],
         "dec_deg" => host["dec_deg"],
         "distance_pc" => host["distance_pc"],
         "color" => candidate["color"] || "#c9b8ff",
         "why_interesting" =>
-          "A TESS planet candidate at #{host_name}. It is not a confirmed planet."
+          "A #{label} planet candidate at #{host_name}. It is not a confirmed planet."
       })
     end)
   end
@@ -902,11 +938,30 @@ defmodule StarsmapApi.Catalog.Importer.RowMapper do
   def exoplanet_candidate_summary(candidate),
     do: take(candidate, @exoplanet_candidate_summary_fields)
 
-  defp exoplanet_candidate_position_model(%{"orbit_display_state" => state})
+  defp exoplanet_candidate_position_model(%{"orbit_display_state" => state} = entry)
        when state in @exoplanet_orbit_display_states,
-       do: "tess_toi_host_relative_orbit"
+       do: "#{exoplanet_candidate_prefix(entry)}_host_relative_orbit"
 
-  defp exoplanet_candidate_position_model(_entry), do: "tess_toi_host_coordinates"
+  defp exoplanet_candidate_position_model(entry),
+    do: "#{exoplanet_candidate_prefix(entry)}_host_coordinates"
+
+  # A snapshot of schema version 1 has TESS candidates only and no catalog field.
+  defp exoplanet_candidate_catalog(%{"catalog" => catalog})
+       when is_map_key(@exoplanet_candidate_catalogs, catalog),
+       do: catalog
+
+  defp exoplanet_candidate_catalog(_entry), do: "toi"
+
+  defp exoplanet_candidate_prefix(entry),
+    do: @exoplanet_candidate_catalogs[exoplanet_candidate_catalog(entry)].prefix
+
+  defp exoplanet_candidate_ids(entry) do
+    reject_nil_values(%{
+      "tic" => prefixed_id("TIC", entry["tic_id"]),
+      "kic" => prefixed_id("KIC", entry["kic_id"]),
+      "epic" => prefixed_id("EPIC", entry["epic_id"])
+    })
+  end
 
   defp exoplanet_summary(planet) when is_map(planet) do
     planet

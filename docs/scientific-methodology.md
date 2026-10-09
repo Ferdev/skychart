@@ -203,8 +203,8 @@ host. With an argument of periastron `w` and a true anomaly `f`, `u = w + f`.
 
 A planet has its own marker only when its orbit is at least 4 pixels wide. At
 a smaller scale the host star represents the system. The snapshot of
-2026-10-08 has 6,347 planets in 4,752 systems: 5,352 with a calculated
-position, 568 with an orbit only, and 427 with no orbit.
+2026-10-09 has 6,417 planets in 4,814 systems: 5,358 with a calculated
+position, 568 with an orbit only, and 491 with no orbit.
 
 ### Precision
 
@@ -238,64 +238,110 @@ AU.
 
 ## Planet candidates
 
-The atlas shows the planet candidates of the NASA Exoplanet Archive TESS
-Objects of Interest (TOI) table. A candidate is not a confirmed planet: TESS
-found a signal that looks like a transit, and follow-up observations show
-that many such signals have a different cause, for example an eclipsing
-binary star. The inspector, the search result, the candidate list of a star,
-and the map note each say that a candidate is not confirmed.
+The atlas shows planet candidates from three tables of the NASA Exoplanet
+Archive and from community reports. A candidate is not a confirmed planet:
+the source reports a signal that looks like a transit, and follow-up
+observations show that many such signals have a different cause, for example
+an eclipsing binary star. The inspector, the search result, the candidate
+list of a star, and the map note each say that a candidate is not confirmed.
 
-Selection (`scripts/build_exoplanet_candidate_catalog.py`):
+Sources (`scripts/build_exoplanet_candidate_catalog.py`, snapshot
+`data/catalogs/exoplanet_candidates.json`, schema version 2):
 
-- Rows with the TFOPWG disposition `PC` (planet candidate) or `APC` (ambiguous
-  planet candidate). Confirmed planets (`CP`), known planets (`KP`), false
-  positives (`FP`), and false alarms (`FA`) are not in the layer.
-- Rows with a star distance. A star with no distance has no place in the
-  atlas and the builder counts it in `coverage.excluded_no_distance`.
-- A candidate that is not in the TOI table (for example a community candidate
-  with no TOI number) is not in the layer.
+| Catalog | Source | Rows that the atlas keeps |
+| --- | --- | --- |
+| `toi` | TESS Objects of Interest table | TFOPWG disposition `PC` or `APC` |
+| `koi` | Kepler Objects of Interest, cumulative table | disposition `CANDIDATE` |
+| `k2` | K2 Planets and Candidates table | disposition `CANDIDATE`, default row |
+| `community` | Reports in `COMMUNITY_REPORTS` of the builder | each listed signal |
+
+- Confirmed planets, known planets, false positives, and false alarms of
+  these tables are not in the layer.
+- A star with no distance has no place in the atlas. The builder counts the
+  rows that it does not keep in `coverage.<catalog>.excluded_no_distance`.
+- The KOI table gives no star distance. The distance is that of Berger et al.
+  (2020), the Gaia-Kepler Stellar Properties Catalog (VizieR `J/AJ/159/280`),
+  by exact KIC number.
+- A candidate table can keep a candidate after the archive confirms it. The
+  importer does not import a candidate that has the period of a confirmed
+  planet of the same star (difference below 0.1 %): the confirmed catalog has
+  that planet.
+
+Community reports:
+
+- A report goes in the list only with a public, citable record and a
+  published ephemeris. The record names the report and links to it.
+- No mission team reviewed such a report. The status in the inspector says
+  "Community report, not reviewed by a mission team", and the note of the
+  report gives the limits that its author states.
+- The list has one report now: Rabtsevich (2026), two transit-like signals in
+  TESS photometry of TIC 4206066 (3.18 d and 11.13 d), preprint
+  doi:10.5281/zenodo.22967456. The report claims no statistical validation,
+  and it calls the 11.13 d signal tentative.
 
 Catalog records:
 
-- A candidate has the object type `planet_candidate`, the group
-  `exoplanet_candidates`, and the key `toi-<star number>-<candidate number>`.
+- A candidate has the object type `planet_candidate` and the group
+  `exoplanet_candidates`. Keys: `toi-<star>-<number>`, `koi-<star>-<number>`,
+  `epic-<star>-<number>`, and the key of the report for a community signal.
   The confirmed planet count of a star does not include candidates.
-- A star with the same TIC number as a confirmed-planet host is that host:
-  its candidates are attached to the host record and use its coordinates.
-  Each other star gets a record in the group `exoplanet_candidate_hosts`, at
-  the coordinates and the distance of the TOI table (position model
-  `tess_toi_coordinates`).
+- Each star has a list of identifiers (TIC, KIC, EPIC, Gaia DR3, HD, HIP, or
+  the name of its confirmed host). A star with an identifier of a
+  confirmed-planet host is that host: its candidates are attached to the host
+  record and use its coordinates.
+- Each other star gets a record in the group `exoplanet_candidate_hosts`. If a
+  Gaia local star has the TIC number or the Gaia DR3 name of the star, the
+  record has the position and the position model of that Gaia record
+  (`facts.position_source_key`), so the two records of one star are at one
+  place. If not, the record has the coordinates and the distance of its
+  source (position models `tess_toi_coordinates`, `kepler_koi_coordinates`,
+  `k2_pandc_coordinates`, `community_report_coordinates`).
 
-Orbit:
+Orbit size:
 
-- The TOI table gives the period and the transit midpoint (BJD in TDB). It
-  gives no orbit size and no star mass. The builder calculates the star mass
-  from the surface gravity and the radius, `M = g R^2 / G`, and the orbit size
-  from Kepler's third law, `a^3 = M P^2` (solar masses, years, AU). The facts
-  `stellar_mass_atlas_calculated` and `semi_major_axis_atlas_calculated` mark
-  these values, and the inspector says "calculated by the atlas".
-- The uncertainty of the orbit size comes from the published uncertainties of
-  the surface gravity and the radius, where the table has them. A mass below
-  0.05 or above 5 solar masses, or with an uncertainty as large as the mass,
-  gives no orbit.
-- The position rules are those of a confirmed planet: the transit midpoint is
-  the conjunction time, the orbit is a circle that is drawn edge-on, the node
-  angle is the same display convention, and a phase uncertainty above 0.25
-  orbit gives a ring and no marker. A candidate with no period, or with no
-  usable star data, has the model `tess_toi_host_coordinates`: no ring and no
-  marker.
+- TESS: the table gives no orbit size and no star mass. The builder
+  calculates the star mass from the surface gravity and the radius,
+  `M = g R^2 / G`, and the orbit size from Kepler's third law, `a^3 = M P^2`
+  (solar masses, years, AU).
+- Kepler: the orbit size is the value of the Kepler pipeline (`koi_sma`). The
+  inspector says "calculated by the archive". The table gives no uncertainty
+  for it.
+- K2: a published orbit size is used where the default row gives one. If not,
+  the builder calculates it from the period and the star mass of the same
+  row: the published mass, or the mass from the surface gravity and the
+  radius. Many K2 rows have no star mass, so those candidates have no orbit.
+- Community report: the builder calculates the orbit size from the period and
+  the star mass of the report.
+- The facts `stellar_mass_atlas_calculated` and
+  `semi_major_axis_atlas_calculated` mark the atlas calculations, and the
+  inspector says "calculated by the atlas". A mass below 0.05 or above 5
+  solar masses, or with an uncertainty as large as the mass, gives no orbit.
+
+Position:
+
+- The rules are those of a confirmed planet: the transit midpoint is the
+  conjunction time, the orbit is a circle, the node angle is the same display
+  convention, and a phase uncertainty above 0.25 orbit gives a ring and no
+  marker. The orbit is drawn edge-on, except for a Kepler candidate, which
+  has the inclination of its transit fit.
+- Most K2 ephemerides are some years old. Their phase uncertainty at the
+  atlas time is often above 0.25 orbit, and then the candidate has a ring and
+  no marker.
+- A candidate with no orbit size has the model
+  `<catalog prefix>_host_coordinates`: no ring and no marker.
 - A candidate ring is violet and dotted. A confirmed-planet ring is blue and
   dashed. With a candidate ring in view, the map note says that candidates
-  are not confirmed planets and that the atlas calculates their orbit size.
+  are not confirmed planets.
 
 Limits:
 
 - The map loads the stars of candidates only at view widths below 40
   light-years. No tile layer contains them, so a wide view does not show them.
-- The Gaia or Hipparcos record of the same star uses its own astrometry, so
-  it can show as a second star marker, as for a confirmed-planet host.
-- The dispositions change when the TESS follow-up working group reviews a
-  candidate. The snapshot shows the state at its generation time.
+- The Gaia or Hipparcos record of the same star can show as a second star
+  marker near a candidate star that is not in the Gaia local catalog, as for
+  a confirmed-planet host.
+- The dispositions change when a follow-up group reviews a candidate. The
+  snapshot shows the state at its generation time.
 
 ## Distance evidence
 
@@ -369,6 +415,10 @@ instead of leaving a broken image or pretending the fallback is DR11.
 - [IAU Resolution B5 and dwarf-planet classifications](https://www.iau.org/static/resolutions/Resolution_GA26-5-6.pdf)
 - [NASA Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu/)
 - [NASA Exoplanet Archive TESS Objects of Interest table](https://exoplanetarchive.ipac.caltech.edu/docs/API_TOI_columns.html)
+- [NASA Exoplanet Archive Kepler Objects of Interest table](https://exoplanetarchive.ipac.caltech.edu/docs/API_kepcandidate_columns.html)
+- [NASA Exoplanet Archive K2 Planets and Candidates table](https://exoplanetarchive.ipac.caltech.edu/docs/API_k2pandc_columns.html)
+- [Berger et al. 2020, Gaia-Kepler Stellar Properties Catalog](https://doi.org/10.3847/1538-3881/159/6/280)
+- [Rabtsevich 2026, two transit-like signals in TESS photometry of TIC 4206066 (preprint)](https://doi.org/10.5281/zenodo.22967456)
 - [BASS Data Release 2](https://www.bass-survey.com/dr2.html)
 - [BASS DR2 black-hole mass catalog at VizieR](https://cdsarc.cds.unistra.fr/viz-bin/cat/J/ApJS/261/2)
 - [DESI Data Release 1](https://data.desi.lbl.gov/doc/releases/dr1/)

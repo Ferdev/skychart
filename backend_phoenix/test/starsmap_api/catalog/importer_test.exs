@@ -711,7 +711,7 @@ defmodule StarsmapApi.Catalog.ImporterTest do
             "ra_deg" => 1.0,
             "dec_deg" => 2.0,
             "distance_pc" => 3.0,
-            "planets" => [%{"name" => "Test Host b"}]
+            "planets" => [%{"name" => "Test Host b", "period_days" => 5.0}]
           }
         ]
       })
@@ -723,7 +723,11 @@ defmodule StarsmapApi.Catalog.ImporterTest do
         "schema_version" => 1,
         "source" => %{"table" => "toi"},
         "systems" => [
-          candidate_system("100", "111", [candidate("100", "03")]),
+          # TOI-100.01 has the period of the confirmed planet: it is that planet and is not imported.
+          candidate_system("100", "111", [
+            candidate("100", "01", %{"period_days" => 5.002}),
+            candidate("100", "03")
+          ]),
           candidate_system("200", "222", [candidate("200", "01")])
         ]
       })
@@ -752,6 +756,7 @@ defmodule StarsmapApi.Catalog.ImporterTest do
     assert [%{"key" => "toi-100-03", "name" => "TOI-100.03"}] = confirmed.facts["candidates"]
     assert [%{"name" => "Test Host b"}] = confirmed.facts["planets"]
 
+    assert {:error, :not_found} = PublicObjects.get_by_key("toi-100-01")
     assert {:ok, at_confirmed} = PublicObjects.get_by_key("toi-100-03")
     assert at_confirmed.object_type == "planet_candidate"
     assert at_confirmed.parent_key == "exosys-test"
@@ -773,11 +778,192 @@ defmodule StarsmapApi.Catalog.ImporterTest do
     assert Repo.aggregate(CatalogSourceObject, :count, :id) == 5
   end
 
+  test "maps Kepler, K2, and community candidates with the source types and models of their catalog" do
+    koi =
+      candidate_system("753", nil, [
+        candidate("753", "01", %{
+          "key" => "koi-753-01",
+          "name" => "KOI-753.01",
+          "toi" => nil,
+          "aliases" => ["KOI 753.01"]
+        })
+      ])
+      |> Map.merge(%{
+        "catalog" => "koi",
+        "key" => "koi-753",
+        "name" => "KOI-753",
+        "kic_id" => "10811496",
+        "aliases" => ["KOI-753", "KIC 10811496"],
+        "distance_source" => "Berger et al. 2020"
+      })
+
+    host = Importer.attrs_for_entry!({:exoplanet_candidate_system, koi})
+    assert host.source_type == "kepler_koi_host"
+    assert host.position_model == "kepler_koi_coordinates"
+    assert host.catalog_group == "exoplanet_candidate_hosts"
+    assert host.external_ids == %{"kic" => "KIC 10811496"}
+    assert host.facts["distance_source"] == "Berger et al. 2020"
+    assert host.search_text =~ "koi753"
+    assert host.search_text =~ "kic10811496"
+
+    assert [candidate] =
+             koi
+             |> RowMapper.exoplanet_candidate_entries(koi)
+             |> Enum.map(&Importer.attrs_for_entry!({:exoplanet_candidate, &1}))
+
+    assert candidate.source_type == "kepler_koi_candidate"
+    assert candidate.position_model == "kepler_koi_host_relative_orbit"
+    assert candidate.object_type == "planet_candidate"
+    assert candidate.aliases == ["KOI-753.01", "KOI 753.01"]
+    assert candidate.external_ids == %{"kic" => "KIC 10811496"}
+
+    assert candidate.facts["why_interesting"] ==
+             "A Kepler planet candidate at KOI-753. It is not a confirmed planet."
+
+    assert candidate.search_text =~ "koi753.01"
+
+    for {catalog, prefix} <- [{"k2", "k2_pandc"}, {"community", "community_report"}] do
+      system =
+        Map.put(
+          candidate_system("9", "9", [candidate("9", "01", %{"orbit_display_state" => "none"})]),
+          "catalog",
+          catalog
+        )
+
+      assert Importer.attrs_for_entry!({:exoplanet_candidate_system, system}).source_type ==
+               "#{prefix}_host"
+
+      assert [row] =
+               system
+               |> RowMapper.exoplanet_candidate_entries(system)
+               |> Enum.map(&Importer.attrs_for_entry!({:exoplanet_candidate, &1}))
+
+      assert row.source_type == "#{prefix}_candidate"
+      assert row.position_model == "#{prefix}_host_coordinates"
+    end
+  end
+
+  test "import_all links a candidate star to a confirmed host by name and to a Gaia star by TIC number" do
+    data_dir = tmp_catalog_dir()
+    File.write!(Path.join(data_dir, "deep_sky_catalog.json"), Jason.encode!(%{"objects" => []}))
+
+    File.write!(
+      Path.join(data_dir, "exoplanet_systems.json"),
+      Jason.encode!(%{
+        "systems" => [
+          %{
+            "key" => "exosys-kepler-11",
+            "name" => "Kepler-11",
+            "aliases" => ["TIC 1"],
+            "ra_deg" => 1.0,
+            "dec_deg" => 2.0,
+            "distance_pc" => 3.0,
+            "planets" => [%{"name" => "Kepler-11 b"}]
+          }
+        ]
+      })
+    )
+
+    File.write!(
+      Path.join(data_dir, "gaia_local_stars.json"),
+      Jason.encode!(%{
+        "stars" => [
+          %{
+            "key" => "gaia-dr3-3220388198192519424",
+            "name" => "StKM 1-561",
+            "source_id" => "3220388198192519424",
+            "aliases" => ["Gaia DR3 3220388198192519424", "StKM 1-561", "TIC 4206066"],
+            "ra_deg" => 80.86,
+            "dec_deg" => -1.33,
+            "distance_pc" => 35.62,
+            "parallax_mas" => 28.075,
+            "parallax_over_error" => 1598.0,
+            "pmra_mas_yr" => -3.4,
+            "pmdec_mas_yr" => 70.8
+          }
+        ]
+      })
+    )
+
+    kepler =
+      candidate_system("157", nil, [
+        candidate("157", "07", %{"key" => "koi-157-07", "name" => "KOI-157.07"})
+      ])
+      |> Map.merge(%{
+        "catalog" => "koi",
+        "key" => "koi-157",
+        "name" => "KOI-157",
+        "host_identifiers" => ["Kepler-11", "KOI-157", "KIC 6541920"]
+      })
+
+    community =
+      candidate_system("4206066", "4206066", [
+        candidate("4206066", "01", %{
+          "key" => "tic-4206066-3-18d",
+          "name" => "TIC 4206066 3.18 d signal",
+          "disposition" => "community_report"
+        })
+      ])
+      |> Map.merge(%{
+        "catalog" => "community",
+        "key" => "tic-4206066",
+        "name" => "TIC 4206066",
+        "host_identifiers" => ["TIC 4206066"],
+        "report_label" => "Fixture 2026"
+      })
+
+    File.write!(
+      Path.join(data_dir, "exoplanet_candidates.json"),
+      Jason.encode!(%{
+        "schema_version" => 2,
+        "sources" => %{
+          "koi" => %{"table" => "cumulative"},
+          "community" => %{"name" => "Community reports"}
+        },
+        "systems" => [kepler, community]
+      })
+    )
+
+    assert {:ok, %{report: report}} = Importer.import_all(data_dir: data_dir)
+    assert report[:valid?] == true
+    assert report.source_types["kepler_koi_candidate"].rows == 1
+    assert report.source_types["community_report_host"].rows == 1
+    refute Map.has_key?(report.source_types, "kepler_koi_host")
+
+    # The Kepler candidate is at the confirmed host with the name of the identifier list.
+    assert {:error, :not_found} = PublicObjects.get_by_key("koi-157")
+    assert {:ok, confirmed} = PublicObjects.get_by_key("exosys-kepler-11")
+    assert [%{"key" => "koi-157-07"}] = confirmed.facts["candidates"]
+    assert {:ok, at_confirmed} = PublicObjects.get_by_key("koi-157-07")
+    assert at_confirmed.parent_key == "exosys-kepler-11"
+    assert at_confirmed.position == confirmed.position
+    assert at_confirmed.source["source"] == %{"table" => "cumulative"}
+
+    # The community star has its own row at the position of the Gaia record of the same star.
+    assert {:ok, gaia} = PublicObjects.get_by_key("gaia-dr3-3220388198192519424")
+    assert gaia.facts["candidate_count"] == 1
+    assert [%{"key" => "tic-4206066-3-18d"}] = gaia.facts["candidates"]
+    assert {:ok, star} = PublicObjects.get_by_key("tic-4206066")
+    assert star.catalog_group == "exoplanet_candidate_hosts"
+    assert star.source_type == "community_report_host"
+    assert star.position == gaia.position
+    assert star.position_model == gaia.position_model
+    assert star.facts["position_source_key"] == "gaia-dr3-3220388198192519424"
+    assert star.facts["parallax_over_error"] == 1598.0
+    assert star.facts["report_label"] == "Fixture 2026"
+    assert star.source["source"] == %{"name" => "Community reports"}
+    assert {:ok, signal} = PublicObjects.get_by_key("tic-4206066-3-18d")
+    assert signal.parent_key == "tic-4206066"
+    assert signal.position == gaia.position
+    assert signal.position_model == "community_report_host_relative_orbit"
+    assert signal.facts["disposition"] == "community_report"
+  end
+
   defp candidate_system(star, tic_id, candidates) do
     %{
       "key" => "toi-#{star}",
       "name" => "TOI-#{star}",
-      "aliases" => ["TOI-#{star}", "TIC #{tic_id}"],
+      "aliases" => Enum.reject(["TOI-#{star}", tic_id && "TIC #{tic_id}"], &is_nil/1),
       "tic_id" => tic_id,
       "ra_deg" => 40.0,
       "dec_deg" => -10.0,
@@ -796,6 +982,7 @@ defmodule StarsmapApi.Catalog.ImporterTest do
         "key" => "toi-#{star}-#{number}",
         "name" => "TOI-#{star}.#{number}",
         "toi" => "#{star}.#{number}",
+        "aliases" => ["TOI #{star}.#{number}"],
         "disposition" => "planet_candidate",
         "tfopwg_disposition" => "PC",
         "period_days" => 10.0,

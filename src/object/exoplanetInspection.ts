@@ -42,7 +42,9 @@ export function renderExoplanetOrbitSection(body: Body): string {
     : facts.semi_major_axis_calculated === true ? "exoplanet.calculatedByArchive" : null;
 
   const rows: Row[] = [
-    [t("exoplanet.candidateStatus"), candidate ? t(facts.disposition === "ambiguous_planet_candidate" ? "exoplanet.dispositionAmbiguous" : "exoplanet.dispositionCandidate") : null],
+    [t("exoplanet.candidateStatus"), candidate ? candidateStatusText(facts) : null],
+    [t("exoplanet.candidateSource"), candidate ? text(facts.source_catalog) : null],
+    [t("exoplanet.candidateNote"), candidate ? text(facts.candidate_note) : null],
     [t("exoplanet.mapPosition"), displayStateText(body)],
     [t("exoplanet.orbitSize"), measurementText(facts, "semi_major_axis_au", "AU", orbitSizeNote) ?? t("exoplanet.notAvailable")],
     [t("exoplanet.period"), measurementText(facts, "period_days", "d")],
@@ -133,6 +135,22 @@ export function renderPlanetCandidateSection(candidates: readonly BodyPlanetCand
 export function renderPlanetarySystemAction(body: Body): string {
   if (!hasPlanetarySystemView(body)) return "";
   return `<p class="planetary-system-action"><button type="button" class="text-action" data-planetary-system="${escapeHtml(body.key)}">${escapeHtml(t("exoplanet.viewSystem"))}</button></p>`;
+}
+
+const DISPOSITION_TEXT_KEYS: Record<string, string> = {
+  ambiguous_planet_candidate: "exoplanet.dispositionAmbiguous",
+  community_report: "exoplanet.dispositionCommunity",
+};
+
+/** The status of a candidate in words, with the term of its source: "Planet candidate (TFOPWG disposition PC)". */
+function candidateStatusText(facts: Facts): string {
+  const status = t(DISPOSITION_TEXT_KEYS[String(facts.disposition)] ?? "exoplanet.typeCandidate");
+  const source = text(facts.disposition_source);
+  return source ? `${status} (${source})` : status;
+}
+
+function text(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
 }
 
 function displayStateText(body: Body): string {

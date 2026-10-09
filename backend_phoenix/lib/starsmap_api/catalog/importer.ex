@@ -122,32 +122,47 @@ defmodule StarsmapApi.Catalog.Importer do
   end
 
   # The candidates come last, because a candidate can belong to a star that
-  # another file gives: a confirmed-planet host with the same TIC number.
-  # Such a star keeps its one row, and the candidates take its coordinates.
+  # another file gives. A confirmed-planet host with one of the identifiers of
+  # the star keeps its one row, and the candidates take its coordinates. A
+  # Gaia local star with one of the identifiers gives its position to the new
+  # star row, so that the two records of one star are at one place. The
+  # confirmed host or the Gaia star gets the short list of the candidates.
   defp with_exoplanet_candidates(rows, path) do
     if File.exists?(path) do
       type = :exoplanet_candidate_system
       data = path |> File.read!() |> Jason.decode!()
-      source_meta = source_meta(type, data, path)
-      confirmed_hosts = confirmed_hosts_by_tic(rows)
+      file_meta = source_meta(type, data, path)
+      sources = data["sources"] || %{}
+      confirmed_hosts = confirmed_hosts_by_identifier(rows)
+      gaia_stars = gaia_stars_by_identifier(rows)
 
       {hosts, candidates, summaries} =
         data
         |> Map.fetch!("systems")
         |> Enum.reduce({[], [], %{}}, fn system, {hosts, candidates, summaries} ->
-          case Map.get(confirmed_hosts, system["tic_id"]) do
+          source_meta = candidate_source_meta(file_meta, sources[system["catalog"]])
+          identifiers = host_identifiers(system)
+
+          case Enum.find_value(identifiers, &Map.get(confirmed_hosts, &1)) do
             nil ->
+              gaia_star = Enum.find_value(identifiers, &Map.get(gaia_stars, &1))
+              system = at_gaia_star(system, gaia_star)
               host = RowMapper.map(type, system, source_meta)
 
               {[host | hosts], [candidates_of(system, system, source_meta) | candidates],
-               summaries}
+               put_summary(summaries, gaia_star, system)}
 
             confirmed ->
-              summary = Enum.map(system["candidates"], &RowMapper.exoplanet_candidate_summary/1)
-              host = host_entry(confirmed)
+              case without_confirmed_planets(system, confirmed) do
+                %{"candidates" => []} ->
+                  {hosts, candidates, summaries}
 
-              {hosts, [candidates_of(system, host, source_meta) | candidates],
-               Map.update(summaries, confirmed.key, summary, &(&1 ++ summary))}
+                system ->
+                  host = host_entry(confirmed)
+
+                  {hosts, [candidates_of(system, host, source_meta) | candidates],
+                   put_summary(summaries, confirmed, system)}
+              end
           end
         end)
 
@@ -158,17 +173,79 @@ defmodule StarsmapApi.Catalog.Importer do
     end
   end
 
+  defp put_summary(summaries, nil, _system), do: summaries
+
+  defp put_summary(summaries, row, system) do
+    summary = Enum.map(system["candidates"], &RowMapper.exoplanet_candidate_summary/1)
+    Map.update(summaries, row.key, summary, &(&1 ++ summary))
+  end
+
   defp candidates_of(system, host, source_meta) do
     system
     |> RowMapper.exoplanet_candidate_entries(host)
     |> Enum.map(&RowMapper.map(:exoplanet_candidate, &1, source_meta))
   end
 
-  defp confirmed_hosts_by_tic(rows) do
+  # A candidate table can keep a candidate after the archive confirms it as a
+  # planet. A candidate with the period of a confirmed planet of its host is
+  # that planet, and the confirmed catalog has it.
+  @same_planet_period_tolerance 0.001
+
+  defp without_confirmed_planets(system, confirmed) do
+    periods =
+      for %{"period_days" => period} when is_number(period) <- confirmed.facts["planets"] || [],
+          do: period
+
+    Map.update!(system, "candidates", fn candidates ->
+      Enum.reject(candidates, fn candidate ->
+        period = candidate["period_days"]
+
+        is_number(period) and
+          Enum.any?(periods, &(abs(period - &1) <= &1 * @same_planet_period_tolerance))
+      end)
+    end)
+  end
+
+  # Each row keeps the source block of its own catalog, not the blocks of all catalogs.
+  defp candidate_source_meta(file_meta, nil), do: file_meta
+
+  defp candidate_source_meta(file_meta, source),
+    do: Map.merge(file_meta, %{"source" => source, "provenance" => source})
+
+  # A snapshot of schema version 1 gives the TIC number only.
+  defp host_identifiers(%{"host_identifiers" => identifiers}) when is_list(identifiers),
+    do: identifiers
+
+  defp host_identifiers(%{"tic_id" => tic_id}) when is_binary(tic_id), do: ["TIC #{tic_id}"]
+  defp host_identifiers(_system), do: []
+
+  defp confirmed_hosts_by_identifier(rows) do
     for %{source_type: "exoplanet_archive_system"} = row <- rows,
-        "TIC " <> tic_id <- row.aliases,
+        identifier <- [row.name | row.aliases],
         into: %{},
-        do: {tic_id, row}
+        do: {identifier, row}
+  end
+
+  defp gaia_stars_by_identifier(rows) do
+    for %{source_type: "gaia_dr3"} = row <- rows,
+        identifier <- row.aliases,
+        String.starts_with?(identifier, ["TIC ", "Gaia DR3 "]),
+        into: %{},
+        do: {identifier, row}
+  end
+
+  @gaia_position_facts ~w(
+    parallax_mas parallax_over_error pmra_mas_yr pmdec_mas_yr source_epoch position_epoch
+    catalog_ra_deg catalog_dec_deg proper_motion_note
+  )
+
+  defp at_gaia_star(system, nil), do: system
+
+  defp at_gaia_star(system, star) do
+    system
+    |> Map.merge(host_entry(star) |> Map.take(["ra_deg", "dec_deg", "distance_pc"]))
+    |> Map.merge(Map.take(star.facts, @gaia_position_facts))
+    |> Map.merge(%{"position_model" => star.position_model, "position_source_key" => star.key})
   end
 
   defp host_entry(row) do
@@ -367,10 +444,6 @@ defmodule StarsmapApi.Catalog.Importer do
   defp source_table_for_row(%{source_type: "exoplanet_archive_planet"}),
     do: "catalog_exoplanet_objects"
 
-  defp source_table_for_row(%{source_type: source_type})
-       when source_type in ["tess_toi_host", "tess_toi_candidate"],
-       do: "catalog_exoplanet_objects"
-
   defp source_table_for_row(%{source_type: "simbad_tap"}), do: "catalog_simbad_objects"
 
   defp source_table_for_row(%{source_type: "curated_extragalactic_survey"}),
@@ -378,6 +451,10 @@ defmodule StarsmapApi.Catalog.Importer do
 
   defp source_table_for_row(%{source_type: "bass_dr2_black_hole_mass"}),
     do: "catalog_bass_dr2_objects"
+
+  defp source_table_for_row(%{catalog_group: group})
+       when group in ["exoplanet_candidate_hosts", "exoplanet_candidates"],
+       do: "catalog_exoplanet_objects"
 
   defp source_table_for_row(_row), do: nil
 

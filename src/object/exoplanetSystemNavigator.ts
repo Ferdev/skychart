@@ -76,8 +76,12 @@ export class ExoplanetSystemNavigator {
   }
 }
 
-/** True when the atlas can show a planetary system for this body: a planet or a planet candidate with an orbit, or a host star. */
+/**
+ * True when the atlas can show a planetary system for this body: a planet or
+ * a planet candidate with an orbit, a host star, or a star record of another
+ * catalog that has planet candidates.
+ */
 export function hasPlanetarySystemView(body: Body): boolean {
   if (orbitsHostStar(body)) return Boolean(body.exoplanet_orbit && body.exoplanet_orbit.display_state !== "none");
-  return isExoplanetHostStar(body);
+  return isExoplanetHostStar(body) || Boolean(body.planet_candidates?.length);
 }

@@ -465,7 +465,7 @@ private objectSummaryText(body: Body, typeLabel: string) {
     case "planet":
       return t("summary.planet", { name });
     case "planet_candidate":
-      return t("exoplanet.candidateSummary", { name });
+      return t("exoplanet.candidateSummary", { name, source: String(body.catalog?.facts?.source_catalog ?? "TESS Objects of Interest") });
     case "moon":
       return t("summary.moon", { name });
     case "star":

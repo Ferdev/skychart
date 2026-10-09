@@ -464,6 +464,79 @@ test.describe("planet candidates", () => {
     await expect(section.locator(".planet-candidate-notice")).toContainText("not a confirmed planet");
     expect((await rings(page)).map((ring) => ring.key)).not.toContain("toi-125-04");
   });
+
+  test("the community report at TIC 4206066 shows its two signals around the Gaia position of the star", async ({ page, request }) => {
+    const star = await catalogObject(request, "tic-4206066");
+    const gaia = await catalogObject(request, "gaia-dr3-3220388198192519424");
+    const signal = await catalogObject(request, "tic-4206066-3-18d");
+    // The star record of the report is at the place of the Gaia record of the same star.
+    expect(star.position).toEqual(gaia.position);
+    expect(star.position_model).toBe(gaia.position_model);
+    expect(star.facts.position_source_key).toBe("gaia-dr3-3220388198192519424");
+    expect(signal.position).toEqual(gaia.position);
+    expect(signal.position_model).toBe("community_report_host_relative_orbit");
+    expect(signal.facts.disposition).toBe("community_report");
+    expect(signal.facts.period_days).toBe(3.182785);
+
+    const issues = collectBrowserIssues(page);
+    await openAtlas(page, `/?perf=1&t=${encodeURIComponent(ATLAS_TIME)}`);
+    await selectCatalogObject(page, "TIC 4206066", "tic-4206066-3-18d", "TIC 4206066 3.18 d signal");
+    await openScienceView(page);
+    const section = page.locator("#body-info .exoplanet-orbit");
+    await expect(section).toHaveAttribute("data-planet-candidate", "");
+    await expect(section.locator(".planet-candidate-notice")).toContainText("not a confirmed planet");
+    await expect(section).toContainText("Community report, not reviewed by a mission team (Rabtsevich 2026");
+    await expect(section).toContainText("no statistical validation");
+    await expect(section).toContainText("calculated by the atlas");
+    await expect(section.locator('a[href="https://doi.org/10.5281/zenodo.22967456"]')).toBeVisible();
+
+    await page.locator("#body-info [data-planetary-system]").click();
+    await waitForRings(page, ["tic-4206066-11-13d", "tic-4206066-3-18d"]);
+    await expect.poll(async () => (await camera(page)).pxPerAu, { timeout: 20_000 }).toBeGreaterThan(1_000);
+    const visible = await visibleKeys(page);
+    expect(visible).toContain("tic-4206066");
+    for (const ring of await rings(page)) expect(ring.displayState, ring.key).toBe("position");
+    expect(await candidatePixelCount(page)).toBeGreaterThan(300);
+    issues.assertClean();
+  });
+
+  test("the Gaia record of a star with candidates lists them and opens the system view", async ({ page }) => {
+    await openAtlas(page, `/?perf=1&t=${encodeURIComponent(ATLAS_TIME)}`);
+    await selectCatalogObject(page, "StKM 1-561", "gaia-dr3-3220388198192519424", "StKM 1-561");
+    await expect(page.locator("#body-info [data-planetary-system]")).toBeVisible();
+    await page.locator('#body-info [data-object-view="science"]').click();
+    const list = page.locator("#body-info .planet-candidates");
+    await expect(list).toHaveAttribute("data-planet-candidate-count", "2");
+    await expect(list.locator('[data-related-key="tic-4206066-3-18d"]')).toBeVisible();
+    await page.locator("#body-info [data-planetary-system]").click();
+    await waitForRings(page, ["tic-4206066-11-13d", "tic-4206066-3-18d"]);
+    // The star record of the report is the marker at the center of the rings.
+    await expect.poll(() => visibleKeys(page), { timeout: 20_000 }).toContain("tic-4206066");
+  });
+
+  test("a Kepler candidate and a K2 candidate show the status and the orbit source of their catalog", async ({ page, request }) => {
+    const kepler = await catalogObject(request, "koi-353-01");
+    expect(kepler.position_model).toBe("kepler_koi_host_relative_orbit");
+    expect(kepler.facts.semi_major_axis_calculated).toBe(true);
+    const k2 = await catalogObject(request, "epic-201111557-01");
+    expect(k2.position_model).toBe("k2_pandc_host_relative_orbit");
+    expect(k2.facts.semi_major_axis_atlas_calculated).toBe(true);
+
+    await openAtlas(page, "/?perf=1");
+    await selectCatalogObject(page, "KOI-353.01", "koi-353-01", "KOI-353.01");
+    await openScienceView(page);
+    const section = page.locator("#body-info .exoplanet-orbit");
+    await expect(section).toContainText("Planet candidate (Kepler KOI disposition CANDIDATE)");
+    await expect(section).toContainText("Kepler Objects of Interest");
+    await expect(section).toContainText("calculated by the archive");
+    await expect(section.locator(".planet-candidate-notice")).toContainText("not a confirmed planet");
+
+    await selectCatalogObject(page, "EPIC 201111557.01", "epic-201111557-01", "EPIC 201111557.01");
+    await openScienceView(page);
+    await expect(section).toContainText("Planet candidate (K2 disposition CANDIDATE, Livingston et al. 2018)");
+    await expect(section).toContainText("calculated by the atlas");
+    await expect(section.locator('a[href^="https://ui.adsabs.harvard.edu/abs/2018AJ"]')).toBeVisible();
+  });
 });
 
 test.describe("exoplanet tile layers and the viewport-object path", () => {
