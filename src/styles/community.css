@@ -1,239 +1,71 @@
-.community-gallery {
-  padding: 22px 0;
-  border-bottom: 1px solid #293932;
-}
-.community-gallery-head,
-.community-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.community-gallery h3 {
-  margin: 4px 0 16px;
-  font:
-    24px Georgia,
-    serif;
-  color: #e6eee9;
-}
-.community-eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  color: #a6c4b5;
-}
-.community-photo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 14px;
-  margin: 18px 0;
-}
-.community-photo-card {
-  padding: 0;
-  text-align: left;
-  overflow: hidden;
-  background: #0c1411;
-  border: 1px solid #2b3f35;
-  border-radius: 8px;
-  color: #e0ebe5;
-  cursor: pointer;
-}
-.community-photo-card img {
-  width: 100%;
-  height: 140px;
-  object-fit: cover;
-  display: block;
-}
-.community-photo-card span,
-.community-photo-card small {
-  display: block;
-  padding: 10px 12px 0;
-}
-.community-photo-card small {
-  padding-bottom: 12px;
-  color: #a5bcb0;
-  font-size: 11px;
-}
-.community-empty {
-  padding: 20px;
-  background: #101b16;
-  color: #a4b9ae;
-  line-height: 1.6;
-  border-radius: 8px;
-}
-.community-dialog {
-  width: min(760px, calc(100vw - 32px));
-  max-height: 90dvh;
-  overflow: auto;
-  padding: 24px;
-  border: 1px solid #3c5c4a;
-  border-radius: 12px;
-  background: #08130e;
-  color: #dce9e2;
-  box-shadow: 0 24px 90px #000a;
-}
-.community-dialog::backdrop {
-  background: #010704cc;
-}
-.community-dialog header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.community-dialog h2 {
-  font:
-    28px Georgia,
-    serif;
-  margin: 0;
-}
-.community-dialog button,
-.community-gallery button {
-  min-height: 40px;
-  border: 1px solid #4b6a59;
-  border-radius: 6px;
-  color: #e7f0eb;
-  background: #173024;
-  padding: 9px 14px;
-  cursor: pointer;
-}
-.community-dialog button:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-.community-dialog label {
-  display: block;
-  margin: 14px 0;
-  color: #b8cec1;
-  font-size: 13px;
-}
-.community-dialog input:not([type="checkbox"]),
-.community-dialog textarea,
-.community-dialog select {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  background: #0e2117;
-  border: 1px solid #3c5848;
-  border-radius: 5px;
-  color: #edf4ef;
-  padding: 10px;
-  margin-top: 6px;
-}
-.community-dialog textarea {
-  min-height: 85px;
-}
-.community-dialog input[type="checkbox"] {
-  margin-right: 8px;
-}
-.community-full-photo {
-  display: block;
-  max-width: 100%;
-  max-height: 60vh;
-  object-fit: contain;
-  margin: auto;
-}
-.community-credit {
-  font-size: 12px;
-  color: #adc5b6;
-}
-.community-message {
-  color: #a8d9bb;
-  white-space: pre-line;
-  line-height: 1.5;
-}
-.community-marker-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 8;
-  overflow: hidden;
-}
-.community-marker {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 110px;
-  padding: 0;
-  pointer-events: auto;
-  display: flex;
-  gap: 6px;
-  background: #07150fe8;
-  border: 1px solid #56755f;
-  border-radius: 5px;
-  text-align: left;
-  color: #e4eee6;
-  cursor: pointer;
-}
-.community-marker img {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-.community-marker span {
-  font-size: 11px;
-  padding: 4px 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.community-marker small {
-  display: block;
-  color: #a6bfae;
-  font-size: 9px;
-}
-/* Bottom row of the top-left atlas panel; styled like the panel's language selector. */
-.community-account-actions {
+/*
+ * Community photos on the atlas: the row of the header card, the photo cards, the section of the
+ * object inspector, and the cards on the map. `community-windows.css` has the windows.
+ * This area uses the tokens and the control classes of docs/ui-style.md:
+ * dark panels, the one sans-serif stack, gold for the primary action and the active state.
+ */
+
+/* Community row of the header card: the same buttons as the time bar above it. */
+.community-bar {
   grid-column: 1 / -1;
   min-width: 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding-top: 10px;
-  border-top: 1px solid rgba(242, 237, 223, 0.12);
+  border-top: 1px solid var(--panel-line);
 }
+
 .community-menu {
   display: contents;
 }
-.community-account-actions .community-menu-toggle {
-  display: none;
+
+.community-bar__label {
+  margin-right: 4px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 760;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
-.community-account-actions button,
-.community-account-actions a {
-  min-height: 30px;
+
+.community-bar__space {
+  flex: 1;
+}
+
+.community-bar button {
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(242, 237, 223, 0.16);
-  border-radius: 999px;
-  color: var(--map-ink);
-  background: rgba(5, 6, 5, 0.72);
-  padding: 0 11px;
-  font: inherit;
-  font-size: 0.78rem;
-  line-height: 1;
-  text-decoration: none;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--panel-ink);
+  background: rgba(12, 16, 13, 0.82);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.15;
   white-space: nowrap;
-  cursor: pointer;
 }
-.community-account-actions button:hover,
-.community-account-actions a:hover {
-  border-color: var(--accent-strong);
+
+.community-bar button:hover {
+  border-color: rgba(239, 196, 104, 0.5);
+  background: rgba(36, 40, 32, 0.92);
 }
-.community-account-actions button:focus-visible,
-.community-account-actions a:focus-visible {
-  outline: 2px solid #afe5c2;
-  outline-offset: 2px;
-}
-.community-account-actions [hidden] {
+
+.community-bar .community-menu-toggle,
+.community-bar [hidden] {
   display: none;
 }
+
 @media (max-width: 899px) {
-  .community-account-actions .community-menu-toggle {
+  .community-bar .community-menu-toggle {
     display: inline-flex;
     margin-right: auto;
   }
+
   .community-menu {
     position: absolute;
     top: calc(100% + 6px);
@@ -246,98 +78,305 @@
     flex-direction: column;
     align-items: stretch;
     gap: 6px;
-    padding: 8px;
-    border: 1px solid rgba(242, 237, 223, 0.13);
-    border-radius: 14px;
-    background: rgba(8, 10, 9, 0.92);
-    box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(16px);
+    padding: 10px;
+    border: 1px solid var(--panel-line-strong);
+    border-radius: var(--radius-lg);
+    background: #141a16;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
   }
-  .community-account-actions[data-open] .community-menu {
+
+  .community-bar[data-open] .community-menu {
     display: flex;
   }
-}
-.community-dialog button:focus-visible,
-.community-marker:focus-visible,
-.community-photo-card:focus-visible {
-  outline: 2px solid #afe5c2;
-  outline-offset: 3px;
-}
-@media (max-width: 899px) {
-  .community-dialog {
-    padding: 18px;
+
+  .community-bar__space {
+    display: none;
   }
-  .community-gallery-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .community-photo-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .community-actions {
-    flex-wrap: wrap;
+
+  .community-menu button {
+    min-height: 44px;
   }
 }
+
+/* A count: photos that wait for review, photos of an object, items of a section. */
+.community-count {
+  min-width: 20px;
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--accent-strong);
+  background: rgba(239, 196, 104, 0.16);
+  font-size: var(--text-xs);
+  font-weight: 760;
+  line-height: 1.4;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.community-count[hidden],
+.community-count:empty {
+  display: none;
+}
+
+/* Photo cards. */
+.community-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.community-card {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  padding: 0 0 10px;
+  overflow: hidden;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  color: var(--panel-ink);
+  background: var(--panel-surface);
+  text-align: left;
+}
+
+.community-card:hover {
+  border-color: rgba(239, 196, 104, 0.5);
+  background: var(--panel-surface-strong);
+}
+
+.community-card:focus-visible,
+.community-marker:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.community-card__image {
+  position: relative;
+  display: block;
+  margin-bottom: 6px;
+  aspect-ratio: 4 / 3;
+  background: #050605;
+}
+
+.community-card__image img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.community-card__rank {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  min-width: 26px;
+  padding: 3px 7px;
+  border: 1px solid rgba(248, 203, 101, 0.28);
+  border-radius: var(--radius-sm);
+  color: var(--accent-strong);
+  background: rgba(8, 10, 9, 0.78);
+  font-size: var(--text-xs);
+  font-weight: 860;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.community-card__row {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 10px;
+}
+
+.community-card__title,
+.community-card__meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-card__meta {
+  padding: 0 10px;
+}
+
+.community-card__title {
+  flex: 1;
+  font-size: var(--text-md);
+  font-weight: 760;
+}
+
+.community-card__meta {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.community-votes {
+  flex: none;
+  color: var(--accent-strong);
+  font-size: var(--text-xs);
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Gallery section of the object inspector. */
+.community-gallery__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.community-gallery__head .secondary-action {
+  padding: 6px 11px;
+}
+
+.community-gallery .community-photo-grid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.community-gallery .community-empty {
+  padding: 14px;
+}
+
+/* Status of a photo. Colour is an addition to the text, not the only sign. */
+.community-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: 999px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 760;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.community-status[data-status="review"] {
+  border-color: rgba(239, 196, 104, 0.5);
+  color: var(--accent-strong);
+}
+
+.community-status[data-status="published"] {
+  border-color: rgba(130, 203, 179, 0.5);
+  color: var(--spectral-teal);
+}
+
+.community-status:is([data-status="rejected"], [data-status="hidden"], [data-status="failed"]) {
+  border-color: rgba(255, 160, 140, 0.5);
+  color: var(--danger);
+}
+
+/* Photo cards on the map, in Sky view, and in the 3D view. */
+.community-marker-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.community-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 168px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 3px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--panel-ink);
+  background: rgba(12, 16, 13, 0.92);
+  text-align: left;
+  pointer-events: auto;
+}
+
+.community-marker:hover {
+  border-color: rgba(239, 196, 104, 0.5);
+}
+
+.community-marker img {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.community-marker__text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.community-marker__text :is(strong, small) {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-marker__text small {
+  color: var(--panel-ink-muted);
+}
+
+/* One selected photo as a plane in the 3D view. */
 .community-photo-plane {
   position: absolute;
-  left: 0;
   top: 0;
+  left: 0;
+  z-index: 4;
   width: 1px;
   height: 1px;
-  transform-origin: 0 0;
   padding: 0;
   border: 0;
-  z-index: 4;
   background: none;
-  cursor: pointer;
+  transform-origin: 0 0;
 }
+
 .community-photo-plane img {
   width: 100%;
   height: 100%;
   display: block;
   pointer-events: none;
 }
+
 .community-plane-credit {
   position: absolute;
-  left: 0;
   top: 0;
-  font-size: 11px;
-  background: #06110de0;
-  color: #c8dfd0;
-  padding: 3px 6px;
+  left: 0;
   z-index: 8;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--panel-ink);
+  background: rgba(8, 10, 9, 0.86);
+  font-size: var(--text-xs);
   pointer-events: none;
 }
+
 .community-opacity {
   display: grid;
   gap: 4px;
   margin-top: 10px;
-  font-size: 11px;
   color: var(--map-muted);
+  font-size: var(--text-xs);
 }
+
 .community-opacity input[type="range"] {
-  display: block;
   width: 100%;
   max-width: 220px;
+  display: block;
+  accent-color: var(--accent-strong);
 }
+
 .community-toggle[hidden],
 .community-marker-layer[hidden],
 .community-photo-plane[hidden],
 .community-plane-credit[hidden] {
   display: none !important;
-}
-.community-photo-stage {
-  position: relative;
-  width: fit-content;
-  max-width: 100%;
-  margin: auto;
-}
-.community-in-frame {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  font-size: 11px;
-  color: #d0efd9;
-  background: #03150cc9;
-  padding: 2px 4px;
-  border-radius: 3px;
 }

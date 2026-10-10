@@ -1,0 +1,856 @@
+/*
+ * Community photos: the windows (the community window with its tabs, the photo viewer, the forms,
+ * and the review tools). `community.css` has the parts that are on the atlas.
+ */
+
+/* Windows. */
+.community-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--panel-ink);
+  background: var(--panel-background);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.5);
+  font-size: var(--text-md);
+}
+
+.community-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.community-dialog::backdrop {
+  background: rgba(4, 6, 5, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.community-dialog--narrow {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.community-dialog--hub {
+  width: min(1080px, calc(100vw - 32px));
+  height: min(820px, calc(100dvh - 32px));
+}
+
+.community-dialog--viewer {
+  width: min(1320px, calc(100vw - 32px));
+}
+
+.community-dialog__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.community-dialog__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.community-dialog__header h2 {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 1.15rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-dialog .icon-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+/* One corner radius for all controls of a window. */
+.community-dialog :is(.primary-action, .secondary-action, .text-action, .icon-button),
+.community-gallery :is(.secondary-action, .text-action) {
+  border-radius: var(--radius-md);
+}
+
+.community-dialog__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+}
+
+.community-dialog--hub .community-dialog__body {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.community-dialog--viewer .community-dialog__body {
+  padding: 0;
+}
+
+.community-message {
+  flex: none;
+  margin: 0;
+  padding: 10px 18px;
+  border-top: 1px solid var(--panel-line);
+  color: var(--accent-strong);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.community-message:empty {
+  display: none;
+}
+
+/* Tabs of the community window: the tabs of the object inspector. */
+.community-tabs {
+  flex: none;
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.community-tabs button {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 46px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 0;
+  color: var(--panel-ink-muted);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.community-tabs button::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+}
+
+.community-tabs button:hover {
+  color: var(--panel-ink);
+  background: var(--panel-surface);
+}
+
+.community-tabs button[aria-selected="true"] {
+  color: var(--accent-strong);
+}
+
+.community-tabs button[aria-selected="true"]::after {
+  background: var(--accent-strong);
+}
+
+.community-tabs button:focus-visible,
+.community-hub__panel:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -3px;
+}
+
+.community-hub__panel {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  overflow: auto;
+  padding: 18px;
+}
+
+/* Text blocks. */
+.community-help,
+.community-muted,
+.community-credit {
+  margin: 0;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.community-lede {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.5;
+}
+
+.community-note {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--panel-line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--panel-surface);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.community-note ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.community-note--warning {
+  border-left-color: var(--danger);
+}
+
+.community-empty {
+  padding: 22px 18px;
+  border: 1px dashed var(--panel-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.community-empty p {
+  margin: 0;
+}
+
+.community-empty p + p {
+  margin-top: 8px;
+}
+
+.community-danger,
+.community-dialog .text-action.community-danger {
+  color: var(--danger);
+}
+
+.community-dialog .primary-action.community-danger {
+  color: #17130c;
+  background: var(--danger);
+}
+
+.community-link {
+  padding: 0;
+  border: 0;
+  color: var(--link);
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.community-link:hover {
+  color: var(--accent-strong);
+}
+
+.community-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-line);
+  font-size: var(--text-sm);
+}
+
+/* Rows of controls. */
+.community-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.community-toolbar .community-help {
+  flex: 1 1 320px;
+}
+
+.community-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.community-actions--wrap {
+  flex-wrap: wrap;
+}
+
+.community-segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.community-segmented .secondary-action {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+}
+
+.community-back {
+  justify-self: start;
+}
+
+/* Tables: photographers, coverage, and the record of decisions. */
+.community-table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.community-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.community-table th,
+.community-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--panel-line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.community-table thead th {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 760;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.community-table tbody th {
+  font-weight: 400;
+}
+
+.community-table tbody tr:hover {
+  background: var(--panel-surface);
+}
+
+.community-table .community-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.community-table__action {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.community-table .text-action {
+  padding: 5px 9px;
+}
+
+/* Number tiles: the statistics of a photographer and the progress of each catalog. */
+.community-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.community-stat {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-surface);
+}
+
+.community-stat dt {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 760;
+}
+
+.community-stat dd {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.community-stats--progress dd {
+  font-size: var(--text-md);
+}
+
+.community-stat progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent-strong);
+}
+
+.community-profile {
+  display: grid;
+  gap: 14px;
+}
+
+.community-profile__head h3,
+.community-section > h3,
+.community-rules h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.25;
+}
+
+/* Sections of a tab. */
+.community-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  background: var(--panel-surface);
+}
+
+.community-section > h3 {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.community-rules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.community-rules section {
+  padding: 14px 16px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  background: var(--panel-surface);
+}
+
+.community-rules__wide {
+  grid-column: 1 / -1;
+}
+
+.community-rules :is(ul, ol) {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+
+.community-rules li + li {
+  margin-top: 5px;
+}
+
+/* Forms. The controls get the base look of the interface; these rules give the layout. */
+.community-form {
+  display: grid;
+  gap: 14px;
+}
+
+.community-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.community-field {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.community-field--wide {
+  grid-column: 1 / -1;
+}
+
+.community-field > span,
+.community-fieldset legend {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 760;
+}
+
+.community-field :is(input, select, textarea) {
+  width: 100%;
+  min-height: 38px;
+  font-size: var(--text-md);
+}
+
+.community-field input[type="file"] {
+  padding: 7px 0;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.community-field input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 11px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--panel-ink);
+  background: var(--panel-surface);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.community-field textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+/* Help text of the field above it. It is not in the label, so that the label text is the name of the control. */
+.community-field__help {
+  grid-column: 1 / -1;
+  margin: -6px 0 0;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.community-field--inline {
+  flex: 1 1 240px;
+}
+
+.community-fieldset {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+}
+
+.community-fieldset legend {
+  padding: 0 6px;
+  text-transform: uppercase;
+}
+
+.community-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.community-check input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--accent-strong);
+}
+
+.community-form__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-left: auto;
+  font-size: var(--text-sm);
+}
+
+.community-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.community-presets .text-action {
+  padding: 5px 9px;
+  font-weight: 600;
+}
+
+.community-reason {
+  flex: 1;
+}
+
+/* Photo viewer. */
+.community-viewer__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  min-height: min(560px, calc(100dvh - 140px));
+}
+
+.community-viewer__stage {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 12px;
+  background: #050605;
+}
+
+.community-photo-stage {
+  position: relative;
+  max-width: 100%;
+}
+
+.community-full-photo {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 170px);
+  margin: auto;
+  object-fit: contain;
+}
+
+.community-viewer__side {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px;
+  overflow: auto;
+  border-left: 1px solid var(--panel-line);
+}
+
+.community-viewer__author {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.community-viewer__author span {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.community-viewer__caption {
+  margin: 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.community-viewer__steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.community-facts {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.community-facts dt {
+  color: var(--panel-ink-muted);
+  font-weight: 760;
+}
+
+.community-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.community-viewer__side [data-vote][aria-pressed="true"]::before {
+  content: "★ ";
+}
+
+.community-in-frame {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 2px 6px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--panel-ink);
+  background: rgba(8, 10, 9, 0.78);
+  font-size: var(--text-xs);
+}
+
+/* The photographer's own photos. */
+.community-own-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.community-own {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  background: var(--panel-background);
+}
+
+.community-own img,
+.community-own__blank {
+  width: 84px;
+  height: 63px;
+  display: block;
+  border-radius: var(--radius-sm);
+  background: #050605;
+  object-fit: cover;
+}
+
+.community-own__text {
+  min-width: 0;
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.community-own__text strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Review tools. */
+.community-review {
+  display: grid;
+  gap: 12px;
+}
+
+.community-review-card {
+  display: grid;
+  grid-template-columns: minmax(200px, 320px) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  background: var(--panel-surface);
+}
+
+.community-review-card__image {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  background: #050605;
+}
+
+/* The image is the link. The mark for a new tab is not shown on top of it. */
+.community-review-card .community-review-card__image[target="_blank"]::after {
+  display: none;
+}
+
+.community-review-card__image img {
+  width: 100%;
+  max-height: 340px;
+  display: block;
+  object-fit: contain;
+}
+
+.community-review-card__text {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.community-review-card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.community-review-card h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.community-review-card__author {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+@media (max-width: 899px) {
+  .community-dialog--hub {
+    height: calc(100dvh - 20px);
+  }
+
+  .community-dialog,
+  .community-dialog--hub,
+  .community-dialog--viewer {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+
+  .community-dialog__body,
+  .community-hub__panel {
+    padding: 14px;
+  }
+
+  .community-dialog--hub .community-dialog__body,
+  .community-dialog--viewer .community-dialog__body {
+    padding: 0;
+  }
+
+  .community-viewer__layout,
+  .community-review-card,
+  .community-rules,
+  .community-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .community-viewer__layout {
+    min-height: 0;
+  }
+
+  .community-viewer__side {
+    border-top: 1px solid var(--panel-line);
+    border-left: 0;
+  }
+
+  .community-full-photo {
+    max-height: 56dvh;
+  }
+
+  .community-photo-grid,
+  .community-gallery .community-photo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .community-own {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .community-own img,
+  .community-own__blank {
+    width: 64px;
+    height: 48px;
+  }
+
+  .community-own .community-actions {
+    grid-column: 1 / -1;
+  }
+
+  .community-dialog :is(.primary-action, .secondary-action, .text-action, .icon-button),
+  .community-tabs button {
+    min-height: 44px;
+  }
+
+  .community-dialog .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+}

@@ -40,7 +40,19 @@ defmodule StarsmapApi.Community.Ranking do
     |> Enum.each(&refresh/1)
   end
 
-  def photographers do
+  def photographers, do: photographer_rows() |> Enum.take(50)
+
+  @doc "Public statistics of one photographer, with the position in the listing."
+  def photographer(handle) do
+    rows = photographer_rows()
+
+    case Enum.find_index(rows, &(&1.handle == handle)) do
+      nil -> nil
+      index -> rows |> Enum.at(index) |> Map.put(:rank, index + 1)
+    end
+  end
+
+  defp photographer_rows do
     scores = scores()
 
     covers =
@@ -64,6 +76,19 @@ defmodule StarsmapApi.Community.Ranking do
       )
       |> Enum.frequencies()
 
+    votes =
+      Repo.all(
+        from v in Vote,
+          join: u in User,
+          on: u.id == v.user_id,
+          join: p in Photo,
+          on: p.id == v.photo_id,
+          where: not u.suspended and p.status == "published",
+          group_by: p.user_id,
+          select: {p.user_id, count()}
+      )
+      |> Map.new()
+
     rows =
       Repo.all(
         from [p, u] in Photos.published(), select: {p.id, u.id, u.handle, u.name, p.subject_id}
@@ -71,7 +96,7 @@ defmodule StarsmapApi.Community.Ranking do
 
     rows
     |> Enum.group_by(&elem(&1, 1))
-    |> Enum.map(fn {_, photos} ->
+    |> Enum.map(fn {user_id, photos} ->
       [{_, _, handle, name, _} | _] = photos
 
       values =
@@ -86,12 +111,13 @@ defmodule StarsmapApi.Community.Ranking do
         name: name,
         h_index: h,
         photos: length(photos),
+        objects: photos |> Enum.map(&elem(&1, 4)) |> Enum.uniq() |> length(),
+        votes: Map.get(votes, user_id, 0),
         covers: Map.get(covers, handle, 0),
         first_photos: Map.get(firsts, handle, 0)
       }
     end)
     |> Enum.sort_by(&{-&1.h_index, -&1.covers, -&1.first_photos, &1.handle})
-    |> Enum.take(50)
   end
 
   def voted?(user, id),
@@ -131,7 +157,12 @@ defmodule StarsmapApi.Community.Ranking do
     end)
   end
 
-  def ranked(period \\ "all") do
+  def ranked(period \\ "all")
+
+  # Newest first is a plain listing: it does not use votes.
+  def ranked("new"), do: Photos.recent()
+
+  def ranked(period) do
     scores = scores()
     field = if period == "trend", do: :trend, else: :score
 

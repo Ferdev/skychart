@@ -120,6 +120,7 @@ defmodule StarsmapApiWeb.Router do
     get "/photos/:id", CommunityController, :show
     get "/community/rankings", CommunityController, :rankings
     get "/community/photographers", CommunityController, :photographers
+    get "/community/photographers/:handle", CommunityController, :photographer
     get "/community/coverage", CommunityController, :coverage
     post "/community/code", CommunityController, :code
     post "/community/verify", CommunityController, :verify
@@ -143,6 +144,8 @@ defmodule StarsmapApiWeb.Router do
     delete "/photos/:id/vote", CommunityController, :vote
     delete "/photos/:id", CommunityController, :remove
     get "/review", CommunityController, :review_queue
+    get "/review/photos", CommunityController, :review_list
+    get "/review/log", CommunityController, :review_log
     post "/photos/:id/review", CommunityController, :review
     post "/users/:handle/suspension", CommunityController, :suspend
     post "/users/:handle/cancel-votes", CommunityController, :cancel_votes
@@ -150,7 +153,7 @@ defmodule StarsmapApiWeb.Router do
 
   scope "/api/community", StarsmapApiWeb do
     pipe_through :community_media
-    get "/session", CommunityController, :me
+    get "/session", CommunityController, :session
     get "/media/:id/:size", CommunityController, :media
   end
 

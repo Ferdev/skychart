@@ -39,15 +39,22 @@
   font-size: var(--text-xs);
 }
 
+/* The language list has the look of the step list of the time bar: one look for the lists of the header. */
 .locale-control select {
-  min-height: 34px;
+  min-height: 36px;
   max-width: 150px;
-  padding: 0 10px;
-  border: 1px solid rgba(242, 237, 223, 0.16);
-  border-radius: 999px;
-  color: var(--map-ink);
-  background: rgba(5, 6, 5, 0.72);
+  padding: 6px 10px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--panel-ink);
+  background: rgba(12, 16, 13, 0.82);
   font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.locale-control select:hover {
+  border-color: rgba(239, 196, 104, 0.5);
+  background: rgba(36, 40, 32, 0.92);
 }
 
 /* Wide header: title, search field, and language in the first row, and the time bar in the second row. */
@@ -119,19 +126,6 @@
 .share-slot:empty,
 .share-slot[hidden] {
   display: none;
-}
-
-/*
- * The community controls (plan 24) are a block that the community code adds to #controls.
- * They go below the header card, so that they do not cover the search field.
- */
-#controls > .community-account-actions {
-  position: fixed;
-  top: calc(var(--atlas-bar-bottom, 128px) + 8px);
-  left: 16px;
-  max-width: calc(100vw - 32px - var(--workspace-width));
-  margin: 0;
-  pointer-events: auto;
 }
 
 /* A narrow header card (phone, or a wide panel on a small window): the search field has its own row, and the time bar is compact. */
