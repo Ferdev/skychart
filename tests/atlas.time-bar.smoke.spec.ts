@@ -1,12 +1,30 @@
-import { expect, test, type Page } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
 
 const mapDate = (page: Page) => page.locator("#time-bar .time-bar__date-text");
 const skyDate = (page: Page) => page.locator("#sky-time-bar .time-bar__date-text");
 
+/**
+ * The ephemeris for each atlas time comes from a fixture (the Sun and Earth at the requested time).
+ * A real ephemeris for a new time is a heavy calculation with calls to an external service, and
+ * these tests are about the time controls, not about the positions.
+ */
+async function routeTimeFixture(context: BrowserContext) {
+  const json = (payload: unknown) => ({ status: 200, contentType: "application/json", body: JSON.stringify(payload) });
+  await context.route(/\/api\/ephemeris(?:\?.*)?$/, (route) => {
+    const timestamp = new URL(route.request().url()).searchParams.get("timestamp") ?? new Date().toISOString();
+    return route.fulfill(json(skyEphemerisFixture(timestamp)));
+  });
+  await context.route("**/api/catalog/sky?**", (route) => route.fulfill(json({ returned: 0, points: [] })));
+  await context.route("**/api/catalog/viewport?**", (route) => route.fulfill(json({ bounds: {}, limit: 0, total: 0, objects: [] })));
+  await context.route("**/api/spacecraft?**", (route) => route.fulfill(json({ bodies: [] })));
+  await context.route("**/catalog-tiles/v1/manifest.json", (route) => route.fulfill({ status: 404, body: "" }));
+}
+
 test.describe("permanent time bar", () => {
-  test.beforeEach(async ({ request }) => {
+  test.beforeEach(async ({ request, context }) => {
     await skipIfAtlasUnavailable(request);
+    await routeTimeFixture(context);
   });
 
   test("a time step in Sky view shows on the 2D map, and Now sets the current time again", async ({ page }) => {
@@ -26,7 +44,7 @@ test.describe("permanent time bar", () => {
     }));
     expect(stepStyles[0]).toBe(stepStyles[1]);
 
-    await selectCatalogObject(page, "Mars", "mars");
+    await selectCatalogObject(page, "Earth", "earth");
     await page.locator("#view-sky-selected").click();
     await expect(page.locator("#sky-view")).toBeVisible();
     const startDate = await skyDate(page).textContent();

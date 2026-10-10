@@ -19,7 +19,9 @@ export default defineConfig({
   },
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  reporter: [["list"]],
+  // In a GitHub workflow, each failed test is also an annotation on the check run,
+  // so that the failure shows on the pull request with no need to open the job log.
+  reporter: process.env.GITHUB_ACTIONS ? [["list"], ["github"]] : [["list"]],
   use: {
     baseURL,
     actionTimeout: 10_000,

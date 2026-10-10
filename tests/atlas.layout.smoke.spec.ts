@@ -214,9 +214,12 @@ test.describe("2D map labels and pointers", () => {
     }
     // At the Solar preset the Sun and the planets have labels, and a small body of a crowd has none.
     await page.locator('[data-zoom-preset="solar"]').click();
-    await page.waitForTimeout(2_500);
-    const names = (await read()).labels.map((label) => label.name);
-    for (const planet of ["Sun", "Jupiter", "Saturn", "Uranus", "Neptune"]) expect(names).toContain(planet);
-    expect(names.length).toBeLessThanOrEqual(20);
+    // The zoom animation and the next frame can take some seconds on a slow browser: wait for the labels.
+    const majorNames = ["Sun", "Jupiter", "Saturn", "Uranus", "Neptune"];
+    await expect.poll(async () => {
+      const drawn = (await read()).labels.map((label) => label.name);
+      return majorNames.filter((name) => !drawn.includes(name));
+    }, { message: "labels of the Sun and the outer planets at the Solar preset", timeout: 30_000 }).toEqual([]);
+    expect((await read()).labels.length).toBeLessThanOrEqual(20);
   });
 });

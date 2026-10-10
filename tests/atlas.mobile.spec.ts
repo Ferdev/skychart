@@ -23,6 +23,15 @@ test.describe("Cosmic Atlas mobile layout", () => {
     expect(centre.usableTop).toBeGreaterThanOrEqual(centre.headerBottom);
     expect(centre.usableBottom).toBeLessThanOrEqual(centre.scaleTop);
 
+    // The atlas is ready before its first frame is drawn on a slow browser: wait for map content.
+    await expect.poll(() => page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>("#map");
+      const data = canvas?.getContext("2d")?.getImageData(0, 0, canvas.width, canvas.height).data;
+      let drawn = 0;
+      if (data) for (let offset = 3; offset < data.length; offset += 4) if (data[offset]! > 20) drawn += 1;
+      return drawn;
+    }), { message: "the map must have its first frame", timeout: 30_000 }).toBeGreaterThan(2_000);
+
     const balance = await page.evaluate(() => {
       const canvas = document.querySelector<HTMLCanvasElement>("#map");
       const context = canvas?.getContext("2d");
