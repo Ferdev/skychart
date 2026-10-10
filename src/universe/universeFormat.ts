@@ -1,4 +1,7 @@
 import { AU_KM } from "./universeBodyGeometry.ts";
+import { formatDistanceAu as formatQuantityDistanceAu, formatDuration as formatQuantityDuration, formatQuantity } from "../format/quantity.ts";
+
+const AU_PER_LIGHT_YEAR = 63_241.077;
 
 /** Speed of light in AU per second. */
 export const LIGHT_SPEED_AU_S = 299_792.458 / AU_KM;
@@ -6,40 +9,32 @@ export const LIGHT_SPEED_AU_S = 299_792.458 / AU_KM;
 export const SPEED_GAUGE_MIN = -9;
 export const SPEED_GAUGE_MAX = 16;
 
-const SUPERSCRIPTS = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+/** Significant digits of one coordinate of the flight position. */
+const COORDINATE_DIGITS = 7;
 
 export function formatNumber(value: number): string {
-  const magnitude = Math.abs(value);
-  if (magnitude >= 1e5 || (magnitude > 0 && magnitude < 0.001)) return value.toExponential(2);
-  return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(value);
+  return formatQuantity(value);
 }
 
+/** One coordinate of the flight position: AU near the Sun, light-years far from it. */
 export function formatCoordinate(value: number): string {
-  const magnitude = Math.abs(value);
-  if (magnitude === 0) return "0 AU";
-  if (magnitude < 1e4) return `${formatNumber(value)} AU`;
-  return `${formatNumber(value / 63_241.077)} ly`;
+  // A value below a millimetre is a rounding remainder, not a position.
+  if (Math.abs(value) < 1e-14) return `0 AU`;
+  // A position needs more digits than a measured value: a short flight near a planet must change the text.
+  return Math.abs(value) < AU_PER_LIGHT_YEAR * 0.1
+    ? `${formatQuantity(value, COORDINATE_DIGITS, COORDINATE_DIGITS)} AU`
+    : `${formatQuantity(value / AU_PER_LIGHT_YEAR, COORDINATE_DIGITS, COORDINATE_DIGITS)} ly`;
 }
 
 export function formatDistanceAu(value: number): string {
-  if (value < 0.01) return `${new Intl.NumberFormat(undefined, { maximumSignificantDigits: 4 }).format(value * AU_KM)} km`;
-  if (value < 10_000) return `${formatNumber(value)} AU`;
-  const lightYears = value / 63_241.077;
-  if (Math.abs(lightYears) < 1e3) return `${formatNumber(lightYears)} ly`;
-  if (Math.abs(lightYears) < 1e6) return `${formatNumber(lightYears / 1e3)} kly`;
-  if (Math.abs(lightYears) < 1e9) return `${formatNumber(lightYears / 1e6)} Mly`;
-  return `${formatNumber(lightYears / 1e9)} Gly`;
+  return formatQuantityDistanceAu(value, { auKm: AU_KM });
 }
 
-/** A speed as a multiple of the speed of light, e.g. "499 c" or "3.2×10⁸ c". */
+/** A speed as a multiple of the speed of light, e.g. "499 c" or "499 billion c". */
 export function formatLightSpeeds(speedAuPerSecond: number): string {
   const ratio = speedAuPerSecond / LIGHT_SPEED_AU_S;
   if (!(ratio > 0)) return "0 c";
-  if (ratio >= 1e-3 && ratio < 1e6) return `${new Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }).format(ratio)} c`;
-  // toExponential rounds the mantissa and carries into the exponent together.
-  const [mantissa, exponent] = ratio.toExponential(1).split("e") as [string, string];
-  const digits = [...exponent.replace(/[+-]/, "")].map((digit) => SUPERSCRIPTS[Number(digit)]).join("");
-  return `${mantissa}×10${exponent.startsWith("-") ? "⁻" : ""}${digits} c`;
+  return `${formatQuantity(ratio, 3)} c`;
 }
 
 /** Speed readout: physical units plus the multiple of light speed. */
@@ -48,14 +43,7 @@ export function formatSpeed(speedAuPerSecond: number): string {
 }
 
 export function formatDuration(seconds: number): string {
-  const format = (value: number, unit: string) => `${new Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }).format(value)} ${unit}`;
-  if (seconds < 3_600) return format(seconds / 60, "min");
-  if (seconds < 172_800) return format(seconds / 3_600, "h");
-  const days = seconds / 86_400;
-  if (days < 730) return format(days, "d");
-  const years = days / 365.25;
-  if (years < 1e4) return format(years, "yr");
-  return years < 1e7 ? format(years / 1e3, "kyr") : format(years / 1e6, "Myr");
+  return formatQuantityDuration(seconds);
 }
 
 /** Position of a speed along the logarithmic gauge, from 0 (at rest or below

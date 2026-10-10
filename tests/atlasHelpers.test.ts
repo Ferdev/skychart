@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { bodyDistanceKm, escapeHtml, formatRatio, identifierLabel, identifierValue, shortBodyName, uniquePairs, uniqueTextValues } from "../src/atlasFormatting.ts";
+import { bodyDistanceKm, escapeHtml, formatRatio, identifierLabel, identifierValue, readableCatalogWords, shortBodyName, uniquePairs, uniqueTextValues } from "../src/atlasFormatting.ts";
 import { clamp, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectUnion } from "../src/geometry.ts";
 import { eclipticCartesianToEquatorial } from "../src/coordinates.ts";
 import { objectMediaFor, objectMediaItemsFor, pixelBufferHasVisibleVariation } from "../src/objectMedia.ts";
@@ -7,6 +7,19 @@ import { catalogSummaryFromEphemeris, mergeBodyList, replaceBodyList } from "../
 
 assert.equal(escapeHtml(`<a title="x">Tom & 'Ada'</a>`), "&lt;a title=&quot;x&quot;&gt;Tom &amp; &#039;Ada&#039;&lt;/a&gt;");
 assert.equal(identifierLabel("gaia_dr3_source_id"), "Gaia DR3 Source ID");
+assert.equal(identifierLabel("jpl_spkid"), "JPL SPK-ID");
+assert.equal(identifierLabel("simbad_oid"), "SIMBAD OID");
+assert.equal(readableCatalogWords("spice_spk"), "SPICE SPK");
+assert.equal(readableCatalogWords("jpl_de440s_ephemeris"), "JPL DE440s Ephemeris");
+assert.equal(readableCatalogWords("naif_mar099s_satellite_spk"), "NAIF Mar099s Satellite SPK");
+assert.equal(readableCatalogWords("desi_dr1_tile"), "DESI DR1 Tile");
+assert.equal(readableCatalogWords("sdss_spiders_dr20"), "SDSS SPIDERS DR20");
+assert.equal(readableCatalogWords("ngc_ic_deep_sky"), "NGC IC Deep Sky");
+assert.equal(readableCatalogWords("esa_gaia_dr3"), "ESA Gaia DR3");
+assert.equal(readableCatalogWords("simbad_tap"), "SIMBAD TAP");
+assert.equal(readableCatalogWords("deep_sky_catalog"), "Deep Sky Catalog");
+assert.equal(readableCatalogWords("discovery"), "Discovery", "a word that contains an acronym does not change");
+assert.equal(readableCatalogWords(""), "");
 assert.equal(identifierValue("  42 "), "42");
 assert.equal(identifierValue(Number.NaN), null);
 assert.deepEqual(uniqueTextValues(["Mars", " mars ", null, "Earth"]), ["Mars", "Earth"]);
@@ -48,6 +61,21 @@ assert.equal(pointInRect({ x: 100, y: 80 }, bounds), true);
 assert.deepEqual(edgeAnchorForScreen({ x: 200, y: 40 }, { x: 50, y: 40 }, bounds), { point: { x: 84, y: 40 }, side: "right" });
 assert.equal(pixelBufferHasVisibleVariation(new Uint8ClampedArray([32, 32, 32, 255, 32, 32, 32, 255])), false);
 assert.equal(pixelBufferHasVisibleVariation(new Uint8ClampedArray([32, 32, 32, 255, 32, 36, 32, 255])), true);
+{
+  // A bright star can fill a survey frame: most pixels are at the maximum of a channel and the image shows a solid colour.
+  const frame = (saturatedPixels: number, darkPixels: number) => new Uint8ClampedArray([
+    ...Array.from({ length: saturatedPixels }, (_, index) => [255, 255, 250 - (index % 3), 255]).flat(),
+    ...Array.from({ length: darkPixels }, (_, index) => [20 + (index % 5), 22, 30, 255]).flat(),
+  ]);
+  assert.equal(pixelBufferHasVisibleVariation(frame(100, 0)), false, "a fully saturated frame");
+  assert.equal(pixelBufferHasVisibleVariation(frame(61, 39)), false, "more than 60% of the pixels saturated");
+  assert.equal(pixelBufferHasVisibleVariation(frame(60, 40)), true, "60% is the limit");
+  assert.equal(pixelBufferHasVisibleVariation(frame(5, 95)), true, "a star field with some saturated stars");
+  // The alpha channel is not a colour channel: an opaque dark image is not saturated.
+  assert.equal(pixelBufferHasVisibleVariation(frame(0, 100)), true);
+  // One saturated channel is sufficient, for example a red frame.
+  assert.equal(pixelBufferHasVisibleVariation(new Uint8ClampedArray(Array.from({ length: 50 }, (_, index) => [255, index % 9, 0, 255]).flat())), false);
+}
 assert.deepEqual(eclipticCartesianToEquatorial(1, 0, 0), { raDeg: 0, decDeg: 0 });
 const eclipticYAxis = eclipticCartesianToEquatorial(0, 1, 0);
 assert.ok(eclipticYAxis);

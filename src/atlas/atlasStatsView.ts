@@ -54,11 +54,6 @@ export class AtlasStatsView {
       <div title="${escapeHtml(t("status.mappedStars", { count: formatInteger(mapped.stars) }))}"><dt>${escapeHtml(t("status.stars"))}</dt><dd>${mapped.total > 0 ? formatCount(mapped.stars) : "—"}</dd></div>
       <div title="${escapeHtml(t("status.mappedExtragalactic", { count: formatInteger(mapped.extragalactic) }))}"><dt>${escapeHtml(t("status.extragalactic"))}</dt><dd>${mapped.total > 0 ? formatCount(mapped.extragalactic) : "—"}</dd></div>
     `;
-    const representedLabel = pointLayerShown > 0 ? `${t("status.shownInline", { count: formatCount(represented) })} · ` : "";
-    const mappedLabel = mapped.total > 0 ? `${t("status.mappedInline", { count: formatCount(mapped.total) })} · ` : "";
-    atlasDom.catalogCount.textContent = total > ephemeris.bodies.length
-      ? `${t("status.searchableInline", { count: formatCount(total) })} · ${mappedLabel}${representedLabel}${t("status.selectableInline", { count: formatInteger(ephemeris.bodies.length) })}`
-      : t("status.objects", { count: formatInteger(ephemeris.bodies.length) });
   }
 
   updatePerfHud() {

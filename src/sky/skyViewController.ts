@@ -3,6 +3,7 @@ import { community } from "../community/communityController";
 import type { Body, Ephemeris } from "../atlas/contracts";
 import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
+import { bindViewEscapeKey } from "../atlas/viewEscapeKey";
 import {
   buildSkyPermalink,
   normalizeSkyViewState,
@@ -13,6 +14,7 @@ import {
   type SkyViewState,
 } from "../viewState";
 import { CONSTELLATIONS } from "./constellations";
+import { constellationName } from "../i18n/constellationNames";
 import {
   bodyCanObserveSky,
   bodyVector,
@@ -29,32 +31,18 @@ import {
   type Vector3,
 } from "./skyProjection";
 import { skyPointAppearance } from "./skyPointAppearance";
+import { skyObjectType, type CatalogSkyPoint, type RenderedHit, type SkyPoint } from "./skyPoint";
+import { drawSkyConstellationLabels, drawSkyObjectLabels, isSkyLabelCandidate, rankSkyLabelCandidates, skyLabelLimit, type DrawnSkyLabel, type SkyConstellationLabel, type SkyLabelArea, type SkyLabelRule } from "./skyLabels";
+import { renderSkyLayerFilters } from "./skyLayerFilters";
+import { formatCount, formatDateTime, formatQuantity, LIGHT_YEAR_KM } from "../format/quantity";
 import { SkySelectionConnectorView } from "./skySelectionConnectorView";
+import { canvasFont } from "../format/fonts";
 
 export { bodyCanObserveSky } from "./skyBody";
-
-type CatalogSkyPoint = {
-  key: string;
-  name: string;
-  object_type?: string | null;
-  catalog_group?: string | null;
-  color?: string | null;
-  apparent_magnitude?: number | null;
-  direction: Vector3;
-};
-
-type SkyPoint = CatalogSkyPoint & { dynamic: boolean };
 
 type SkyPayload = {
   returned?: number;
   points?: CatalogSkyPoint[];
-};
-
-type RenderedHit = {
-  point: SkyPoint;
-  x: number;
-  y: number;
-  radius: number;
 };
 
 type SkyViewControllerOptions = {
@@ -80,6 +68,14 @@ type SkyViewControllerOptions = {
   errorTitle: HTMLElement;
   errorMessage: HTMLElement;
   closeButton: HTMLButtonElement;
+  /** The text part of the exit button. On a phone the button shows only its arrow. */
+  closeLabel: HTMLElement;
+  /** Opens the menu with Share and Reset on a narrow window. */
+  moreButton: HTMLButtonElement;
+  /** The header. Labels stay below it. */
+  header: HTMLElement;
+  /** The footer. Labels stay above its text. */
+  footer: HTMLElement;
   resetButton: HTMLButtonElement;
   workspacePanel: HTMLElement;
   selectedObjectPanel: HTMLElement;
@@ -91,37 +87,24 @@ type SkyViewControllerOptions = {
   resolveObserver: (key: string) => Promise<Body | null>;
   catalogRelease: () => string | undefined;
   locale: () => SkyShareLocale;
+  /** Closes the object inspector and keeps Sky view open. */
+  closeInspector: () => void;
 };
 
 type SkyViewIntegrationOptions = Pick<SkyViewControllerOptions,
-  "bodyByKey" | "ephemeris" | "translate" | "selectBody" | "stateChanged" | "resolveObserver" | "catalogRelease" | "locale">;
+  "bodyByKey" | "ephemeris" | "translate" | "selectBody" | "stateChanged" | "resolveObserver" | "catalogRelease" | "locale" | "closeInspector">;
 
-const DEFAULT_FOV_DEG = 72;
-const MAX_LABELS = 28;
-const SKY_POINT_LIMIT = 12_000;
-const SKY_OBJECT_TYPE_ORDER = new Map<string, number>(SKY_OBJECT_TYPES.map((type, index) => [type, index]));
-const OBJECT_TYPE_LABEL_KEYS: Readonly<Record<string, string>> = {
-  star: "type.star",
-  planet: "type.planet",
-  moon: "type.moon",
-  dwarf_planet: "type.dwarfPlanet",
-  galaxy: "type.galaxy",
-  quasar: "type.quasar",
-  active_galaxy: "type.activeGalaxy",
-  black_hole: "type.blackHole",
-  pulsar: "type.pulsar",
-  nebula: "type.nebula",
-  star_cluster: "type.starCluster",
-  xray_source: "type.xraySource",
-  xray_extended: "type.xrayExtended",
-  asterism: "type.asterism",
-  milky_way_patch: "type.milkyWayPatch",
-  asteroid: "type.asteroid",
-  comet: "type.comet",
-  small_body: "type.smallBody",
-  unknown: "type.object",
+/** Where `Exit` goes when Sky view did not open from the 2D map. It is kept in memory only. */
+export type SkyReturnTarget = {
+  /** Translation key of the exit button text, for example `sky.backTo3d`. */
+  labelKey: string;
+  restore: () => void;
 };
 
+const DEFAULT_FOV_DEG = 72;
+/** The top part of the footer is an empty colour fade. Labels can use it. */
+const FOOTER_FADE_PX = 30;
+const SKY_POINT_LIMIT = 12_000;
 type SkyShareSnapshot = {
   state: SkyPermalinkState;
   observer: Body;
@@ -145,14 +128,20 @@ export class SkyViewController {
   private shareSnapshot: SkyShareSnapshot | null = null;
   private shareStatusTimer: number | null = null;
   private selectedPointKey: string | null = null;
+  private drawnLabels: DrawnSkyLabel[] = [];
+  private returnTarget: SkyReturnTarget | null = null;
   private readonly selectionConnector: SkySelectionConnectorView;
 
   constructor(private readonly options: SkyViewControllerOptions) {
     this.selectionConnector = new SkySelectionConnectorView({
       element: options.selectionConnector, canvas: options.canvas, workspacePanel: options.workspacePanel,
     });
-    options.closeButton.addEventListener("click", () => this.close());
-    options.resetButton.addEventListener("click", () => this.resetOrientation());
+    options.closeButton.addEventListener("click", () => this.exit());
+    options.resetButton.addEventListener("click", () => { this.setMoreMenu(false); this.resetOrientation(); });
+    options.moreButton.addEventListener("click", () => this.setMoreMenu(options.moreButton.getAttribute("aria-expanded") !== "true"));
+    options.root.addEventListener("pointerdown", (event) => {
+      if (!(event.target as HTMLElement).closest(".sky-view__more")) this.setMoreMenu(false);
+    });
     options.canvas.addEventListener("pointerdown", (event) => this.pointerDown(event));
     options.canvas.addEventListener("pointermove", (event) => this.pointerMove(event));
     options.canvas.addEventListener("pointerup", (event) => this.pointerUp(event));
@@ -160,12 +149,13 @@ export class SkyViewController {
     options.canvas.addEventListener("pointerleave", () => this.hideTooltip());
     options.canvas.addEventListener("wheel", (event) => this.wheel(event), { passive: false });
     options.canvas.addEventListener("keydown", (event) => this.keyDown(event));
+    bindViewEscapeKey({ active: () => this.active, canvas: options.canvas, escape: () => this.escape() });
     options.constellationsToggle.addEventListener("change", () => {
       this.options.stateChanged("replace");
       this.requestRender();
     });
     options.objectTypeFilters.addEventListener("change", (event) => this.objectTypeFilterChanged(event));
-    options.shareButton.addEventListener("click", () => void this.toggleSharePanel());
+    options.shareButton.addEventListener("click", () => { this.setMoreMenu(false); void this.toggleSharePanel(); });
     options.shareCloseButton.addEventListener("click", () => this.closeSharePanel());
     options.copyLinkButton.addEventListener("click", () => void this.copyViewpointLink());
     options.nativeShareButton.addEventListener("click", () => void this.nativeShare());
@@ -199,11 +189,13 @@ export class SkyViewController {
     return this.currentObserver();
   }
 
-  async open(observer: Body, restoredCamera?: Omit<SkyViewState, "observerKey">): Promise<void> {
+  async open(observer: Body, restoredCamera?: Omit<SkyViewState, "observerKey">, returnTarget?: SkyReturnTarget): Promise<void> {
     if (!bodyCanObserveSky(observer)) {
       this.showUnavailable(this.options.translate("sky.positionUnavailable"));
       return;
     }
+    // A new observer in an open Sky view keeps the origin of the first one.
+    this.returnTarget = returnTarget ?? (this.active ? this.returnTarget : null);
     this.observer = observer;
     this.catalogPoints = [];
     this.camera = restoredCamera ? normalizeCamera(restoredCamera) : this.initialCamera(observer);
@@ -252,7 +244,28 @@ export class SkyViewController {
     this.catalogPoints = [];
     this.observer = null;
     this.shareSnapshot = null;
+    this.returnTarget = null;
     if (options.updateHistory !== false) this.options.stateChanged("push");
+  }
+
+  /** The labels of the last frame, in draw order. Tests read this list. */
+  labels(): readonly DrawnSkyLabel[] {
+    return this.drawnLabels;
+  }
+
+  private setMoreMenu(open: boolean): void {
+    this.options.moreButton.setAttribute("aria-expanded", String(open));
+  }
+
+  /** The user leaves Sky view: back to the view that opened it (3D mode), or to the 2D map. */
+  exit(): void {
+    const returnTarget = this.returnTarget;
+    if (!returnTarget) {
+      this.close();
+      return;
+    }
+    this.close({ updateHistory: false });
+    returnTarget.restore();
   }
 
   closeForAtlasNavigation(navigate: () => void): void {
@@ -275,7 +288,7 @@ export class SkyViewController {
     if (!this.active) return;
     this.updateChrome();
     this.updateFilterControls();
-    this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
+    this.options.status.textContent = this.options.translate("sky.ready", { count: formatCount(this.catalogPoints.length) });
     this.requestRender();
   }
 
@@ -313,7 +326,7 @@ export class SkyViewController {
       const payload = await response.json() as SkyPayload;
       if (requestId !== this.requestId || !this.active) return;
       this.catalogPoints = (payload.points ?? []).filter(validCatalogPoint);
-      this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
+      this.options.status.textContent = this.options.translate("sky.ready", { count: formatCount(this.catalogPoints.length) });
     } catch {
       if (requestId !== this.requestId || !this.active) return;
       this.catalogPoints = [];
@@ -351,9 +364,12 @@ export class SkyViewController {
     if (!observer) return;
     this.options.title.textContent = this.options.translate("sky.title", { name: observer.name });
     const timestamp = ephemeris?.timestamp_utc
-      ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(new Date(ephemeris.timestamp_utc))
+      ? formatDateTime(ephemeris.timestamp_utc, { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" })
       : this.options.translate("sky.unknownTime");
     this.options.meta.textContent = this.options.translate("sky.meta", { date: timestamp });
+    const exitLabel = this.options.translate(this.returnTarget?.labelKey ?? "sky.backToMap");
+    this.options.closeLabel.textContent = exitLabel;
+    this.options.closeButton.title = exitLabel;
   }
 
   private requestRender(): void {
@@ -380,7 +396,7 @@ export class SkyViewController {
     const context = canvas.getContext("2d");
     if (!context) return;
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    this.renderScene(context, width, height, this.camera, true);
+    this.drawnLabels = this.renderScene(context, width, height, this.camera, true, this.screenLabelArea(width, height));
     community.drawFootprints(context, createSkyProjector(this.camera, width, height), observer.key);
     community.render("sky", this.options.root, this.renderedHits.map(h => ({key: h.point.key, x: h.x, y: h.y})), community.showMarkers);
     this.updateSelectionConnector();
@@ -392,9 +408,10 @@ export class SkyViewController {
     height: number,
     camera: SkyCamera,
     recordHits: boolean,
-  ): void {
+    labelArea: SkyLabelArea,
+  ): DrawnSkyLabel[] {
     const observer = this.currentObserver();
-    if (!observer) return;
+    if (!observer) return [];
     const background = context.createRadialGradient(width * 0.5, height * 0.45, 0, width * 0.5, height * 0.45, Math.max(width, height) * 0.72);
     background.addColorStop(0, "#0c1519");
     background.addColorStop(0.5, "#080d11");
@@ -403,9 +420,32 @@ export class SkyViewController {
     context.fillRect(0, 0, width, height);
     this.drawGrid(context, width, height, camera);
     const points = this.mergedPoints(observer);
-    this.drawConstellations(context, points, width, height, camera);
-    this.drawPoints(context, points, width, height, camera, recordHits);
+    const constellationLabels = this.drawConstellations(context, points, width, height, camera);
+    const rule: SkyLabelRule = { fovDeg: camera.fovDeg, selectedKey: this.selectedPointKey };
+    const candidates = this.drawPoints(context, points, width, height, camera, recordHits, rule);
+    // The object labels are first. The constellation names use the space that stays free.
+    const drawn = drawSkyObjectLabels(context, rankSkyLabelCandidates(candidates, rule), labelArea);
+    drawn.push(...drawSkyConstellationLabels(context, constellationLabels, labelArea));
     this.drawReticle(context, width, height);
+    return drawn;
+  }
+
+  /** The free area of the screen: below the real header, above the footer, and not below the layer panel. */
+  private screenLabelArea(width: number, height: number): SkyLabelArea {
+    const root = this.options.root.getBoundingClientRect();
+    const relative = (element: HTMLElement) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left - root.left, top: rect.top - root.top, right: rect.right - root.left, bottom: rect.bottom - root.top };
+    };
+    const header = relative(this.options.header);
+    const footer = relative(this.options.footer);
+    const filters = relative(this.options.layerControls);
+    return {
+      bounds: { left: 8, top: Math.max(8, header.bottom), right: width - 8, bottom: Math.min(height - 8, footer.top + FOOTER_FADE_PX) },
+      exclusions: filters.right > filters.left ? [filters] : [],
+      occupied: [],
+      limit: skyLabelLimit(width),
+    };
   }
 
   private drawGrid(context: CanvasRenderingContext2D, width: number, height: number, camera: SkyCamera): void {
@@ -451,10 +491,10 @@ export class SkyViewController {
     width: number,
     height: number,
     camera: SkyCamera,
-  ): void {
-    if (!this.options.constellationsToggle.checked) return;
+  ): SkyConstellationLabel[] {
+    if (!this.options.constellationsToggle.checked) return [];
     const pointByKey = new Map(points.map((point) => [point.key, point]));
-    const labels: Array<{ name: string; x: number; y: number }> = [];
+    const labels: SkyConstellationLabel[] = [];
     context.save();
     context.strokeStyle = "rgba(248, 203, 101, 0.48)";
     context.lineWidth = 1.15;
@@ -481,44 +521,14 @@ export class SkyViewController {
       if (visibleEndpoints.size >= 2) {
         const endpoints = [...visibleEndpoints.values()];
         labels.push({
-          name: constellation.name,
+          name: constellationName(constellation.name, this.options.locale()),
           x: endpoints.reduce((sum, point) => sum + point.x, 0) / endpoints.length,
           y: endpoints.reduce((sum, point) => sum + point.y, 0) / endpoints.length,
         });
       }
     }
     context.restore();
-    this.drawConstellationLabels(context, labels, width, height);
-  }
-
-  private drawConstellationLabels(
-    context: CanvasRenderingContext2D,
-    labels: Array<{ name: string; x: number; y: number }>,
-    width: number,
-    height: number,
-  ): void {
-    const occupied: Array<{ left: number; top: number; right: number; bottom: number }> = [];
-    context.save();
-    context.font = "700 10px system-ui, sans-serif";
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    for (const label of labels) {
-      const labelWidth = context.measureText(label.name).width + 12;
-      const rect = {
-        left: label.x - labelWidth / 2,
-        top: label.y - 10,
-        right: label.x + labelWidth / 2,
-        bottom: label.y + 10,
-      };
-      if (rect.left < 8 || rect.right > width - 8 || rect.top < 72 || rect.bottom > height - 48) continue;
-      if (occupied.some((item) => overlaps(item, rect))) continue;
-      occupied.push(rect);
-      context.fillStyle = "rgba(3, 6, 7, 0.72)";
-      context.fillRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-      context.fillStyle = "rgba(248, 203, 101, 0.76)";
-      context.fillText(label.name, label.x, label.y);
-    }
-    context.restore();
+    return labels;
   }
 
   private drawPoints(
@@ -528,7 +538,8 @@ export class SkyViewController {
     height: number,
     camera: SkyCamera,
     recordHits: boolean,
-  ): void {
+    rule: SkyLabelRule,
+  ): RenderedHit[] {
     const hits: RenderedHit[] = [];
     const labelCandidates: RenderedHit[] = [];
     context.save();
@@ -569,30 +580,11 @@ export class SkyViewController {
       }
       const hit = { point, x: projected.x, y: projected.y, radius: Math.max(7, appearance.coreRadius + 4) };
       hits.push(hit);
-      if (point.dynamic || (Number.isFinite(point.apparent_magnitude) && Number(point.apparent_magnitude) <= 4.5)) labelCandidates.push(hit);
+      if (isSkyLabelCandidate(point, rule)) labelCandidates.push(hit);
     }
     context.restore();
     if (recordHits) this.renderedHits = hits;
-    labelCandidates.sort((a, b) => Number(b.point.dynamic) - Number(a.point.dynamic) ||
-      numericMagnitude(a.point.apparent_magnitude) - numericMagnitude(b.point.apparent_magnitude));
-    this.drawLabels(context, labelCandidates.slice(0, MAX_LABELS), width, height);
-  }
-
-  private drawLabels(context: CanvasRenderingContext2D, candidates: RenderedHit[], width: number, height: number): void {
-    const occupied: Array<{ left: number; top: number; right: number; bottom: number }> = [];
-    context.font = "600 12px system-ui, sans-serif";
-    context.textBaseline = "middle";
-    for (const hit of candidates) {
-      const labelWidth = context.measureText(hit.point.name).width + 14;
-      const rect = { left: hit.x + 8, top: hit.y - 10, right: hit.x + 8 + labelWidth, bottom: hit.y + 10 };
-      if (rect.right > width - 8 || rect.left < 8 || rect.top < 72 || rect.bottom > height - 48) continue;
-      if (occupied.some((item) => overlaps(item, rect))) continue;
-      occupied.push(rect);
-      context.fillStyle = "rgba(3, 6, 7, 0.68)";
-      context.fillRect(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-      context.fillStyle = "rgba(238, 242, 234, 0.86)";
-      context.fillText(hit.point.name, hit.x + 14, hit.y);
-    }
+    return labelCandidates;
   }
 
   private drawReticle(context: CanvasRenderingContext2D, width: number, height: number): void {
@@ -635,34 +627,7 @@ export class SkyViewController {
   private updateFilterControls(): void {
     const observer = this.currentObserver();
     if (!observer) return;
-    const counts = new Map<string, number>();
-    for (const point of this.mergedPoints(observer)) {
-      const type = skyObjectType(point);
-      counts.set(type, (counts.get(type) ?? 0) + 1);
-    }
-    const types = [...new Set<string>([...SKY_OBJECT_TYPES, ...counts.keys()])].sort((a, b) =>
-      (SKY_OBJECT_TYPE_ORDER.get(a) ?? Number.MAX_SAFE_INTEGER) -
-      (SKY_OBJECT_TYPE_ORDER.get(b) ?? Number.MAX_SAFE_INTEGER) ||
-      this.objectTypeLabel(a).localeCompare(this.objectTypeLabel(b)));
-    const fragment = document.createDocumentFragment();
-    for (const type of types) {
-      const label = document.createElement("label");
-      label.className = "sky-view__filter";
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.name = "sky-object-type";
-      input.value = type;
-      input.dataset.skyObjectType = type;
-      input.checked = this.visibleObjectTypes.get(type) !== false;
-      const text = document.createElement("span");
-      text.textContent = this.objectTypeLabel(type);
-      const count = document.createElement("span");
-      count.className = "sky-view__filter-count";
-      count.textContent = String(counts.get(type) ?? 0);
-      label.append(input, text, count);
-      fragment.append(label);
-    }
-    this.options.objectTypeFilters.replaceChildren(fragment);
+    renderSkyLayerFilters(this.options.objectTypeFilters, this.mergedPoints(observer), this.visibleObjectTypes);
   }
 
   private objectTypeFilterChanged(event: Event): void {
@@ -765,7 +730,13 @@ export class SkyViewController {
     if (!context) throw new Error("Sky share preview canvas unavailable");
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, canvas.width, canvas.height);
-    this.renderScene(context, canvas.width, canvas.height, state, false);
+    // The card has its own title and footer bands. The labels stay between them.
+    this.renderScene(context, canvas.width, canvas.height, state, false, {
+      bounds: { left: 8, top: 72, right: canvas.width - 8, bottom: canvas.height - 48 },
+      exclusions: [],
+      occupied: [],
+      limit: skyLabelLimit(canvas.width),
+    });
 
     const topShade = context.createLinearGradient(0, 0, 0, 250);
     topShade.addColorStop(0, "rgba(2, 5, 6, 0.96)");
@@ -780,18 +751,18 @@ export class SkyViewController {
 
     context.textBaseline = "top";
     context.fillStyle = "#82cbb3";
-    context.font = "800 20px system-ui, sans-serif";
+    context.font = canvasFont(20, 800);
     context.fillText("COSMIC ATLAS · SKYCHART.ORG", 64, 46);
     context.fillStyle = "#f3eedf";
     drawFittedText(context, this.options.translate("sky.cardTitle", { name: observer.name }), 64, 86, 940, 54);
     context.fillStyle = "rgba(238, 242, 234, 0.86)";
-    context.font = "650 23px system-ui, sans-serif";
+    context.font = canvasFont(23, 650);
     context.fillText(`UTC ${state.epochUtc}`, 64, 158);
     context.fillStyle = "rgba(248, 203, 101, 0.92)";
-    context.font = "650 21px system-ui, sans-serif";
+    context.font = canvasFont(21, 650);
     context.fillText(this.distanceContext(observer), 64, 526);
     context.fillStyle = "rgba(238, 242, 234, 0.72)";
-    context.font = "500 17px system-ui, sans-serif";
+    context.font = canvasFont(17, 500);
     context.fillText(this.options.translate("sky.cardDisclosure"), 64, 570, 1070);
   }
 
@@ -811,8 +782,8 @@ export class SkyViewController {
     if (!Number.isFinite(distanceKm) || Number(distanceKm) < 0) return this.options.translate("sky.distanceUnknown");
     if (Number(distanceKm) < 1) return this.options.translate("sky.distanceEarth");
     const distanceAu = Number(distanceKm) / 149_597_870.7;
-    if (distanceAu < 100_000) return this.options.translate("sky.distanceAu", { distance: formatCardNumber(distanceAu) });
-    return this.options.translate("sky.distanceLy", { distance: formatCardNumber(Number(distanceKm) / 9_460_730_472_580.8) });
+    if (distanceAu < 100_000) return this.options.translate("sky.distanceAu", { distance: formatQuantity(distanceAu, 3) });
+    return this.options.translate("sky.distanceLy", { distance: formatQuantity(Number(distanceKm) / LIGHT_YEAR_KM, 3) });
   }
 
   private cardFilename(snapshot: SkyShareSnapshot): string {
@@ -831,12 +802,6 @@ export class SkyViewController {
 
   private objectTypeVisible(point: SkyPoint): boolean {
     return this.visibleObjectTypes.get(skyObjectType(point)) !== false;
-  }
-
-  private objectTypeLabel(type: string): string {
-    const key = OBJECT_TYPE_LABEL_KEYS[type];
-    if (key) return this.options.translate(key);
-    return type.replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 
   private pointerDown(event: PointerEvent): void {
@@ -905,10 +870,17 @@ export class SkyViewController {
     this.requestRender();
   }
 
+  /** Escape closes the `More` menu, then the inspector. The next press leaves Sky view. */
+  private escape(): void {
+    if (this.options.moreButton.getAttribute("aria-expanded") === "true") this.setMoreMenu(false);
+    else if (this.options.root.dataset.objectInspector === "true" && !this.options.workspacePanel.hidden) this.options.closeInspector();
+    else this.exit();
+  }
+
   private keyDown(event: KeyboardEvent): void {
     if (!this.active) return;
     const step = event.shiftKey ? 10 : 3;
-    if (event.key === "Escape") { this.close(); return; }
+    if (event.key === "Escape") { event.preventDefault(); this.escape(); return; }
     if (event.key === "ArrowLeft") this.camera.yawDeg -= step;
     else if (event.key === "ArrowRight") this.camera.yawDeg += step;
     else if (event.key === "ArrowUp") this.camera.pitchDeg += step;
@@ -933,7 +905,7 @@ export class SkyViewController {
       this.options.root.dataset.objectInspector = "true";
       this.updateSelectionConnector();
     }
-    this.options.status.textContent = this.options.translate("sky.ready", { count: this.catalogPoints.length });
+    this.options.status.textContent = this.options.translate("sky.ready", { count: formatCount(this.catalogPoints.length) });
   }
 
   private hideObjectInspector(): void {
@@ -993,24 +965,19 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     errorTitle: dom.skyErrorTitle,
     errorMessage: dom.skyErrorMessage,
     closeButton: dom.skyClose,
+    closeLabel: dom.skyCloseLabel,
+    moreButton: dom.skyMoreButton,
+    header: dom.skyHeader,
+    footer: dom.skyFooter,
     resetButton: dom.skyReset,
     workspacePanel: dom.workspacePanel,
     selectedObjectPanel: dom.selectedObjectPanel,
   });
 }
 
-function skyObjectType(point: Pick<SkyPoint, "object_type">): string {
-  const type = point.object_type?.trim().toLowerCase();
-  return type || "unknown";
-}
-
 function validCatalogPoint(point: CatalogSkyPoint): boolean {
   return Boolean(point && point.key && point.name && point.direction &&
     [point.direction.x, point.direction.y, point.direction.z].every(Number.isFinite));
-}
-
-function numericMagnitude(value: number | null | undefined): number {
-  return Number.isFinite(value) ? Number(value) : Number.POSITIVE_INFINITY;
 }
 
 function pointerDistance(pointers: ReadonlyMap<number, { x: number; y: number }>): number {
@@ -1031,10 +998,6 @@ function nearestHit(hits: RenderedHit[], point: { x: number; y: number }): Rende
   return nearest;
 }
 
-function overlaps(a: { left: number; top: number; right: number; bottom: number }, b: { left: number; top: number; right: number; bottom: number }): boolean {
-  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-}
-
 function drawFittedText(
   context: CanvasRenderingContext2D,
   text: string,
@@ -1045,7 +1008,7 @@ function drawFittedText(
 ): void {
   let size = initialSize;
   do {
-    context.font = `750 ${size}px Georgia, serif`;
+    context.font = canvasFont(size, 750);
     if (context.measureText(text).width <= maxWidth || size <= 30) break;
     size -= 2;
   } while (size > 30);
@@ -1055,10 +1018,4 @@ function drawFittedText(
 function slugify(value: string): string {
   return value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
-}
-
-function formatCardNumber(value: number): string {
-  if (!Number.isFinite(value)) return "unknown";
-  if (Math.abs(value) >= 10_000 || (Math.abs(value) > 0 && Math.abs(value) < 0.01)) return value.toExponential(2);
-  return new Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }).format(value);
 }

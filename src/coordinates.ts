@@ -1,3 +1,4 @@
+import { formatFixed } from "./format/quantity.ts";
 const DEG_PER_HOUR = 15;
 const RA_HOURS_PER_CIRCLE = 24;
 const FULL_CIRCLE_DEG = 360;
@@ -44,7 +45,7 @@ export function formatDeclination(decDeg: number): string {
 
 export function formatDecimalDegrees(value: number, digits = 5): string {
   if (!Number.isFinite(value)) return "";
-  return `${value.toFixed(digits)}°`;
+  return `${formatFixed(value, digits)}°`;
 }
 
 export function equatorialToGalactic({ raDeg, decDeg }: EquatorialCoordinates): GalacticCoordinates | null {

@@ -1,0 +1,229 @@
+/*
+ * Search panel and the object B search of the comparison tool. The two use the same parts:
+ * the field, one row of type chips, and one scroll area.
+ *
+ * Search panel: the field and the chips stay at the top, and the rest of the panel is the one scroll area.
+ * While the field is empty, the scroll area shows the discovery blocks (events, Explore, guided tours).
+ * With text or a type filter, it shows only the result list.
+ */
+.search-workspace {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.search-primary {
+  padding: 14px 16px 8px;
+}
+
+.search-primary .field-label {
+  display: block;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 760;
+}
+
+.search-primary .search-control {
+  margin: 6px 0 0;
+}
+
+/* One row of type chips. The row scrolls sideways when the chips need more room. */
+.scope-section {
+  min-width: 0;
+  padding: 0 16px 10px;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.scope-section .body-picker-filters {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 2px 0 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.scope-section .body-picker-filters button,
+.body-picker-filters__more {
+  flex: none;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  color: var(--panel-ink-muted);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.body-picker-filters__more {
+  max-width: 11rem;
+}
+
+.scope-section .body-picker-filters button:hover,
+.body-picker-filters__more:hover {
+  border-color: var(--panel-line-strong);
+  color: var(--panel-ink);
+  background: var(--panel-surface);
+}
+
+.scope-section .body-picker-filters button.active {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  background: rgba(239, 196, 104, 0.14);
+}
+
+.search-scroll {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.search-discovery[hidden],
+.results-section[hidden] {
+  display: none;
+}
+
+.search-discovery > .workspace-section:first-child,
+.search-scroll > .results-section {
+  border-top: 0;
+}
+
+.results-section {
+  padding: 8px 16px 16px;
+}
+
+.results-section .body-picker {
+  margin: 0;
+}
+
+/* Happening now */
+.now-panel .section-heading a,
+.guided-tours-section .section-heading a {
+  font-size: var(--text-sm);
+}
+
+.now-panel #now-status {
+  margin: 0;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.now-panel ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.now-panel li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+}
+
+.now-panel li[hidden] {
+  display: none;
+}
+
+.now-panel li time {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.now-panel li p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.now-panel #now-show-all {
+  justify-self: start;
+}
+
+/* Guided tours */
+.guided-tour-list {
+  display: grid;
+  gap: 8px;
+}
+
+.guided-tour-list a {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-lg);
+  color: var(--panel-ink);
+  background: var(--panel-surface);
+  text-decoration: none;
+}
+
+.guided-tour-list a:hover,
+.guided-tour-list a:focus-visible {
+  border-color: var(--panel-line-strong);
+  background: var(--panel-surface-strong);
+}
+
+.guided-tour-list span {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+}
+
+/* An empty result: the message, a way out, and examples. */
+.empty-state__examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+/* Object B search of the comparison tool: no height of its own. It scrolls with the Compare view. */
+.compare-search-workspace {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.compare-search-workspace .results-section {
+  padding: 8px 16px 16px;
+}
+
+@media (max-width: 899px) {
+  .search-primary {
+    padding: 12px 14px 8px;
+  }
+
+  .search-primary .search-control {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .scope-section {
+    padding: 0 14px 8px;
+  }
+
+  .scope-section .body-picker-filters button,
+  .body-picker-filters__more {
+    min-height: 44px;
+  }
+
+  .results-section {
+    padding: 8px 14px 16px;
+  }
+}
+
+/* The comparison result list has no border and no height of its own. */
+.compare-picker .destination-picker__section {
+  gap: 5px;
+}

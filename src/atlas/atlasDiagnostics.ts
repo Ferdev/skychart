@@ -23,6 +23,15 @@ export interface AtlasDiagnostics {
   /** Bodies with a marker, bodies with a label, and exoplanet rings in the current frame. */
   visibleBodyKeys(): string[];
   labelBodyKeys(): string[];
+  /** Labels that the last frame drew, after the collision step. `labelBodyKeys` lists candidates only. */
+  /** `text` is the text on the map. It is different from `name` for the `Solar System` marker. */
+  drawnLabels(): { key: string; name: string; text: string; rect: Rect }[];
+  /** Edge pointers that the last frame drew. */
+  drawnEdgePointers(): { key: string; rect: Rect }[];
+  /** Object labels and constellation names of the last Sky view frame, in draw order. */
+  skyLabels(): { key: string; name: string; rect: { left: number; top: number; right: number; bottom: number } }[];
+  /** Object labels of the last 3D frame, in draw order. */
+  universeLabels(): { key: string; name: string; rect: { left: number; top: number; right: number; bottom: number } }[];
   exoplanetOrbits(): {
     key: string;
     displayState: string;
@@ -51,6 +60,10 @@ interface InstallDiagnosticsOptions {
   camera: () => Camera;
   gestureState: () => { activePointerIds: number[]; hadPinch: boolean };
   visibility: () => { visibleBodies(): Body[]; prioritizedLabelBodies(): Body[]; resolvedExoplanets(): Body[] };
+  drawnLabels: () => { body: Body; text: string; rect: Rect }[];
+  drawnEdgePointers: () => { body: Body; rect: Rect }[];
+  skyLabels: () => readonly { key: string; name: string; rect: { left: number; top: number; right: number; bottom: number } }[];
+  universeLabels: () => readonly { key: string; name: string; rect: { left: number; top: number; right: number; bottom: number } }[];
 }
 
 export function installAtlasDiagnostics(options: InstallDiagnosticsOptions): void {
@@ -75,6 +88,10 @@ export function installAtlasDiagnostics(options: InstallDiagnosticsOptions): voi
     gestureState: options.gestureState,
     visibleBodyKeys: () => options.visibility().visibleBodies().map((body) => body.key),
     labelBodyKeys: () => options.visibility().prioritizedLabelBodies().map((body) => body.key),
+    drawnLabels: () => options.drawnLabels().map(({ body, text, rect }) => ({ key: body.key, name: body.name, text, rect })),
+    drawnEdgePointers: () => options.drawnEdgePointers().map(({ body, rect }) => ({ key: body.key, rect })),
+    skyLabels: () => [...options.skyLabels()],
+    universeLabels: () => [...options.universeLabels()],
     exoplanetOrbits: () => options.visibility().resolvedExoplanets().map((body) => {
       const orbit = body.exoplanet_orbit!;
       const host = { ...body, position: { ...body.position, x_au: orbit.host_position.x_au, y_au: orbit.host_position.y_au } };

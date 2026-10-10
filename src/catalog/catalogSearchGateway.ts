@@ -5,6 +5,7 @@ import type {
   CatalogSearchPayload,
   CatalogSearchResult,
 } from "../atlas/contracts";
+import { localNameMatchesFirst } from "../i18n/objectNames";
 import type { CatalogObjectMapper } from "./catalogObjectMapper";
 
 export type CatalogSearchOptions = {
@@ -51,7 +52,7 @@ export class CatalogSearchGateway {
         ? payload.offset + payload.limit
         : Math.max(offset + returnedCount, payload.offset + returnedCount);
       return {
-        bodies: offset === 0 ? mergeCatalogSearchBodies(this.localSearch(options), bodies, options.limit) : bodies.slice(0, options.limit),
+        bodies: offset === 0 ? localNameMatchesFirst(mergeCatalogSearchBodies(this.localSearch(options), bodies, options.limit), query) : bodies.slice(0, options.limit),
         source: "phoenix",
         total: payload.total,
         hasMore: payload.has_more,
@@ -60,7 +61,7 @@ export class CatalogSearchGateway {
     } catch (error) {
       if (options.signal?.aborted) return { bodies: [], source: "local" };
       console.warn("Phoenix catalog search unavailable; using loaded ephemeris catalog.", error);
-      return { bodies: this.localSearch(options), source: "local", fallback: true };
+      return { bodies: localNameMatchesFirst(this.localSearch(options), query), source: "local", fallback: true };
     }
   }
 

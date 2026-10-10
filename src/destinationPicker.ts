@@ -1,4 +1,7 @@
-import { t } from "./i18n";
+import { objectTypeLabel } from "./format/objectTypeLabel";
+import { DEFAULT_AU_KM, formatDistanceKm, formatQuantity } from "./format/quantity";
+import { locale, t } from "./i18n";
+import { isLocalObjectName, localObjectName, localObjectNameTokens } from "./i18n/objectNames";
 import {
   compareRecentDateDesc,
   getFrequentDestinationKeys,
@@ -20,8 +23,6 @@ export {
   type RecentDestinationOptions,
   type RecordDestinationOptions,
 } from "./destination/recentDestinations";
-const DEFAULT_AU_KM = 149_597_870.7;
-const LIGHT_YEAR_KM = 9_460_730_472_580.8;
 const DEFAULT_COLOR = "#d9b86f";
 export const DEFAULT_FAVORITE_BODY_KEYS = ["moon", "mars", "jupiter", "saturn"] as const;
 export const DESTINATION_PICKER_CLASSES = {
@@ -148,6 +149,8 @@ export type DestinationPickerBadge = {
 export type DestinationPickerItem = {
   key: string;
   name: string;
+  /** The name of the object in the interface language, when that name is different from the catalog name. */
+  localName: string | null;
   searchLabel: string;
   type: DestinationBodyType;
   typeLabel: string;
@@ -257,30 +260,6 @@ const SOLAR_ORDER = new Map<string, number>([
   ["charon", 91]
 ]);
 
-const TYPE_LABEL_KEYS: Record<DestinationBodyType, string> = {
-  star: "type.star",
-  planet: "type.planet",
-  planet_candidate: "exoplanet.typeCandidate",
-  moon: "type.moon",
-  dwarf_planet: "type.dwarfPlanet",
-  galaxy: "type.galaxy",
-  quasar: "type.quasar",
-  active_galaxy: "type.activeGalaxy",
-  black_hole: "type.blackHole",
-  pulsar: "type.pulsar",
-  nebula: "type.nebula",
-  star_cluster: "type.starCluster",
-  xray_source: "type.xraySource",
-  xray_extended: "type.xrayExtended",
-  asterism: "type.asterism",
-  milky_way_patch: "type.milkyWayPatch",
-  asteroid: "type.asteroid",
-  comet: "type.comet",
-  spacecraft: "type.spacecraft",
-  small_body: "type.smallBody",
-  unknown: "type.object"
-};
-
 const TYPE_ICONS: Record<DestinationBodyType, DestinationIconKey> = {
   star: "sun",
   planet: "planet",
@@ -336,7 +315,7 @@ export function classifyBody(body: Pick<DestinationBody, "key" | "name" | "radiu
 
   return {
     type,
-    label: t(TYPE_LABEL_KEYS[type]),
+    label: objectTypeLabel(type),
     icon: TYPE_ICONS[type],
     sortGroup: TYPE_SORT_GROUPS[type]
   };
@@ -487,8 +466,9 @@ export function createDestinationPickerItem(
 ): DestinationPickerItem {
   const classification = options.classification ?? classifyBody(body);
   const key = normalizeBodyKey(body.key);
-  const distanceLabel = formatPickerDistance(body.distance_from_earth_km, options.auKm);
-  const radiusLabel = formatPickerDistance(body.radius_km, options.auKm, { preferCompact: false });
+  // A row shows only values that the catalog has. The inspector tells the user when a value is unknown.
+  const distanceLabel = Number.isFinite(body.distance_from_earth_km) ? formatPickerDistance(body.distance_from_earth_km, options.auKm) : "";
+  const radiusLabel = Number.isFinite(body.radius_km) && body.radius_km > 0 ? formatPickerDistance(body.radius_km, options.auKm) : "";
   const metaLabel = destinationMetaLabel(body, classification, radiusLabel);
   const heliocentricDistanceLabel = formatPickerDistance(body.position.heliocentric_distance_km, options.auKm);
   const selectedKey = options.selectedKey ? normalizeBodyKey(options.selectedKey) : null;
@@ -501,6 +481,7 @@ export function createDestinationPickerItem(
   const isRecent = Boolean(options.recent);
   const badges = destinationBadges({ isCurrentTarget, isSelected, isFavorite, isFrequent, isRecent });
   const searchLabel = body.name;
+  const localName = localObjectName(body.key, locale(), body.name);
   const searchTokens = destinationSearchTokens(body, classification);
   const sortRank = destinationSortRank(body, classification, {
     isCurrentTarget,
@@ -516,6 +497,7 @@ export function createDestinationPickerItem(
   return {
     key: body.key,
     name: body.name,
+    localName,
     searchLabel,
     type: classification.type,
     typeLabel: classification.label,
@@ -528,7 +510,7 @@ export function createDestinationPickerItem(
     distanceLabel,
     heliocentricDistanceKm: finiteNumber(body.position.heliocentric_distance_km, 0),
     heliocentricDistanceLabel,
-    ariaLabel: destinationAriaLabel(body.name, classification.label, distanceLabel, badges),
+    ariaLabel: destinationAriaLabel(localName ? `${body.name} ${localName}` : body.name, metaLabel, distanceLabel, badges),
     badges,
     isCurrentTarget,
     isSelected,
@@ -559,34 +541,8 @@ export function destinationPickerColorStyle(colorOrItem: string | Pick<Destinati
   return { "--destination-color": safeCssColor(color) };
 }
 
-export function formatPickerDistance(
-  km: number,
-  auKm = DEFAULT_AU_KM,
-  options: { preferCompact?: boolean } = {}
-): string {
-  if (!Number.isFinite(km)) return t("value.unknown");
-  const value = km;
-  const abs = Math.abs(value);
-  const preferCompact = options.preferCompact ?? true;
-
-  if (abs >= LIGHT_YEAR_KM * 0.1) {
-    const lightYears = value / LIGHT_YEAR_KM;
-    if (Math.abs(lightYears) >= 100) return `${formatWholeNumber(lightYears)} ly`;
-    if (Math.abs(lightYears) >= 10) return `${lightYears.toFixed(1)} ly`;
-    return `${lightYears.toFixed(2)} ly`;
-  }
-  if (abs >= auKm * 0.1) {
-    const au = value / auKm;
-    return preferCompact ? `${formatAu(au)} AU` : `${formatWholeNumber(value)} km (${formatAu(au)} AU)`;
-  }
-  if (preferCompact && abs >= 1_000_000) {
-    const millions = value / 1_000_000;
-    return `${millions >= 10 ? millions.toFixed(0) : millions.toFixed(1)}M km`;
-  }
-  if (preferCompact && abs >= 100_000) {
-    return `${(value / 1_000).toFixed(0)}k km`;
-  }
-  return `${formatWholeNumber(value)} km`;
+export function formatPickerDistance(km: number, auKm = DEFAULT_AU_KM): string {
+  return formatDistanceKm(km, { auKm });
 }
 
 export function normalizeBodyKey(key: string): string {
@@ -636,7 +592,7 @@ function destinationMetaLabel(body: DestinationBody, classification: BodyClassif
   }
 
   const deepSky = body.deep_sky;
-  if (!deepSky) return `${classification.label} · ${radiusLabel} ${t("picker.radius")}`;
+  if (!deepSky) return radiusLabel ? `${classification.label} · ${radiusLabel} ${t("picker.radius")}` : classification.label;
 
   const parts = [deepSky.deep_sky_type_label || classification.label];
   if (typeof deepSky.apparent_magnitude === "number") parts.push(`mag ${formatMagnitude(deepSky.apparent_magnitude)}`);
@@ -652,6 +608,8 @@ function destinationSearchTokens(body: DestinationBody, classification: BodyClas
     normalizeText(classification.type),
     normalizeText(classification.label),
     ...bodyAliases(body).map(normalizeText),
+    // The local names of all languages: `Marte` finds Mars in each interface language.
+    ...localObjectNameTokens(body.key),
     normalizeText(body.deep_sky?.deep_sky_type_label ?? ""),
     normalizeText(body.deep_sky?.common_name ?? ""),
     normalizeText(body.deep_sky?.constellation ?? ""),
@@ -684,7 +642,7 @@ function scoreItemForQuery(item: DestinationPickerItem, query: string): number |
     total += best;
   }
 
-  if (normalizeText(item.name) === query) total += 300;
+  if (normalizeText(item.name) === query || isLocalObjectName(item.key, query)) total += 300;
   if (normalizeBodyKey(item.key) === query) total += 250;
   if (normalizeText(item.name).startsWith(query)) total += 120;
   if (normalizeBodyKey(item.key).startsWith(query)) total += 90;
@@ -751,14 +709,16 @@ function destinationBadges(flags: {
   return badges;
 }
 
+/** The accessible name of a result row. It starts with the visible text of the row (name, details, distance). */
 function destinationAriaLabel(
   name: string,
-  typeLabel: string,
+  metaLabel: string,
   distanceLabel: string,
   badges: readonly DestinationPickerBadge[]
 ): string {
   const badgeText = badges.length > 0 ? `, ${badges.map((badge) => badge.label).join(", ")}` : "";
-  return `${name}, ${typeLabel}, ${distanceLabel} ${t("picker.fromEarth")}${badgeText}`;
+  const distanceText = distanceLabel ? ` ${distanceLabel} ${t("picker.fromEarth")}` : "";
+  return `${name} ${metaLabel}${distanceText}${badgeText}`;
 }
 
 function recentDestinationMap(destinations: readonly RecentDestination[]): Map<string, RecentDestination> {
@@ -815,22 +775,8 @@ function finiteNumber(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function formatWholeNumber(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: value >= 100 ? 0 : 2
-  }).format(value);
-}
-
 function formatMagnitude(value: number): string {
-  return value.toFixed(1).replace(/\.0$/, "");
-}
-
-function formatAu(au: number): string {
-  const abs = Math.abs(au);
-  if (abs >= 10) return au.toFixed(1);
-  if (abs >= 1) return au.toFixed(2);
-  if (abs >= 0.01) return au.toFixed(3);
-  return au.toExponential(2);
+  return formatQuantity(Number(value.toFixed(1)));
 }
 
 function compareNullableDateDesc(left: string | null, right: string | null): number {

@@ -119,6 +119,24 @@ export class ObjectSelectionController {
     }
   }
 
+  /**
+   * Removes the selection and closes the inspector with no history entry.
+   * A tour step with no object uses this: the tour makes its own history entries.
+   */
+  dismiss(): void {
+    const { state } = this.options;
+    if (!state.selectedKey && !state.compareTargetKey && state.activeTab !== "object") return;
+    this.pendingCenter = null;
+    this.options.cancelMapSelection();
+    this.options.cleanupTransient(state.selectedKey);
+    state.selectedKey = "";
+    this.options.setTransientKey(null);
+    this.clearComparison();
+    if (state.activeTab === "object") state.activeTab = null;
+    this.options.updateAllUi();
+    this.options.requestRender(true);
+  }
+
   clear(clearOptions: { openSearch?: boolean; preserveMapDetailRequest?: boolean } = {}): void {
     this.pendingCenter = null;
     if (!clearOptions.preserveMapDetailRequest) this.options.cancelMapSelection();

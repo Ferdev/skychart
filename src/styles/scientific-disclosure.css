@@ -1,9 +1,4 @@
-.about-link {
-  position: fixed; right: 1rem; bottom: .75rem; z-index: 20;
-  color: rgba(220, 231, 224, .72); font: 600 .68rem/1 system-ui, sans-serif;
-  letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
-}
-.about-link:hover, .about-link:focus-visible { color: #e5eee8; text-decoration: underline; }
+
 
 .science-caveat { margin-top: 10px; color: #514c40; }
 .science-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
@@ -11,19 +6,14 @@
 .science-layer-disclosure section { padding: 10px 0; border-bottom: 1px solid rgba(21, 23, 20, .16); }
 .science-layer-disclosure dl { margin: 6px 0; }
 .science-layer-disclosure dl > div { display: flex; justify-content: space-between; gap: 12px; }
-.science-layer-disclosure dt, .science-layer-disclosure dd { margin: 0; font-size: .72rem; }
-.science-layer-disclosure p { margin: 6px 0; font-size: .72rem; line-height: 1.35; }
-.atlas-footer { position: fixed; z-index: 20; right: 126px; bottom: 8px; display: flex; gap: 12px; align-items: center; font-size: .68rem; }
-.atlas-footer > a { color: rgba(220, 231, 224, .78); text-transform: uppercase; text-decoration: none; }
-.atlas-footer .about-link { position: static; }
-.atlas-footer .repo-link { display: inline-flex; align-items: center; }
+.science-layer-disclosure dt, .science-layer-disclosure dd { margin: 0; font-size: var(--text-xs); }
+.science-layer-disclosure p { margin: 6px 0; font-size: var(--text-xs); line-height: 1.35; }
 
+/* The list shows all types. The Settings popover scrolls, not the list. */
 .scale-options .map-filter-buttons {
-  max-height: 148px;
   margin: 0;
   padding: 2px 1px 4px;
   gap: 6px;
-  overflow-y: auto;
 }
 
 .scale-options .map-filter-buttons button {
@@ -50,7 +40,7 @@
   border-radius: 999px;
   color: rgba(243, 238, 223, 0.82);
   background: rgba(243, 238, 223, 0.075);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   font-weight: 680;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
@@ -63,42 +53,220 @@
   background: rgba(241, 197, 104, 0.1);
 }
 
-.scale-options .map-filter-buttons button:hover,
+.scale-options .map-filter-buttons button:hover {
+  border-color: var(--panel-line-strong);
+  background: var(--panel-surface-strong);
+}
+
 .scale-options .map-filter-buttons button.active {
   border-color: rgba(239, 196, 104, 0.52);
   color: #f1c568;
   background: rgba(239, 196, 104, 0.12);
 }
-
-@media (min-width: 900px) {
-  .atlas-footer {
-    /* Leave the 560px scale rail and its 16px outer/inner gaps clear. */
-    left: 592px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
+/*
+ * Footer links. At 900 px and wider they are in the bottom right corner, next to the toolbar.
+ * The footer gives way to an open panel, which uses the same corner.
+ * Below 900 px the same links are at the end of Settings.
+ */
+.atlas-footer {
+  position: fixed;
+  z-index: 20;
+  right: 16px;
+  bottom: 8px;
+  left: 652px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px 14px;
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
-@media (min-width: 900px) and (max-width: 1099px) {
-  .atlas-footer {
-    right: 12px;
-    bottom: 70px;
-  }
+.atlas-footer > a,
+.settings-footer-links a {
+  color: rgba(220, 231, 224, 0.78);
+  text-decoration: none;
+}
+
+.atlas-footer > a:hover,
+.atlas-footer > a:focus-visible,
+.settings-footer-links a:hover,
+.settings-footer-links a:focus-visible {
+  color: #e5eee8;
+  text-decoration: underline;
+}
+
+.atlas-footer .repo-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.map-hud.workspace-open ~ .atlas-footer {
+  visibility: hidden;
+}
+
+.settings-footer-links {
+  display: none;
 }
 
 @media (max-width: 899px) {
   .atlas-footer {
-    right: auto;
-    left: 12px;
-    bottom: calc(max(10px, env(safe-area-inset-bottom)) + 170px);
+    display: none;
+  }
+
+  .settings-footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    padding: 12px 4px 4px;
+    border-top: 1px solid var(--panel-line);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+
+  .settings-footer-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
 }
-.now-panel { border-top: 1px solid var(--line, #39443e); }
-.now-panel .section-heading { display:flex; justify-content:space-between; }
-.now-events { list-style:none; margin:0; padding:0; }
-.now-events li { padding:.7rem 0; border-top:1px solid rgba(180,200,188,.14); }
-.now-events time { float:right; color:#93a49a; font-size:.72rem; }
-.now-events p, #now-status, .observe-panel p { color:#a6b5ac; font-size:.78rem; margin:.25rem 0; }
-.observe-panel { padding:1rem; border:1px solid rgba(180,200,188,.18); }
-.observe-fields { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; margin:.7rem 0; }
-.observe-fields input { width:100%; box-sizing:border-box; }
+
+/* The catalog counts, at the top of "What am I seeing?" in Settings. */
+#atlas-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px 12px;
+  margin: 4px 0 10px;
+}
+
+#atlas-stats div {
+  min-width: 0;
+}
+
+#atlas-stats dt {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+#atlas-stats dd {
+  margin: 1px 0 0;
+  color: var(--panel-ink);
+  font-size: var(--text-md);
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Observe view of the inspector: where the object is in the sky of a place on Earth. */
+.observe-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+}
+
+.observe-panel p {
+  margin: 0;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.observe-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.observe-field {
+  display: grid;
+  gap: 4px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.observe-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-md);
+  color: var(--panel-ink);
+  background: var(--panel-surface);
+}
+
+.observe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.observe-actions button {
+  min-height: 44px;
+}
+
+.observe-status:empty,
+.observe-error[hidden],
+.observe-result[hidden] {
+  display: none;
+}
+
+.observe-panel .observe-error {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.observe-result {
+  display: grid;
+  gap: 10px;
+}
+
+.observe-now {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0;
+}
+
+.observe-now dt {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.observe-now dd {
+  margin: 2px 0 0;
+  color: var(--panel-ink);
+  font-size: 1.1rem;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.observe-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--panel-ink);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.observe-table th,
+.observe-table td {
+  padding: 8px 6px;
+  border-top: 1px solid var(--panel-line);
+  text-align: left;
+}
+
+.observe-table thead th {
+  border-top: 0;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.observe-panel .observe-note {
+  font-size: var(--text-xs);
+}

@@ -11,8 +11,7 @@ npm ci
 npm run validate:tours
 npm run build
 npm run build:phoenix
-npm run test:view-state
-npm run test:helpers
+npm run test:unit
 python3 -m pytest -q tests
 cd backend_phoenix && mix test
 ```

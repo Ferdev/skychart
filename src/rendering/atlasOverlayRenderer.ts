@@ -3,7 +3,10 @@ import type { SmallBodyPosition } from "../catalog/smallBodyPropagation";
 import { isPlanetCandidate } from "../catalog/exoplanetGroups";
 import { exoplanetOrbitPathAu, exoplanetOrbitReachAu, exoplanetUncertaintyPathAu, isPositionedExoplanet, isRingOnlyExoplanet } from "../catalog/exoplanetOrbit";
 import { t } from "../i18n";
-import { clamp, degToRad, edgeAnchorForScreen, expandedRect, isPresent, niceStep, pointInRect, pointRect, rectsOverlap, rectUnion, type EdgeSide, type Rect, type ScreenPoint } from "../geometry";
+import { placeLabels } from "../labels/labelRank";
+import type { UniverseEntryMarker } from "../atlas/universeEntryMarker";
+import { clamp, degToRad, edgeAnchorForScreen, expandedRect, niceStep, pointInRect, pointRect, rectsOverlap, rectUnion, type EdgeSide, type Rect, type ScreenPoint } from "../geometry";
+import { canvasFont } from "../format/fonts";
 
 type EdgeBody = { body: Body; screen: ScreenPoint };
 
@@ -21,6 +24,10 @@ type OverlayFrame = {
   labelBodies: Body[];
   edgeBodies: EdgeBody[];
   exoplanetOrbits: Body[];
+  /** The planets are one point at this scale: the Sun label is `Solar System`. */
+  solarSystemCollapsed: boolean;
+  /** The left end of the scale bar line. */
+  scaleBarOrigin: ScreenPoint;
 };
 
 type AtlasOverlayRendererOptions = {
@@ -38,12 +45,19 @@ type AtlasOverlayRendererOptions = {
   auKm: () => number;
   formatDistance: (kilometers: number) => string;
   smallBodyOrbitPathAu: (body: Body) => SmallBodyPosition[] | null;
-  universeEntryMarker: HTMLElement;
+  universeEntryMarker: UniverseEntryMarker;
+  /** Page element that shows the map notes where the toolbar covers the canvas lines. */
   exoplanetOrbitNote: HTMLElement;
   toolbar: HTMLElement;
 };
 
 const POINT_ALPHA = 0.82;
+// Places for a label, in order of preference: [side, row]. Side 1 is right of the object and -1 is left.
+// Row -1 is above the object and row 1 is below; rows -2 and 2 are one label height more distant.
+const LABEL_ANCHORS: readonly (readonly [number, number])[] = [[1, -1], [-1, -1], [1, 1], [-1, 1], [1, -2], [-1, -2], [1, 2], [-1, 2]];
+const LABEL_NEAR_ANCHORS = 4;
+const EDGE_POINTER_LIMIT_WIDE = 5;
+const EDGE_POINTER_LIMIT_NARROW = 3;
 const SELECTION_RING_PX = 8.5;
 // Orbit guides are polylines; a fixed sample count makes their chords drift
 // visibly off the true ellipse once the on-screen orbit radius grows large.
@@ -64,10 +78,16 @@ const CANDIDATE_UNCERTAINTY_COLOR = "rgba(201, 184, 255, 0.34)";
 /** Draws the navigational overlays layered above the catalog point renderer. */
 export class AtlasOverlayRenderer {
   private edgeHitRegions: { body: Body; rect: Rect }[] = [];
-  // Canvas position of the convention line in this frame, or null when the frame has no exoplanet ring.
+  // Rectangles of the object labels of this frame, so that a label reacts to the pointer like its object.
+  private labelHitRegions: { body: Body; text: string; rect: Rect }[] = [];
+  private scaleBarArea: Rect | null = null;
+  private toolbarRect: Rect | null = null;
+  private reservedAreas: Rect[] = [];
+  // Canvas position of the note lines in this frame, or null when the frame has no note.
   private exoplanetNoteAnchor: ScreenPoint | null = null;
-  // Text of the convention line in this frame: one sentence for each kind of ring in view.
+  // Text of the note lines in this frame: one sentence for each layer that draws by a convention.
   private exoplanetNoteText = "";
+  private frameNotes: string[] = [];
 
   constructor(private readonly options: AtlasOverlayRendererOptions) {}
 
@@ -97,17 +117,36 @@ export class AtlasOverlayRenderer {
       ctx.lineTo(rect.right, screen.y);
       ctx.stroke();
     }
-    this.drawScaleBar(frame.viewport, step, frame.camera);
+    this.drawScaleBar(frame.scaleBarOrigin, step, frame.camera);
     ctx.restore();
   }
 
-  /** Keep the crosshair on the map center, where the 3D view places the
-   * observer. It is a page element, not canvas ink, so image exports stay clean. */
-  placeUniverseEntryMarker() {
-    const { camera } = this.options.frame();
-    const center = this.options.worldToScreen(camera.xAu, camera.yAu);
-    this.options.universeEntryMarker.style.transform = `translate(${center.x - 22}px, ${center.y - 22}px)`;
-    this.options.universeEntryMarker.hidden = false;
+  /**
+   * A layer that draws by a convention (exoplanet ring direction, constellation lines seen from above)
+   * adds one sentence here. `finishFrame` draws the sentences above the scale bar.
+   */
+  addNote(text: string) {
+    if (text && !this.frameNotes.includes(text)) this.frameNotes.push(text);
+  }
+
+  /** Draws the notes of this frame, and puts the `3D` mark and the page copy of the notes in place. */
+  finishFrame() {
+    const frame = this.options.frame();
+    this.exoplanetNoteText = this.frameNotes.join(" ");
+    this.frameNotes = [];
+    // The labels and the edge pointers of this frame stay out of the scale bar and the toolbar.
+    // (On a wide window the map continues below the toolbar.)
+    const toolbar = this.options.toolbar.getBoundingClientRect();
+    this.toolbarRect = toolbar.height > 0 ? toolbar : null;
+    this.reservedAreas = [this.scaleBarArea, this.toolbarRect].filter((area): area is Rect => area !== null);
+    this.scaleBarArea = null;
+    if (this.exoplanetNoteText) this.drawExoplanetOrbitNote(frame.viewport);
+    const center = this.options.worldToScreen(frame.camera.xAu, frame.camera.yAu);
+    const selectedScreen = frame.selected ? this.options.bodyToScreen(frame.selected) : null;
+    const selectedAtCenter = Boolean(selectedScreen && Math.hypot(selectedScreen.x - center.x, selectedScreen.y - center.y) < 28);
+    // The key has six significant digits: an animation frame that moves the centre by less than a pixel is no change.
+    const centerKey = `${frame.camera.xAu.toPrecision(6)}:${frame.camera.yAu.toPrecision(6)}`;
+    this.options.universeEntryMarker.place(center, centerKey, selectedAtCenter);
     this.placeExoplanetOrbitNote();
   }
 
@@ -125,11 +164,10 @@ export class AtlasOverlayRenderer {
       if (!note.hidden) note.hidden = true;
       return;
     }
-    const toolbar = this.options.toolbar.getBoundingClientRect();
-    const covered = toolbar.height > 0 && anchor.y >= toolbar.top && anchor.x >= toolbar.left && anchor.x <= toolbar.right;
+    const covered = this.toolbarCovers(anchor);
     note.hidden = !covered;
     if (!covered) return;
-    note.style.bottom = `${Math.round(window.innerHeight - toolbar.top + 8)}px`;
+    note.style.bottom = `${Math.round(window.innerHeight - this.toolbarRect!.top + 8)}px`;
     if (note.textContent !== this.exoplanetNoteText) note.textContent = this.exoplanetNoteText;
   }
 
@@ -180,11 +218,8 @@ export class AtlasOverlayRenderer {
       this.strokePolyline(arc, false);
     }
     ctx.restore();
-    this.exoplanetNoteText = [
-      frame.exoplanetOrbits.some((body) => !isPlanetCandidate(body)) ? t("exoplanet.mapNote") : null,
-      frame.exoplanetOrbits.some(isPlanetCandidate) ? t("exoplanet.candidateMapNote") : null,
-    ].filter(isPresent).join(" ");
-    this.drawExoplanetOrbitNote(frame.viewport);
+    if (frame.exoplanetOrbits.some((body) => !isPlanetCandidate(body))) this.addNote(t("exoplanet.mapNote"));
+    if (frame.exoplanetOrbits.some(isPlanetCandidate)) this.addNote(t("exoplanet.candidateMapNote"));
   }
 
   /**
@@ -211,10 +246,19 @@ export class AtlasOverlayRenderer {
    * States above the scale bar that the ring direction is a convention, and
    * that a violet ring is a planet candidate. The line wraps on a narrow view.
    */
+  private toolbarCovers(point: ScreenPoint): boolean {
+    const toolbar = this.toolbarRect;
+    return toolbar !== null && point.y >= toolbar.top && point.x >= toolbar.left && point.x <= toolbar.right;
+  }
+
   private drawExoplanetOrbitNote(rect: Rect) {
+    this.exoplanetNoteAnchor = { x: rect.left + 24, y: rect.bottom - 62 };
+    // When the toolbar covers this corner, the page copy of the note shows above the toolbar.
+    // The canvas text is not drawn then: a part of it would show at the side of the toolbar.
+    if (this.toolbarCovers(this.exoplanetNoteAnchor)) return;
     const ctx = this.options.context;
     ctx.save();
-    ctx.font = "11px Inter, system-ui, sans-serif";
+    ctx.font = canvasFont(12);
     ctx.fillStyle = "rgba(190, 228, 245, 0.82)";
     const maxWidth = Math.max(120, rect.width - 48);
     const lines: string[] = [];
@@ -223,8 +267,7 @@ export class AtlasOverlayRenderer {
       if (lines.length > 0 && ctx.measureText(candidate).width <= maxWidth) lines[lines.length - 1] = candidate;
       else lines.push(word);
     }
-    this.exoplanetNoteAnchor = { x: rect.left + 24, y: rect.bottom - 62 };
-    lines.forEach((line, index) => ctx.fillText(line, rect.left + 24, rect.bottom - 62 - (lines.length - 1 - index) * 14));
+    lines.forEach((line, index) => ctx.fillText(line, rect.left + 24, rect.bottom - 62 - (lines.length - 1 - index) * 15));
     ctx.restore();
   }
 
@@ -268,20 +311,56 @@ export class AtlasOverlayRenderer {
 
   drawLabels() {
     const frame = this.options.frame();
-    const occupied: Rect[] = [];
+    this.labelHitRegions = [];
     const ctx = this.options.context;
     ctx.save();
-    ctx.font = "12px Inter, system-ui, sans-serif";
-    for (const body of frame.labelBodies) {
-      if (this.hasRingOnly(body)) continue;
-      const screen = this.options.bodyToScreen(body);
-      const width = ctx.measureText(body.name).width + 18;
-      const rect = { left: screen.x + 10, top: screen.y - 30, right: screen.x + 10 + width, bottom: screen.y - 8, width, height: 22 };
-      if (!rectInCanvas(rect) || occupied.some((item) => rectsOverlap(item, rect))) continue;
-      occupied.push(rect);
-      this.drawLabel(body.name, rect.left, rect.top + 15, body.key === frame.selectedKey ? "rgba(248, 218, 136, 0.95)" : "rgba(239, 233, 213, 0.76)");
+    ctx.font = canvasFont(12);
+    // A label is fully inside the free map area, so that no panel covers a part of it.
+    const bounds = expandedRect(frame.viewport, 2);
+    const candidates = frame.labelBodies
+      .filter((body) => !this.hasRingOnly(body))
+      .map((body) => {
+        const text = body.key === "sun" && frame.solarSystemCollapsed ? t("map.solarSystem") : body.name;
+        return { body, text, screen: this.options.bodyToScreen(body), width: ctx.measureText(text).width + 18 };
+      });
+    const placed = placeLabels(candidates, {
+      bounds,
+      exclusions: this.reservedAreas,
+      rectsFor: (candidate) => LABEL_ANCHORS.map(([side, row]) => {
+        const left = side > 0 ? candidate.screen.x + 10 : candidate.screen.x - 10 - candidate.width;
+        const top = row < 0 ? candidate.screen.y - 8 - 22 * -row - 4 * (-row - 1) : candidate.screen.y + 8 + 26 * (row - 1);
+        return { left, top, right: left + candidate.width, bottom: top + 22 };
+      }),
+    });
+    for (const { item, rect, anchorIndex } of placed) {
+      // A label in the second row is not next to its object: a short line shows which object it names.
+      if (anchorIndex >= LABEL_NEAR_ANCHORS) {
+        ctx.strokeStyle = "rgba(239, 233, 213, 0.36)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(item.screen.x, item.screen.y);
+        ctx.lineTo(rect.left < item.screen.x ? rect.right : rect.left, rect.top < item.screen.y ? rect.bottom : rect.top);
+        ctx.stroke();
+      }
+      this.labelHitRegions.push({ body: item.body, text: item.text, rect: { ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top } });
+      this.drawLabel(item.text, rect.left, rect.top + 15, item.body.key === frame.selectedKey ? "rgba(248, 218, 136, 0.95)" : "rgba(239, 233, 213, 0.76)");
     }
     ctx.restore();
+  }
+
+  /** Forgets the label rectangles when the label layer is off, so that a hidden label cannot be selected. */
+  clearLabels() {
+    this.labelHitRegions = [];
+  }
+
+  /** The labels that the last frame drew, after the collision step. */
+  drawnLabels(): readonly { body: Body; text: string; rect: Rect }[] {
+    return this.labelHitRegions;
+  }
+
+  /** The object whose drawn label is at this point, or null. */
+  labelAt(x: number, y: number) {
+    return this.labelHitRegions.find((entry) => pointInRect({ x, y }, entry.rect))?.body ?? null;
   }
 
   drawEdgeReferences() {
@@ -293,16 +372,28 @@ export class AtlasOverlayRenderer {
     this.edgeHitRegions = [];
     const ctx = this.options.context;
     ctx.save();
-    ctx.font = "11px Inter, system-ui, sans-serif";
-    for (const reference of frame.edgeBodies.slice(0, 8)) {
+    ctx.font = canvasFont(12);
+    const limit = window.innerWidth < 900 ? EDGE_POINTER_LIMIT_NARROW : EDGE_POINTER_LIMIT_WIDE;
+    // The candidates are in rank order. A pointer that would be on top of a drawn pointer is left out.
+    for (const reference of frame.edgeBodies) {
+      if (this.edgeHitRegions.length >= limit) break;
       const edge = edgeAnchorForScreen(reference.screen, origin, rect);
       const labelRect = this.edgeLabelRect(reference.body.name, edge.point, edge.side, rect);
       const hitRect = expandedRect(rectUnion(labelRect, pointRect(edge.point, 16)), 4);
+      if (this.edgeHitRegions.some((drawn) => rectsOverlap(drawn.rect, hitRect))) continue;
+      // A pointer does not go across an object label or the scale bar.
+      if (this.labelHitRegions.some((label) => rectsOverlap(label.rect, labelRect))) continue;
+      if (this.reservedAreas.some((area) => rectsOverlap(area, labelRect))) continue;
       this.drawEdgeChevron(edge.point, edge.side, reference.body.color || "#d9b86f", frame.hoverKey === reference.body.key);
       this.drawLabel(reference.body.name, labelRect.left + 6, labelRect.top + 15, frame.hoverKey === reference.body.key ? "rgba(248, 218, 136, 0.95)" : "rgba(239, 233, 213, 0.68)");
       this.edgeHitRegions.push({ body: reference.body, rect: hitRect });
     }
     ctx.restore();
+  }
+
+  /** The edge pointers that the last frame drew. */
+  drawnEdgeReferences(): readonly { body: Body; rect: Rect }[] {
+    return this.edgeHitRegions;
   }
 
   edgeReferenceAt(x: number, y: number) {
@@ -323,10 +414,9 @@ export class AtlasOverlayRenderer {
     ctx.restore();
   };
 
-  private drawScaleBar(rect: Rect, stepAu: number, camera: Camera) {
+  private drawScaleBar(origin: ScreenPoint, stepAu: number, camera: Camera) {
     const lengthPx = Math.min(180, Math.max(64, stepAu * camera.pxPerAu));
-    const x = rect.left + 24;
-    const y = rect.bottom - 34;
+    const { x, y } = origin;
     const ctx = this.options.context;
     ctx.strokeStyle = "rgba(239, 233, 213, 0.72)";
     ctx.fillStyle = "rgba(239, 233, 213, 0.82)";
@@ -339,8 +429,11 @@ export class AtlasOverlayRenderer {
     ctx.moveTo(x + lengthPx, y - 5);
     ctx.lineTo(x + lengthPx, y + 5);
     ctx.stroke();
-    ctx.font = "12px Inter, system-ui, sans-serif";
-    ctx.fillText(this.options.formatDistance((lengthPx / camera.pxPerAu) * this.options.auKm()), x, y - 10);
+    ctx.font = canvasFont(12);
+    const text = this.options.formatDistance((lengthPx / camera.pxPerAu) * this.options.auKm());
+    ctx.fillText(text, x, y - 10);
+    const right = x + Math.max(lengthPx, ctx.measureText(text).width) + 8;
+    this.scaleBarArea = { left: x - 8, top: y - 28, right, bottom: y + 10, width: right - x + 8, height: 38 };
   }
 
   private strokeOrbitPath(screens: ScreenPoint[], highlighted: boolean) {
@@ -466,10 +559,6 @@ export class AtlasOverlayRenderer {
     top = clamp(top, bounds.top + 3, bounds.bottom - height - 3);
     return { left, top, right: left + width, bottom: top + height, width, height };
   }
-}
-
-function rectInCanvas(rect: Rect) {
-  return rect.right >= 0 && rect.left <= window.innerWidth && rect.bottom >= 0 && rect.top <= window.innerHeight;
 }
 
 function circleIntersectsRect(center: ScreenPoint, radiusPx: number, rect: Rect) {

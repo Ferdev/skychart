@@ -33,14 +33,28 @@ defmodule StarsmapApiWeb.CommunityPageController do
         )
       )
     else
-      send_resp(conn, 404, "Photo not found")
+      conn
+      |> put_status(:not_found)
+      |> html(
+        StarsmapApiWeb.StaticPage.not_found(
+          "Photo not found",
+          "This photo is not public or does not exist."
+        )
+      )
     end
   end
 
   def profile(conn, %{"handle" => handle}) do
     case Repo.get_by(User, handle: handle, suspended: false) do
       nil ->
-        send_resp(conn, 404, "Photographer not found")
+        conn
+        |> put_status(:not_found)
+        |> html(
+          StarsmapApiWeb.StaticPage.not_found(
+            "Photographer not found",
+            "This photographer page does not exist."
+          )
+        )
 
       user ->
         cards =

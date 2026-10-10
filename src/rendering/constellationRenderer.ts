@@ -1,6 +1,7 @@
 import type { Body, CatalogViewportPayload } from "../atlas/contracts";
 import { pointInRect, rectsOverlap, type Rect, type ScreenPoint } from "../geometry";
 import { MAP_CONSTELLATIONS } from "../atlas/constellationStyles";
+import { canvasFont } from "../format/fonts";
 
 type Position = { x_au: number; y_au: number };
 export type ConstellationRendererOptions = {
@@ -10,6 +11,8 @@ export type ConstellationRendererOptions = {
   viewport: () => Rect;
   requestRender: () => void;
   hiddenConstellations?: () => ReadonlySet<string>;
+  /** The name of a figure in the application language. The default is the IAU name. */
+  figureName?: (latinName: string) => string;
 };
 
 const ENDPOINT_KEYS = new Set(MAP_CONSTELLATIONS.flatMap((figure) => figure.polylines.flat()));
@@ -41,7 +44,7 @@ export class ConstellationRenderer {
     ctx.rect(viewport.left, viewport.top, viewport.width, viewport.height);
     ctx.clip();
     ctx.lineWidth = 1.15;
-    ctx.font = "700 10px system-ui, sans-serif";
+    ctx.font = canvasFont(12, 700);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const occupied: Rect[] = [];
@@ -49,6 +52,12 @@ export class ConstellationRenderer {
     const hidden = this.options.hiddenConstellations?.();
     for (const figure of MAP_CONSTELLATIONS) {
       if (hidden?.has(figure.id)) continue;
+      // One star in the view is not a figure: draw a figure only when two or more of its stars are in the view.
+      const starsInView = new Set(figure.polylines.flat().filter((key) => {
+        const point = projected.get(key);
+        return point !== undefined && pointInRect(point, viewport);
+      }));
+      if (starsInView.size < 2) continue;
       ctx.strokeStyle = figure.color;
       ctx.fillStyle = figure.color;
       ctx.globalAlpha = 0.6;
@@ -79,7 +88,8 @@ export class ConstellationRenderer {
         ctx.fill();
       }
       if (!showLabels || endpoints.size < 2) continue;
-      const points = [...endpoints.values()];
+      // The name is at the centre of the stars that are in the view, so that it is on the visible part of the figure.
+      const points = [...starsInView].map((key) => projected.get(key)!);
       const span = Math.max(
         Math.max(...points.map((p) => p.x)) - Math.min(...points.map((p) => p.x)),
         Math.max(...points.map((p) => p.y)) - Math.min(...points.map((p) => p.y)),
@@ -87,12 +97,13 @@ export class ConstellationRenderer {
       if (span < 40 || span > Math.max(viewport.width, viewport.height) * 4) continue;
       const x = points.reduce((sum, p) => sum + p.x, 0) / points.length;
       const y = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-      const width = ctx.measureText(figure.name).width + 12;
+      const name = this.options.figureName?.(figure.name) ?? figure.name;
+      const width = ctx.measureText(name).width + 12;
       const rect = { left: x - width / 2, right: x + width / 2, top: y - 10, bottom: y + 10, width, height: 20 };
       if (rect.left < viewport.left || rect.right > viewport.right || rect.top < viewport.top || rect.bottom > viewport.bottom ||
           occupied.some((other) => rectsOverlap(other, rect))) continue;
       occupied.push(rect);
-      ctx.fillText(figure.name, x, y);
+      ctx.fillText(name, x, y);
     }
     ctx.restore();
   }

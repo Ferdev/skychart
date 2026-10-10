@@ -134,10 +134,11 @@ test("community row sits inside the atlas panel and clear of its content", async
   const overlaps = (a: Box, b: Box) =>
     a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
   const rowBox = await box(row);
-  for (const selector of ["h1", ".locale-control", "#atlas-stats"]) {
+  // The panel holds the title, the language, the search field, and the time bar. The counts are in Settings.
+  for (const selector of ["h1", ".locale-control", ".header-search", "#time-bar"]) {
     expect(overlaps(rowBox, await box(panel.locator(selector))), selector).toBe(false);
   }
-  expect(rowBox.y).toBeGreaterThan((await box(panel.locator("#atlas-stats"))).y);
+  expect(rowBox.y).toBeGreaterThan((await box(panel.locator("#time-bar"))).y);
   const buttons = row.locator("button:visible, a:visible");
   expect(await buttons.count()).toBe(5);
   for (const button of await buttons.all()) {

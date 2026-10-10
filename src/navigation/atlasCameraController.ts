@@ -3,6 +3,9 @@ import type { Body, Camera } from "../atlas/contracts";
 import { classifyBody } from "../destinationPicker";
 import { clamp, easeInOutCubic, lerp, type Rect } from "../geometry";
 import { lightYearsToAu } from "../galacticModel";
+import { MAP_FILTER_ZOOM_PRESETS } from "../atlas/atlasDefinitions";
+import type { BodyFilter } from "../viewState";
+import { fitCameraForBody } from "./cameraFit";
 
 type AtlasCameraControllerOptions = {
   camera: () => Camera;
@@ -20,7 +23,6 @@ type AtlasCameraControllerOptions = {
 const MIN_ZOOM = 1e-14;
 const MAX_ZOOM = 50_000_000;
 const SLIDER_STEPS = 1000;
-const LOCAL_DIAMETER_PX = 170;
 const ANIMATION_MS = 1100;
 
 /** Owns camera fitting, cursor-anchored zoom, slider mapping, and animation. */
@@ -43,16 +45,17 @@ export class AtlasCameraController {
     }
   }
 
+  /** The camera that shows one object in full. See `fitCameraForBody` for the rule. */
   localCamera(body: Body): Camera {
-    if (body.object_type === "spacecraft") return { xAu: body.position.x_au, yAu: body.position.y_au, pxPerAu: this.options.camera().pxPerAu };
-    const classification = classifyBody(body);
-    const rect = this.options.viewport();
-    const diameterAu = Math.max((body.radius_km * 2) / this.options.auKm(), 1e-9);
-    const targetDiameterPx = ["moon", "planet", "planet_candidate", "dwarf_planet"].includes(classification.type) ? LOCAL_DIAMETER_PX : LOCAL_DIAMETER_PX * 0.72;
-    const pxPerAu = body.catalog?.source_type === "deep_sky_catalog"
-      ? clamp(rect.width / Math.max(body.distance_from_earth_km / this.options.auKm() / 40, 1000), MIN_ZOOM, MAX_ZOOM)
-      : clamp(targetDiameterPx / diameterAu, MIN_ZOOM, MAX_ZOOM);
-    return { xAu: body.position.x_au, yAu: body.position.y_au, pxPerAu };
+    const current = this.options.camera();
+    if (body.object_type === "spacecraft") return { xAu: body.position.x_au, yAu: body.position.y_au, pxPerAu: current.pxPerAu };
+    const type = classifyBody(body).type;
+    return fitCameraForBody(body, this.options.viewport(), {
+      auKm: this.options.auKm(),
+      type,
+      typePreset: MAP_FILTER_ZOOM_PRESETS[type as BodyFilter],
+      currentPxPerAu: current.pxPerAu,
+    });
   }
 
   animateTo(target: Camera, durationMs = ANIMATION_MS, onComplete?: () => void) {
