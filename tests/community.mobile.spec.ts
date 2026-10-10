@@ -6,7 +6,16 @@ test("community sign-in dialog fits the mobile screen and returns focus", async 
 }) => {
   await communityFixture(page);
   await openAtlas(page);
-  await page.locator("[data-community-account]").click({ force: true });
+  const panel = page.locator("header.atlas-bar");
+  await panel.locator(".community-menu-toggle").click();
+  const menu = panel.locator(".community-menu");
+  await expect(menu).toBeVisible();
+  for (const button of await menu.locator("button:visible, a:visible").all()) {
+    const b = (await button.boundingBox())!;
+    expect(b.x).toBeGreaterThanOrEqual(0);
+    expect(b.x + b.width).toBeLessThanOrEqual(390);
+  }
+  await page.locator("[data-community-account]").click();
   const dialog = page.getByRole("dialog", { name: "Sign in" });
   await expect(dialog).toBeVisible();
   const box = await dialog.boundingBox();

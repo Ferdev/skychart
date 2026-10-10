@@ -135,9 +135,14 @@ sessions, anonymizes identity, hides public photos and queues removal of all med
 
 Grant the first moderator role after the owner has verified their account:
 
-```elixir
-StarsmapApi.Release.community_role("owner-handle", "admin")
+```bash
+docker exec <web container> env -u PHX_SERVER /app/bin/starsmap_api eval \
+  'IO.inspect(StarsmapApi.Release.community_role("owner-handle", "admin"))'
 ```
+
+Plain `eval` tries to start a second web server on the port that is already in
+use (`env -u PHX_SERVER` prevents that), and `rpc` cannot connect to the running
+node in this container setup.
 
 This is an operator release command, not a public API. The Review dialog supports
 approvals, reports, hiding, rejection, account suspension/restoration and vote

@@ -159,6 +159,8 @@ export class CommunityController {
     document.querySelectorAll<HTMLElement>("[data-community-label]").forEach(e => e.textContent = e.dataset.communityLabel === "Rankings" ? ct(7) : cx(e.dataset.communityLabel!));
     document.querySelectorAll<HTMLElement>("[data-community-account]").forEach(e => e.textContent = this.api.user?.name ?? ct(3));
     document.querySelectorAll<HTMLElement>("[data-community-review]").forEach(e => e.textContent = ct(9));
+    document.querySelectorAll<HTMLElement>(".community-account-actions").forEach(e => e.setAttribute("aria-label", ct(0)));
+    document.querySelectorAll<HTMLElement>(".community-menu-toggle").forEach(e => e.textContent = ct(6));
   }
   private async start() {
     try {
@@ -170,8 +172,34 @@ export class CommunityController {
       document
         .querySelectorAll<HTMLElement>(".community-toggle")
         .forEach((e) => (e.hidden = false));
-      const controls = document.createElement("div");
+      const controls = document.createElement("nav");
       controls.className = "community-account-actions";
+      controls.setAttribute("aria-label", ct(0));
+      // Below 900 px the panel only holds the language selector, so the pills sit behind this toggle.
+      const toggle = document.createElement("button");
+      toggle.className = "community-menu-toggle";
+      toggle.textContent = ct(6);
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.setAttribute("aria-controls", "community-menu");
+      const menu = document.createElement("div");
+      menu.className = "community-menu";
+      menu.id = "community-menu";
+      const setOpen = (open: boolean) => {
+        controls.toggleAttribute("data-open", open);
+        toggle.setAttribute("aria-expanded", String(open));
+      };
+      toggle.onclick = () => setOpen(!controls.hasAttribute("data-open"));
+      menu.addEventListener("click", () => setOpen(false));
+      document.addEventListener("pointerdown", (event) => {
+        if (!controls.contains(event.target as Node)) setOpen(false);
+      });
+      controls.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && controls.hasAttribute("data-open")) {
+          setOpen(false);
+          toggle.focus();
+        }
+      });
+      controls.append(toggle, menu);
       const account = document.createElement("button");
       account.dataset.communityAccount = "";
       account.textContent = ct(3);
@@ -180,19 +208,20 @@ export class CommunityController {
       rankings.textContent = ct(7);
       rankings.dataset.communityLabel = "Rankings";
       rankings.onclick = () => void this.rankings();
-      controls.append(account, rankings);
+      menu.append(account, rankings);
       const coverage = document.createElement("button");
       coverage.textContent = cx("Coverage");
       coverage.dataset.communityLabel = "Coverage";
       coverage.onclick = () => void this.coverage();
-      controls.append(coverage);
+      menu.append(coverage);
       const rules = document.createElement("a");
       rules.href = "/community/rules";
       rules.textContent = cx("Community rules");
       rules.dataset.communityLabel = "Community rules";
-      controls.append(rules);
-      document.querySelector("#controls")?.append(controls);
+      menu.append(rules);
+      document.querySelector(".atlas-bar")?.append(controls);
       const opacity = document.createElement("label");
+      opacity.className = "community-opacity";
       const opacityText = document.createElement("span");
       opacityText.dataset.communityLabel = "Photo opacity";
       opacityText.textContent = cx("Photo opacity");
@@ -205,14 +234,14 @@ export class CommunityController {
       slider.value = String(this.opacity);
       slider.oninput = () => (this.opacity = Number(slider.value));
       opacity.append(slider);
-      controls.append(opacity);
+      document.querySelector("#scale-map-overlays")?.append(opacity);
       await this.api.session();
       account.textContent = this.api.user?.name ?? ct(3);
       const review = document.createElement("button");
       review.dataset.communityReview = "";
       review.textContent = ct(9);
       review.onclick = () => void this.review();
-      controls.append(review);
+      menu.append(review);
       this.localize();
       await this.refresh();
       if (this.pendingMount)
