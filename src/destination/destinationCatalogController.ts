@@ -40,7 +40,6 @@ interface DestinationCatalogControllerOptions {
   applyZoomPreset: (preset: ZoomPreset, update?: boolean) => void;
   setActiveTab: (tab: ActiveAtlasTab) => void;
   updateStats: () => void;
-  updateSelectedPanelMetrics: () => void;
   requestRender: (withData?: boolean) => void;
   translate: (key: string) => string;
   searchDebounceMs: number;
@@ -120,7 +119,22 @@ export class DestinationCatalogController {
       emptyMessage: this.options.translate("search.noObjects"),
       loadingMessage: this.options.translate("search.loading"),
       fallbackMessage: this.options.translate("search.fallback"),
+      onBrowsing: (browsing) => this.options.controlView.showSearchDiscovery(browsing),
+      clearFilters: () => this.clearBodyFilter(),
     };
+  }
+
+  /** Removes the type filter and the guided set of the Search panel. The query text stays. */
+  clearBodyFilter(): void {
+    this.options.state.activeFilter = "all";
+    this.options.state.activeGuidedSetId = null;
+    this.options.catalogSearchState.latestBodies = [];
+    this.options.catalogSearchState.activeOptionKey = null;
+    this.updateExploreDomains();
+    this.updateBodyFilters();
+    this.updateGuidedSets();
+    void this.updateBodyPicker();
+    this.options.requestRender(true);
   }
 
   scheduleBodyPicker(): void {
@@ -154,7 +168,6 @@ export class DestinationCatalogController {
     if (!config) {
       this.options.compareSearchState.latestBodies = [];
       this.options.comparePicker.innerHTML = "";
-      this.options.updateSelectedPanelMetrics();
       return;
     }
     await this.options.searchView.update(config);
@@ -177,8 +190,17 @@ export class DestinationCatalogController {
       loadingMessage: this.options.translate("search.loading"),
       fallbackMessage: this.options.translate("search.fallback"),
       queryForSearch: (query) => target && query.toLowerCase() === target.name.toLowerCase() ? "" : query,
-      afterRender: this.options.updateSelectedPanelMetrics,
+      clearFilters: () => this.clearCompareFilter(),
     };
+  }
+
+  /** Removes the type filter of the comparison search. The query text stays. */
+  clearCompareFilter(): void {
+    this.options.state.activeCompareFilter = "all";
+    this.options.compareSearchState.latestBodies = [];
+    this.options.compareSearchState.activeOptionKey = null;
+    this.updateCompareFilters();
+    void this.updateComparePicker();
   }
 
   updateComparePanel(): void {

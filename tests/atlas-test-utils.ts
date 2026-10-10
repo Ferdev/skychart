@@ -31,6 +31,11 @@ export async function skipIfAtlasUnavailable(request: APIRequestContext) {
 }
 
 export async function openAtlas(page: Page, path = "/") {
+  // The 3D view shows a card with the flight controls at the first entry. Tests of other behaviour start
+  // with the card closed. The test of the card removes this key.
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("test:keep-universe-hint")) localStorage.setItem("cosmic-atlas:universe-hint-seen", "1");
+  });
   await page.goto(path, { waitUntil: "domcontentloaded" });
   await expect(page.locator("#load-state")).toHaveText("ready", { timeout: 45_000 });
   await expect(page.locator("#loading-screen")).toBeHidden({ timeout: 45_000 });

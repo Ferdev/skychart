@@ -2,6 +2,7 @@ import { trackEvent } from "../analytics";
 import type { Body, Camera, Ephemeris } from "./contracts";
 import type { CatalogPointManifestRepository } from "../catalog/catalogPointManifest";
 import { composeAtlasPng } from "../exportCompositor";
+import type { Rect } from "../geometry";
 import { t } from "../i18n";
 import { encodeViewState, type ViewState } from "../viewState";
 import type { WebglPointRenderer } from "../webglPointRenderer";
@@ -12,6 +13,8 @@ type AtlasSharingControllerOptions = {
   viewState: () => ViewState;
   selectedBody: () => Body | null;
   camera: () => Camera;
+  /** The free map area. The map centre is at the centre of this rectangle. */
+  viewportRect: () => Rect;
   ephemeris: () => Ephemeris | null;
   pointRenderer: WebglPointRenderer;
   manifest: CatalogPointManifestRepository;
@@ -59,23 +62,24 @@ export class AtlasSharingController {
     window.setTimeout(() => { atlasDom.embedFeedback.textContent = ""; }, 2500);
   }
 
-  async share(preferNative: boolean) {
+  /** Shares or copies the link of the current view. The result text shows in `feedback`, next to the control that the user used. */
+  async share(preferNative: boolean, feedback: HTMLElement = atlasDom.shareFeedback) {
     this.options.replaceViewState();
     try {
       if (preferNative && navigator.share) {
         await navigator.share({ title: document.title, url: window.location.href });
-        atlasDom.shareFeedback.textContent = t("launch.linkShared");
+        feedback.textContent = t("launch.linkShared");
         trackEvent("share", { method: "native" });
       } else {
         await navigator.clipboard.writeText(window.location.href);
-        atlasDom.shareFeedback.textContent = t("launch.linkCopied");
+        feedback.textContent = t("launch.linkCopied");
         trackEvent("share", { method: "clipboard" });
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
-      atlasDom.shareFeedback.textContent = t("launch.shareFailed");
+      feedback.textContent = t("launch.shareFailed");
     }
-    window.setTimeout(() => { atlasDom.shareFeedback.textContent = ""; }, 2500);
+    window.setTimeout(() => { feedback.textContent = ""; }, 2500);
   }
 
   async exportCurrentView() {
@@ -93,11 +97,16 @@ export class AtlasSharingController {
       this.options.preparePointLayers();
       const camera = this.options.camera();
       const ephemeris = this.options.ephemeris();
+      const mapArea = this.options.viewportRect();
       const blob = await composeAtlasPng({
         width: requestedWidth,
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
         maxTileSize: limits.maxTileSize,
+        centerOffsetCss: {
+          x: mapArea.left + mapArea.width / 2 - window.innerWidth / 2,
+          y: mapArea.top + mapArea.height / 2 - window.innerHeight / 2,
+        },
         overlay: atlasDom.canvas,
         provenance: {
           centerXAu: camera.xAu, centerYAu: camera.yAu, pxPerAu: camera.pxPerAu,

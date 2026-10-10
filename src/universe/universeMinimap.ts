@@ -1,6 +1,7 @@
 import { niceStep } from "../geometry";
 import type { Vector3 } from "../sky/skyProjection";
 import { formatDistanceAu } from "./universeFormat";
+import { canvasFont } from "../format/fonts";
 
 export type MinimapLandmark = { key: string; name: string; position: Vector3; color?: string | null; object_type?: string | null };
 
@@ -69,7 +70,7 @@ export class UniverseMinimap {
 
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     context.clearRect(0, 0, width, height);
-    context.font = "600 11px system-ui, sans-serif";
+    context.font = canvasFont(12, 600);
     context.textBaseline = "middle";
 
     context.fillStyle = "rgba(190, 214, 224, 0.5)";

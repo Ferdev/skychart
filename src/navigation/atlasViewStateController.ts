@@ -28,6 +28,8 @@ interface AtlasViewStateControllerOptions {
   transientSelectedKey: () => string | null;
   selectBodyByKey: (key: string, options?: SelectBodyOptions) => Promise<void>;
   setCompareTargetByKey: (key: string) => Promise<void>;
+  /** Removes the selection and closes the inspector with no history entry. */
+  dismissSelection: () => void;
   updateAllUi: () => void;
   updateScale: () => void;
   requestRender: (withData?: boolean) => void;
@@ -188,15 +190,24 @@ export class AtlasViewStateController {
     const target = { ...this.options.state.camera };
     if (navigation.animate) {
       this.options.state.camera = start;
-      await new Promise<void>((resolve) => this.options.animateCameraTo(target, this.options.localZoomDurationMs, resolve));
+      // A different camera action can stop the animation, and then its callback does not run.
+      // The abort signal ends the wait in that case.
+      await new Promise<void>((resolve) => {
+        navigation.signal.addEventListener("abort", () => resolve(), { once: true });
+        this.options.animateCameraTo(target, this.options.localZoomDurationMs, resolve);
+      });
     } else {
       this.options.state.camera = target;
       this.options.updateScale();
       this.options.requestRender(true);
     }
     if (navigation.signal.aborted) return this.finishTourRestore(navigation);
+    // A step with no object must not show the object of the step before it.
+    if (!view.objectKey && !view.compare) this.options.dismissSelection();
     await this.restoreSelection(view);
     if (navigation.signal.aborted) return this.finishTourRestore(navigation);
+    // A step can change the object type filter and the layers.
+    this.options.updateAllUi();
     const params = new URLSearchParams(encodeViewState({ ...view, tour: navigation.slug, step: navigation.step }));
     const perf = new URLSearchParams(window.location.search).get("perf");
     if (perf !== null) params.set("perf", perf);
@@ -217,6 +228,14 @@ export class AtlasViewStateController {
     };
     this.options.pointStream.prewarm();
     this.options.state.camera = previous;
+  }
+
+  /** The user closed the tour: remove the tour parameters from the address, so that address updates work again. */
+  endTour(): void {
+    // A step that the close stopped must not keep address updates off.
+    this.historyRestoreInProgress = false;
+    if (!this.isTourUrl() || !this.options.hasEphemeris()) return;
+    history.replaceState(null, "", this.currentUrl());
   }
 
   private finishTourRestore(navigation: TourNavigationOptions): void {

@@ -130,7 +130,8 @@ defmodule StarsmapApi.SkyEvents.Refresher do
       [
         %{
           source: "jpl_cneos",
-          source_id: "#{des}:#{DateTime.to_iso8601(starts)}",
+          # One id for each object and UTC day: a new predicted time on the same day updates the row.
+          source_id: "#{des}:#{Date.to_iso8601(DateTime.to_date(starts))}",
           kind: "close_approach",
           title: "#{des} close approach",
           summary: "Predicted approach at #{Float.round(dist / 0.00256956, 2)} lunar distances.",

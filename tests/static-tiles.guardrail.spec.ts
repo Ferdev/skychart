@@ -185,8 +185,17 @@ test.describe("static catalog tile guardrails", () => {
         y: usable.top + usable.height / 2 - (pointAu - camera.yAu) * camera.pxPerAu
       };
     });
+    // A click on a label selects the object of the label. The Sun label is near this point, so the labels are off.
+    await page.locator('.toolbar-quick-layers [data-layer="labels"]').uncheck();
     const hit = await fixtureScreenPoint();
 
+    // The catalog point is nearer to the pointer than the Sun marker, so the pointer is on the point.
+    // The hover mark shows that the point can be selected.
+    await expect(async () => {
+      await page.mouse.move(hit.x + 2, hit.y);
+      await page.mouse.move(hit.x, hit.y);
+      await expect(page.locator("#catalog-point-hover")).toHaveAttribute("data-visible", "true", { timeout: 500 });
+    }).toPass({ timeout: 12_000 });
     await page.mouse.click(hit.x, hit.y);
     await expect(page.locator("#selected-summary-name")).toHaveText("Gaia DR3 star");
     await expect(page.locator(".object-detail-state--loading")).toContainText("Loading object detail");
@@ -198,7 +207,7 @@ test.describe("static catalog tile guardrails", () => {
     expect(repeatedHit).not.toBeNull();
     const retryHit = await fixtureScreenPoint();
     await page.mouse.click(retryHit.x, retryHit.y);
-    await page.locator('input[data-layer="labels"]').evaluate((input: HTMLInputElement) => {
+    await page.locator('.toolbar-quick-layers input[data-layer="labels"]').evaluate((input: HTMLInputElement) => {
       input.checked = false;
       input.dispatchEvent(new Event("change", { bubbles: true }));
     });

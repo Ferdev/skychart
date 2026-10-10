@@ -3,9 +3,9 @@ import { decodeViewState, type DisplayLayer } from "../viewState";
 import type { MapInteractionController } from "../navigation/mapInteractionController";
 import type { SizeMode, ZoomPreset } from "./contracts";
 import type { atlasDom } from "./atlasDom";
+import { bindShareButtonPlacement } from "./shareButtonPlacement";
 
 interface AtlasEventState {
-  viewTime: "now" | string;
   sizeMode: SizeMode;
   displayLayers: Record<DisplayLayer, boolean>;
   performanceEnabled: boolean;
@@ -19,14 +19,10 @@ interface AtlasEventBindingsOptions {
   restoreTourStep: (step: number) => void;
   restoreViewState: (state: ReturnType<typeof decodeViewState> & {}) => void;
   exportCurrentView: () => void;
-  shareCurrentView: (preferNative: boolean) => void;
+  /** `feedback` is the element that shows the result text. With no element, the Share popover shows it. */
+  shareCurrentView: (preferNative: boolean, feedback?: HTMLElement) => void;
   copyEmbedSnippet: () => void;
   activateEmbedInteraction: () => void;
-  loadAtlas: (timestampIso?: string) => void;
-  dateFromInput: () => Date | null;
-  updateTimeSummary: () => void;
-  updateTimeStepUi: () => void;
-  stepTime: (direction: -1 | 1) => void;
   applyZoomPreset: (preset: ZoomPreset) => void;
   zoomViewportCenter: (factor: number) => void;
   setZoomFromSlider: () => void;
@@ -35,7 +31,6 @@ interface AtlasEventBindingsOptions {
   updatePerformanceHud: () => void;
   updateAllUi: () => void;
   resizeCanvas: () => void;
-  updateSelectedPanelMetrics: () => void;
   requestRender: (withData?: boolean) => void;
   scheduleViewStateReplace: () => void;
   viewSkySelected: () => void;
@@ -51,6 +46,10 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
     dom.shareMenuButton.setAttribute("aria-expanded", String(dom.sharePopover.matches(":popover-open")));
   });
   dom.closeSharePopoverButton.addEventListener("click", () => dom.sharePopover.hidePopover());
+  bindShareButtonPlacement({
+    control: dom.shareControl, button: dom.shareMenuButton, popover: dom.sharePopover,
+    toolbarSlot: dom.shareSlotToolbar, headerSlot: dom.shareSlotHeader,
+  });
   dom.exportButton.addEventListener("click", options.exportCurrentView);
   window.addEventListener("popstate", () => {
     const params = new URLSearchParams(window.location.search);
@@ -63,7 +62,7 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
     if (view) options.restoreViewState(view);
   });
   dom.copyLinkButton.addEventListener("click", () => options.shareCurrentView(false));
-  dom.shareCompareButton.addEventListener("click", () => options.shareCurrentView(false));
+  dom.shareCompareButton.addEventListener("click", () => options.shareCurrentView(false, dom.compareFeedback));
   dom.nativeShareButton.addEventListener("click", () => options.shareCurrentView(true));
   dom.nativeShareButton.hidden = typeof navigator.share !== "function";
   dom.copyEmbedButton.addEventListener("click", options.copyEmbedSnippet);
@@ -73,14 +72,11 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
       ? options.translate("status.ready")
       : options.translate("status.error");
     options.updateAllUi();
-    options.updateTimeSummary();
-    options.updateTimeStepUi();
     options.requestRender(true);
     options.scheduleViewStateReplace();
   });
   window.addEventListener("resize", () => {
     options.resizeCanvas();
-    options.updateSelectedPanelMetrics();
     options.requestRender(true);
   });
   window.addEventListener("keydown", (event) => {
@@ -92,20 +88,6 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
   });
 
   options.bindDestinations();
-  dom.timeNow.addEventListener("click", () => {
-    dom.timeInput.value = localDatetimeValue(new Date());
-    state.viewTime = "now";
-    options.loadAtlas();
-  });
-  dom.applyTime.addEventListener("click", () => {
-    const date = options.dateFromInput();
-    if (date) options.loadAtlas(date.toISOString());
-  });
-  dom.timeStepSlider.addEventListener("input", options.updateTimeStepUi);
-  dom.timeStepBack.addEventListener("click", () => options.stepTime(-1));
-  dom.timeStepForward.addEventListener("click", () => options.stepTime(1));
-  dom.skyTimeBack.addEventListener("click", () => options.stepTime(-1));
-  dom.skyTimeForward.addEventListener("click", () => options.stepTime(1));
   dom.zoomPresets.addEventListener("click", (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-zoom-preset]");
     if (button) options.applyZoomPreset((button.dataset.zoomPreset as ZoomPreset) ?? "solar");
@@ -135,9 +117,4 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
     options.updatePerformanceHud();
   });
   options.mapInteraction.bind();
-}
-
-function localDatetimeValue(date: Date): string {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
 }

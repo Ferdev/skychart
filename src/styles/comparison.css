@@ -11,52 +11,6 @@
   overflow: hidden;
 }
 
-.compare-workspace-body {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 232px;
-  overflow: hidden;
-}
-
-.compare-workspace-body .compare-panel {
-  min-height: 0;
-  margin: 0;
-  overflow: auto;
-  padding: 14px;
-  border-right: 1px solid rgba(242, 237, 223, 0.1);
-}
-
-.compare-target-card {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.compare-picker {
-  flex: 1 1 auto;
-  max-height: none;
-  min-height: 0;
-  margin: 10px 0 0;
-  overflow-y: auto;
-  border: 1px solid rgba(21, 23, 20, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 250, 240, 0.48);
-  padding: 8px;
-}
-
-.compare-picker .destination-picker__section {
-  gap: 5px;
-}
-
-.compare-picker .destination-picker__item {
-  padding: 7px;
-}
-
-.compare-picker .destination-picker__distance {
-  max-width: 74px;
-}
-
 .compare-card,
 .size-compare-card {
   display: grid;
@@ -153,9 +107,9 @@
   gap: 14px;
   overflow: hidden;
   padding: 10px;
-  border: 0;
+  border: 1px solid var(--panel-line);
   border-radius: 7px;
-  background: #fffaf0;
+  background: var(--panel-surface);
 }
 
 .size-disk-wrap {
@@ -247,8 +201,8 @@
   height: 8px;
   background: var(--body-color, var(--accent));
   box-shadow:
-    0 0 0 2.5px rgba(21, 23, 20, 0.1),
-    0 0 9px rgba(21, 23, 20, 0.22);
+    0 0 0 2.5px rgba(242, 237, 223, 0.16),
+    0 0 9px rgba(242, 237, 223, 0.24);
 }
 
 .size-disk-wrap figcaption {
@@ -265,12 +219,16 @@
   white-space: nowrap;
 }
 
+.size-disk-wrap strong {
+  color: var(--panel-ink);
+}
+
 .size-disk-wrap span {
-  color: rgba(21, 23, 20, 0.56);
+  color: var(--panel-ink-muted);
   font-size: 0.76rem;
 }
 
 .size-disk-wrap .size-subpixel-note {
-  color: rgba(21, 23, 20, 0.74);
+  color: var(--panel-ink);
   font-weight: 760;
 }

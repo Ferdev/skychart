@@ -1,4 +1,5 @@
 import type { Body } from "./atlas/contracts";
+import { formatCount as formatQuantityCount, formatLightYears as formatQuantityLightYears, formatQuantity } from "./format/quantity.ts";
 
 export function uniqueTextValues(values: readonly (string | null | undefined)[]) {
   const seen = new Set<string>();
@@ -24,8 +25,27 @@ export function uniquePairs(entries: readonly [string, string][]) {
   });
 }
 
+/** Words that catalogs write in capitals. The inspector shows them this way in source names and identifier names. */
+const CATALOG_ACRONYMS = [
+  "SPICE", "SPK", "JPL", "NAIF", "SIMBAD", "NGC", "IC", "DESI", "SDSS", "ESA", "NASA", "SBDB", "TAP", "NED", "CDS",
+  "HEASARC", "IPAC", "SPIDERS", "BOSS", "TESS", "TOI", "KOI", "TIC", "HIP", "HD", "XMM", "ID", "OID", "RA", "UTC", "TDB",
+];
+const CATALOG_ACRONYM_PATTERN = new RegExp(`\\b(${CATALOG_ACRONYMS.join("|")})\\b`, "gi");
+
+/**
+ * Changes a catalog code such as `spice_spk` or `desi_dr1_tile` into words: `SPICE SPK`, `DESI DR1 Tile`.
+ * Data release and ephemeris numbers keep their capitals (`DR3`, `DE440s`).
+ */
+export function readableCatalogWords(value: string) {
+  return value
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .replace(CATALOG_ACRONYM_PATTERN, (word) => word.toUpperCase())
+    .replace(/\b(Dr|De)(\d+)/g, (_match, prefix: string, digits: string) => `${prefix.toUpperCase()}${digits}`);
+}
+
 export function identifierLabel(key: string) {
-  return key.replace(/_/g, " ").replace(/\bdr3\b/gi, "DR3").replace(/\bid\b/gi, "ID").replace(/\boid\b/gi, "OID").replace(/\bspkid\b/gi, "SPK-ID").replace(/\b\w/g, (char) => char.toUpperCase());
+  return readableCatalogWords(key.replace(/spkid/gi, "spk-id"));
 }
 
 export function identifierValue(value: unknown) {
@@ -34,36 +54,19 @@ export function identifierValue(value: unknown) {
   return null;
 }
 
-export function formatNumber(value: number) {
-  const abs = Math.abs(value);
-  if (abs >= 1_000_000_000) return Intl.NumberFormat(undefined, { maximumFractionDigits: 2, notation: "compact" }).format(value);
-  if (abs >= 10_000) return Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
-  if (abs >= 100) return Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
-  if (abs >= 1) return Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
-  return Intl.NumberFormat(undefined, { maximumSignificantDigits: 3 }).format(value);
-}
+/** A measured value with no unit. See `format/quantity.ts` for the number rule. */
+export function formatNumber(value: number) { return formatQuantity(value); }
 
-export function formatLightYears(value: number) {
-  if (value >= 1_000_000_000) return `${formatNumber(value / 1_000_000_000)} Gly`;
-  if (value >= 1_000_000) return `${formatNumber(value / 1_000_000)} Mly`;
-  if (value >= 1_000) return `${formatNumber(value / 1_000)} kly`;
-  return `${formatNumber(value)} ly`;
-}
+export function formatLightYears(value: number) { return formatQuantityLightYears(value); }
 
+/** A count for a small space: all digits below 100,000, and the short form ("2.33M") above. */
 export function formatCount(value: number) {
-  return Intl.NumberFormat(undefined, { maximumFractionDigits: value >= 1_000_000 ? 2 : 1, notation: value >= 100_000 ? "compact" : "standard" }).format(value);
+  return formatQuantityCount(value, { compact: value >= 100_000, maximumFractionDigits: value >= 1_000_000 ? 2 : 1 });
 }
 
-export function formatInteger(value: number) { return Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value); }
+export function formatInteger(value: number) { return formatQuantityCount(value); }
 
-export function formatRatio(value: number) {
-  if (!Number.isFinite(value)) return "unknown";
-  if (value >= 1_000_000) return value.toExponential(2);
-  if (value >= 1000) return Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
-  if (value >= 100) return value.toFixed(1);
-  if (value >= 10) return value.toFixed(2);
-  return value.toFixed(3);
-}
+export function formatRatio(value: number) { return formatQuantity(value); }
 
 export function bodyDistanceKm(left: Body, right: Body, auKm: number) {
   return Math.hypot(

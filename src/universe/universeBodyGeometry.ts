@@ -53,7 +53,7 @@ export function framingDistance(radiusAu: number, fovDeg: number, frame: number)
   return radiusAu * Math.sqrt(1 + 1 / (halfExtent * halfExtent));
 }
 
-/** Where "Go to object" and autopilot stop. The distance depends only on the
+/** Where "Jump there" and autopilot stop. The distance depends only on the
  * object and the field of view, so every star, planet or nebula arrives at the
  * same apparent size, from any start point. `volumeRadiusAu` is the enclosing
  * radius of a deep-sky form, when the object has one. */

@@ -14,8 +14,8 @@
 }
 
 .destination-picker__section-title {
-  color: var(--muted, rgba(244, 241, 232, 0.62));
-  font-size: 11px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -40,7 +40,7 @@
   border-radius: 7px;
   padding: 7px 9px;
   background: rgba(244, 241, 232, 0.038);
-  color: var(--text, #f4f1e8);
+  color: var(--panel-ink);
   text-align: left;
 }
 
@@ -116,14 +116,14 @@
 }
 
 .destination-picker__meta {
-  color: var(--muted, rgba(244, 241, 232, 0.62));
-  font-size: 11px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
 }
 
 .destination-picker__distance {
-  color: var(--text, #f4f1e8);
-  font-family: var(--font-data, ui-monospace, monospace);
-  font-size: 11px;
+  color: var(--panel-ink);
+  font-family: ui-monospace, monospace;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -140,6 +140,14 @@
   padding: 2px 5px;
   background: rgba(217, 184, 111, 0.09);
   color: #efd89e;
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: 680;
+}
+
+/* The name of the object in the interface language, next to the catalog name. */
+.destination-picker__local-name {
+  margin-left: 6px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
 }

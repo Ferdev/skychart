@@ -25,19 +25,37 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
       const settings = page.getByRole("dialog", { name: "Settings", exact: true });
       const settingsToggle = page.locator("#map-settings-toggle");
       const before = await toolbar.boundingBox();
-      expect(before!.height).toBeLessThanOrEqual(viewport.width < 900 ? 175 : 125);
+      // A phone toolbar has two rows: the zoom row and the four presets.
+      expect(before!.height).toBeLessThanOrEqual(viewport.width < 900 ? 112 : 125);
       expect(before!.x).toBeGreaterThanOrEqual(0);
       expect(before!.x + before!.width).toBeLessThanOrEqual(viewport.width);
       await expect(settings).toBeHidden();
       await page.screenshot({ path: testInfo.outputPath("toolbar.png") });
       await toolbar.screenshot({ path: testInfo.outputPath("toolbar-detail.png") });
+      // Below 520 px the toolbar has no layer switches. They are in Settings.
+      const quickLayers = viewport.width >= 520;
       for (const layer of ["constellations", "labels", "grid"]) {
-        await expect(toolbar.locator(`.toolbar-quick-layers input[data-layer="${layer}"]`)).toBeVisible();
+        const quick = toolbar.locator(`.toolbar-quick-layers input[data-layer="${layer}"]`);
+        if (quickLayers) await expect(quick).toBeVisible();
+        else await expect(quick).toBeHidden();
       }
       await expect(page.locator("#zoom-scale-slider")).toBeVisible();
       await expect(page.locator("#zoom-presets button")).toHaveCount(4);
-      await page.locator('.toolbar-quick-layers input[data-layer="constellations"]').check();
-      await page.locator('input[data-layer="grid"]').uncheck();
+      if (quickLayers) {
+        await page.locator('.toolbar-quick-layers input[data-layer="constellations"]').check();
+        await page.locator('.toolbar-quick-layers input[data-layer="grid"]').uncheck();
+      } else {
+        await settingsToggle.tap();
+        await page.locator('[aria-controls="scale-constellations"]').click();
+        await page.locator('#scale-constellations input[data-layer="constellations"]').check();
+        await page.locator('[aria-controls="scale-map-overlays"]').click();
+        for (const layer of ["labels", "grid"]) await expect(page.locator(`#scale-map-overlays input[data-layer="${layer}"]`)).toBeVisible();
+        await page.locator('#scale-map-overlays input[data-layer="grid"]').uncheck();
+        // Close the section again: the steps below open it.
+        await page.locator('[aria-controls="scale-map-overlays"]').click();
+        await page.keyboard.press("Escape");
+        await expect(settings).toBeHidden();
+      }
       await expect(page).toHaveURL(/constellations.1/);
       await expect(page).toHaveURL(/grid.0/);
       const zoom = await page.locator("#zoom-view-scale").textContent();
@@ -69,20 +87,35 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
       await expect(settings).toBeHidden();
       await page.reload({ waitUntil: "domcontentloaded" });
       await expect(page.locator('.toolbar-quick-layers input[data-layer="constellations"]')).toBeChecked();
-      await expect(page.locator('input[data-layer="grid"]')).not.toBeChecked();
+      await expect(page.locator('.toolbar-quick-layers input[data-layer="grid"]')).not.toBeChecked();
       await settingsToggle.click();
       await page.locator('[aria-controls="scale-map-overlays"]').click();
       await expect(page.locator('input[data-layer="orbits"]')).not.toBeChecked();
       await page.keyboard.press("Escape");
       await page.locator("#locale-select").selectOption("de");
       await expect(settingsToggle).toHaveText("Einstellungen");
-      const overflow = await toolbar.locator("button, label, input[type=range]").evaluateAll(elements => elements
+      const overflow = () => toolbar.locator("button, label, input[type=range]").evaluateAll(elements => elements
         .filter(element => element.getClientRects().length > 0)
         .some(element => {
           const rect = element.getBoundingClientRect();
           return rect.left < 0 || rect.right > window.innerWidth;
         }));
-      expect(overflow, "translated controls stay inside the viewport").toBe(false);
+      // The four presets are on one line, also with the longer German and Spanish texts.
+      const presetRows = () => toolbar.locator("[data-zoom-preset]").evaluateAll(buttons => new Set(buttons.map(button => Math.round(button.getBoundingClientRect().top))).size);
+      expect(await overflow(), "German controls stay inside the viewport").toBe(false);
+      expect(await presetRows(), "German presets are on one line").toBe(1);
+      await page.locator("#locale-select").selectOption("es");
+      await expect(page.locator("html")).toHaveAttribute("lang", "es");
+      expect(await overflow(), "Spanish controls stay inside the viewport").toBe(false);
+      expect(await presetRows(), "Spanish presets are on one line").toBe(1);
+      // On a wide window a language with long texts has one more row, for the presets. A phone toolbar keeps its two rows.
+      expect((await toolbar.boundingBox())!.height, "the Spanish toolbar height").toBeLessThanOrEqual(viewport.width < 900 ? 112 : 160);
+      const cutTexts = await toolbar.locator(".toolbar-quick-layers label:not([hidden]) span, [data-zoom-preset] span").evaluateAll(spans => spans
+        .filter(span => span.getClientRects().length > 0 && span.scrollWidth > span.clientWidth + 1 && window.innerWidth >= 900)
+        .map(span => span.textContent));
+      expect(cutTexts, "no Spanish text of the wide toolbar is cut").toEqual([]);
+      await page.locator("#locale-select").selectOption("de");
+      await expect(settingsToggle).toHaveText("Einstellungen");
       await settingsToggle.click();
       await page.locator('[aria-controls="scale-constellations"]').click();
       await page.locator("#constellations-hide-all").click();
