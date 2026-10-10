@@ -174,7 +174,8 @@ if config_env() != :test do
       community_s3_bucket: System.get_env("COMMUNITY_S3_BUCKET"),
       community_mailer: StarsmapApi.Community.Mailer.Webhook,
       community_mail_url: System.get_env("COMMUNITY_MAIL_URL"),
-      community_mail_token: System.get_env("COMMUNITY_MAIL_TOKEN")
+      community_mail_token: System.get_env("COMMUNITY_MAIL_TOKEN"),
+      community_mail_from: System.get_env("COMMUNITY_MAIL_FROM")
 
     if config_env() == :prod and System.get_env("COMMUNITY_STORAGE") != "s3",
       do: raise("Production community media requires S3 storage")
@@ -186,8 +187,12 @@ if config_env() != :test do
     end
 
     if config_env() == :prod do
-      for name <- ~w(COMMUNITY_MAIL_URL COMMUNITY_MAIL_TOKEN COMMUNITY_MEDIA_URL),
+      for name <-
+            ~w(COMMUNITY_MAIL_URL COMMUNITY_MAIL_TOKEN COMMUNITY_MAIL_FROM COMMUNITY_MEDIA_URL),
           do: System.fetch_env!(name)
+
+      if System.fetch_env!("COMMUNITY_MAIL_FROM") == "",
+        do: raise("COMMUNITY_MAIL_FROM must not be empty")
 
       for name <- ~w(COMMUNITY_MAIL_URL COMMUNITY_MEDIA_URL) do
         if URI.parse(System.fetch_env!(name)).scheme != "https",

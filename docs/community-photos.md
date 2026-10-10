@@ -74,13 +74,17 @@ Set the corresponding `STAGING_` or `PRODUCTION_` GitHub variables/secrets below
 | `COMMUNITY_S3_ACCESS_KEY_ID`, `COMMUNITY_S3_SECRET_ACCESS_KEY` | secrets | Media credentials |
 | `COMMUNITY_S3_ENDPOINT`, `COMMUNITY_S3_REGION` | variables | S3-compatible endpoint and region |
 | `COMMUNITY_MEDIA_URL` | variable | Separate HTTPS media/CDN origin |
-| `COMMUNITY_MAIL_URL`, `COMMUNITY_MAIL_TOKEN` | variable, secret | HTTPS mail webhook and Bearer token |
+| `COMMUNITY_MAIL_URL`, `COMMUNITY_MAIL_TOKEN` | variable, secret | HTTPS mail endpoint and Bearer token |
+| `COMMUNITY_MAIL_FROM` | variable | Sender address, for example `Cosmic Atlas <login@example.org>` |
 | `COMMUNITY_BACKUP_URI`, `COMMUNITY_BACKUP_ENDPOINT` | variables | Off-host backup prefix and S3 endpoint |
 | `COMMUNITY_BACKUP_SECRET` | secret | Independent backup encryption password |
 | `COMMUNITY_BACKUP_ACCESS_KEY_ID`, `COMMUNITY_BACKUP_SECRET_ACCESS_KEY` | secrets | Separate backup credentials |
 
-The webhook receives JSON `{email, code, expires_in: 600}`. It must send the
-six-digit code to that address and return HTTP 2xx. It must not log the code.
+The app sends a POST with a Bearer token and the JSON body
+`{from, to, subject, text}`. The text holds the six-digit code. The endpoint
+must send the mail and return HTTP 2xx. It must not log the code. This shape
+matches Resend's `POST https://api.resend.com/emails`. So `COMMUNITY_MAIL_URL`
+can be that address, and `COMMUNITY_MAIL_TOKEN` can be a Resend send-only API key.
 Email enumeration responses are generic. Codes expire after ten minutes and five
 failed attempts. The database limits requests to ten per email per rolling day.
 Sessions expire after 30 days and are revocable. Production cookies are HttpOnly,
