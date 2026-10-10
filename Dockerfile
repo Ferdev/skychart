@@ -57,8 +57,13 @@ ENV PHX_SERVER=true
 ENV PORT=4000
 ENV PYTHON_BACKEND_URL=http://127.0.0.1:8765
 
+# pg_dump must match the PostgreSQL 16 server; bookworm ships client 15, so use the PGDG repository.
 RUN apt-get update -y && \
-  apt-get install -y libstdc++6 openssl libncurses6 locales ca-certificates curl python3 python3-venv postgresql-client libvips-tools gnupg \
+  apt-get install -y libstdc++6 openssl libncurses6 locales ca-certificates curl python3 python3-venv libvips-tools gnupg \
+  && install -d /usr/share/postgresql-common/pgdg \
+  && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+  && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+  && apt-get update -y && apt-get install -y postgresql-client-16 \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen

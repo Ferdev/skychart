@@ -203,7 +203,8 @@ if config_env() != :test do
     config :ex_aws,
       access_key_id: System.get_env("COMMUNITY_S3_ACCESS_KEY_ID"),
       secret_access_key: System.get_env("COMMUNITY_S3_SECRET_ACCESS_KEY"),
-      region: System.get_env("COMMUNITY_S3_REGION") || "us-east-1"
+      region: System.get_env("COMMUNITY_S3_REGION") || "us-east-1",
+      http_client: StarsmapApi.Community.Storage.S3.HttpClient
 
     if endpoint = System.get_env("COMMUNITY_S3_ENDPOINT") do
       uri = URI.parse(endpoint)
