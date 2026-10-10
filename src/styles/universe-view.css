@@ -70,7 +70,7 @@
 .universe-view__eyebrow {
   margin: 0 0 3px;
   color: rgba(130, 203, 179, 0.86);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   font-weight: 820;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -80,21 +80,15 @@
   margin: 0;
   font-size: clamp(1.45rem, 3vw, 2.35rem);
   line-height: 1.05;
+  white-space: nowrap;
 }
 
 .universe-view__position {
   max-width: min(760px, calc(100vw - 40px));
   margin: 5px 0 0;
   color: rgba(238, 242, 234, 0.7);
-  font: 600 0.72rem ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 600 var(--text-xs) ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow-wrap: anywhere;
-}
-
-.universe-view__selection-summary {
-  max-width: min(760px, calc(100vw - 40px));
-  margin: 3px 0 0;
-  color: #f8cb65;
-  font-size: 0.72rem;
 }
 
 .universe-view__actions {
@@ -110,10 +104,11 @@
   border-radius: 7px;
   color: #eef2ea;
   background: rgba(3, 8, 10, 0.78);
+  font-size: var(--text-sm);
   font-weight: 750;
 }
 
-.universe-view__actions button { padding: 8px 11px; }
+.universe-view__actions button { padding: 8px 11px; white-space: nowrap; }
 
 .universe-view__search-dialog {
   z-index: 80;
@@ -136,6 +131,12 @@
 .universe-view__search-results { display: grid; gap: 6px; min-height: 36px; max-height: 380px; margin-top: 12px; overflow: auto; color: #b9cac5; }
 .universe-view__search-results button { padding: 9px 10px; text-align: left; }
 .universe-view__search-results button:hover, .universe-view__search-results button:focus-visible { border-color: #f8cb65; color: #f8cb65; }
+.universe-view__search-results [role="group"] { display: grid; gap: 6px; }
+.universe-view__search-section { margin: 6px 0 0; color: #9fb3ad; font-size: var(--text-xs); font-weight: 760; text-transform: uppercase; }
+.universe-view__search-option { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; }
+.universe-view__search-option span { flex: none; color: #9fb3ad; font-size: var(--text-xs); }
+.universe-view__search-option.is-active { border-color: #f8cb65; color: #f8cb65; background: #14292d; }
+.universe-view__search-option[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 
 .universe-view__actions button:hover,
 .universe-view__actions button:focus-visible,
@@ -171,11 +172,44 @@
   border-radius: 9px;
   background: rgba(3, 7, 8, 0.8);
   backdrop-filter: blur(12px);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   pointer-events: none;
 }
 
-.universe-view__minimap figcaption { max-width: 340px; color: rgba(238, 242, 234, 0.72); }
+.universe-view__minimap figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  max-width: 340px;
+  color: rgba(238, 242, 234, 0.72);
+}
+
+/* The button hides the drawing. The route text stays. */
+.universe-view__minimap-toggle {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(116, 184, 183, 0.3);
+  border-radius: 6px;
+  color: #eef2ea;
+  background: rgba(12, 24, 27, 0.95);
+  font-size: 1rem;
+  line-height: 1;
+  pointer-events: auto;
+}
+
+.universe-view__minimap-toggle:hover { border-color: #f8cb65; color: #f8cb65; }
+
+/* A touch screen gets a 44 px target. */
+@media (pointer: coarse) {
+  .universe-view__minimap-toggle {
+    width: 44px;
+    height: 44px;
+  }
+}
+.universe-view__minimap[data-collapsed="true"] canvas { display: none; }
 .universe-view__minimap canvas { width: 340px; height: 270px; border-radius: 5px; background: rgba(1, 4, 5, 0.72); }
 
 .universe-view__speed {
@@ -189,7 +223,7 @@
   border-radius: 9px;
   background: rgba(3, 7, 8, 0.8);
   backdrop-filter: blur(12px);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
 }
 
 .universe-view__speed output {
@@ -236,14 +270,91 @@
   padding-top: 14px;
   border-left: 1px solid rgba(238, 242, 234, 0.4);
   color: rgba(238, 242, 234, 0.55);
-  font-size: 0.6rem;
+  font-size: var(--text-xs);
   line-height: 1;
   text-indent: 3px;
   white-space: nowrap;
 }
-.universe-view__light-speed { border-left-color: #f8cb65; color: #f8cb65; font: italic 700 0.74rem Georgia, serif; }
+.universe-view__light-speed { border-left-color: #f8cb65; color: #f8cb65; font: italic 700 var(--text-xs) var(--font-sans); }
 
-.universe-view__autopilot-row { display: flex; gap: 6px; }
+.universe-view__speed-caption {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: rgba(238, 242, 234, 0.62);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+/* Says what the autopilot does when it has no target. It takes no room when it is empty. */
+.universe-view__flight-note {
+  margin: 0;
+  padding: 5px 9px;
+  border: 1px solid rgba(248, 203, 101, 0.4);
+  border-radius: 6px;
+  color: #f8cb65;
+  background: rgba(3, 7, 8, 0.86);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.universe-view__flight-note:empty { display: none; }
+
+.universe-view__autopilot-row { display: flex; align-items: center; gap: 6px; }
+.universe-view__flight button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* The card with the flight controls, shown at the first entry. */
+/* It is below the header, so that it does not cover the object in the centre of the view. */
+.universe-view__hint {
+  position: absolute;
+  z-index: 4;
+  top: 104px;
+  left: 50%;
+  display: grid;
+  gap: 8px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid rgba(248, 203, 101, 0.4);
+  border-radius: 10px;
+  background: rgba(3, 8, 10, 0.94);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.universe-view__hint[hidden] { display: none; }
+.universe-view__hint strong { font-size: var(--text-lg); }
+.universe-view__hint p { margin: 0; color: rgba(238, 242, 234, 0.84); font-size: var(--text-sm); line-height: 1.5; }
+.universe-view__hint button { justify-self: end; min-height: 36px; }
+
+/* Touch controls: a joystick and two buttons. A fine pointer has the key pad. */
+.universe-view__touch { display: none; align-items: center; gap: 10px; }
+
+.universe-view__joystick {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border: 1px solid rgba(130, 203, 179, 0.4);
+  border-radius: 50%;
+  background: rgba(3, 7, 8, 0.72);
+  touch-action: none;
+}
+
+.universe-view__joystick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border: 1px solid rgba(130, 203, 179, 0.7);
+  border-radius: 50%;
+  background: rgba(130, 203, 179, 0.28);
+  pointer-events: none;
+}
+
+.universe-view__touch-vertical { display: grid; gap: 8px; }
+.universe-view__touch-vertical button { width: 48px; min-height: 48px; padding: 0; }
+
 .universe-view__gravity { padding: 8px 12px; }
 .universe-view__gravity[aria-pressed="true"] { border-color: #82cbb3 !important; color: #82cbb3 !important; background: rgba(130, 203, 179, 0.18) !important; }
 
@@ -265,6 +376,12 @@
 .universe-view__move-pad [data-universe-move="up"] { grid-area: up; }
 .universe-view__move-pad [data-universe-move="down"] { grid-area: down; }
 
+/* A touch screen has the joystick in place of the key pad. */
+@media (pointer: coarse) {
+  .universe-view__move-pad { display: none; }
+  .universe-view__touch { display: flex; }
+}
+
 .universe-view__footer {
   grid-row: 3;
   display: flex;
@@ -273,7 +390,7 @@
   padding: 42px 20px 16px;
   background: linear-gradient(0deg, rgba(2, 5, 6, 0.94), rgba(2, 5, 6, 0));
   color: rgba(238, 242, 234, 0.62);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
 }
 
 #universe-status { color: rgba(248, 203, 101, 0.9); }
@@ -290,7 +407,7 @@
   color: #f3eedf;
   background: rgba(3, 7, 8, 0.9);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   pointer-events: none;
   transform: translate(12px, -50%);
 }
@@ -312,7 +429,7 @@
 
 .universe-view__target[hidden] { display: none; }
 .universe-view__target strong { font-size: 0.94rem; }
-.universe-view__target > span { color: rgba(238, 242, 234, 0.7); font-size: 0.72rem; }
+.universe-view__target > span { color: rgba(238, 242, 234, 0.7); font-size: var(--text-xs); }
 .universe-view__target-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
 .universe-view__target-actions button {
   min-height: 34px;
@@ -321,7 +438,7 @@
   border-radius: 6px;
   color: #eef2ea;
   background: rgba(12, 24, 27, 0.95);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   font-weight: 700;
 }
 .universe-view__target-actions button:hover,
@@ -332,23 +449,17 @@ body[data-universe-view="true"] .atlas-footer,
 body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
 
 .universe-view[data-object-inspector="true"] ~ #controls[data-workspace-tab="object"] { z-index: 73; }
-.universe-view[data-object-inspector="true"] ~ #controls > .scale-rail,
-.universe-view[data-object-inspector="true"] ~ #controls > .mode-rail { display: none; }
+.universe-view[data-object-inspector="true"] ~ #controls > .scale-rail { display: none; }
 .universe-view[data-object-inspector="true"] ~ #controls #workspace-search-link { display: none; }
 .universe-view[data-object-inspector="true"] ~ #controls .workspace-panel {
   top: 80px;
   width: min(555px, calc(100vw - 420px));
 }
-.universe-view[data-object-inspector="true"] .universe-view__flight {
-  right: calc(min(555px, 100vw - 420px) + 20px);
-}
-@media (max-width: 1200px) {
-  .universe-view[data-object-inspector="true"] .universe-view__target { display: none; }
-}
+/* The flight panel and the target card do not move when the inspector opens: the inspector is above them. */
 
 @media (max-width: 899px) {
-  .universe-view[data-object-inspector="true"] ~ #controls .workspace-panel { top: auto; width: auto; }
-  .universe-view[data-object-inspector="true"] .universe-view__flight { top: 110px; right: 12px; bottom: auto; }
+  /* On a narrow window the inspector is a bottom sheet of half the height at most. */
+  .universe-view[data-object-inspector="true"] ~ #controls .workspace-panel { top: auto; width: auto; max-height: 50dvh; }
   .universe-selection-connector { display: none; }
 }
 
@@ -364,20 +475,47 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
 
 @media (max-width: 640px) {
   .universe-view__header { flex-wrap: wrap; gap: 5px; padding: 12px; }
-  .universe-view__actions { width: 100%; gap: 5px; }
-  .universe-view__actions button { flex: 1; min-height: 36px; padding: 6px 8px; font-size: 0.7rem; }
-  .universe-view__position { max-width: calc(100vw - 160px); font-size: 0.62rem; }
+  /* Two rows: the time bar, then Find, Reset, and Exit. */
+  .universe-view__actions { flex-wrap: wrap; width: 100%; gap: 5px; }
+  #universe-time-bar { flex: 1 1 100%; }
+  #universe-time-bar .time-bar__date { flex: 1 1 0; min-width: 0; }
+  /* The time popover has the Now button on a phone. */
+  #universe-time-bar .time-bar__now { display: none; }
+  .universe-view__actions button { flex: 1; min-height: 36px; padding: 6px 8px; font-size: var(--text-xs); }
+  .universe-view__position { max-width: calc(100vw - 160px); font-size: var(--text-xs); }
   .universe-view__flight { right: 12px; bottom: 78px; }
-  .universe-view__speed { width: 236px; padding: 7px 9px 6px; }
-  .universe-view__minimap { left: 12px; top: auto; bottom: 78px; gap: 4px; padding: 6px; font-size: 0.66rem; }
-  .universe-view__minimap canvas { width: 200px; height: 100px; }
-  .universe-view__minimap figcaption { max-width: 200px; }
+  .universe-view__speed { width: 216px; padding: 7px 9px 6px; }
+  .universe-view__autopilot-row { flex-wrap: wrap; justify-content: flex-end; max-width: 216px; }
+  .universe-view__minimap { left: 12px; top: auto; bottom: 78px; gap: 4px; padding: 6px; font-size: var(--text-xs); }
+  /* The trip map is small, so that the joystick has room next to it. */
+  .universe-view__minimap canvas { width: 130px; height: 80px; }
+  .universe-view__minimap figcaption { max-width: 130px; }
   .universe-view__footer { display: grid; gap: 3px; padding: 46px 12px 10px; }
   .universe-view__footer > span:first-child { display: none; }
-  .universe-view__target { left: 12px; top: 152px; bottom: auto; width: min(280px, calc(100vw - 24px)); }
-  .universe-view[data-object-inspector="true"] .universe-view__flight { top: 152px; right: 12px; bottom: auto; }
-  .universe-view[data-object-inspector="true"] .universe-view__move-pad,
-  .universe-view[data-object-inspector="true"] .universe-view__minimap { display: none; }
+  /* The target card and the hint card start below the header, which has a different height in each language. */
+  .universe-view__target,
+  .universe-view__hint {
+    position: relative;
+    grid-row: 2;
+    grid-column: 1;
+    align-self: start;
+    top: auto;
+    bottom: auto;
+    left: auto;
+    margin: 4px 12px 0;
+    transform: none;
+  }
+  .universe-view__target { justify-self: start; width: min(280px, calc(100vw - 24px)); }
+  /*
+   * The inspector sheet covers the lower half. The card shows its name and buttons only, and the scene
+   * moves up into the band between the card and the sheet, so that the target at the view centre stays in view.
+   */
+  .universe-view[data-object-inspector="true"] .universe-view__target > span { display: none; }
+  .universe-view[data-object-inspector="true"] :is(.universe-view__canvas, .universe-view__points, .universe-view__deep-sky, .universe-view__bodies, .universe-selection-connector) {
+    transform: translateY(-64px);
+  }
+  .universe-view__hint { justify-self: center; width: auto; }
+  .universe-view__speed-caption { display: none; }
 }
 
 .universe-view__credits { color: inherit; pointer-events: auto; }
@@ -391,7 +529,7 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   pointer-events: none;
 }
 .universe-entry-marker path { fill: none; stroke: #82cbb3; stroke-width: 1.5; stroke-linecap: round; opacity: 0.9; }
-.universe-entry-marker text { fill: #82cbb3; font: 700 9px system-ui, sans-serif; paint-order: stroke; stroke: rgba(2, 5, 6, 0.85); stroke-width: 2.5px; }
+.universe-entry-marker text { fill: #82cbb3; font: 700 12px var(--font-sans); paint-order: stroke; stroke: rgba(2, 5, 6, 0.85); stroke-width: 2.5px; }
 body[data-atlas-mode="embed"] .universe-entry-marker { display: none; }
 /* States that an exoplanet ring direction is a convention. It sits above the toolbar, which covers the canvas scale bar. */
 .exoplanet-orbit-note {
@@ -406,7 +544,7 @@ body[data-atlas-mode="embed"] .universe-entry-marker { display: none; }
   border-radius: 6px;
   color: rgba(205, 233, 246, 0.92);
   background: rgba(8, 10, 9, 0.78);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.35;
   pointer-events: none;
 }

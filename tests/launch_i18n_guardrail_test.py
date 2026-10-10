@@ -50,7 +50,7 @@ def test_every_advertised_locale_has_real_launch_copy():
     payload = json.loads(source[source.index("{"):].rstrip().removesuffix(";"))
     english = {
         key: json.loads(f'"{value}"')
-        for key, value in re.findall(r'"(launch\.[^"]+)":"((?:[^"\\]|\\.)*)"', i18n[:i18n.index("const PARTIAL_TRANSLATIONS")])
+        for key, value in re.findall(r'"(launch\.[^"]+)":"((?:[^"\\]|\\.)*)"', i18n[:i18n.index("const FILTER_COUNT_TRANSLATIONS")])
     }
     assert set(payload) == {"es", "fr", "de", "pt-BR", "it", "zh-Hans", "ja", "ko"}
     for locale, strings in payload.items():

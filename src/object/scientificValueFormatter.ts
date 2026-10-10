@@ -1,8 +1,9 @@
-import { formatNumber } from "../atlasFormatting";
+import { formatNumber, readableCatalogWords } from "../atlasFormatting";
 import type { Body } from "../atlas/contracts";
 import { finiteOptionalNumber } from "../catalog/catalogObjectMapper";
 import { eclipticCartesianToSpherical, equatorialToGalactic, formatDecimalDegrees, formatDeclination, formatRightAscension } from "../coordinates";
 import { formatPickerDistance } from "../destinationPicker";
+import { formatDateTime, formatFixed, formatLightYears, formatQuantity } from "../format/quantity";
 import { t } from "../i18n";
 
 /** Formats scientific values and coordinate systems consistently across object views. */
@@ -11,13 +12,13 @@ export class ScientificValueFormatter {
 
   formatDistance = (kilometers: number) => formatPickerDistance(kilometers, this.auKm());
   nullableDistance = (value: number | null | undefined) => finite(value) ? this.formatDistance(value) : t("value.unknown");
-  nullableNumber = (value: number | null | undefined, digits: number) => finite(value) ? value.toFixed(digits) : t("value.unknown");
-  nullableDegrees = (value: number | null | undefined) => finite(value) ? t("value.degrees", { value: value.toFixed(2) }) : t("value.unknown");
+  nullableNumber = (value: number | null | undefined, digits: number) => finite(value) ? formatFixed(value, digits) : t("value.unknown");
+  nullableDegrees = (value: number | null | undefined) => finite(value) ? t("value.degrees", { value: formatFixed(value, 2) }) : t("value.unknown");
   nullableDays = (value: number | null | undefined) => {
     if (!finite(value)) return t("value.unknown");
-    return value >= 365 ? t("value.years", { value: (value / 365.25).toFixed(2) }) : t("value.days", { value: value.toFixed(2) });
+    return value >= 365 ? t("value.years", { value: formatQuantity(value / 365.25) }) : t("value.days", { value: formatQuantity(value) });
   };
-  nullableLightYears = (value: number | null | undefined) => finite(value) ? `${formatNumber(value)} ly` : t("value.unknown");
+  nullableLightYears = (value: number | null | undefined) => finite(value) ? formatLightYears(value, { auKm: this.auKm() }) : t("value.unknown");
 
   formatRightAscensionForBody = (body: Body) => {
     const coordinates = equatorialCoordinates(body);
@@ -63,15 +64,16 @@ export function toDatetimeLocalValue(date: Date) {
 }
 
 export function formatShortDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }).format(new Date(value));
+  return formatDateTime(value, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
 }
 
 export function formatFullDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
+  return formatDateTime(value, {
     year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit",
     timeZoneName: "short", timeZone: "UTC",
-  }).format(new Date(value));
+  });
 }
+
 
 function equatorialCoordinates(body: Body) {
   const raDeg = finiteOptionalNumber(body.catalog?.ra_deg);
@@ -89,7 +91,7 @@ function eclipticCoordinates(body: Body) {
 }
 
 function readablePositionModel(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) || t("value.unknown");
+  return readableCatalogWords(value) || t("value.unknown");
 }
 
 function finite(value: number | null | undefined): value is number {

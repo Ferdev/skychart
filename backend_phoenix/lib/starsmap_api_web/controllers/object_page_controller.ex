@@ -216,5 +216,8 @@ defmodule StarsmapApiWeb.ObjectPageController do
 
   defp not_found,
     do:
-      "<!doctype html><html><head><title>Object not found — Cosmic Atlas</title></head><body><main><h1>Object not found</h1></main></body></html>"
+      StarsmapApiWeb.StaticPage.not_found(
+        "Object not found",
+        "The atlas has no public object with this key. Use the search in the atlas to find an object."
+      )
 end

@@ -2,8 +2,9 @@ import { formatDuration } from "../navigationMetrics";
 import { classifyBody } from "../destinationPicker";
 import { pointInRect, isPresent, type Rect, type ScreenPoint } from "../geometry";
 import { t } from "../i18n";
-import { objectMediaItemsFor, pixelBufferHasVisibleVariation, type ObjectMediaFallback } from "../objectMedia";
+import { objectMediaItemsFor, type MediaText, type ObjectMediaFallback } from "../objectMedia";
 import { measuredRedshift, scienceSemanticsFor, uncertaintySummary } from "../scienceSemantics";
+import { dataLabelText } from "../i18n/dataLabels";
 import { trackEvent } from "../analytics";
 import {
   escapeHtml,
@@ -15,26 +16,27 @@ import {
   uniquePairs,
   uniqueTextValues,
 } from "../atlasFormatting";
-import { AU_PER_LIGHT_YEAR } from "../galacticModel";
+import { closestLayerLevel, formatSampleRate } from "../atlas/scienceLayerDisclosure";
+import { NEW_TAB_LINK_ATTRIBUTES } from "../format/links";
+import { canObserveFromEarth, renderObservePanel } from "./observePanel";
+import { ObjectMediaFallbacks } from "./objectMediaFallbacks";
 import { renderExoplanetList, renderExoplanetOrbitSection, renderPlanetCandidateSection, renderPlanetarySystemAction } from "./exoplanetInspection";
 import type {
   Body,
   Ephemeris,
   ExternalLink,
   ObjectDetailHydrationState,
-  CatalogPointTileManifestLayer,
   UniverseShell,
 } from "../atlas/contracts";
 import type { CatalogPointManifestRepository } from "../catalog/catalogPointManifest";
 
 export type ObjectInspectionContext = {
   bodyInfo: HTMLElement;
-  nowStatus: HTMLElement;
-  nowEvents: HTMLElement;
-  scienceLayerDisclosure: HTMLElement;
   hydrationStates: Map<string, ObjectDetailHydrationState>;
   manifest: CatalogPointManifestRepository;
   curatedSummaries: Record<string, string>;
+  /** Text of the media cards in the application language. */
+  mediaText: MediaText;
   selectedBody: () => Body | null;
   bodyByKey: () => Map<string, Body>;
   ephemeris: () => Ephemeris | null;
@@ -75,7 +77,7 @@ type ObjectView = {
 
 /** Renders the complete scientific meaning of one selected object. */
 export class ObjectInspectionView {
-  private mediaFallbackCleanups: (() => void)[] = [];
+  private readonly mediaFallbacks = new ObjectMediaFallbacks();
   private activeView: ObjectViewId = "overview";
   private renderedBodyKey = "";
   private activeMediaBodyKey: string | null = null;
@@ -86,7 +88,7 @@ export class ObjectInspectionView {
 update() {
   const body = this.context.selectedBody();
   if (!body) {
-    this.clearMediaFallbacks();
+    this.mediaFallbacks.clear();
     this.renderedBodyKey = "";
     this.activeView = "overview";
     this.activeMediaBodyKey = null;
@@ -228,7 +230,7 @@ update() {
     : [];
 
   const mediaMarkup = this.renderMediaSection(body);
-  const scienceContent = [
+  const scienceFacts = [
     this.renderUniverseSciencePanel(body),
     this.renderDataSection(t("section.stellarFacts"), stellarRows),
     renderExoplanetOrbitSection(body),
@@ -236,9 +238,11 @@ update() {
     renderPlanetCandidateSection(body.planet_candidates ?? []),
     this.renderDataSection(t("section.deepSkyFacts"), deepSkyRows),
     this.renderDataSection(t("section.smallBodyFacts"), smallBodyRows),
-    this.renderObjectNotes(body),
   ].join("");
-  const views: ObjectView[] = [
+  // A view shows only when it has data. Notes with no other science data are part of Overview.
+  const notes = this.renderObjectNotes(body);
+  const sourcesContent = [this.renderIdentifierSection(body), this.renderSourceSection(body)].join("");
+  const optionalViews: (ObjectView | null)[] = [
     {
       id: "overview",
       label: t("section.overview"),
@@ -246,9 +250,10 @@ update() {
         mediaMarkup,
         this.renderDataSection(t("section.overview"), overviewRows),
         this.renderRelatedObjects(body),
+        scienceFacts ? "" : notes,
       ].join(""),
     },
-    ...(scienceContent ? [{ id: "science" as const, label: t("object.viewScience"), content: scienceContent }] : []),
+    scienceFacts ? { id: "science", label: t("object.viewScience"), content: scienceFacts + notes } : null,
     {
       id: "position",
       label: t("section.position"),
@@ -258,29 +263,26 @@ update() {
         this.renderDataSection(t("section.orbit"), orbitRows),
       ].join(""),
     },
-    { id: "observe", label: t("object.viewObserve"), content: this.renderObservePanel(body) },
-    {
-      id: "sources",
-      label: t("object.viewSources"),
-      content: [this.renderIdentifierSection(body), this.renderSourceSection(body)].join(""),
-    },
+    canObserveFromEarth(body) ? { id: "observe", label: t("object.viewObserve"), content: renderObservePanel(body) } : null,
+    sourcesContent ? { id: "sources", label: t("object.viewSources"), content: sourcesContent } : null,
   ];
+  const views = optionalViews.filter(isPresent);
   if (!views.some((view) => view.id === this.activeView)) this.activeView = "overview";
   const currentMediaSection = this.context.bodyInfo.querySelector<HTMLElement>(".object-media-section");
   const preserveMediaSection = currentMediaSection != null
     && this.activeMediaBodyKey === body.key
     && this.activeMediaMarkup === mediaMarkup;
   if (preserveMediaSection) currentMediaSection.remove();
-  else this.clearMediaFallbacks();
+  else this.mediaFallbacks.clear();
 
   this.context.bodyInfo.innerHTML = `
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
       <div class="object-orientation">
         ${this.renderObjectDetailState(body)}
-        ${this.renderObjectSummaryCard(body, classification.label)}
+        ${this.renderObjectSummaryCard(body)}
         ${this.renderFactTiles(primaryStats)}${renderPlanetarySystemAction(body)}
         ${body.spacecraft ? `<p>${escapeHtml(t("mission.trajectory"))}</p>` : ""}
-        ${body.key === "spacecraft-31" ? `<p><a href="https://science.nasa.gov/mission/voyager/voyager-1/voyager-1-what-is-a-light-day/" target="_blank" rel="noopener noreferrer">${escapeHtml(t("mission.milestone"))}</a></p>` : ""}
+        ${body.key === "spacecraft-31" ? `<p><a href="https://science.nasa.gov/mission/voyager/voyager-1/voyager-1-what-is-a-light-day/" ${NEW_TAB_LINK_ATTRIBUTES}>${escapeHtml(t("mission.milestone"))}</a></p>` : ""}
       </div>
       <nav class="object-view-tabs" role="tablist" aria-label="${escapeHtml(t("object.detailViews"))}">
         ${views.map((view) => this.renderObjectViewTab(view)).join("")}
@@ -294,8 +296,8 @@ update() {
   if (preserveMediaSection && replacementMediaSection) {
     replacementMediaSection.replaceWith(currentMediaSection);
   } else {
-    if (preserveMediaSection) this.clearMediaFallbacks();
-    this.installMediaFallbacks();
+    if (preserveMediaSection) this.mediaFallbacks.clear();
+    this.mediaFallbacks.install(this.context.bodyInfo);
   }
   this.activeMediaBodyKey = body.key;
   this.activeMediaMarkup = mediaMarkup;
@@ -349,26 +351,6 @@ private renderObjectViewPanel(view: ObjectView) {
   return `<section id="object-view-panel-${view.id}" class="object-view-panel" role="tabpanel" data-object-view-panel="${view.id}" aria-labelledby="object-view-tab-${view.id}"${active ? "" : " hidden"}>${view.content}</section>`;
 }
 
-private renderObservePanel(body: Body) {
-  if (body.spacecraft) return `<p>${escapeHtml(t("launch.observeUnavailable"))}</p>`;
-  return `<section class="observe-panel" data-observe-key="${escapeHtml(body.key)}"><div class="section-heading"><span>${escapeHtml(t("launch.skyTonight"))}</span></div><p>${escapeHtml(t("launch.observeHelp"))}</p><div class="observe-fields"><label>${escapeHtml(t("launch.latitude"))} <input id="observe-lat" inputmode="decimal"></label><label>${escapeHtml(t("launch.longitude"))} <input id="observe-lon" inputmode="decimal"></label></div><button type="button" data-observe-location="manual">${escapeHtml(t("launch.calculate"))}</button> <button type="button" data-observe-location="browser">${escapeHtml(t("launch.useLocation"))}</button><p id="observe-result" role="status"></p></section>`;
-}
-
-async requestObservation(useBrowser: boolean) {
-  const panel=this.context.bodyInfo.querySelector<HTMLElement>("[data-observe-key]"); const result=panel?.querySelector<HTMLElement>("#observe-result"); if(!panel||!result)return; result.textContent=useBrowser?t("launch.requestingLocation"):t("launch.calculating");
-  try {
-    const latValue=panel.querySelector<HTMLInputElement>("#observe-lat")?.value.trim()??""; const lonValue=panel.querySelector<HTMLInputElement>("#observe-lon")?.value.trim()??""; let lat=latValue===""?Number.NaN:Number(latValue); let lon=lonValue===""?Number.NaN:Number(lonValue);
-    if(useBrowser){const pos=await new Promise<GeolocationPosition>((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{timeout:10_000,maximumAge:300_000}));lat=pos.coords.latitude;lon=pos.coords.longitude;}
-    if(!Number.isFinite(lat)||lat < -90||lat > 90||!Number.isFinite(lon)||lon < -180||lon > 180)throw new Error(t("launch.invalidCoordinates"));
-    const response=await fetch(`/api/observe?${new URLSearchParams({key:panel.dataset.observeKey??"",lat:String(lat),lon:String(lon)})}`);if(!response.ok)throw new Error(t("launch.observeUnavailable"));
-    const p=await response.json() as {altitude_deg:number;azimuth_deg:number;summary:string;accuracy_note:string};result.textContent=t("launch.altAz",{summary:p.summary,altitude:p.altitude_deg.toFixed(1),azimuth:p.azimuth_deg.toFixed(1),note:p.accuracy_note});
-  }catch(error){result.textContent=error instanceof Error?error.message:t("launch.observeFailed");}
-}
-
-async loadNowEvents() {
-  try {const response=await fetch("/api/now");if(!response.ok)throw new Error();const p=await response.json() as {stale:boolean;refreshed_at:string|null;events:{title:string;summary:string;starts_at:string;url:string;catalog_key:string|null}[]};this.context.nowStatus.textContent=p.stale?t("launch.eventsCached",{date:p.refreshed_at?new Date(p.refreshed_at).toLocaleString():t("launch.unknown")}):t("launch.eventsUpdated",{date:new Date(p.refreshed_at??Date.now()).toLocaleString()});this.context.nowEvents.innerHTML=p.events.slice(0,6).map(item=>`<li><a href="${escapeHtml(item.url)}" ${item.catalog_key?"":`target="_blank" rel="noopener noreferrer"`}>${escapeHtml(item.title)}</a><time datetime="${escapeHtml(item.starts_at)}">${escapeHtml(new Date(item.starts_at).toLocaleDateString())}</time><p>${escapeHtml(item.summary)}</p></li>`).join("");}catch{this.context.nowStatus.textContent=t("launch.eventsUnavailable");}
-}
-
 private renderObjectEmptyState() {
   return `
     <section class="object-empty-state">
@@ -398,27 +380,29 @@ private renderObjectDetailState(body: Body) {
   }
   if (!body.catalog?.preview) return "";
   return `
-    <section class="object-detail-state" aria-label="Object detail state">
+    <section class="object-detail-state" aria-label="${escapeHtml(t("object.detailState"))}">
       <strong>${escapeHtml(t("object.catalogPreview"))}</strong>
       <span>${escapeHtml(t("object.catalogPreviewBody"))}</span>
     </section>
   `;
 }
 
-private renderObjectSummaryCard(body: Body, typeLabel: string) {
-  const summary = this.objectSummaryText(body, typeLabel);
+private renderObjectSummaryCard(body: Body) {
+  // A sentence from a template says nothing that the header does not say, so only curated text gets the card.
+  const summary = this.objectSummaryText(body);
   const contextItems = this.objectSummaryContext(body);
+  if (!summary && contextItems.length === 0) return "";
+  const context = contextItems.length > 0
+    ? `<ul>${contextItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+    : "";
+  if (!summary) return `<section class="object-summary-card object-summary-card--context" aria-label="${escapeHtml(t("object.context"))}">${context}</section>`;
   return `
     <section class="object-summary-card" aria-label="${escapeHtml(t("object.whyThisMatters"))}">
       <div>
         <span>${escapeHtml(t("object.whyThisMatters"))}</span>
         <p>${escapeHtml(summary)}</p>
       </div>
-      ${
-        contextItems.length > 0
-          ? `<ul>${contextItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-          : ""
-      }
+      ${context}
     </section>
   `;
 }
@@ -433,9 +417,9 @@ private renderUniverseSciencePanel(body: Body) {
   const semantics = scienceSemanticsFor(body.catalog?.position_model);
   const chips = [
     [t("universe.context.distance"), this.context.formatLightYears(distanceLy)],
-    ...(redshift == null ? [] : [["Catalog spectroscopic redshift", String(redshift)]]),
+    ...(redshift == null ? [] : [[t("field.spectroscopicRedshift"), String(redshift)]]),
     ...(semantics?.cosmology && semantics.distance_kind
-      ? [["Distance convention", `${semantics.distance_kind.replace(/_/g, " ")} · ${semantics.cosmology.name}`]]
+      ? [[t("field.distanceConvention"), `${this.context.readablePositionModel(semantics.distance_kind)} · ${semantics.cosmology.name}`]]
       : []),
     [t("universe.context.shell"), t(shell.labelKey)]
   ];
@@ -447,49 +431,22 @@ private renderUniverseSciencePanel(body: Body) {
       </div>
       <p>${escapeHtml(t("object.scienceContextBody", { name: body.name, type: classification.label.toLowerCase() }))}</p>
       <dl>${chips.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>
-      <p class="science-caveat">${escapeHtml(uncertaintySummary(record))}</p>
+      <p class="science-caveat">${escapeHtml(uncertaintySummary(record, t))}</p>
       <a href="/methodology" data-analytics-event="methodology">${escapeHtml(t("launch.readMethodology"))}</a>
     </section>
   `;
 }
 
-private objectSummaryText(body: Body, typeLabel: string) {
-  if (body.spacecraft) return body.spacecraft.description ?? `${typeLabel} · ${t(`mission.${body.spacecraft.availability}`)}`;
+/** The curated text about this object, or null when the atlas has none. A template sentence is not curated text. */
+private objectSummaryText(body: Body) {
+  if (body.spacecraft) return body.spacecraft.description ?? null;
+  // The status of a planet candidate is a fact that the user must see, not a template sentence.
+  if (body.object_type === "planet_candidate") {
+    return t("exoplanet.candidateSummary", { name: body.name, source: String(body.catalog?.facts?.source_catalog ?? "TESS Objects of Interest") });
+  }
   const curated = this.firstText([body.exoplanet_system?.why_interesting, body.deep_sky?.why_interesting]);
   if (curated) return curated;
-  const curatedSummary = this.context.curatedSummaries[body.key.toLowerCase()] ?? this.curatedAliasSummary(body);
-  if (curatedSummary) return curatedSummary;
-
-  const name = body.name;
-  switch (body.object_type) {
-    case "planet":
-      return t("summary.planet", { name });
-    case "planet_candidate":
-      return t("exoplanet.candidateSummary", { name, source: String(body.catalog?.facts?.source_catalog ?? "TESS Objects of Interest") });
-    case "moon":
-      return t("summary.moon", { name });
-    case "star":
-      return body.stellar?.exoplanet_count ? t("summary.exoplanetHost", { name, count: body.stellar.exoplanet_count }) : t("summary.star", { name });
-    case "dwarf_planet":
-      return t("summary.dwarfPlanet", { name });
-    case "galaxy":
-      return t("summary.galaxy", { name });
-    case "quasar":
-      return t("summary.quasar", { name });
-    case "active_galaxy":
-      return t("summary.activeGalaxy", { name });
-    case "nebula":
-      return t("summary.nebula", { name });
-    case "star_cluster":
-      return t("summary.starCluster", { name });
-    case "asteroid":
-    case "comet":
-    case "small_body":
-      return t("summary.smallBody", { name });
-    default:
-      if (body.exoplanet_system) return t("summary.exoplanetSystem", { name });
-      return t("summary.generic", { name, type: typeLabel.toLowerCase() });
-  }
+  return this.context.curatedSummaries[body.key.toLowerCase()] ?? this.curatedAliasSummary(body) ?? null;
 }
 
 private curatedAliasSummary(body: Body) {
@@ -574,13 +531,14 @@ private renderSourceSection(body: Body) {
     [t("mission.audit"), body.spacecraft?.audited_at ?? null],
     [t("field.positionModel"), this.context.readableOptionalModel(body.catalog?.position_model)],
     [t("field.catalogGroup"), this.context.readableCatalogGroup(body.catalog_group ?? body.catalog?.catalog_group)],
-    [t("field.atlasSource"), ephemeris?.data_source ?? null],
+    // The source of this object, not the list of all sources of the atlas payload.
+    [t("field.atlasSource"), objectSource(body)],
     [t("field.epoch"), ephemeris?.timestamp_utc ? this.context.formatFullDate(ephemeris.timestamp_utc) : null],
-    ["Distance kind", semantics?.distance_kind?.replace(/_/g, " ") ?? null],
-    ["Catalog epoch", semantics?.catalog_epoch ?? null],
-    ["Position epoch", semantics?.position_epoch ?? null],
-    ["Uncertainty", uncertaintySummary({ position_model: body.catalog?.position_model, facts: body.catalog?.facts })],
-    ["Selection caveat", semantics?.selection_caveat ?? null]
+    [t("field.distanceKind"), semantics?.distance_kind ? this.context.readablePositionModel(semantics.distance_kind) : null],
+    [t("field.catalogEpoch"), semantics?.catalog_epoch ?? null],
+    [t("field.positionEpoch"), semantics?.position_epoch ?? null],
+    [t("field.uncertainty"), uncertaintySummary({ position_model: body.catalog?.position_model, facts: body.catalog?.facts }, t)],
+    [t("field.selectionCaveat"), semantics?.selection_caveat ?? null]
   ];
   const rows = this.renderRows(sourceRows);
   if (!rows && links.length === 0) return "";
@@ -594,9 +552,9 @@ private renderSourceSection(body: Body) {
           ? `<div class="source-link-list">${links
               .map(
                 (link) => `
-                  <a href="${escapeHtml(link.url ?? "")}" target="_blank" rel="noreferrer">
+                  <a href="${escapeHtml(link.url ?? "")}" ${NEW_TAB_LINK_ATTRIBUTES}>
                     <span>${escapeHtml(link.provider ?? t("object.source"))}</span>
-                    <strong>${escapeHtml(link.label ?? t("object.openSourceRecord"))}</strong>
+                    <strong>${escapeHtml(link.label ? dataLabelText(link.label) : t("object.openSourceRecord"))}</strong>
                   </a>
                 `
               )
@@ -635,39 +593,10 @@ async copyCitationDetails(body: Body, button: HTMLButtonElement) {
 private citationSamplingContext(body: Body) {
   const layer = this.context.manifest.value?.layers.find((candidate) => candidate.groups.includes(body.catalog_group ?? ""));
   if (!layer) return "Selected named object; no static-layer sampling metadata applies.";
-  const level = this.closestLayerLevel(layer);
+  const level = closestLayerLevel(layer, this.context.currentViewWidthLy());
   if (!level) return `${layer.id}; sampling metadata unavailable.`;
   const rate = level.raw_point_count && level.point_count != null ? level.point_count / level.raw_point_count : 1;
-  return `${layer.id}, displayed ${formatCount(level.point_count ?? 0)} of ${formatCount(level.raw_point_count ?? level.point_count ?? 0)} at this LOD (${this.formatPercent(rate)}), release ${this.context.manifest.value?.version}.`;
-}
-
-private closestLayerLevel(layer: CatalogPointTileManifestLayer) {
-  const targetSpan = Math.max(1, this.context.currentViewWidthLy() * AU_PER_LIGHT_YEAR / 2);
-  return [...layer.levels].sort((a, b) => Math.abs(Math.log2(a.span_au / targetSpan)) - Math.abs(Math.log2(b.span_au / targetSpan)))[0] ?? null;
-}
-
-private formatPercent(value: number) {
-  return `${Math.min(100, Math.max(0, value * 100)).toLocaleString(undefined, { maximumFractionDigits: value < 0.01 ? 3 : 1 })}%`;
-}
-
-updateScienceLayerDisclosure() {
-  if (!this.context.manifest.value) return;
-  const rows = this.context.manifest.value.layers.map((layer) => {
-    const available = Object.values(layer.source_counts).reduce((sum, count) => sum + count, 0);
-    const level = this.closestLayerLevel(layer);
-    const displayed = level?.point_count ?? available;
-    const raw = level?.raw_point_count ?? displayed;
-    const rate = raw > 0 ? displayed / raw : 1;
-    const context: Record<string, string> = {
-      gaia_stars: "Gaia positive-parallax quality tiers; parallax and magnitude cuts vary by tier. Not a complete stellar census.",
-      desi_dr1: "DESI DR1 successful spectroscopy and target/class cuts inside the DESI footprint.",
-      quaia_g20: "Quaia G<20 quasar candidates with inferred redshifts; near-all-sky selection is not spectroscopic completeness.",
-      deep_sky: "Named and literature-compiled catalogs with heterogeneous selection and coverage.",
-      xray: "eROSITA-DE DR2 (eRASS:3) and SDSS-V DR20 SPIDERS DL1. Distances come from spectroscopic or SIMBAD-compiled redshifts where available; sources without a usable redshift are drawn on an explicit 1 billion ly reference shell (display convention, not a measurement)."
-    };
-    return `<section><strong>${escapeHtml(layer.id.replace(/_/g, " "))}</strong><dl><div><dt>${escapeHtml(t("launch.sourceObjects"))}</dt><dd>${escapeHtml(formatCount(available))}</dd></div><div><dt>${escapeHtml(t("launch.displayedAvailable"))}</dt><dd>${escapeHtml(formatCount(displayed))} / ${escapeHtml(formatCount(raw))}</dd></div><div><dt>${escapeHtml(t("launch.sampleRate"))}</dt><dd>${escapeHtml(this.formatPercent(rate))}</dd></div><div><dt>${escapeHtml(t("launch.release"))}</dt><dd>${escapeHtml(this.context.manifest.value!.version)}</dd></div></dl><p>${escapeHtml(context[layer.id] ?? t("launch.methodologyCaveat"))}</p></section>`;
-  });
-  this.context.scienceLayerDisclosure.innerHTML = rows.join("");
+  return `${layer.id}, displayed ${formatCount(level.point_count ?? 0)} of ${formatCount(level.raw_point_count ?? level.point_count ?? 0)} at this LOD (${formatSampleRate(rate)}), release ${this.context.manifest.value?.version}.`;
 }
 
 private renderRelatedObjects(body: Body) {
@@ -696,7 +625,7 @@ private renderRelatedObjects(body: Body) {
 
 private renderObjectMedia(body: Body) {
   const observer = this.context.ephemeris()?.bodies.find((candidate) => candidate.key === "earth");
-  const mediaItems = objectMediaItemsFor(body, observer);
+  const mediaItems = objectMediaItemsFor(body, observer, this.context.mediaText);
   if (mediaItems.length === 0) return "";
   const hasSurveyMedia = mediaItems.some((media) => media.kind === "survey");
 
@@ -718,7 +647,7 @@ private renderObjectMedia(body: Body) {
           <strong class="object-media__title">${escapeHtml(media.title)}</strong>
           ${media.description ? `<p class="object-media__description">${escapeHtml(media.description)}</p>` : ""}
           <span class="object-media__credit">${escapeHtml(media.credit)}</span>
-          <a class="object-media__source" href="${escapeHtml(media.sourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(media.license)}</a>
+          <a class="object-media__source" href="${escapeHtml(media.sourceUrl)}" ${NEW_TAB_LINK_ATTRIBUTES}>${escapeHtml(media.license)}</a>
         </div>
       </section>
     `).join("")}</div>`;
@@ -736,162 +665,6 @@ private renderMediaFallbackData(fallback: ObjectMediaFallback) {
     ["data-fallback-badge", fallback.badge],
     ["data-fallback-description", fallback.description]
   ].map(([name, value]) => `${name}="${escapeHtml(value)}"`).join(" ");
-}
-
-private installMediaFallbacks() {
-  const syncSectionState = (mediaSection: HTMLElement | null) => {
-    if (!mediaSection) return;
-    const cards = [...mediaSection.querySelectorAll<HTMLElement>(".object-media")];
-    const mediaList = mediaSection.querySelector<HTMLElement>(".object-media-list");
-    if (mediaList) mediaList.hidden = cards.every((candidate) => candidate.hidden);
-
-    const status = mediaSection.querySelector<HTMLElement>("[data-media-status]");
-    if (!status) return;
-    const surveys = cards.filter((candidate) => candidate.dataset.mediaValidation === "pixels");
-    const loading = surveys.filter((candidate) => candidate.dataset.mediaState === "loading");
-    const available = surveys.filter((candidate) => candidate.dataset.mediaState === "available");
-    const failed = surveys.filter((candidate) => candidate.dataset.mediaState === "failed");
-
-    if (loading.length > 0) {
-      this.updateMediaStatus(status, "loading", t("object.mediaLoading"), t("object.mediaLoadingBody"));
-    } else if (available.length > 0) {
-      status.hidden = true;
-    } else if (failed.length > 0) {
-      this.updateMediaStatus(status, "failed", t("object.mediaFailed"), t("object.mediaFailedBody"));
-    } else {
-      this.updateMediaStatus(status, "unavailable", t("object.mediaUnavailable"), t("object.mediaUnavailableBody"));
-    }
-  };
-  for (const mediaSection of this.context.bodyInfo.querySelectorAll<HTMLElement>(".object-media-section")) {
-    syncSectionState(mediaSection);
-  }
-
-  for (const card of this.context.bodyInfo.querySelectorAll<HTMLElement>(".object-media")) {
-    const image = card.querySelector<HTMLImageElement>("img");
-    if (!image) continue;
-
-    const fallbackSrc = card.dataset.fallbackSrc;
-    const mediaSection = card.closest<HTMLElement>(".object-media-section");
-    const requiresPixelValidation = card.dataset.mediaValidation === "pixels";
-    let settled = false;
-    let usingFallback = false;
-    let fallbackFailureState: "unavailable" | "failed" = "unavailable";
-    let timeoutId: number | null = null;
-    const clearPending = () => {
-      if (timeoutId != null) window.clearTimeout(timeoutId);
-      timeoutId = null;
-    };
-    this.mediaFallbackCleanups.push(() => {
-      settled = true;
-      clearPending();
-    });
-    const finish = (state: "available" | "unavailable" | "failed") => {
-      if (settled) return;
-      settled = true;
-      clearPending();
-      card.dataset.mediaState = state;
-      card.hidden = state !== "available";
-      syncSectionState(mediaSection);
-    };
-
-    if (!requiresPixelValidation) {
-      image.addEventListener("error", () => finish("failed"), { once: true });
-      if (image.complete && image.naturalWidth <= 0) finish("failed");
-      continue;
-    }
-
-    const startTimeout = (onTimeout: () => void) => {
-      if (timeoutId == null && !settled) timeoutId = window.setTimeout(onTimeout, 30_000);
-    };
-    let validateLoadedImage = () => {};
-    const useFallback = (reason: "unavailable" | "failed") => {
-      if (settled || usingFallback || !fallbackSrc) {
-        if (!fallbackSrc) finish(reason);
-        return;
-      }
-      usingFallback = true;
-      fallbackFailureState = reason;
-      clearPending();
-      card.dataset.mediaProvider = card.dataset.fallbackProvider ?? "fallback";
-      card.dataset.mediaState = "loading";
-      card.classList.add("object-media--fallback");
-      image.addEventListener("load", validateLoadedImage, { once: true });
-      image.addEventListener("error", () => finish("failed"), { once: true });
-      image.src = fallbackSrc;
-      image.alt = card.dataset.fallbackAlt ?? image.alt;
-      const updates: [string, string | undefined][] = [
-        [".object-media__badge", card.dataset.fallbackBadge],
-        [".object-media__title", card.dataset.fallbackTitle],
-        [".object-media__description", card.dataset.fallbackDescription],
-        [".object-media__credit", card.dataset.fallbackCredit]
-      ];
-      for (const [selector, value] of updates) {
-        const element = card.querySelector<HTMLElement>(selector);
-        if (element && value) element.textContent = value;
-      }
-      const source = card.querySelector<HTMLAnchorElement>(".object-media__source");
-      if (source) {
-        if (card.dataset.fallbackSourceUrl) source.href = card.dataset.fallbackSourceUrl;
-        if (card.dataset.fallbackLicense) source.textContent = card.dataset.fallbackLicense;
-      }
-      syncSectionState(mediaSection);
-      startTimeout(() => finish("failed"));
-    };
-    validateLoadedImage = () => {
-      if (settled) return;
-      if (image.naturalWidth <= 0 || image.naturalHeight <= 0) {
-        if (usingFallback) finish("failed");
-        else useFallback("failed");
-        return;
-      }
-      if (!this.mediaImageHasVisibleData(image)) {
-        if (usingFallback) finish(fallbackFailureState);
-        else useFallback("unavailable");
-        return;
-      }
-      finish("available");
-    };
-
-    image.addEventListener("load", validateLoadedImage, { once: true });
-    image.addEventListener("error", () => useFallback("failed"), { once: true });
-    if (image.complete) {
-      if (image.naturalWidth > 0) validateLoadedImage();
-      else useFallback("failed");
-    } else {
-      startTimeout(() => useFallback("failed"));
-    }
-  }
-}
-
-private updateMediaStatus(status: HTMLElement, state: "loading" | "unavailable" | "failed", title: string, body: string) {
-  status.hidden = false;
-  status.dataset.mediaStatus = state;
-  status.className = `object-media-status object-media-status--${state}`;
-  const titleElement = status.querySelector<HTMLElement>("[data-media-status-title]");
-  const bodyElement = status.querySelector<HTMLElement>("[data-media-status-body]");
-  if (titleElement) titleElement.textContent = title;
-  if (bodyElement) bodyElement.textContent = body;
-}
-
-private mediaImageHasVisibleData(image: HTMLImageElement) {
-  const canvas = document.createElement("canvas");
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) return true;
-  try {
-    context.drawImage(image, 0, 0);
-    return pixelBufferHasVisibleVariation(context.getImageData(0, 0, canvas.width, canvas.height).data);
-  } catch {
-    // Keep a successfully loaded image if canvas access is unexpectedly
-    // unavailable; transport policy is not evidence that survey data is blank.
-    return true;
-  }
-}
-
-private clearMediaFallbacks() {
-  for (const cleanup of this.mediaFallbackCleanups) cleanup();
-  this.mediaFallbackCleanups = [];
 }
 
 private aliasesForBody(body: Body) {
@@ -1035,6 +808,14 @@ private renderRows(rows: (string | number | null | undefined)[][]) {
     .join("");
 }
 
+}
+
+/** Source of the position of one object, for example "NASA/JPL DE440s (de440s.bsp)". */
+function objectSource(body: Body): string | null {
+  const source = body.catalog?.ephemeris_source?.trim();
+  if (!source) return null;
+  const kernel = body.catalog?.ephemeris_kernel?.trim();
+  return kernel && kernel !== source ? `${source} (${kernel})` : source;
 }
 
 export function normalizeExternalLinks(links: readonly ExternalLink[]): ExternalLink[] {

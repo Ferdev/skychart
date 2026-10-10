@@ -1,4 +1,5 @@
 import type { PointRenderCamera } from "./webglPointRenderer";
+import { canvasFont } from "./format/fonts.ts";
 
 export const EXPORT_MAX_WIDTH = 8000;
 export const EXPORT_FOOTER_CSS_HEIGHT = 88;
@@ -26,6 +27,11 @@ export type ExportRequest = {
   viewportWidth: number;
   viewportHeight: number;
   maxTileSize: number;
+  /**
+   * Offset of the centre of the free map area from the centre of the window, in CSS pixels.
+   * The map centre is drawn there on the screen, and the overlay canvas is copied with that offset.
+   */
+  centerOffsetCss: { x: number; y: number };
   overlay: HTMLCanvasElement;
   provenance: ExportProvenance;
   renderPoints: (tile: ExportTile) => Uint8ClampedArray;
@@ -36,6 +42,29 @@ export function exportDimensions(width: number, viewportWidth: number, viewportH
   const safeWidth = Math.max(1, Math.min(EXPORT_MAX_WIDTH, Math.round(width)));
   const scale = safeWidth / Math.max(1, viewportWidth);
   return { width: safeWidth, mapHeight: Math.max(1, Math.round(viewportHeight * scale)), footerHeight: Math.round(EXPORT_FOOTER_CSS_HEIGHT * Math.max(1, scale)), scale };
+}
+
+/**
+ * Camera for one tile of the point layer. The point renderer draws the camera position at the tile centre,
+ * so the camera is the world position that the overlay shows at that pixel of the export.
+ *
+ * The scale of the camera stays in CSS pixels for each AU: the renderer gets the export scale as its
+ * device pixel ratio and multiplies positions and point sizes by it.
+ */
+export function exportTileCamera(
+  provenance: Pick<ExportProvenance, "centerXAu" | "centerYAu" | "pxPerAu">,
+  size: { width: number; mapHeight: number; scale: number },
+  tile: { left: number; top: number; width: number; height: number },
+  centerOffsetCss: { x: number; y: number },
+): PointRenderCamera {
+  const exportPxPerAu = provenance.pxPerAu * size.scale;
+  const mapCenterX = size.width / 2 + centerOffsetCss.x * size.scale;
+  const mapCenterY = size.mapHeight / 2 + centerOffsetCss.y * size.scale;
+  return {
+    xAu: provenance.centerXAu + (tile.left + tile.width / 2 - mapCenterX) / exportPxPerAu,
+    yAu: provenance.centerYAu - (tile.top + tile.height / 2 - mapCenterY) / exportPxPerAu,
+    pxPerAu: provenance.pxPerAu,
+  };
 }
 
 export async function composeAtlasPng(request: ExportRequest): Promise<Blob> {
@@ -56,11 +85,7 @@ export async function composeAtlasPng(request: ExportRequest): Promise<Blob> {
     for (let left = 0; left < size.width; left += tileSize) {
       const width = Math.min(tileSize, size.width - left);
       const height = Math.min(tileSize, size.mapHeight - top);
-      const camera = {
-        xAu: request.provenance.centerXAu + (left + width / 2 - size.width / 2) / (request.provenance.pxPerAu * size.scale),
-        yAu: request.provenance.centerYAu - (top + height / 2 - size.mapHeight / 2) / (request.provenance.pxPerAu * size.scale),
-        pxPerAu: request.provenance.pxPerAu * size.scale
-      };
+      const camera = exportTileCamera(request.provenance, size, { left, top, width, height }, request.centerOffsetCss);
       const pixels = request.renderPoints({ left, top, width, height, scale: size.scale, camera });
       context.putImageData(new ImageData(new Uint8ClampedArray(pixels), width, height), left, top);
       complete += 1;
@@ -79,7 +104,7 @@ export function drawProvenanceFooter(context: CanvasRenderingContext2D, width: n
   context.fillStyle = "#101512";
   context.fillRect(0, top, width, height);
   context.fillStyle = "#efc468";
-  context.font = `600 ${15 * unit}px system-ui, sans-serif`;
+  context.font = canvasFont(15 * unit, 600);
   context.fillText("COSMIC ATLAS", padding, top + 27 * unit);
   context.fillStyle = "#d7ded8";
   context.font = `${10 * unit}px ui-monospace, monospace`;

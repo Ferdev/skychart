@@ -20,8 +20,11 @@ A navigable perspective over catalog objects with finite heliocentric ecliptic
 of view, and movement step in versioned view state. Dense 2D-only point-tile
 records are not assigned invented depth; the 3D endpoint combines nearby
 positions with a bounded bright-landmark sample and excludes unknown-distance
-reference shells. Entry starts at the 2D map center and can aim at the selected
-object; a selected 3D point can be approached or inspected in 2D or Sky.
+reference shells. Entry starts at the 2D map center and aims at the selected
+object. With no selected object the view aims at the Sun when the Sun is in the
+2D view, and at the nearest major object in other cases. A selected 3D point
+shows a target card only; from the card it can be approached, opened in the
+inspector (`Details`), or inspected in 2D or Sky.
 
 ### Catalog object
 

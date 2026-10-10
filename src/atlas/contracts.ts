@@ -38,6 +38,9 @@ export type VectorComponents = {
 export type BodyCatalog = {
   source_type?: string | null;
   position_model?: string | null;
+  /** Source and file of the position of this object, for example "NASA/JPL DE440s" and "de440s.bsp". */
+  ephemeris_source?: string | null;
+  ephemeris_kernel?: string | null;
   dynamic_position?: boolean;
   preview?: boolean;
   aliases?: readonly string[];

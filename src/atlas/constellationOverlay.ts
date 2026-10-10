@@ -1,17 +1,20 @@
 import { ConstellationRenderer, type ConstellationRendererOptions } from "../rendering/constellationRenderer";
 import { MAP_CONSTELLATIONS, normalizeHiddenConstellations } from "./constellationStyles";
-import { t } from "../i18n";
+import { locale, t } from "../i18n";
+import { constellationName } from "../i18n/constellationNames";
 
 /** Owns the main-map figure selection and its matching color key. */
 export class ConstellationOverlay {
   private hiddenIds = new Set<string>();
   private renderer: ConstellationRenderer;
-  private rows: { name: string; label: HTMLLabelElement; input: HTMLInputElement }[] = [];
+  private rows: { latinName: string; name: string; text: Text; label: HTMLLabelElement; input: HTMLInputElement }[] = [];
+  private list = document.querySelector<HTMLElement>("#constellation-list")!;
+  private namesLocale = "";
   private search = document.querySelector<HTMLInputElement>("#constellation-search")!;
 
   constructor(private readonly options: ConstellationRendererOptions & { stateChanged: () => void }) {
-    this.renderer = new ConstellationRenderer({ ...options, hiddenConstellations: () => this.hiddenIds });
-    const list = document.querySelector<HTMLElement>("#constellation-list")!;
+    this.renderer = new ConstellationRenderer({ ...options, hiddenConstellations: () => this.hiddenIds, figureName: (latinName) => constellationName(latinName, locale()) });
+    const list = this.list;
     for (const figure of [...MAP_CONSTELLATIONS].sort((a, b) => a.name.localeCompare(b.name))) {
       const label = document.createElement("label");
       const input = document.createElement("input");
@@ -22,9 +25,10 @@ export class ConstellationOverlay {
       swatch.className = "constellation-swatch";
       swatch.style.backgroundColor = figure.color;
       swatch.setAttribute("aria-hidden", "true");
-      label.append(input, swatch, document.createTextNode(figure.name));
+      const text = document.createTextNode(figure.name);
+      label.append(input, swatch, text);
       list.append(label);
-      this.rows.push({ name: figure.name, label, input });
+      this.rows.push({ latinName: figure.name, name: figure.name, text, label, input });
       input.addEventListener("change", () => {
         if (input.checked) this.hiddenIds.delete(figure.id);
         else this.hiddenIds.add(figure.id);
@@ -67,15 +71,30 @@ export class ConstellationOverlay {
   private update(): void {
     const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const query = normalize(this.search.value.trim());
+    this.updateNames();
     let matches = 0;
     for (const row of this.rows) {
       row.input.checked = !this.hiddenIds.has(row.input.dataset.constellation!);
-      row.label.hidden = !normalize(row.name).includes(query);
+      // A search finds the name in the application language and the IAU name.
+      row.label.hidden = !normalize(row.name).includes(query) && !normalize(row.latinName).includes(query);
       if (!row.label.hidden) matches += 1;
     }
     document.querySelector("#constellation-count")!.textContent = t("constellations.count", {
       selected: MAP_CONSTELLATIONS.length - this.hiddenIds.size, total: MAP_CONSTELLATIONS.length,
     });
     (document.querySelector("#constellation-empty") as HTMLElement).hidden = matches > 0;
+  }
+
+  /** Shows the names of the application language, in the order of that language. */
+  private updateNames(): void {
+    const code = locale();
+    if (code === this.namesLocale) return;
+    this.namesLocale = code;
+    for (const row of this.rows) {
+      row.name = constellationName(row.latinName, code);
+      row.text.data = row.name;
+    }
+    this.rows.sort((a, b) => a.name.localeCompare(b.name, code));
+    this.list.append(...this.rows.map((row) => row.label));
   }
 }

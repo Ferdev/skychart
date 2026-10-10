@@ -143,12 +143,9 @@ test.describe("exoplanet orbits on the 2D map", () => {
     await expect(page.locator("#exoplanet-orbit-note")).toContainText("display convention");
     const before = await rings(page);
 
-    await page.evaluate(() => {
-      const slider = document.querySelector<HTMLInputElement>("#time-step-slider")!;
-      slider.value = "0";
-      slider.dispatchEvent(new Event("input", { bubbles: true }));
-      document.querySelector<HTMLButtonElement>("#time-step-forward")!.click();
-    });
+    await page.locator("#time-step-size").selectOption({ label: "1 day" });
+    await expect(page.locator("#time-step-forward")).toHaveAccessibleName("Step forward 1 day");
+    await page.locator("#time-step-forward").click();
     await expect.poll(async () => {
       const now = await rings(page);
       const moved = now.find((ring) => ring.key === "exoplanet-trappist-1-b");
@@ -446,7 +443,9 @@ test.describe("planet candidates", () => {
     await expect(page.locator('#body-info .planet-candidates [data-related-key="toi-6276-03"]')).toBeVisible();
     // The confirmed planets stay in their own list, with no candidate in it.
     await expect(page.locator('#body-info .planet-list [data-related-key^="exoplanet-"]')).toHaveCount(2);
-    await expect(page.locator('#body-info [data-related-key="toi-6276-03"]')).toHaveCount(1);
+    // The candidate is in one planet list only: the list of the candidates. The check is for the planet lists,
+    // because `Related objects` of the Overview shows the candidate also when the map has loaded the objects of this system.
+    await expect(page.locator('#body-info .planet-list [data-related-key="toi-6276-03"]')).toHaveCount(1);
   });
 
   test("a candidate with no period has no ring and the inspector says so", async ({ page, request }) => {

@@ -14,12 +14,15 @@ config :starsmap_api,
 
 config :starsmap_api, :dev_routes, config_env() in [:dev, :test]
 
+# The error page module returns a complete document, so the `html` format needs no template engine.
+config :phoenix_template, :format_encoders, html: StarsmapApiWeb.RawHTML
+
 # Configures the endpoint
 config :starsmap_api, StarsmapApiWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [json: StarsmapApiWeb.ErrorJSON],
+    formats: [html: StarsmapApiWeb.ErrorHTML, json: StarsmapApiWeb.ErrorJSON],
     layout: false
   ],
   pubsub_server: StarsmapApi.PubSub,

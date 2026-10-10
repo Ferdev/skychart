@@ -7,6 +7,8 @@ import { CURATED_HOST_GROUP, EXOPLANET_HOST_GROUP, isExoplanetHostStar, orbitsHo
 import { exoplanetOrbitReachAu, isExoplanetOrbitResolved, isPositionedExoplanet, isRingOnlyExoplanet } from "../catalog/exoplanetOrbit";
 import { classifyBody } from "../destinationPicker";
 import { expandedRect, pointInRect, type Rect, type ScreenPoint } from "../geometry";
+import { labelClass, rankLabels } from "../labels/labelRank";
+import { isUnresolvedSeparation, pickBody, type BodyPickHit } from "./bodyPick";
 
 type VisibilityFrame = {
   ephemeris: Ephemeris | null;
@@ -40,6 +42,13 @@ const EXOPLANET_MARKER_RADIUS_PX = 3;
 // A curated nearby host and its archive record come from the same archive
 // coordinates. Measured on 2026-10-08, the 16 pairs are 0.0 AU apart.
 const HOST_TWIN_TOLERANCE_AU = 0.01;
+// Neptune's orbit is 60 AU wide. Below this size on the screen the planets are one point.
+const SOLAR_SYSTEM_DIAMETER_AU = 60;
+const SOLAR_SYSTEM_MIN_PX = 24;
+// Object types that get an edge pointer only when they are featured.
+const EDGE_MINOR_TYPES = new Set(["asteroid", "comet", "small_body", "spacecraft"]);
+/** With more small bodies or catalog codes than this in view, they get no label. */
+const MINOR_LABEL_CROWD = 12;
 // Stands for each exoplanet host star when the model asks if the active filter shows the hosts.
 const EXOPLANET_HOST_PROBE = { key: "", name: "", radius_km: 0, object_type: "star", catalog_group: EXOPLANET_HOST_GROUP } as Body;
 
@@ -52,6 +61,7 @@ export class AtlasVisibilityModel {
   private pointGridValid = false;
   private curatedHostCache: Body[] | null = null;
   private resolvedExoplanetCache: Body[] | null = null;
+  private bodyIndexCache: Map<string, Body> | null = null;
 
   constructor(private readonly options: AtlasVisibilityModelOptions) {}
 
@@ -59,6 +69,7 @@ export class AtlasVisibilityModel {
     this.visibleCache = null;
     this.curatedHostCache = null;
     this.resolvedExoplanetCache = null;
+    this.bodyIndexCache = null;
     this.bodyGridValid = false;
     this.pointGridValid = false;
   }
@@ -76,11 +87,12 @@ export class AtlasVisibilityModel {
     return this.visibleCache;
   }
 
+  /** The body that a click or hover at this point selects. See `pickBody` for the rule. */
   nearestBody(x: number, y: number) {
     const startedAt = performance.now();
     if (!this.bodyGridValid) this.rebuildBodyGrid();
     const frame = this.options.frame();
-    let nearest: { body: Body; distancePx: number } | null = null;
+    const hits: (BodyPickHit & { body: Body })[] = [];
     const cellX = Math.floor(x / BODY_GRID_CELL_PX);
     const cellY = Math.floor(y / BODY_GRID_CELL_PX);
     const seen = new Set<string>();
@@ -90,12 +102,14 @@ export class AtlasVisibilityModel {
           if (entry.body.key === frame.transientSelectedKey || seen.has(entry.body.key)) continue;
           seen.add(entry.body.key);
           const distancePx = Math.hypot(entry.x - x, entry.y - y);
-          if (distancePx <= entry.radius && (!nearest || distancePx < nearest.distancePx)) nearest = { body: entry.body, distancePx };
+          if (distancePx > entry.radius) continue;
+          hits.push({ body: entry.body, key: entry.body.key, parentKey: entry.body.parent_key, x: entry.x, y: entry.y, distancePx, priority: this.typePriority(entry.body) });
         }
       }
     }
+    const picked = pickBody(hits);
     this.options.recordHitTestMs(performance.now() - startedAt);
-    return nearest;
+    return picked ? { body: picked.body, distancePx: picked.distancePx } : null;
   }
 
   nearestCatalogPoint(x: number, y: number): CatalogPointHitEntry | null {
@@ -116,31 +130,67 @@ export class AtlasVisibilityModel {
     return nearest;
   }
 
+  /**
+   * Bodies that can get a label, best first: the selected and the hovered body, then the label class
+   * (major body, named object, minor body, catalog designation), then the type rank,
+   * then the distance from the map centre. The payload order has no effect.
+   */
   prioritizedLabelBodies() {
     const frame = this.options.frame();
-    return this.visibleBodies()
-      .filter((body) => body.key === frame.selectedKey || body.key === frame.hoverKey || this.isMajorBody(body, frame) || frame.camera.pxPerAu > 12)
-      .sort((left, right) => this.labelPriority(right, frame) - this.labelPriority(left, frame))
-      .slice(0, 40);
+    const center = { x: frame.viewport.left + frame.viewport.width / 2, y: frame.viewport.top + frame.viewport.height / 2 };
+    // The pointer does not change the rank of a label: a label that moves away from the pointer cannot be used.
+    const pinned = (body: Body) => body.key === frame.selectedKey || body.key === frame.hoverKey || this.options.featuredKeys.includes(body.key);
+    const all = this.visibleBodies()
+      .filter((body) => pinned(body) || this.isMajorBody(body, frame) || frame.camera.pxPerAu > 12)
+      .map((body) => {
+        const screen = this.bodyToScreen(body, frame);
+        const point = { key: body.key, name: body.name, objectType: body.object_type, selected: body.key === frame.selectedKey };
+        return { ...point, labelClass: labelClass(point), body, typePriority: this.typePriority(body), distancePx: Math.hypot(screen.x - center.x, screen.y - center.y) };
+      });
+    // Labels for a few of many small bodies or catalog codes are noise. They show when few are in view.
+    const isCrowdClass = (candidate: { labelClass: string }) => candidate.labelClass === "minor" || candidate.labelClass === "designation";
+    const crowded = all.filter(isCrowdClass).length > MINOR_LABEL_CROWD;
+    const candidates = crowded ? all.filter((candidate) => !isCrowdClass(candidate) || pinned(candidate.body)) : all;
+    // One tie-break number: the type rank is first (higher is better), then the nearer body.
+    return rankLabels(candidates, (candidate) => (100 - candidate.typePriority) * 1e7 + candidate.distancePx)
+      .slice(0, 40)
+      .map((candidate) => candidate.body);
   }
 
+  /**
+   * Off-screen bodies for the edge pointers, best first. A pointer is for an object that helps the user
+   * find the way: the label class is first, then the distance. A minor body or a spacecraft gets a pointer
+   * only when it is featured (the selected body has no pointer: it has its own controls).
+   */
   edgeReferenceBodies() {
     const frame = this.options.frame();
     const selected = frame.ephemeris?.bodies.find((body) => body.key === frame.selectedKey) ?? null;
-    return (frame.ephemeris?.bodies ?? [])
+    const references = (frame.ephemeris?.bodies ?? [])
       .filter((body) => {
         if (body.key === frame.selectedKey) return false;
         if (!this.options.matchesActiveFilter(body) || !this.shouldRenderAtScale(body, frame)) return false;
-        if (frame.viewWidthLy >= 6_000 && !this.isMajorBody(body, frame) && !this.options.featuredKeys.includes(body.key)) return false;
+        const featured = this.options.featuredKeys.includes(body.key);
+        if (EDGE_MINOR_TYPES.has(body.object_type ?? "") && !featured) return false;
+        if (labelClass({ key: body.key, name: body.name, objectType: body.object_type }) === "designation" && !featured) return false;
+        if (frame.viewWidthLy >= 6_000 && !this.isMajorBody(body, frame) && !featured) return false;
         return true;
       })
       .map((body) => ({
+        key: body.key,
+        name: body.name,
+        objectType: body.object_type,
         body,
         screen: this.bodyToScreen(body, frame),
         selectedDistanceKm: selected ? this.options.bodyDistanceKm(selected, body) : body.distance_from_earth_km,
       }))
-      .filter(({ screen }) => !pointInRect(screen, frame.renderViewport))
-      .sort((left, right) => left.selectedDistanceKm - right.selectedDistanceKm);
+      .filter(({ screen }) => !pointInRect(screen, frame.renderViewport));
+    return rankLabels(references, (reference) => reference.selectedDistanceKm)
+      .map(({ body, screen }) => ({ body, screen }));
+  }
+
+  /** True when the planets are too near to the Sun on the screen to show: one `Solar System` marker stands for them. */
+  solarSystemCollapsed() {
+    return SOLAR_SYSTEM_DIAMETER_AU * this.options.frame().camera.pxPerAu < SOLAR_SYSTEM_MIN_PX;
   }
 
   bodyDisplayRadiusPx(body: Body) {
@@ -187,7 +237,11 @@ export class AtlasVisibilityModel {
   private shouldRenderAtScale(body: Body, frame: VisibilityFrame) {
     if (!hasBodyPosition(body)) return false;
     const width = frame.viewWidthLy;
-    if (body.key === frame.selectedKey || body.key === frame.hoverKey || this.options.featuredKeys.includes(body.key)) return true;
+    if (body.key === frame.selectedKey) return true;
+    // At a large scale the Sun marker stands for the Solar System (label `Solar System`).
+    if (isSolarSystemBody(body) && body.key !== "sun" && SOLAR_SYSTEM_DIAMETER_AU * frame.camera.pxPerAu < SOLAR_SYSTEM_MIN_PX) return false;
+    if (!this.isResolvedFromParent(body, frame)) return false;
+    if (body.key === frame.hoverKey || this.options.featuredKeys.includes(body.key)) return true;
     if (body.object_type === "spacecraft") return width < 0.03;
     if (orbitsHostStar(body)) return this.rendersExoplanet(body, frame);
     if (body.catalog_group === EXOPLANET_HOST_GROUP && this.hasCuratedTwin(body, frame)) return false;
@@ -273,7 +327,7 @@ export class AtlasVisibilityModel {
     // The rule is by group: an exoplanet is a major body only where it has its own marker.
     if (orbitsHostStar(body)) return body.key === frame.selectedKey || this.rendersExoplanet(body, frame);
     const type = classifyBody(body).type;
-    return type === "planet" || type === "galaxy" || type === "quasar" || type === "active_galaxy" ||
+    return body.key === "sun" || type === "planet" || type === "galaxy" || type === "quasar" || type === "active_galaxy" ||
       body.key === frame.selectedKey || this.options.featuredKeys.includes(body.key) ||
       (type === "star" && isExoplanetHostStar(body)) ||
       (type === "star" && body.catalog_group === "bright_stars" && (body.stellar?.apparent_magnitude ?? 99) <= 1.5);
@@ -282,6 +336,11 @@ export class AtlasVisibilityModel {
   private labelPriority(body: Body, frame: VisibilityFrame) {
     if (body.key === frame.selectedKey) return 100;
     if (body.key === frame.hoverKey) return 90;
+    return this.typePriority(body);
+  }
+
+  /** Rank of the object type, with no effect from selection or hover. Labels and hit tests use it. */
+  private typePriority(body: Body) {
     const type = classifyBody(body).type;
     if (body.key === "sun") return 80;
     // An exoplanet is below its host star, so that the star keeps its label.
@@ -290,6 +349,22 @@ export class AtlasVisibilityModel {
     if (type === "moon") return 42;
     if (type === "star") return 36;
     return type === "quasar" || type === "active_galaxy" ? 34 : 20;
+  }
+
+  /**
+   * A moon has its own marker when it is 6 px or more from its parent on the screen.
+   * Nearer than that, the parent marker stands for the moon.
+   */
+  private isResolvedFromParent(body: Body, frame: VisibilityFrame) {
+    if (body.object_type !== "moon" || !body.parent_key) return true;
+    const parent = this.bodyIndex(frame).get(body.parent_key);
+    if (!parent || !hasBodyPosition(parent)) return true;
+    return !isUnresolvedSeparation(this.bodyToScreen(body, frame), this.bodyToScreen(parent, frame));
+  }
+
+  private bodyIndex(frame: VisibilityFrame) {
+    this.bodyIndexCache ??= new Map((frame.ephemeris?.bodies ?? []).map((body) => [body.key, body]));
+    return this.bodyIndexCache;
   }
 
   private bodyToScreen(body: Body, frame: VisibilityFrame) {

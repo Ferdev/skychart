@@ -1,5 +1,7 @@
+import { formatFixed } from "../format/quantity";
 import type { Body, BodyExoplanet, BodyPlanetCandidate } from "../atlas/contracts";
 import { escapeHtml, formatNumber } from "../atlasFormatting";
+import { NEW_TAB_LINK_ATTRIBUTES } from "../format/links";
 import { isPlanetCandidate, orbitsHostStar } from "../catalog/exoplanetGroups";
 import { isPresent } from "../geometry";
 import { t } from "../i18n";
@@ -214,7 +216,7 @@ function renderReferences(facts: Facts): string {
 
 function referenceLink(url: string, label: string, quantities: string[]): string {
   const text = `${escapeHtml(label)}${quantities.length ? ` (${escapeHtml(quantities.join(", "))})` : ""}`;
-  return /^https:\/\//.test(url) ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${text}</a>` : text;
+  return /^https:\/\//.test(url) ? `<a href="${escapeHtml(url)}" ${NEW_TAB_LINK_ATTRIBUTES}>${text}</a>` : text;
 }
 
 function isReference(value: unknown): value is { label: string; url: string; quantities: string[] } {
@@ -234,7 +236,7 @@ function fractionDigits(value: number, errors: number[]): number {
 }
 
 function fixed(value: number, digits: number): string {
-  return Intl.NumberFormat(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false }).format(value);
+  return formatFixed(value, digits);
 }
 
 function isNumber(value: unknown): value is number {

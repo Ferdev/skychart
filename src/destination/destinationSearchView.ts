@@ -1,4 +1,5 @@
 import { trackAnalytics } from "../analytics";
+import { nextOptionIndex } from "./optionListKeyboard";
 import { formatCount } from "../atlasFormatting";
 import type { Body, BodyFilterDefinition } from "../atlas/contracts";
 import { CatalogSearchGateway, mergeCatalogSearchBodies } from "../catalog/catalogSearchGateway";
@@ -40,6 +41,13 @@ export type DestinationSearchConfig = {
   excludeKeys?: string[];
   queryForSearch?: (query: string) => string;
   afterRender?: () => void;
+  /**
+   * Tells the owner if the user looks for something (text, a type filter, or a guided set) or only browses.
+   * While the user browses, the Search panel shows its discovery blocks and no result list.
+   */
+  onBrowsing?: (browsing: boolean) => void;
+  /** Removes the type filter. With this function, an empty result offers a `Clear filters` button. */
+  clearFilters?: () => void;
 };
 
 type DestinationSearchViewOptions = {
@@ -87,6 +95,18 @@ export class DestinationSearchView {
     const rawQuery = config.input.value.trim();
     const query = config.queryForSearch ? config.queryForSearch(rawQuery) : rawQuery;
     const guidedSet = config.guidedSet ?? null;
+    const browsing = !guidedSet && config.filter.key === "all" && !rawQuery;
+    config.onBrowsing?.(browsing);
+    if (browsing && config.onBrowsing) {
+      // Nothing to search: the list stays empty and the owner shows the discovery blocks.
+      this.clearResultPage(config.state);
+      config.state.signature = undefined;
+      config.state.activeOptionKey = null;
+      config.input.removeAttribute("aria-activedescendant");
+      config.picker.replaceChildren();
+      config.afterRender?.();
+      return;
+    }
     const useCatalog = !guidedSet && (query.length >= 3 || (query.length === 0 && config.filter.key !== "all"));
     const signature = searchSignature(query, config.filter, config.excludeKeys);
     const queryChanged = config.state.signature !== signature;
@@ -252,7 +272,7 @@ export class DestinationSearchView {
         </section>
       `)
       .join("");
-    if (!config.picker.innerHTML) config.picker.innerHTML = `<div class="empty-state">${escapeHtml(config.emptyMessage)}</div>`;
+    if (!config.picker.innerHTML) config.picker.innerHTML = renderEmptyResult(config);
     config.picker.scrollTop = config.state.activeOptionKey ? previousScrollTop : 0;
   }
 
@@ -277,9 +297,7 @@ export class DestinationSearchView {
     const choices = visibleOptions(options.picker);
     if (choices.length === 0) return false;
     const currentIndex = choices.findIndex((button) => button.dataset.bodyKey === options.state.activeOptionKey);
-    const nextIndex = destination === "next"
-      ? currentIndex < 0 ? 0 : Math.min(currentIndex + 1, choices.length - 1)
-      : currentIndex < 0 ? choices.length - 1 : Math.max(currentIndex - 1, 0);
+    const nextIndex = nextOptionIndex(choices.length, currentIndex, destination === "next" ? "ArrowDown" : "ArrowUp");
     options.state.activeOptionKey = choices[nextIndex]?.dataset.bodyKey ?? null;
     this.syncActiveOption(options.state, options.input, options.picker);
     return true;
@@ -302,6 +320,29 @@ export class DestinationSearchView {
       input.removeAttribute("aria-activedescendant");
     }
   }
+}
+
+const EXAMPLE_QUERIES = ["Mars", "M31", "Sirius"];
+
+/** An empty result shows the query, a way to remove the filter, and three queries that always have a result. */
+function renderEmptyResult(config: DestinationSearchConfig) {
+  const query = config.input.value.trim();
+  const message = query ? t("search.noResultsFor", { query }) : config.emptyMessage;
+  const clear = config.clearFilters && config.filter.key !== "all"
+    ? `<button type="button" class="secondary-action" data-search-clear-filters>${escapeHtml(t("search.clearFilters"))}</button>`
+    : "";
+  // The comparison search does not offer its own object A as an example.
+  const examples = EXAMPLE_QUERIES
+    .filter((example) => !config.excludeKeys?.includes(example.toLowerCase()))
+    .map((example) => `<button type="button" class="text-action" data-search-example="${escapeHtml(example)}">${escapeHtml(example)}</button>`)
+    .join("");
+  return `
+    <div class="empty-state" role="status">
+      <p>${escapeHtml(message)}</p>
+      ${clear}
+      <p class="empty-state__examples"><span>${escapeHtml(t("search.tryExample"))}</span> ${examples}</p>
+    </div>
+  `;
 }
 
 function searchSignature(query: string, filter: BodyFilterDefinition, excludeKeys: readonly string[] = []) {
@@ -330,7 +371,7 @@ function renderPickerItem(item: DestinationPickerItem, selectedKey: string | nul
     >
       <span class="destination-picker__orb" aria-hidden="true"></span>
       <span class="destination-picker__copy">
-        <strong class="destination-picker__name">${escapeHtml(item.name)}</strong>
+        <strong class="destination-picker__name">${escapeHtml(item.name)}${item.localName ? ` <span class="destination-picker__local-name">${escapeHtml(item.localName)}</span>` : ""}</strong>
         <span class="destination-picker__meta">${escapeHtml(item.metaLabel)}</span>
       </span>
       <span class="destination-picker__distance">${escapeHtml(item.distanceLabel)}</span>

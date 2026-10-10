@@ -2,6 +2,7 @@ import type { Camera } from "../atlas/contracts";
 import type { DisplayLayer } from "../viewState";
 import { clamp, expandedRect, pointInRect, pointRect, rectsOverlap, type Rect, type ScreenPoint } from "../geometry";
 import { lightYearsToAu, MILKY_WAY_MODEL, type GalacticModelFeature, type GalacticModelPoint } from "../galacticModel";
+import { canvasFont } from "../format/fonts";
 
 type HazeCache = {
   screenBlend: HTMLCanvasElement;
@@ -29,6 +30,8 @@ type MilkyWayRendererOptions = {
   usableViewport: () => Rect;
   worldToScreen: (xAu: number, yAu: number) => ScreenPoint;
   drawLabel: (text: string, x: number, y: number, color: string) => void;
+  /** The text of a model label in the application language. The default is the English label of the model. */
+  labelText?: (label: string) => string;
 };
 
 const HAZE_MARGIN_RATIO = 0.25;
@@ -267,10 +270,11 @@ export class MilkyWayRenderer {
     this.drawLabel(feature.label, screen.x + 8, screen.y - 8, "rgba(239, 233, 213, 0.68)", occupiedLabels);
   }
 
-  private drawLabel(text: string, x: number, y: number, color: string, occupiedLabels: Rect[]) {
+  private drawLabel(label: string, x: number, y: number, color: string, occupiedLabels: Rect[]) {
+    const text = this.options.labelText?.(label) ?? label;
     const ctx = this.options.context;
     ctx.save();
-    ctx.font = "11px Inter, system-ui, sans-serif";
+    ctx.font = canvasFont(12);
     const width = ctx.measureText(text).width + 12;
     const rect = { left: x - 6, top: y - 15, right: x - 6 + width, bottom: y + 7, width, height: 22 };
     if (!pointInRect({ x, y }, this.options.usableViewport()) || occupiedLabels.some((item) => rectsOverlap(item, rect))) {

@@ -14,13 +14,24 @@ defmodule StarsmapApi.Catalog.PublicObjects do
 
   @summary_timeout 120_000
 
-  def get_by_key(key)
-      when key in ~w(sun mercury venus earth moon mars jupiter saturn uranus neptune pluto phobos deimos io europa ganymede callisto titan rhea iapetus dione tethys enceladus mimas),
-      do: StarsmapApi.Community.CoreObjects.get(key)
+  @core_keys ~w(sun mercury venus earth moon mars jupiter saturn uranus neptune pluto phobos deimos io europa ganymede callisto titan rhea iapetus dione tethys enceladus mimas)
 
-  def get_by_key("spacecraft-" <> _ = key), do: StarsmapApi.Spacecraft.get(key)
+  # The key match ignores the case of the letters: `Mars` is the key `mars`.
+  def get_by_key(key) when is_binary(key) and byte_size(key) <= 180 do
+    case String.downcase(key) do
+      ^key -> get_by_lower_key(key)
+      lower -> get_by_lower_key(lower)
+    end
+  end
 
-  def get_by_key(key) when is_binary(key) do
+  def get_by_key(key) when is_binary(key), do: get_by_lower_key(key)
+
+  defp get_by_lower_key(key) when key in @core_keys,
+    do: StarsmapApi.Community.CoreObjects.get(key)
+
+  defp get_by_lower_key("spacecraft-" <> _ = key), do: StarsmapApi.Spacecraft.get(key)
+
+  defp get_by_lower_key(key) when is_binary(key) do
     normalized = String.downcase(key)
 
     CatalogSourceObject
@@ -57,11 +68,17 @@ defmodule StarsmapApi.Catalog.PublicObjects do
 
   def public_observer(_), do: {:error, :not_found}
 
-  def public_object(key)
-      when key in ~w(sun mercury venus earth moon mars jupiter saturn uranus neptune pluto phobos deimos io europa ganymede callisto titan rhea iapetus dione tethys enceladus mimas),
-      do: StarsmapApi.Community.CoreObjects.get(key)
+  # The key match ignores the case of the letters: `/o/Mars` is the page of `mars`.
+  def public_object(key) when is_binary(key) and byte_size(key) <= 180 do
+    public_object_by_lower_key(String.downcase(key))
+  end
 
-  def public_object("spacecraft-" <> _ = key) do
+  def public_object(_), do: {:error, :not_found}
+
+  defp public_object_by_lower_key(key) when key in @core_keys,
+    do: StarsmapApi.Community.CoreObjects.get(key)
+
+  defp public_object_by_lower_key("spacecraft-" <> _ = key) do
     with {:ok, object} <- StarsmapApi.Spacecraft.get(key) do
       {:ok,
        Map.merge(object, %{
@@ -72,8 +89,8 @@ defmodule StarsmapApi.Catalog.PublicObjects do
     end
   end
 
-  def public_object(key) when is_binary(key) and byte_size(key) <= 180 do
-    normalized = String.downcase(key)
+  defp public_object_by_lower_key(key) do
+    normalized = key
 
     case PublicCache.get({:object, normalized}) do
       {:ok, result} ->
@@ -87,8 +104,6 @@ defmodule StarsmapApi.Catalog.PublicObjects do
         )
     end
   end
-
-  def public_object(_), do: {:error, :not_found}
 
   defp load_public_observer(key) do
     case public_catalog_record(key) do

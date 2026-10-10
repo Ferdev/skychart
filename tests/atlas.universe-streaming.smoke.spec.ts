@@ -187,7 +187,10 @@ test("trip map, light-speed mark, gravity route and the 2D start crosshair", asy
   await openAtlas(page, `/?${new URLSearchParams({ v: "1", c: "-10,0", z: "20", t: timestamp, o: "earth", L: "" })}`);
 
   // The 2D crosshair marks the map center, which is where 3D places the observer.
+  // The mark shows while the pointer or the focus is on the 3D button.
   const marker = page.locator("#universe-entry-marker");
+  await expect(marker).toBeHidden();
+  await page.locator("#universe-3d-toggle").hover();
   await expect(marker).toBeVisible();
   const markerBox = (await marker.boundingBox())!;
   const viewport = page.viewportSize()!;
@@ -230,8 +233,8 @@ test("trip map, light-speed mark, gravity route and the 2D start crosshair", asy
   await expect(page.locator("#universe-route")).toHaveText(/^Orbit around Sun · 6\.\d+ yr$/);
   await expect(minimap).toHaveAttribute("data-route", "gravity");
   await page.screenshot({ path: testInfo.outputPath("gravity-route-preview.png") });
-  // With the inspector closed, the trip map and every flight control must fit a phone screen.
-  await page.locator("#close-panel").click();
+  // A 3D selection shows the target card only. The trip map and every flight control must fit a phone screen.
+  await expect(page.locator("#selected-object-panel")).toBeHidden();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: testInfo.outputPath("gravity-route-mobile.png") });
   const mobileControlsInsideViewport = await page.locator(".universe-view__flight > *, .universe-view__minimap").evaluateAll((controls) => controls.every((control) => {
@@ -252,7 +255,8 @@ test("trip map, light-speed mark, gravity route and the 2D start crosshair", asy
   await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("#universe-status")).toHaveText(/^Gravity route to Earth · .+ of 6\.\d+ yr · .+ per second$/, { timeout: 30_000 });
   // On a gravity route the gauge shows the real orbital speed, far below light speed.
-  await expect(page.locator("#universe-speed")).toHaveText(/ km\/s · \d\.\d×10⁻⁵ c$/);
+  // The speed has no exponent form.
+  await expect(page.locator("#universe-speed")).toHaveText(/ km\/s · 0\.0000\d+ c$/);
   await expect(gauge).toHaveAttribute("data-faster-than-light", "false");
   await page.waitForTimeout(2_500);
   await page.screenshot({ path: testInfo.outputPath("gravity-route-flight.png") });

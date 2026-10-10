@@ -1,3 +1,4 @@
+import { placeInfoTip } from "./atlas/infoTipPlacement";
 export function bindMapSettings() {
   const toolbar = document.querySelector<HTMLElement>(".atlas-toolbar");
   const settings = document.querySelector<HTMLElement>("#map-settings");
@@ -7,12 +8,21 @@ export function bindMapSettings() {
     const rect = toolbar.getBoundingClientRect();
     const bottom = Math.max(12, window.innerHeight - rect.top + 10);
     document.documentElement.style.setProperty("--atlas-toolbar-height", `${rect.height}px`);
+    // The tour card sits above the toolbar.
+    document.documentElement.style.setProperty("--atlas-toolbar-clearance", `${Math.round(window.innerHeight - rect.top)}px`);
     settings.style.left = `${rect.left}px`;
     settings.style.bottom = `${bottom}px`;
     settings.style.maxHeight = `${Math.max(120, rect.top - 24)}px`;
   };
   new ResizeObserver(position).observe(toolbar);
   window.addEventListener("resize", position);
+  // The phone layout puts the Search sheet below the header card. The card height changes with its content.
+  const header = document.querySelector<HTMLElement>(".atlas-bar");
+  if (header) {
+    const measureHeader = () => document.documentElement.style.setProperty("--atlas-bar-bottom", `${Math.round(header.getBoundingClientRect().bottom)}px`);
+    new ResizeObserver(measureHeader).observe(header);
+    measureHeader();
+  }
   settings.addEventListener("toggle", () => {
     const open = settings.matches(":popover-open");
     toggle.setAttribute("aria-expanded", String(open));
@@ -69,17 +79,13 @@ export function bindControlInfoTips(
     if (!tooltip.matches(":popover-open")) tooltip.showPopover();
     for (const candidate of buttons) candidate.toggleAttribute("data-active", candidate === button);
 
-    const buttonBounds = button.getBoundingClientRect();
-    const tooltipBounds = tooltip.getBoundingClientRect();
-    const gutter = 12;
-    const left = Math.min(
-      Math.max(gutter, buttonBounds.left + buttonBounds.width / 2 - tooltipBounds.width / 2),
-      window.innerWidth - tooltipBounds.width - gutter
-    );
-    const below = buttonBounds.bottom + 8;
-    const top = below + tooltipBounds.height <= window.innerHeight - gutter
-      ? below
-      : Math.max(gutter, buttonBounds.top - tooltipBounds.height - 8);
+    const panel = button.closest<HTMLElement>(".map-settings, .workspace-panel");
+    const { left, top } = placeInfoTip({
+      button: button.getBoundingClientRect(),
+      tip: tooltip.getBoundingClientRect(),
+      panel: panel?.getBoundingClientRect() ?? null,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+    });
     tooltip.style.left = `${Math.round(left)}px`;
     tooltip.style.top = `${Math.round(top)}px`;
   };

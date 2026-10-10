@@ -7,24 +7,40 @@ interface AtlasViewportOptions {
   pointRenderer: WebglPointRenderer;
   camera: () => Camera;
   activeTab: () => string | null;
-  selectedObjectPanel: HTMLElement;
 }
 
 export class AtlasViewport {
   private frameRect: Rect | null = null;
+  private frameScaleBarOrigin: ScreenPoint | null = null;
 
   constructor(private readonly options: AtlasViewportOptions) {}
 
   beginFrame(): void {
     this.frameRect = this.computeRect();
+    this.frameScaleBarOrigin = null;
   }
 
   endFrame(): void {
     this.frameRect = null;
+    this.frameScaleBarOrigin = null;
   }
 
   rect(): Rect {
     return this.frameRect ?? this.computeRect();
+  }
+
+  /**
+   * The left end of the scale bar line. The bar is in the bottom left corner of the map area.
+   * When the toolbar covers that corner, the bar is above the toolbar.
+   */
+  scaleBarOrigin(): ScreenPoint {
+    if (this.frameScaleBarOrigin) return this.frameScaleBarOrigin;
+    const rect = this.rect();
+    const toolbar = document.querySelector<HTMLElement>(".scale-rail")?.getBoundingClientRect();
+    const covered = toolbar && toolbar.width > 0 && toolbar.top < rect.bottom && toolbar.left < rect.left + 220;
+    const origin = { x: rect.left + 24, y: (covered ? toolbar.top + 10 : rect.bottom) - 34 };
+    if (this.frameRect) this.frameScaleBarOrigin = origin;
+    return origin;
   }
 
   /** Rendering extends beside desktop controls; centering still uses rect(). */
@@ -87,26 +103,15 @@ export class AtlasViewport {
   private computeRect(): Rect {
     const workspace = document.querySelector<HTMLElement>(".workspace-panel:not([hidden])");
     const bar = document.querySelector<HTMLElement>(".atlas-bar");
-    const selection = document.querySelector<HTMLElement>(".selection-strip");
-    const modeRail = document.querySelector<HTMLElement>(".mode-rail:not([hidden])");
     const scaleRail = document.querySelector<HTMLElement>(".scale-rail");
     const workspaceRect = workspace?.getBoundingClientRect();
     const barRect = bar?.getBoundingClientRect();
-    const selectionRect = selection?.getBoundingClientRect();
-    const modeRailRect = modeRail?.getBoundingClientRect();
     const scaleRailRect = scaleRail?.getBoundingClientRect();
     const isWide = window.innerWidth >= 900;
-    const topBoundary = Math.max(
-      barRect?.bottom ?? 0,
-      !isWide ? modeRailRect?.bottom ?? 0 : 0,
-      !isWide ? selectionRect?.bottom ?? 0 : 0,
-    );
-    const rightObstructions = [
-      workspaceRect?.left,
-      selectionRect && !this.options.selectedObjectPanel.hidden ? selectionRect.left : undefined,
-    ].filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
-    const right = isWide && rightObstructions.length > 0
-      ? Math.max(240, Math.min(...rightObstructions) - 12)
+    const topBoundary = barRect?.bottom ?? 0;
+    const workspaceLeft = workspaceRect?.left;
+    const right = isWide && typeof workspaceLeft === "number" && Number.isFinite(workspaceLeft) && workspaceLeft > 0
+      ? Math.max(240, workspaceLeft - 12)
       : window.innerWidth;
     const top = Math.max(0, topBoundary + 8);
     const mobileObjectSheetTop = !isWide && this.options.activeTab() === "object" ? workspaceRect?.top : undefined;

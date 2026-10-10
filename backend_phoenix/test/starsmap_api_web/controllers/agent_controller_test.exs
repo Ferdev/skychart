@@ -114,7 +114,9 @@ defmodule StarsmapApiWeb.AgentControllerTest do
     assert robots =~ "Allow: /api/agent/"
     assert robots =~ "Sitemap: https://skychart.org/sitemap.xml"
     refute robots =~ ~r/User-agent: (GPTBot|ClaudeBot|OAI-SearchBot|PerplexityBot)/
-    assert homepage =~ ~s(<a href="/agents">Guide for AI agents</a>)
+
+    assert homepage =~
+             ~s(<a href="/agents" data-i18n="settings.agentGuide">Guide for AI agents</a>)
   end
 
   defp json_ld_documents(body) do
