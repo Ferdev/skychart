@@ -121,6 +121,21 @@ test.describe("PNG export position", () => {
       expect(Math.hypot(centerOffset.x, centerOffset.y), "the free map area must be off the window centre, or the test checks nothing").toBeGreaterThan(20);
       if (withInspector) expect(Math.abs(centerOffset.x), "an open inspector moves the free map area to the left").toBeGreaterThan(100);
 
+      // The exported image has the labels and the edge pointers above the point layer, and a label box makes
+      // a point below it dark. With the full catalog many small bodies are below the labels of the inner planets.
+      // This test is about the position of the point layer, so the two text layers are off.
+      await page.evaluate(() => {
+        for (const layer of ["labels", "references"]) {
+          for (const input of document.querySelectorAll<HTMLInputElement>(`input[data-layer="${layer}"]`)) {
+            if (!input.checked) continue;
+            input.checked = false;
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }
+      });
+      await expect.poll(() => page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.drawnLabels().length), { message: "the labels must be off" }).toBe(0);
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+
       const markers = await pointLayerMarkers(page);
       expect(markers.length, "the point layer must show markers").toBeGreaterThan(4);
       for (const tier of ["current", "4k"] as const) {
