@@ -1,6 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { openAtlas, selectCatalogObject } from "./atlas-test-utils";
-import { communityFixture } from "./community-fixtures";
+import { communityFixture, photo } from "./community-fixtures";
+
+type Box = { x: number; y: number; width: number; height: number };
 
 test("object gallery keeps credit, escapes author text, and does not taint map export", async ({
   page,
@@ -88,6 +90,7 @@ test("disabled community keeps the atlas usable", async ({ page }) => {
   );
   await openAtlas(page);
   await expect(page.locator(".community-account-actions")).toHaveCount(0);
+  await expect(page.locator(".community-opacity")).toHaveCount(0);
   await expect(page.locator(".community-toggle")).toBeHidden();
 });
 
@@ -117,4 +120,109 @@ test('photo markers follow Sky and 3D view objects',async({page})=>{
   await expect(page.locator('#sky-view')).toBeVisible();await expect(page.locator('#sky-view .community-marker-layer button').first()).toBeVisible();
   await page.locator('#sky-view-close').click();await page.locator('#universe-3d-toggle').click();
   await expect(page.locator('#universe-view')).toBeVisible();await expect(page.locator('#universe-view .community-marker-layer button').first()).toBeVisible();
+});
+
+test("community row sits inside the atlas panel and clear of its content", async ({ page }) => {
+  const state = await communityFixture(page, { role: "admin" });
+  state.signed = true;
+  await openAtlas(page);
+  const panel = page.locator("header.atlas-bar");
+  const row = panel.locator(".community-account-actions");
+  await expect(row.locator("[data-community-review]")).toBeVisible();
+  const box = async (locator: Locator) => (await locator.boundingBox())!;
+  const panelBox = await box(panel);
+  const overlaps = (a: Box, b: Box) =>
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  const rowBox = await box(row);
+  for (const selector of ["h1", ".locale-control", "#atlas-stats"]) {
+    expect(overlaps(rowBox, await box(panel.locator(selector))), selector).toBe(false);
+  }
+  expect(rowBox.y).toBeGreaterThan((await box(panel.locator("#atlas-stats"))).y);
+  const buttons = row.locator("button:visible, a:visible");
+  expect(await buttons.count()).toBe(5);
+  for (const button of await buttons.all()) {
+    const b = await box(button);
+    expect(b.x).toBeGreaterThanOrEqual(panelBox.x);
+    expect(b.y).toBeGreaterThanOrEqual(panelBox.y);
+    expect(b.x + b.width).toBeLessThanOrEqual(panelBox.x + panelBox.width);
+    expect(b.y + b.height).toBeLessThanOrEqual(panelBox.y + panelBox.height);
+  }
+});
+
+test("photo opacity lives in the settings overlays group", async ({ page }) => {
+  await communityFixture(page);
+  await openAtlas(page);
+  await expect(page.locator(".community-account-actions .community-opacity")).toHaveCount(0);
+  await page.locator("#map-settings-toggle").click();
+  await page.locator('button[aria-controls="scale-map-overlays"]').click();
+  const opacity = page.locator("#scale-map-overlays .community-opacity");
+  await expect(opacity).toContainText("Photo opacity");
+  await expect(opacity.locator('input[type="range"]')).toBeVisible();
+  await page.locator("#locale-select").selectOption("es");
+  await expect(opacity).not.toContainText("Photo opacity");
+});
+
+test("moderators can hide a public photo with a reason", async ({ page }) => {
+  const state = await communityFixture(page, { role: "moderator" });
+  state.signed = true;
+  await openAtlas(page);
+  await selectCatalogObject(page, "Sun", "sun");
+  await page.locator('[data-layer="photos"]').check({ force: true });
+  await expect(page.locator("#app > .community-marker-layer button").first()).toBeVisible();
+  await page.locator(".community-gallery [data-photo]").first().click();
+  const viewer = page.getByRole("dialog", { name: "Sun portrait" });
+  await viewer.getByRole("button", { name: "Hide" }).click();
+  const form = page.getByRole("dialog", { name: "Hide", exact: true });
+  const reason = form.getByLabel("Reason");
+  await expect(reason).toHaveAttribute("minlength", "3");
+  await expect(reason).toHaveAttribute("maxlength", "2000");
+  await expect(reason).toHaveAttribute("required", "");
+  await reason.fill("Not an astronomical photo");
+  await form.getByRole("button", { name: "Hide" }).click();
+  await expect(page.locator("dialog.community-dialog")).toHaveCount(0);
+  expect(state.reviews).toEqual([
+    {
+      path: `/api/community/photos/${photo.id}/review`,
+      body: { action: "hide", reason: "Not an astronomical photo" },
+    },
+  ]);
+  await expect(page.locator(".community-gallery")).toContainText("No community photos");
+  await expect(page.locator("#app > .community-marker-layer button")).toHaveCount(0);
+});
+
+for (const [name, role, signed] of [
+  ["members", "member", true],
+  ["signed-out visitors", "member", false],
+] as const) {
+  test(`${name} do not get a Hide button`, async ({ page }) => {
+    const state = await communityFixture(page, { role });
+    state.signed = signed;
+    await openAtlas(page);
+    await selectCatalogObject(page, "Sun", "sun");
+    await page.locator(".community-gallery [data-photo]").first().click();
+    const viewer = page.getByRole("dialog", { name: "Sun portrait" });
+    await expect(viewer.getByRole("button", { name: "Report" })).toBeVisible();
+    await expect(viewer.locator("[data-hide]")).toHaveCount(0);
+    await expect(viewer.getByRole("button", { name: "Hide" })).toHaveCount(0);
+  });
+}
+
+test("community row stays reachable on a tablet-width screen", async ({ page }) => {
+  const state = await communityFixture(page, { role: "admin" });
+  state.signed = true;
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await openAtlas(page);
+  const panel = page.locator("header.atlas-bar");
+  const toggle = panel.locator(".community-menu-toggle");
+  await expect(toggle).toBeVisible();
+  await expect(page.locator(".community-menu")).toBeHidden();
+  await toggle.click();
+  await expect(page.locator(".community-menu")).toBeVisible();
+  for (const button of await page.locator(".community-menu").locator("button:visible, a:visible").all()) {
+    const b = (await button.boundingBox())!;
+    expect(b.x).toBeGreaterThanOrEqual(0);
+    expect(b.x + b.width).toBeLessThanOrEqual(820);
+  }
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".community-menu")).toBeHidden();
 });

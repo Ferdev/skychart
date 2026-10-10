@@ -69,7 +69,8 @@ export class PhotoDialogs {
       return;
     }
     if (!view.dialog.isConnected) return;
-    view.body.innerHTML = communityHtml`<img class="community-full-photo" src="${h(photo.image_url)}" alt="${h(photo.title)}"><p>${h(photo.caption)}</p><p class="community-credit">${h(photo.author.name)} · ${h(photo.licence)} · ${h(photo.captured_at.slice(0, 10))}</p><p>${h(photo.equipment)} ${h(photo.processing)}</p><div class="community-actions"><button data-vote>${h(ct(4))} · ${photo.votes}</button><button data-report>${h(ct(8))}</button><a href="/o/${encodeURIComponent(photo.declared_key)}">Open object</a></div>`;
+    const canHide = ["admin", "moderator"].includes(this.api.user?.role ?? "");
+    view.body.innerHTML = communityHtml`<img class="community-full-photo" src="${h(photo.image_url)}" alt="${h(photo.title)}"><p>${h(photo.caption)}</p><p class="community-credit">${h(photo.author.name)} · ${h(photo.licence)} · ${h(photo.captured_at.slice(0, 10))}</p><p>${h(photo.equipment)} ${h(photo.processing)}</p><div class="community-actions"><button data-vote>${h(ct(4))} · ${photo.votes}</button><button data-report>${h(ct(8))}</button>${canHide ? `<button data-hide>${h(cx("Hide"))}</button>` : ""}<a href="/o/${encodeURIComponent(photo.declared_key)}">Open object</a></div>`;
     let voted = false;
     const image = view.body.querySelector<HTMLImageElement>(
       ".community-full-photo",
@@ -159,22 +160,43 @@ export class PhotoDialogs {
         }
       };
     view.body.querySelector<HTMLButtonElement>("[data-report]")!.onclick =
-      () => {
-        const report = this.dialog(ct(8));
-        report.body.innerHTML = communityHtml`<form><label>Reason<textarea name="reason" minlength="3" maxlength="2000" required></textarea></label><button>Send report</button></form>`;
-        const form = report.body.querySelector("form")!;
-        form.onsubmit = async (event) => {
-          event.preventDefault();
-          try {
-            await this.api.request(`/api/photos/${photo.id}/report`, "POST", {
-              reason: new FormData(form).get("reason"),
-            });
-            report.dialog.close();
-          } catch (error) {
-            report.message.textContent = String(error);
-          }
-        };
-      };
+      () =>
+        this.reasonForm(ct(8), cx("Send report"), async (reason) => {
+          await this.api.request(`/api/photos/${photo.id}/report`, "POST", {
+            reason,
+          });
+        });
+    const hide = view.body.querySelector<HTMLButtonElement>("[data-hide]");
+    if (hide)
+      hide.onclick = () =>
+        this.reasonForm(cx("Hide"), cx("Hide"), async (reason) => {
+          await this.api.request(
+            `/api/community/photos/${photo.id}/review`,
+            "POST",
+            { action: "hide", reason },
+          );
+          view.dialog.close();
+          this.changed();
+        });
+  }
+  /** Small dialog asking for a reason; closes itself once `send` succeeds. */
+  private reasonForm(
+    title: string,
+    submit: string,
+    send: (reason: string) => Promise<void>,
+  ) {
+    const view = this.dialog(title);
+    view.body.innerHTML = communityHtml`<form><label>Reason<textarea name="reason" minlength="3" maxlength="2000" required></textarea></label><button>${h(submit)}</button></form>`;
+    const form = view.body.querySelector("form")!;
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        await send(String(new FormData(form).get("reason")));
+        view.dialog.close();
+      } catch (error) {
+        view.message.textContent = String(error);
+      }
+    };
   }
   upload(key: string, name: string) {
     if (!this.api.user) {
