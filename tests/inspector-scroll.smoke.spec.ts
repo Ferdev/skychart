@@ -91,3 +91,27 @@ test.describe("object inspector scroll", () => {
     issues.assertClean();
   });
 });
+
+test.describe("object inspector scroll on a tablet", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test("Overview, Position, and Sources scroll at 768x1024", async ({ page, request }) => {
+    await skipIfAtlasUnavailable(request);
+    await openAtlas(page);
+    await selectCatalogObject(page, "Mars", "mars");
+    for (const view of ["overview", "position", "sources"]) {
+      await page.locator(`#body-info [data-object-view="${view}"]`).click();
+      await expect(page.locator(`#object-view-panel-${view}`)).toBeVisible();
+      await page.locator("#body-info").evaluate((element) => { element.scrollTop = 0; });
+      const metrics = await scrollMetrics(page, "#body-info");
+      expect(metrics.scrollHeight, `the ${view} view is longer than the sheet`).toBeGreaterThan(metrics.clientHeight + 40);
+      await wheelOver(page, "#body-info", 480);
+      await expect.poll(async () => (await scrollMetrics(page, "#body-info")).scrollTop, { message: `${view} scrolls` }).toBeGreaterThan(0);
+    }
+    // The last row of Sources can come into view.
+    const last = page.locator("#object-view-panel-sources").locator("a, button, dd").last();
+    await last.scrollIntoViewIfNeeded();
+    await expect(last).toBeInViewport();
+  });
+});
+

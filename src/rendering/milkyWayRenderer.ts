@@ -30,6 +30,8 @@ type MilkyWayRendererOptions = {
   usableViewport: () => Rect;
   worldToScreen: (xAu: number, yAu: number) => ScreenPoint;
   drawLabel: (text: string, x: number, y: number, color: string) => void;
+  /** The text of a model label in the application language. The default is the English label of the model. */
+  labelText?: (label: string) => string;
 };
 
 const HAZE_MARGIN_RATIO = 0.25;
@@ -268,7 +270,8 @@ export class MilkyWayRenderer {
     this.drawLabel(feature.label, screen.x + 8, screen.y - 8, "rgba(239, 233, 213, 0.68)", occupiedLabels);
   }
 
-  private drawLabel(text: string, x: number, y: number, color: string, occupiedLabels: Rect[]) {
+  private drawLabel(label: string, x: number, y: number, color: string, occupiedLabels: Rect[]) {
+    const text = this.options.labelText?.(label) ?? label;
     const ctx = this.options.context;
     ctx.save();
     ctx.font = canvasFont(12);

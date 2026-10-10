@@ -82,28 +82,38 @@
   cursor: pointer;
 }
 
+/*
+ * The switches and the presets are one row when their texts fit. In a language with long texts
+ * (German, Spanish) the four presets go to a row of their own: no text is cut and no preset is alone on a line.
+ */
 .toolbar-bottom {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 4px 10px;
+  /* The row is a grid item of the toolbar: it must not be wider than the toolbar. */
+  min-width: 0;
   border-top: 1px solid rgba(238, 230, 206, 0.1);
   padding-top: 8px;
 }
 
+/* A switch text that is longer than the toolbar gets an ellipsis. */
 .toolbar-quick-layers {
   display: flex;
+  flex: 0 1 auto;
   gap: 4px;
-  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .toolbar-quick-layers label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
+  min-width: 0;
   min-height: 32px;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 1px solid transparent;
   border-radius: 7px;
   color: rgba(238, 230, 206, 0.75);
@@ -113,7 +123,15 @@
   font-weight: 550;
 }
 
+.toolbar-quick-layers span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .toolbar-quick-layers input {
+  flex: none;
   width: 13px;
   height: 13px;
   margin: 0;
@@ -131,12 +149,12 @@
 
 .atlas-toolbar .zoom-presets {
   display: flex;
-  flex: 1;
+  flex: 1 0 auto;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   gap: 2px;
   margin: 0;
-  padding: 0 0 0 8px;
-  border-left: 1px solid rgba(238, 230, 206, 0.14);
+  padding: 0;
   overflow: visible;
 }
 
@@ -149,7 +167,8 @@
   display: block;
   min-width: 0;
   min-height: 32px;
-  padding: 0 7px;
+  padding: 0 6px;
+  white-space: nowrap;
   border: 1px solid transparent;
   border-radius: 7px;
   background: transparent;
@@ -253,11 +272,11 @@
   .toolbar-settings-button svg { display: none; }
   .share-trigger span { display: none; }
   .share-trigger { min-width: 44px; }
-  .toolbar-bottom { flex-wrap: wrap; gap: 5px; padding-top: 4px; }
+  .toolbar-bottom { gap: 5px; padding-top: 4px; }
   .toolbar-quick-layers { width: 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); }
   .toolbar-quick-layers label { min-height: 44px; }
   /* The four presets are one row of equal width. */
-  .atlas-toolbar .zoom-presets { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 0; padding: 0; }
+  .atlas-toolbar .zoom-presets { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .atlas-toolbar .zoom-presets button { min-width: 0; min-height: 44px; padding: 0 4px; }
   .atlas-toolbar .zoom-presets button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .map-settings { width: calc(100vw - 20px); border-radius: 16px; padding: 12px; }
@@ -266,11 +285,9 @@
 
 /* A narrow toolbar (an open panel on a small window): the quick layers and the presets each have a row. */
 @container (max-width: 550px) {
-  .toolbar-bottom { flex-wrap: wrap; }
   .toolbar-quick-layers { width: 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); }
-  .toolbar-quick-layers label { min-width: 0; gap: 4px; padding: 0 4px; }
-  .toolbar-quick-layers span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .atlas-toolbar .zoom-presets { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 0; padding: 0; }
+  .toolbar-quick-layers label { gap: 4px; padding: 0 4px; }
+  .atlas-toolbar .zoom-presets { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .atlas-toolbar .zoom-presets button { min-width: 0; padding: 0 4px; }
   .atlas-toolbar .zoom-presets button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 }

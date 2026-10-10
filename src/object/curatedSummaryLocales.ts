@@ -1,7 +1,12 @@
+import type { MediaText, MediaTextKey } from "../objectMedia";
 import { CURATED_OBJECT_SUMMARIES } from "./curatedObjectSummaries";
 
+type CuratedMediaText = { title: string; alt: string };
+/** The curated texts of one locale: the object summaries, and the titles and alternative texts of the curated images. */
+type CuratedLocaleModule = { CURATED_OBJECT_SUMMARIES: Record<string, string>; CURATED_MEDIA_TEXT: Record<string, CuratedMediaText> };
+
 /** One module for each locale. The browser loads only the module of the active locale. */
-const LOADERS: Record<string, () => Promise<{ CURATED_OBJECT_SUMMARIES: Record<string, string> }>> = {
+const LOADERS: Record<string, () => Promise<CuratedLocaleModule>> = {
   es: () => import("./curatedSummaries/es"),
   fr: () => import("./curatedSummaries/fr"),
   de: () => import("./curatedSummaries/de"),
@@ -12,14 +17,14 @@ const LOADERS: Record<string, () => Promise<{ CURATED_OBJECT_SUMMARIES: Record<s
   ko: () => import("./curatedSummaries/ko"),
 };
 
-const loaded = new Map<string, Record<string, string>>();
+const loaded = new Map<string, CuratedLocaleModule>();
 
 /** Loads the curated summaries of a locale. English needs no load. A failed load keeps the English text. */
 export async function loadCuratedSummaries(locale: string): Promise<void> {
   if (!Object.prototype.hasOwnProperty.call(LOADERS, locale) || loaded.has(locale)) return;
   try {
-    const { CURATED_OBJECT_SUMMARIES: summaries } = await LOADERS[locale]();
-    loaded.set(locale, summaries);
+    const { CURATED_OBJECT_SUMMARIES: summaries, CURATED_MEDIA_TEXT: media } = await LOADERS[locale]();
+    loaded.set(locale, { CURATED_OBJECT_SUMMARIES: summaries, CURATED_MEDIA_TEXT: media });
   } catch {
     // The locale stays unloaded. The English text is shown, and a later call can try again.
   }
@@ -27,7 +32,18 @@ export async function loadCuratedSummaries(locale: string): Promise<void> {
 
 /** The curated summary of an object in the given locale, or the English text when the locale has none. */
 export function curatedObjectSummary(key: string, locale: string): string | undefined {
-  return loaded.get(locale)?.[key] ?? CURATED_OBJECT_SUMMARIES[key];
+  return loaded.get(locale)?.CURATED_OBJECT_SUMMARIES[key] ?? CURATED_OBJECT_SUMMARIES[key];
+}
+
+/**
+ * The text source of the media cards in the application language. The titles and alternative texts of the
+ * curated images come from the locale module that `followCuratedSummaryLocale` loads; English is in `objectMedia.ts`.
+ */
+export function mediaTextFor(locale: () => string, translate: (key: string, params?: Record<string, string | number>) => string): MediaText {
+  return {
+    translate: (key: MediaTextKey, params) => translate(key, params),
+    curated: (key) => loaded.get(locale())?.CURATED_MEDIA_TEXT[key],
+  };
 }
 
 /**

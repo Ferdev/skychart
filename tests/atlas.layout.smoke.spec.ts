@@ -91,6 +91,11 @@ test.describe("header search and Search panel", () => {
     await page.keyboard.press("Control+k");
     await expect(page.locator("#body-search")).toBeFocused();
     await page.locator("#close-panel").click();
+    await expect(page.locator("#tab-catalog")).toBeHidden();
+    // Cmd+K is the same shortcut on macOS.
+    await page.keyboard.press("Meta+k");
+    await expect(page.locator("#body-search")).toBeFocused();
+    await page.locator("#close-panel").click();
     // A text that the user types into the header field goes into the Search panel field.
     await page.locator("#header-search").click();
     await page.keyboard.type("Mars");
@@ -132,6 +137,46 @@ test.describe("header search and Search panel", () => {
     await expect(page.locator("#body-picker [data-search-example]")).toHaveText(["Mars", "M31", "Sirius"]);
     await page.locator('#body-picker [data-search-example="Sirius"]').click();
     await expect(page.locator("#body-search")).toHaveValue("Sirius");
+  });
+
+  test("the More types menu sets a filter that shows as an active chip, and Clear filters removes it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openAtlas(page);
+    await openSearchWorkspace(page);
+    const chips = page.locator("#body-filter-buttons");
+    // Eight main types are chips. The other types are in the menu.
+    await expect(chips.locator("[data-body-filter]")).toHaveCount(9);
+    await expect(chips.locator('[data-body-filter="dwarf_planet"]')).toHaveCount(0);
+    await chips.locator("[data-body-filter-menu]").selectOption("dwarf_planet");
+    // The filter from the menu is now a chip, and it is the only active chip.
+    await expect(chips.locator('[data-body-filter="dwarf_planet"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(chips.locator('[aria-pressed="true"]')).toHaveCount(1);
+    await expect(page.locator("#search-results")).toBeVisible();
+    await expect(page.locator('#body-picker [data-body-key="pluto"]').first()).toBeVisible();
+
+    // A query with no result in this filter offers to remove the filter. The query text stays.
+    await page.locator("#body-search").fill("Sirius");
+    await expect(page.locator("#body-picker .empty-state")).toContainText("Sirius");
+    await page.locator("#body-picker [data-search-clear-filters]").click();
+    await expect(chips.locator('[data-body-filter="all"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(chips.locator('[data-body-filter="dwarf_planet"]')).toHaveCount(0);
+    await expect(page.locator("#body-search")).toHaveValue("Sirius");
+    await expect(page.locator("#body-picker [data-body-key]").filter({ hasText: "Sirius" }).first()).toBeVisible();
+    await expect(page.locator("#body-picker [data-search-clear-filters]")).toHaveCount(0);
+  });
+
+  test("below 900 px the fixed footer is hidden and its links are at the end of Settings", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await openAtlas(page);
+    await expect(page.locator(".atlas-footer")).toBeHidden();
+    await page.locator("#map-settings-toggle").click();
+    const settings = page.locator("#map-settings");
+    await expect(settings).toBeVisible();
+    for (const href of ["/methodology", "/about", "/agents", "https://ferdev.com/", "https://github.com/Ferdev/skychart"]) {
+      const link = settings.locator(`.settings-footer-links a[href="${href}"]`);
+      await link.scrollIntoViewIfNeeded();
+      await expect(link, href).toBeVisible();
+    }
   });
 
   test("a guided tour starts from the Search panel", async ({ page }) => {
@@ -222,4 +267,97 @@ test.describe("2D map labels and pointers", () => {
     }, { message: "labels of the Sun and the outer planets at the Solar preset", timeout: 30_000 }).toEqual([]);
     expect((await read()).labels.length).toBeLessThanOrEqual(20);
   });
+
+  const drawnLabelTexts = (page: Page) => page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.drawnLabels().map((label) => label.text));
+
+  test("the first view has labels for the Sun and the inner planets", async ({ page, request }) => {
+    await skipIfAtlasUnavailable(request);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openAtlas(page, "/?perf=1");
+    const inner = ["Sun", "Mercury", "Venus", "Earth", "Mars"];
+    await expect.poll(async () => { const texts = await drawnLabelTexts(page); return inner.filter((name) => !texts.includes(name)); }, { message: "labels of the Sun and the inner planets", timeout: 30_000 }).toEqual([]);
+  });
+
+  test("a phone has labels for the Sun and Earth, and three edge pointers at most", async ({ page, request }) => {
+    await skipIfAtlasUnavailable(request);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openAtlas(page, "/?perf=1");
+    await expect.poll(async () => { const texts = await drawnLabelTexts(page); return ["Sun", "Earth"].filter((name) => !texts.includes(name)); }, { message: "labels of the Sun and Earth", timeout: 30_000 }).toEqual([]);
+    const pointers = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.drawnEdgePointers());
+    expect(pointers.length).toBeLessThanOrEqual(3);
+    type Rect = { left: number; top: number; right: number; bottom: number };
+    const overlap = (a: Rect, b: Rect) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    for (let first = 0; first < pointers.length; first += 1) {
+      for (let second = first + 1; second < pointers.length; second += 1) {
+        expect(overlap(pointers[first]!.rect, pointers[second]!.rect), `${pointers[first]!.key} and ${pointers[second]!.key} overlap`).toBe(false);
+      }
+    }
+  });
+
+  for (const preset of ["nearby", "galaxy"]) {
+    test(`at the ${preset} preset the home label is Solar System, with no planet labels`, async ({ page, request }) => {
+      await skipIfAtlasUnavailable(request);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await openAtlas(page, "/?perf=1");
+      await page.locator(`[data-zoom-preset="${preset}"]`).click();
+      await expect.poll(() => drawnLabelTexts(page), { message: "the Solar System label", timeout: 30_000 }).toContain("Solar System");
+      const texts = await drawnLabelTexts(page);
+      for (const planet of ["Sun", "Earth", "Mars", "Jupiter", "Saturn"]) expect(texts, `${planet} has no label at this scale`).not.toContain(planet);
+    });
+  }
+
+  test("the Universe preset shows its view width in words", async ({ page, request }) => {
+    await skipIfAtlasUnavailable(request);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openAtlas(page);
+    await page.locator('[data-zoom-preset="cosmicWeb"]').click();
+    await expect(page.locator("#zoom-view-scale")).toContainText(/billion ly/, { timeout: 15_000 });
+    await expect(page.locator("#zoom-view-scale")).not.toContainText(/Gly|e\+|kly|Mly/);
+  });
 });
+
+test.describe("3D mark and map notes", () => {
+  test.beforeEach(async ({ request }) => { await skipIfAtlasUnavailable(request); });
+
+  test("the 3D mark shows on demand and after a change of the map centre, and not on a selected object", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openAtlas(page);
+    const marker = page.locator("#universe-entry-marker");
+    const button = page.locator("#universe-3d-toggle");
+    await expect(button).toHaveAttribute("title", "The 3D view starts at the map centre");
+    await expect(marker).toBeHidden({ timeout: 10_000 });
+    // The focus on the 3D button shows the mark, as the pointer does.
+    await button.focus();
+    await expect(marker).toBeVisible();
+    await button.evaluate((element) => (element as HTMLElement).blur());
+    await expect(marker).toBeHidden();
+    // A drag changes the map centre: the mark shows for a short time.
+    await page.mouse.move(500, 450);
+    await page.mouse.down();
+    await page.mouse.move(620, 520, { steps: 6 });
+    await page.mouse.up();
+    await expect(marker).toBeVisible();
+    await expect(marker).toBeHidden({ timeout: 6_000 });
+    // With the selected object at the map centre there is no mark on its label.
+    await selectCatalogObject(page, "Mars", "mars");
+    await page.locator("#center-selected").click();
+    await button.hover();
+    await page.waitForTimeout(500);
+    await expect(marker).toBeHidden();
+  });
+
+  test("the constellation layer shows its note while it is on", async ({ page }) => {
+    // On a wide window the toolbar covers the canvas line of the note, so the note is a page element also.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openAtlas(page);
+    const note = page.locator("#exoplanet-orbit-note");
+    await expect(note).toBeHidden();
+    const layer = page.locator('.toolbar-quick-layers input[data-layer="constellations"]');
+    await layer.check();
+    await expect(note).toBeVisible({ timeout: 15_000 });
+    await expect(note).toContainText("Constellation lines join the stars at their catalog distances");
+    await layer.uncheck();
+    await expect(note).toBeHidden();
+  });
+});
+

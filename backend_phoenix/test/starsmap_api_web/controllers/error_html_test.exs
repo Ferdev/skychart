@@ -40,7 +40,9 @@ defmodule StarsmapApiWeb.ErrorHTMLTest do
     for {path, heading} <- [
           {"/o/not-real", "Object not found"},
           {"/tours/not-a-tour", "Tour not found"},
-          {"/community/not-a-policy", "Page not found"}
+          {"/community/not-a-policy", "Page not found"},
+          {"/photos/00000000-0000-0000-0000-000000000000", "Photo not found"},
+          {"/u/no-such-photographer", "Photographer not found"}
         ] do
       body = conn |> recycle() |> get(path) |> html_response(404)
       assert body =~ "<h1>#{heading}</h1>"

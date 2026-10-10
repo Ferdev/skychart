@@ -69,3 +69,7 @@ universe3d.position de
 universe3d.searchSuggestions fr
 value.no es
 value.no it
+
+# Media cards, uncertainty sentences, and data labels (second pass, 2026-10-10).
+sourceLink.mission fr
+sourceLink.mission de

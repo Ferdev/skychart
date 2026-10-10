@@ -136,8 +136,132 @@ test.describe("3D view controls", () => {
   });
 });
 
+test.describe("3D view: time bar, search, Sky return, and target card", () => {
+  test.beforeEach(async ({ context }) => { await installFixtures(context); });
+
+  test("the 3D header has the time bar of the atlas", async ({ page }) => {
+    await openAtlas(page, START);
+    const date2d = (await page.locator("#time-date").innerText()).trim();
+    await enter3d(page);
+    const bar = page.locator("#universe-time-bar");
+    await expect(bar).toBeVisible();
+    await expect(bar.locator(".time-bar__date")).toBeVisible();
+    // The same atlas time as the 2D header, and the two step buttons.
+    await expect(bar.locator(".time-bar__date-text")).toHaveText(new RegExp(date2d.split("\n")[0]!.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    await expect(bar.locator(".time-bar__step")).toHaveCount(2);
+    // One step changes the date in the bar. The fixture gives an ephemeris for each time.
+    const before = await bar.locator(".time-bar__date-text").innerText();
+    await bar.locator(".time-bar__step").last().click();
+    await expect(bar.locator(".time-bar__date-text")).not.toHaveText(before);
+    await expect(bar.locator(".time-bar__date")).toHaveClass(/not-now|is-not-now|time-bar__date/);
+    await expect(page.locator("#universe-view")).toBeVisible();
+  });
+
+  test("the search shows a recent destination, and Escape closes only the open dialog", async ({ page }) => {
+    await openAtlas(page, START);
+    await enter3d(page);
+    // `Details` of a target makes it a recent destination.
+    await page.locator("#universe-find").click();
+    await page.locator("#universe-search-results").getByRole("option", { name: /^Earth/ }).click();
+    await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+    await page.locator("#universe-details").click();
+    await expect(page.locator("#workspace-panel")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#workspace-panel")).toBeHidden();
+
+    await page.locator("#universe-find").click();
+    const dialog = page.locator("#universe-search-dialog");
+    await expect(dialog).toBeVisible();
+    const results = page.locator("#universe-search-results");
+    await expect(results).toContainText("Recent");
+    await expect(results.locator("[role=option]").first()).toContainText("Earth");
+    // Escape closes the dialog. It does not stop the 3D view and does not ask for a second press.
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(page.locator("#universe-view")).toBeVisible();
+    await expect(page.locator("#universe-status")).not.toHaveText("Press Esc again to exit 3D");
+    await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+  });
+
+  test("the Sky button of the inspector goes to Sky view and back to the same 3D target", async ({ page }) => {
+    await openAtlas(page, START);
+    await enter3d(page);
+    await page.locator("#universe-find").click();
+    await page.locator("#universe-search-results").getByRole("option", { name: /^Earth/ }).click();
+    await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+    const position = await page.locator("#universe-position").textContent();
+    await page.locator("#universe-details").click();
+    await expect(page.locator("#workspace-panel")).toBeVisible();
+    await page.locator("#view-sky-selected").click();
+    await expect(page.locator("#sky-view")).toBeVisible();
+    await expect(page.locator("#universe-view")).toBeHidden();
+    await expect(page.locator("#sky-view-close-label")).toHaveText("Back to 3D");
+    await page.locator("#sky-view-close").click();
+    await expect(page.locator("#sky-view")).toBeHidden();
+    await expect(page.locator("#universe-view")).toBeVisible();
+    await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+    await expect(page.locator("#universe-position")).toHaveText(position!);
+  });
+
+  test("Sky view from the 2D map goes back to the map, and Escape closes the inspector first", async ({ page }) => {
+    await openAtlas(page, START);
+    await page.locator("#header-search").click();
+    await page.locator("#body-search").fill("Earth");
+    await page.locator('#body-picker [data-body-key="earth"]').first().click();
+    await expect(page.locator("#selected-summary-name")).toHaveText("Earth");
+    await page.locator("#view-sky-selected").click();
+    await expect(page.locator("#sky-view")).toBeVisible();
+    await expect(page.locator("#sky-view-close-label")).toHaveText("Back to map");
+    await page.locator("#sky-view-close").focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#sky-view")).toBeHidden();
+    await expect(page.locator("#universe-view")).toBeHidden();
+    await expect(page.locator("#map")).toBeVisible();
+  });
+
+  test("at 1200 px the target card stays in view with the inspector open, and the position line has no exponent", async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await openAtlas(page, START);
+    await enter3d(page);
+    await chooseFixtureA(page);
+    await expect(page.locator("#universe-position")).toContainText("AU");
+    await expect(page.locator("#universe-position")).not.toHaveText(/\de[+-]?\d/);
+    await page.locator("#universe-details").click();
+    const panel = page.locator("#workspace-panel");
+    await expect(panel).toBeVisible();
+    const card = page.locator("#universe-target");
+    await expect(card).toBeVisible();
+    await expect(card).toBeInViewport({ ratio: 1 });
+    const cardBox = (await card.boundingBox())!;
+    const panelBox = (await panel.boundingBox())!;
+    const overlap = cardBox.x < panelBox.x + panelBox.width && panelBox.x < cardBox.x + cardBox.width && cardBox.y < panelBox.y + panelBox.height && panelBox.y < cardBox.y + cardBox.height;
+    expect(overlap, "the inspector does not cover the target card").toBe(false);
+    // The flight panel does not move when the inspector opens.
+    await expect(page.locator("#universe-autopilot")).toBeInViewport({ ratio: 1 });
+  });
+});
+
 test.describe("3D view on a touch screen", () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+
+  test("on a phone the inspector is a sheet of half the window at most", async ({ page, context }) => {
+    await installFixtures(context);
+    await openAtlas(page, START);
+    await page.locator("#universe-3d-toggle").tap();
+    await expect(page.locator("#universe-view")).toBeVisible();
+    await page.locator("#universe-find").tap();
+    await page.locator("#universe-search-results").getByRole("option", { name: /^Earth/ }).tap();
+    await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+    await page.locator("#universe-details").tap();
+    const panel = page.locator("#workspace-panel");
+    await expect(panel).toBeVisible();
+    const box = (await panel.boundingBox())!;
+    expect(box.height, "the sheet is half the window at most").toBeLessThanOrEqual(844 / 2 + 1);
+    expect(box.y + box.height).toBeLessThanOrEqual(844 + 1);
+    // The header controls stay in view above the sheet.
+    await expect(page.locator("#universe-close")).toBeInViewport({ ratio: 1 });
+    expect((await page.locator("#universe-close").boundingBox())!.y, "the exit button is above the sheet").toBeLessThan(box.y);
+  });
 
   test("a phone flies with the joystick, and every control is in the window", async ({ page, context }) => {
     await installFixtures(context);

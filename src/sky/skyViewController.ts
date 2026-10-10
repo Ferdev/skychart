@@ -14,6 +14,7 @@ import {
   type SkyViewState,
 } from "../viewState";
 import { CONSTELLATIONS } from "./constellations";
+import { constellationName } from "../i18n/constellationNames";
 import {
   bodyCanObserveSky,
   bodyVector,
@@ -520,7 +521,7 @@ export class SkyViewController {
       if (visibleEndpoints.size >= 2) {
         const endpoints = [...visibleEndpoints.values()];
         labels.push({
-          name: constellation.name,
+          name: constellationName(constellation.name, this.options.locale()),
           x: endpoints.reduce((sum, point) => sum + point.x, 0) / endpoints.length,
           y: endpoints.reduce((sum, point) => sum + point.y, 0) / endpoints.length,
         });

@@ -1,4 +1,5 @@
 import type { LabelRect } from "../labels/labelRank";
+import { universeLabelLimit } from "./universeLabelLimit";
 
 export type UniverseLabelArea = {
   /** A label must be fully inside this rectangle. */
@@ -8,9 +9,6 @@ export type UniverseLabelArea = {
   limit: number;
 };
 
-const LABEL_LIMIT = 30;
-const NARROW_LABEL_LIMIT = 12;
-const NARROW_WIDTH_PX = 640;
 
 /**
  * The areas of the 3D view that labels must not use.
@@ -47,7 +45,7 @@ export class UniverseLabelAreas {
     return {
       bounds: { left: 8, top: 8, right: root.width - 8, bottom: root.height - 8 },
       exclusions,
-      limit: root.width <= NARROW_WIDTH_PX ? NARROW_LABEL_LIMIT : LABEL_LIMIT,
+      limit: universeLabelLimit(root.width),
     };
   }
 }

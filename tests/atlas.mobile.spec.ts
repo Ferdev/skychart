@@ -262,11 +262,14 @@ test.describe("Cosmic Atlas mobile layout", () => {
     const x = (initial.left + initial.right) / 2;
     const startY = initial.bottom - 30;
     const touch = (y: number) => [{ id: 1, x, y, radiusX: 4, radiusY: 4, force: 1 }];
-    await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: touch(startY) });
-    for (let step = 1; step <= 8; step += 1) {
-      await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touch(startY - step * 30) });
-    }
-    await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    const swipe = async () => {
+      await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: touch(startY) });
+      for (let step = 1; step <= 8; step += 1) {
+        await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: touch(startY - step * 30) });
+      }
+      await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    };
+    await swipe();
     await expect.poll(async () => (await metrics()).scrollTop, { message: "one swipe must scroll the sheet content" }).toBeGreaterThan(0);
 
     // After one swipe the sticky tab row is inside the sheet, and each tab opens its view.
@@ -276,6 +279,7 @@ test.describe("Cosmic Atlas mobile layout", () => {
     expect(tabRow!.y).toBeGreaterThanOrEqual(afterSwipe.top - 1);
     expect(tabRow!.y + tabRow!.height).toBeLessThanOrEqual(afterSwipe.bottom + 1);
     const views = await page.locator("#body-info [data-object-view]").evaluateAll((tabs) => tabs.map((tab) => (tab as HTMLElement).dataset.objectView ?? ""));
+    const scrolledViews: string[] = [];
     expect(views.length).toBeGreaterThanOrEqual(4);
     for (const view of views) {
       const tab = page.locator(`#body-info [data-object-view="${view}"]`);
@@ -284,11 +288,46 @@ test.describe("Cosmic Atlas mobile layout", () => {
       await expect(page.locator(`#object-view-panel-${view}`)).toBeVisible();
       const box = await tab.boundingBox();
       expect(box!.height, `${view} tab touch target`).toBeGreaterThanOrEqual(44);
+      // A view that is longer than the sheet scrolls with a touch drag also (Position and Sources of Mars).
+      await bodyInfo.evaluate((element) => { element.scrollTop = 0; });
+      const viewMetrics = await metrics();
+      if (viewMetrics.scrollHeight > viewMetrics.clientHeight + 40) {
+        await swipe();
+        await expect.poll(async () => (await metrics()).scrollTop, { message: `one swipe must scroll the ${view} view` }).toBeGreaterThan(0);
+        scrolledViews.push(view);
+      }
     }
+    expect(scrolledViews, "the long views scroll by touch").toEqual(expect.arrayContaining(["position", "sources"]));
 
     const geometry = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry());
     expect(geometry.workspaceTop!, "object sheet should leave a meaningful map region visible").toBeGreaterThan(320);
     issues.assertClean();
+  });
+
+  test("shows the comparison header in full on a narrow screen", async ({ page }) => {
+    await openAtlas(page);
+    await selectCatalogObject(page, "Jupiter", "jupiter");
+    await page.locator("#compare-selected").click();
+    await expect(page.locator("#compare-heading")).toBeVisible();
+    await page.locator("#compare-search").fill("Mars");
+    await page.locator('#compare-picker [data-body-key="mars"]').first().click();
+    await expect(page.locator("#compare-actions")).toBeVisible();
+    await page.locator("#compare-heading").scrollIntoViewIfNeeded();
+    // The title is in view, and no text of the title or of an action is cut.
+    for (const selector of ["#compare-heading", "#share-compare", "#clear-compare"]) {
+      const element = page.locator(selector);
+      await expect(element, selector).toBeInViewport();
+      expect(await element.evaluate((node) => node.scrollWidth <= node.clientWidth + 1), `${selector} text is not cut`).toBe(true);
+      const box = (await element.boundingBox())!;
+      expect(box.x, selector).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width, selector).toBeLessThanOrEqual(390);
+    }
+    // A phone shows the short text of the copy action.
+    await expect(page.locator("#share-compare .label-narrow")).toBeVisible();
+    await expect(page.locator("#share-compare .label-wide")).toBeHidden();
+    for (const selector of ["#share-compare", "#clear-compare"]) {
+      expect((await page.locator(selector).boundingBox())!.height, `${selector} touch target`).toBeGreaterThanOrEqual(44);
+    }
   });
 
   test("pinches the atlas itself to zoom on touch screens", async ({ page }) => {

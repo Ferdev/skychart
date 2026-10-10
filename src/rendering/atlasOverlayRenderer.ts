@@ -79,7 +79,7 @@ const CANDIDATE_UNCERTAINTY_COLOR = "rgba(201, 184, 255, 0.34)";
 export class AtlasOverlayRenderer {
   private edgeHitRegions: { body: Body; rect: Rect }[] = [];
   // Rectangles of the object labels of this frame, so that a label reacts to the pointer like its object.
-  private labelHitRegions: { body: Body; rect: Rect }[] = [];
+  private labelHitRegions: { body: Body; text: string; rect: Rect }[] = [];
   private scaleBarArea: Rect | null = null;
   private toolbarRect: Rect | null = null;
   private reservedAreas: Rect[] = [];
@@ -342,7 +342,7 @@ export class AtlasOverlayRenderer {
         ctx.lineTo(rect.left < item.screen.x ? rect.right : rect.left, rect.top < item.screen.y ? rect.bottom : rect.top);
         ctx.stroke();
       }
-      this.labelHitRegions.push({ body: item.body, rect: { ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top } });
+      this.labelHitRegions.push({ body: item.body, text: item.text, rect: { ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top } });
       this.drawLabel(item.text, rect.left, rect.top + 15, item.body.key === frame.selectedKey ? "rgba(248, 218, 136, 0.95)" : "rgba(239, 233, 213, 0.76)");
     }
     ctx.restore();
@@ -354,7 +354,7 @@ export class AtlasOverlayRenderer {
   }
 
   /** The labels that the last frame drew, after the collision step. */
-  drawnLabels(): readonly { body: Body; rect: Rect }[] {
+  drawnLabels(): readonly { body: Body; text: string; rect: Rect }[] {
     return this.labelHitRegions;
   }
 

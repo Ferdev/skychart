@@ -330,6 +330,197 @@ The first list did not have these keys. `launch.observeHelp` is an old text that
 | `typePlural.planetCandidate` | Planet candidates | Candidatos a planeta |
 | `typePlural.spacecraft` | Spacecraft | Naves espaciales |
 
+## Second pass of 2026-10-10: media cards, uncertainty sentences, data labels (56 keys)
+
+The keys are in `src/i18n/dataLabelTranslations.ts`. The English text is in `src/objectMedia.ts`, `src/scienceSemantics.ts`, and the label table of that module.
+
+| Key | English | Spanish |
+|---|---|---|
+| `media.badge.curated` | Curated NASA image | Imagen seleccionada de la NASA |
+| `media.badge.dss2` | All-sky DSS2 context | Contexto de todo el cielo de DSS2 |
+| `media.badge.allwise` | AllWISE fallback | Imagen alternativa de AllWISE |
+| `media.source.nasaScience` | NASA Science image | Imagen de NASA Science |
+| `media.source.dss2` | Explore the DSS2 field in Aladin | Explorar el campo de DSS2 en Aladin |
+| `media.source.legacy` | Explore in the DR11 Sky Viewer | Explorar en el Sky Viewer de DR11 |
+| `media.source.allwise` | Explore the AllWISE field in Aladin | Explorar el campo de AllWISE en Aladin |
+| `media.dss2.title` | {name} all-sky context | {name}: contexto de todo el cielo |
+| `media.dss2.titleMoving` | {name} current sky field | {name}: campo celeste actual |
+| `media.dss2.alt` | DSS2 color sky-survey cutout centered on {name}. | Recorte en color del sondeo del cielo DSS2 centrado en {name}. |
+| `media.dss2.altMoving` | Archival DSS2 color sky-survey cutout centered on the current modeled sky position of {name}. | Recorte de archivo en color del sondeo del cielo DSS2, centrado en la posición actual de {name} en el cielo según el modelo. |
+| `media.legacy.title` | {name} in Legacy Surveys DR11 | {name} en Legacy Surveys DR11 |
+| `media.legacy.titleMoving` | {name} current sky field in Legacy Surveys DR11 | {name}: campo celeste actual en Legacy Surveys DR11 |
+| `media.legacy.alt` | DESI Legacy Imaging Surveys DR11 color cutout centered on {name}. | Recorte en color de DESI Legacy Imaging Surveys DR11 centrado en {name}. |
+| `media.legacy.altMoving` | Archival DESI Legacy Imaging Surveys DR11 color cutout centered on the current modeled sky position of {name}. | Recorte de archivo en color de DESI Legacy Imaging Surveys DR11, centrado en la posición actual de {name} en el cielo según el modelo. |
+| `media.legacy.footprint` | Coverage follows the DR11 survey footprint. | La cobertura corresponde al área del sondeo DR11. |
+| `media.allwise.title` | {name} in AllWISE infrared | {name} en el infrarrojo de AllWISE |
+| `media.allwise.titleMoving` | {name} current sky field in AllWISE infrared | {name}: campo celeste actual en el infrarrojo de AllWISE |
+| `media.allwise.alt` | AllWISE infrared color cutout centered on {name}, shown because DR11 did not return a usable field. | Recorte infrarrojo en color de AllWISE centrado en {name}, que se muestra porque DR11 no devolvió un campo utilizable. |
+| `media.allwise.altMoving` | Archival AllWISE infrared color cutout centered on the current modeled sky position of {name}, shown because DR11 did not return a usable field. | Recorte infrarrojo de archivo en color de AllWISE, centrado en la posición actual de {name} en el cielo según el modelo; se muestra porque DR11 no devolvió un campo utilizable. |
+| `media.allwise.description` | DR11 did not return a usable field at these coordinates, so this card is showing a reliable all-sky infrared comparison from AllWISE. | DR11 no devolvió un campo utilizable en estas coordenadas, por lo que esta tarjeta muestra una comparación fiable en el infrarrojo del sondeo de todo el cielo AllWISE. |
+| `media.allwise.descriptionMoving` | DR11 did not return a usable field at these coordinates, so this card is showing an archival all-sky infrared comparison from AllWISE. Because this object moves, the survey image may not contain the object itself. | DR11 no devolvió un campo utilizable en estas coordenadas, por lo que esta tarjeta muestra una comparación de archivo en el infrarrojo del sondeo de todo el cielo AllWISE. Como este objeto se mueve, es posible que la imagen del sondeo no contenga el objeto. |
+| `media.survey.reference` | Reliable all-sky reference at RA {ra} deg, Dec {dec} deg. | Referencia fiable de todo el cielo en AR {ra} grados, Dec {dec} grados. |
+| `media.survey.optical` | Optical color cutout at RA {ra} deg, Dec {dec} deg. | Recorte óptico en color en AR {ra} grados, Dec {dec} grados. |
+| `media.survey.moving` | This is an archival field centered on {name}'s current modeled direction; a moving object may not appear in the survey exposure. | Este es un campo de archivo centrado en la dirección actual de {name} según el modelo; es posible que un objeto en movimiento no aparezca en la exposición del sondeo. |
+| `media.survey.reconstructed` | Sky coordinates were reconstructed from the atlas position. | Las coordenadas celestes se reconstruyeron a partir de la posición en el atlas. |
+| `uncertainty.notSupplied` | Uncertainty not supplied by this atlas source. | Esta fuente del atlas no proporciona la incertidumbre. |
+| `uncertainty.parallax` | Parallax uncertainty: {value} mas. | Incertidumbre de la paralaje: {value} mas. |
+| `uncertainty.parallaxSignal` | Parallax signal-to-noise (parallax/error): {value}. | Relación señal-ruido de la paralaje (paralaje/error): {value}. |
+| `uncertainty.distance` | Published distance uncertainty: ±{value} Mpc. | Incertidumbre publicada de la distancia: ±{value} Mpc. |
+| `uncertainty.distanceMethod` | Published distance uncertainty: ±{value} Mpc ({method}). | Incertidumbre publicada de la distancia: ±{value} Mpc ({method}). |
+| `uncertainty.distanceInterval` | Published distance interval: {min}–{max} Mpc. | Intervalo de distancia publicado: {min}–{max} Mpc. |
+| `uncertainty.redshiftInferred` | Inferred redshift uncertainty: {value}. | Incertidumbre del corrimiento al rojo inferido: {value}. |
+| `uncertainty.redshiftSpectroscopic` | Spectroscopic redshift uncertainty: {value}. | Incertidumbre del corrimiento al rojo espectroscópico: {value}. |
+| `uncertainty.orbit` | Orbit uncertainty: {value}. | Incertidumbre de la órbita: {value}. |
+| `uncertainty.orbitSize` | Published orbit-size uncertainty: +{plus} / −{minus} AU. | Incertidumbre publicada del tamaño de la órbita: +{plus} / −{minus} UA. |
+| `milkyWay.arm.scutumCentaurus` | Scutum-Centaurus Arm | Brazo de Escudo-Centauro |
+| `milkyWay.arm.sagittariusCarina` | Sagittarius-Carina Arm | Brazo de Sagitario-Carina |
+| `milkyWay.arm.local` | Local Arm | Brazo Local |
+| `milkyWay.arm.perseus` | Perseus Arm | Brazo de Perseo |
+| `milkyWay.arm.outer` | Outer Arm | Brazo Exterior |
+| `milkyWay.disk` | Milky Way disk | Disco de la Vía Láctea |
+| `milkyWay.innerDisk` | Inner disk | Disco interior |
+| `milkyWay.solarCircle` | Solar circle | Círculo solar |
+| `milkyWay.centralBar` | Central bar | Barra central |
+| `milkyWay.galacticCenter` | Galactic center | Centro galáctico |
+| `sourceLink.simbad` | SIMBAD object lookup | Consulta del objeto en SIMBAD |
+| `sourceLink.ned` | NASA/IPAC Extragalactic Database lookup | Consulta en NASA/IPAC Extragalactic Database |
+| `sourceLink.sbdb` | Small-Body Database lookup | Consulta en la base de datos de cuerpos menores |
+| `sourceLink.trajectory` | Trajectory and coverage | Trayectoria y cobertura |
+| `sourceLink.mission` | Mission | Misión |
+| `sourceLink.desiDocumentation` | DESI DR1 catalog documentation | Documentación del catálogo DESI DR1 |
+| `sourceLink.quaiaCatalog` | Quaia G<20 published catalog | Catálogo publicado de Quaia G<20 |
+| `sourceLink.gaiaSource` | Gaia DR3 source | Fuente de Gaia DR3 |
+| `object.detailState` | Object detail state | Estado del detalle del objeto |
+| `embed.attribution` | Cosmic Atlas attribution | Atribución de Cosmic Atlas |
+
+## Second pass of 2026-10-10: curated images (27 objects)
+
+The Spanish text is `CURATED_MEDIA_TEXT` in `src/object/curatedSummaries/es.ts`. Each object has the title of the image and the text for screen readers.
+
+| Object | English title | Spanish title | English description | Spanish description |
+|---|---|---|---|---|
+| `sun` | Full Disk View of the Sun | Vista del disco completo del Sol | Solar Dynamics Observatory full disk view of the Sun. | Vista del disco completo del Sol obtenida por el Solar Dynamics Observatory. |
+| `mercury` | Unmasking the Secrets of Mercury | Los secretos de Mercurio al descubierto | Enhanced color MESSENGER view of Mercury. | Vista de Mercurio en color realzado obtenida por la sonda MESSENGER. |
+| `venus` | Venus - Global View Centered at 90 Degrees East Longitude | Venus: vista global centrada en los 90 grados de longitud este | Computer-simulated global radar view of Venus. | Vista global de radar de Venus, simulada por computadora. |
+| `earth` | Blue Marble 2012 | Canica Azul 2012 | Full disk view of Earth from space with blue oceans, white clouds, and visible continents. | Vista del disco completo de la Tierra desde el espacio, con océanos azules, nubes blancas y continentes visibles. |
+| `moon` | Nearside of Earth's Moon as Seen by Clementine | La cara visible de la Luna vista por Clementine | Global nearside mosaic of Earth's Moon. | Mosaico global de la cara visible de la Luna. |
+| `phobos` | Phobos from 6,800 Kilometers | Fobos desde 6800 kilómetros | Color Mars Reconnaissance Orbiter view of the Martian moon Phobos. | Vista en color de Fobos, luna de Marte, obtenida por el Mars Reconnaissance Orbiter. |
+| `deimos` | The Moons of Mars | Las lunas de Marte | NASA image showing the Martian moons Phobos and Deimos. | Imagen de la NASA que muestra Fobos y Deimos, las lunas de Marte. |
+| `mars` | Tharsis Volcanoes and Valles Marineris | Los volcanes de Tharsis y Valles Marineris | Global Mars view showing the Tharsis volcanic region and the long Valles Marineris canyon system. | Vista global de Marte que muestra la región volcánica de Tharsis y el largo sistema de cañones de Valles Marineris. |
+| `jupiter` | High Resolution Globe of Jupiter | Globo de Júpiter en alta resolución | Color globe of Jupiter with banded clouds and the Great Red Spot. | Globo de Júpiter en color, con nubes en bandas y la Gran Mancha Roja. |
+| `io` | Active Lava Flows at Prometheus Volcano, Io | Coladas de lava activas en el volcán Prometheus de Ío | Galileo near-infrared view of volcanic activity on Io. | Vista en el infrarrojo cercano de la actividad volcánica de Ío obtenida por la sonda Galileo. |
+| `europa` | Clay Prints on Europa | Huellas de arcilla en Europa | NASA image of Europa's fractured icy terrain. | Imagen de la NASA del terreno helado y fracturado de Europa. |
+| `ganymede` | Stereo View of Ganymede Galileo Region | Vista estereoscópica de la región Galileo de Ganimedes | Galileo spacecraft view of grooved terrain on Ganymede. | Vista del terreno surcado de Ganimedes obtenida por la sonda Galileo. |
+| `callisto` | Global Callisto in Color | Vista global de Calisto en color | Global color image of Jupiter's moon Callisto. | Imagen global en color de Calisto, luna de Júpiter. |
+| `saturn` | Across Resplendent Rings | A través de anillos resplandecientes | Cassini view of Saturn and its ring plane. | Vista de Saturno y del plano de sus anillos obtenida por la sonda Cassini. |
+| `enceladus` | Saturn Geyser Moon Enceladus | Encélado, la luna de los géiseres de Saturno | Cassini view of Enceladus with bright icy terrain. | Vista de Encélado obtenida por la sonda Cassini, con terreno helado y brillante. |
+| `titan` | Glowing Titan | Titán luminoso | Cassini image of Titan with atmospheric haze. | Imagen de Titán obtenida por la sonda Cassini, con neblina atmosférica. |
+| `uranus` | Uranus as Seen by Voyager 2 | Urano visto por la Voyager 2 | Voyager 2 image of Uranus as a blue-green disk. | Imagen de Urano obtenida por la Voyager 2, en la que el planeta aparece como un disco verde azulado. |
+| `neptune` | Neptune from Voyager 2 | Neptuno desde la Voyager 2 | Voyager 2 image of Neptune with blue atmospheric features. | Imagen de Neptuno obtenida por la Voyager 2, con formaciones atmosféricas azules. |
+| `pluto` | Global Mosaics of Pluto and Charon | Mosaicos globales de Plutón y Caronte | New Horizons global mosaics of Pluto and Charon. | Mosaicos globales de Plutón y Caronte obtenidos por la sonda New Horizons. |
+| `m31` | Hubble's High-Definition Panoramic View of the Andromeda Galaxy | Vista panorámica en alta definición de la Galaxia de Andrómeda obtenida por el Hubble | Wide Hubble mosaic of the Andromeda Galaxy showing dense star fields and dust lanes. | Amplio mosaico de la Galaxia de Andrómeda obtenido por el Hubble, que muestra densos campos de estrellas y bandas de polvo. |
+| `m5` | Messier 5 | Messier 5 | Hubble image of the globular cluster Messier 5. | Imagen del cúmulo globular Messier 5 obtenida por el Hubble. |
+| `m11` | M11 - Wild Duck Cluster | M11: Cúmulo del Pato Salvaje | Hubble image of the Wild Duck open cluster. | Imagen del cúmulo abierto del Pato Salvaje obtenida por el Hubble. |
+| `m13` | M13 - Globular Cluster | M13: cúmulo globular | Hubble image of the dense globular cluster Messier 13. | Imagen del denso cúmulo globular Messier 13 obtenida por el Hubble. |
+| `m42` | Orion Nebula and Bow Shock | Nebulosa de Orión y arco de choque | Hubble view of glowing gas and dust in the Orion Nebula. | Vista del gas y el polvo brillantes de la Nebulosa de Orión obtenida por el Hubble. |
+| `m45` | The Seven Sisters | Las Siete Hermanas | Infrared view of the Pleiades star cluster and surrounding dust. | Vista en infrarrojo del cúmulo estelar de las Pléyades y del polvo que lo rodea. |
+| `m44` | Messier 44 ACS Image | Imagen de Messier 44 obtenida con la ACS | Hubble view through the outskirts of the Beehive Cluster. | Vista a través de las regiones exteriores del Cúmulo del Pesebre obtenida por el Hubble. |
+| `m57` | Looking Down a Barrel of Gas at a Doomed Star | Una estrella condenada vista a través de un barril de gas | Hubble image of the Ring Nebula with glowing gas around a central star. | Imagen de la Nebulosa del Anillo obtenida por el Hubble, con gas brillante alrededor de una estrella central. |
+
+## Second pass of 2026-10-10: constellation names (87 figures)
+
+The names are in `src/i18n/constellationNames.ts`, in the order of the IAU names. They show in Sky view, on the 2D map, and in the Settings list.
+
+| IAU name | Spanish |
+|---|---|
+| Andromeda | Andrómeda |
+| Antlia | Máquina Neumática |
+| Apus | Ave del Paraíso |
+| Aquarius | Acuario |
+| Aquila | Águila |
+| Ara | Altar |
+| Aries | Aries |
+| Auriga | Auriga |
+| Boötes | Boyero |
+| Caelum | Cincel |
+| Camelopardalis | Jirafa |
+| Cancer | Cáncer |
+| Canes Venatici | Lebreles |
+| Canis Major | Can Mayor |
+| Canis Minor | Can Menor |
+| Capricornus | Capricornio |
+| Carina | Quilla |
+| Cassiopeia | Casiopea |
+| Centaurus | Centauro |
+| Cepheus | Cefeo |
+| Cetus | Ballena |
+| Chamaeleon | Camaleón |
+| Circinus | Compás |
+| Columba | Paloma |
+| Coma Berenices | Cabellera de Berenice |
+| Corona Australis | Corona Austral |
+| Corona Borealis | Corona Boreal |
+| Corvus | Cuervo |
+| Crater | Copa |
+| Crux | Cruz del Sur |
+| Cygnus | Cisne |
+| Delphinus | Delfín |
+| Dorado | Dorado |
+| Draco | Dragón |
+| Equuleus | Caballito |
+| Eridanus | Erídano |
+| Fornax | Horno |
+| Gemini | Géminis |
+| Grus | Grulla |
+| Hercules | Hércules |
+| Horologium | Reloj |
+| Hydra | Hidra |
+| Hydrus | Hidra Macho |
+| Indus | Indio |
+| Lacerta | Lagarto |
+| Leo | Leo |
+| Leo Minor | León Menor |
+| Lepus | Liebre |
+| Libra | Libra |
+| Lupus | Lobo |
+| Lynx | Lince |
+| Lyra | Lira |
+| Monoceros | Unicornio |
+| Musca | Mosca |
+| Norma | Escuadra |
+| Octans | Octante |
+| Ophiuchus | Ofiuco |
+| Orion | Orión |
+| Pavo | Pavo |
+| Pegasus | Pegaso |
+| Perseus | Perseo |
+| Phoenix | Fénix |
+| Pictor | Pintor |
+| Pisces | Piscis |
+| Piscis Austrinus | Pez Austral |
+| Puppis | Popa |
+| Pyxis | Brújula |
+| Reticulum | Retículo |
+| Sagitta | Flecha |
+| Sagittarius | Sagitario |
+| Scorpius | Escorpio |
+| Sculptor | Escultor |
+| Scutum | Escudo |
+| Serpens Caput | Cabeza de la Serpiente |
+| Serpens Cauda | Cola de la Serpiente |
+| Sextans | Sextante |
+| Taurus | Tauro |
+| Telescopium | Telescopio |
+| Triangulum | Triángulo |
+| Triangulum Australe | Triángulo Austral |
+| Tucana | Tucán |
+| Ursa Major | Osa Mayor |
+| Ursa Minor | Osa Menor |
+| Vela | Vela |
+| Virgo | Virgo |
+| Volans | Pez Volador |
+| Vulpecula | Zorra |
+
 ## Object names (24 bodies)
 
 The catalog has the English names. The search finds a body by its Spanish name, and a result row shows the Spanish name as second text.

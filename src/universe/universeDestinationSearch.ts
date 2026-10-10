@@ -1,6 +1,7 @@
 import type { Body } from "../atlas/contracts";
 import { isOptionListKey, nextOptionIndex } from "../destination/optionListKeyboard";
 import { objectTypeLabel } from "../format/objectTypeLabel";
+import { localObjectName } from "../i18n/objectNames";
 
 type DestinationSearchOptions = {
   findButton: HTMLButtonElement;
@@ -162,7 +163,9 @@ export class UniverseDestinationSearch {
     // The option cannot have the focus: the focus stays in the field, as in the main search.
     option.tabIndex = -1;
     const name = document.createElement("strong");
-    name.textContent = body.name;
+    // The row shows the name in the application language also, as the main search does.
+    const localName = localObjectName(body.key, document.documentElement.lang, body.name);
+    name.textContent = localName ? `${body.name} · ${localName}` : body.name;
     const type = document.createElement("span");
     type.textContent = objectTypeLabel(body.object_type);
     option.append(name, type);

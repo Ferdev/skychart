@@ -80,6 +80,15 @@ A missing value is the text `Unknown` in the inspector. Result rows and comparis
 
 Each text that the user reads has a translation key and a value in all nine locales. New keys go into a module of their area in `src/i18n/` and into the list in `src/i18n/areaTranslations.ts`.
 
+Some text has its English source in a module that node tests import, so that module does not import `i18n.ts`:
+
+- **Media cards** (`src/objectMedia.ts`): `MEDIA_TEXT_EN` has the English text. The functions get a text source (`MediaText`); the default is English. The title and the description of each curated image are in `CURATED_MEDIA_TEXT` of `src/object/curatedSummaries/<locale>.ts`, which the browser loads for the active language only.
+- **Uncertainty sentences** (`src/scienceSemantics.ts`): `UNCERTAINTY_TEXT_EN`. `uncertaintySummary(record, t)` gives the sentence in the application language.
+- **Labels from data** (`src/i18n/dataLabelTranslations.ts`): the Milky Way labels and the labels of source links come from data modules or from the server in English. `DATA_LABEL_KEYS` gives the key of each known label, and `dataLabelText(label)` gives the text. A label with no key shows as it is.
+- **Constellation names** (`src/i18n/constellationNames.ts`): one list of 87 names for each language, in the order of the IAU names. `constellationName(latinName, locale)` gives the name. A search in Settings finds the name of the language and the IAU name.
+
+These texts are not translated, by decision: unit symbols (`km`, `AU`, `ly`, `mag`, `mas`, `Mpc`), names of catalogs, missions, and image libraries, catalog designations of objects, the citation text for the clipboard, the performance panel (`?perf=1`), and text that the server sends (for example the type label of a deep-sky object).
+
 ## Labels
 
 `src/labels/labelRank.ts` is the one label rule for the 2D map, Sky view, and the 3D view.

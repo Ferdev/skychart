@@ -94,13 +94,28 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
       await page.keyboard.press("Escape");
       await page.locator("#locale-select").selectOption("de");
       await expect(settingsToggle).toHaveText("Einstellungen");
-      const overflow = await toolbar.locator("button, label, input[type=range]").evaluateAll(elements => elements
+      const overflow = () => toolbar.locator("button, label, input[type=range]").evaluateAll(elements => elements
         .filter(element => element.getClientRects().length > 0)
         .some(element => {
           const rect = element.getBoundingClientRect();
           return rect.left < 0 || rect.right > window.innerWidth;
         }));
-      expect(overflow, "translated controls stay inside the viewport").toBe(false);
+      // The four presets are on one line, also with the longer German and Spanish texts.
+      const presetRows = () => toolbar.locator("[data-zoom-preset]").evaluateAll(buttons => new Set(buttons.map(button => Math.round(button.getBoundingClientRect().top))).size);
+      expect(await overflow(), "German controls stay inside the viewport").toBe(false);
+      expect(await presetRows(), "German presets are on one line").toBe(1);
+      await page.locator("#locale-select").selectOption("es");
+      await expect(page.locator("html")).toHaveAttribute("lang", "es");
+      expect(await overflow(), "Spanish controls stay inside the viewport").toBe(false);
+      expect(await presetRows(), "Spanish presets are on one line").toBe(1);
+      // On a wide window a language with long texts has one more row, for the presets. A phone toolbar keeps its two rows.
+      expect((await toolbar.boundingBox())!.height, "the Spanish toolbar height").toBeLessThanOrEqual(viewport.width < 900 ? 112 : 160);
+      const cutTexts = await toolbar.locator(".toolbar-quick-layers label:not([hidden]) span, [data-zoom-preset] span").evaluateAll(spans => spans
+        .filter(span => span.getClientRects().length > 0 && span.scrollWidth > span.clientWidth + 1 && window.innerWidth >= 900)
+        .map(span => span.textContent));
+      expect(cutTexts, "no Spanish text of the wide toolbar is cut").toEqual([]);
+      await page.locator("#locale-select").selectOption("de");
+      await expect(settingsToggle).toHaveText("Einstellungen");
       await settingsToggle.click();
       await page.locator('[aria-controls="scale-constellations"]').click();
       await page.locator("#constellations-hide-all").click();

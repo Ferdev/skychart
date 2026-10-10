@@ -2,8 +2,9 @@ import { formatDuration } from "../navigationMetrics";
 import { classifyBody } from "../destinationPicker";
 import { pointInRect, isPresent, type Rect, type ScreenPoint } from "../geometry";
 import { t } from "../i18n";
-import { objectMediaItemsFor, type ObjectMediaFallback } from "../objectMedia";
+import { objectMediaItemsFor, type MediaText, type ObjectMediaFallback } from "../objectMedia";
 import { measuredRedshift, scienceSemanticsFor, uncertaintySummary } from "../scienceSemantics";
+import { dataLabelText } from "../i18n/dataLabels";
 import { trackEvent } from "../analytics";
 import {
   escapeHtml,
@@ -34,6 +35,8 @@ export type ObjectInspectionContext = {
   hydrationStates: Map<string, ObjectDetailHydrationState>;
   manifest: CatalogPointManifestRepository;
   curatedSummaries: Record<string, string>;
+  /** Text of the media cards in the application language. */
+  mediaText: MediaText;
   selectedBody: () => Body | null;
   bodyByKey: () => Map<string, Body>;
   ephemeris: () => Ephemeris | null;
@@ -377,7 +380,7 @@ private renderObjectDetailState(body: Body) {
   }
   if (!body.catalog?.preview) return "";
   return `
-    <section class="object-detail-state" aria-label="Object detail state">
+    <section class="object-detail-state" aria-label="${escapeHtml(t("object.detailState"))}">
       <strong>${escapeHtml(t("object.catalogPreview"))}</strong>
       <span>${escapeHtml(t("object.catalogPreviewBody"))}</span>
     </section>
@@ -428,7 +431,7 @@ private renderUniverseSciencePanel(body: Body) {
       </div>
       <p>${escapeHtml(t("object.scienceContextBody", { name: body.name, type: classification.label.toLowerCase() }))}</p>
       <dl>${chips.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join("")}</dl>
-      <p class="science-caveat">${escapeHtml(uncertaintySummary(record))}</p>
+      <p class="science-caveat">${escapeHtml(uncertaintySummary(record, t))}</p>
       <a href="/methodology" data-analytics-event="methodology">${escapeHtml(t("launch.readMethodology"))}</a>
     </section>
   `;
@@ -534,7 +537,7 @@ private renderSourceSection(body: Body) {
     [t("field.distanceKind"), semantics?.distance_kind ? this.context.readablePositionModel(semantics.distance_kind) : null],
     [t("field.catalogEpoch"), semantics?.catalog_epoch ?? null],
     [t("field.positionEpoch"), semantics?.position_epoch ?? null],
-    [t("field.uncertainty"), uncertaintySummary({ position_model: body.catalog?.position_model, facts: body.catalog?.facts })],
+    [t("field.uncertainty"), uncertaintySummary({ position_model: body.catalog?.position_model, facts: body.catalog?.facts }, t)],
     [t("field.selectionCaveat"), semantics?.selection_caveat ?? null]
   ];
   const rows = this.renderRows(sourceRows);
@@ -551,7 +554,7 @@ private renderSourceSection(body: Body) {
                 (link) => `
                   <a href="${escapeHtml(link.url ?? "")}" ${NEW_TAB_LINK_ATTRIBUTES}>
                     <span>${escapeHtml(link.provider ?? t("object.source"))}</span>
-                    <strong>${escapeHtml(link.label ?? t("object.openSourceRecord"))}</strong>
+                    <strong>${escapeHtml(link.label ? dataLabelText(link.label) : t("object.openSourceRecord"))}</strong>
                   </a>
                 `
               )
@@ -622,7 +625,7 @@ private renderRelatedObjects(body: Body) {
 
 private renderObjectMedia(body: Body) {
   const observer = this.context.ephemeris()?.bodies.find((candidate) => candidate.key === "earth");
-  const mediaItems = objectMediaItemsFor(body, observer);
+  const mediaItems = objectMediaItemsFor(body, observer, this.context.mediaText);
   if (mediaItems.length === 0) return "";
   const hasSurveyMedia = mediaItems.some((media) => media.kind === "survey");
 

@@ -7,6 +7,7 @@ import "./styles.css";
 import { readRecentDestinations, type RecentDestination } from "./destinationPicker";
 import { AU_PER_LIGHT_YEAR, MILKY_WAY_MODEL } from "./galacticModel";
 import { initI18n, locale, t } from "./i18n";
+import { dataLabelText } from "./i18n/dataLabels";
 import { WebglPointRenderer } from "./webglPointRenderer";
 import { installAnalytics, trackEvent } from "./analytics";
 import { initializeErrorReporting } from "./errorReporting";
@@ -37,7 +38,7 @@ import { UniverseEntryMarker } from "./atlas/universeEntryMarker";
 import { loadNowEvents } from "./atlas/nowEventsView";
 import { updateScienceLayerDisclosure } from "./atlas/scienceLayerDisclosure";
 import { FEATURED_KEYS, TIME_STEPS, universeShellForRadius, zoomPresetBodies } from "./atlas/atlasDefinitions";
-import { followCuratedSummaryLocale } from "./object/curatedSummaryLocales";
+import { followCuratedSummaryLocale, mediaTextFor } from "./object/curatedSummaryLocales";
 import { ScientificValueFormatter, formatFullDate, toDatetimeLocalValue } from "./object/scientificValueFormatter";
 import { ViewportCatalogLoader } from "./catalog/viewportCatalogLoader";
 import { AtlasCameraController } from "./navigation/atlasCameraController";
@@ -381,7 +382,7 @@ const milkyWayRenderer = new MilkyWayRenderer({
   currentViewWidthLy,
   usableViewport: usableViewportRect,
   worldToScreen,
-  drawLabel: atlasOverlay.drawLabel,
+  drawLabel: atlasOverlay.drawLabel, labelText: dataLabelText,
 });
 const constellationRenderer = new ConstellationOverlay({
   stateChanged: scheduleViewStateReplace,
@@ -423,7 +424,7 @@ const objectInspection: ObjectInspectionView = new ObjectInspectionView({
   bodyInfo,
   hydrationStates: objectDetailHydrationStates,
   manifest: catalogPointManifest,
-  curatedSummaries: followCuratedSummaryLocale(locale, () => { if (ephemeris) updateAllUi(); }),
+  curatedSummaries: followCuratedSummaryLocale(locale, () => { if (ephemeris) updateAllUi(); }), mediaText: mediaTextFor(locale, t),
   selectedBody,
   bodyByKey: () => bodyByKey,
   ephemeris: () => ephemeris,

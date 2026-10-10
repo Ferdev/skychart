@@ -1,6 +1,6 @@
-import { canvasFont } from "../format/fonts";
-import { labelClass, placeLabels, rankLabels, type LabelRect } from "../labels/labelRank";
-import { numericMagnitude, type RenderedHit, type SkyPoint } from "./skyPoint";
+import { canvasFont } from "../format/fonts.ts";
+import { labelClass, placeLabels, rankLabels, type LabelRect } from "../labels/labelRank.ts";
+import { numericMagnitude, type RenderedHit, type SkyPoint } from "./skyPoint.ts";
 
 export type SkyConstellationLabel = { name: string; x: number; y: number };
 

@@ -26,12 +26,6 @@ export type ObjectMediaFallback = {
   description: string;
 };
 
-export type ObjectMediaStatus = {
-  badge: string;
-  title: string;
-  description: string;
-};
-
 /** A survey image with more than this share of pixels at the maximum of a channel shows no object. */
 const SATURATED_PIXEL_SHARE_LIMIT = 0.6;
 
@@ -59,6 +53,57 @@ export function pixelBufferHasVisibleVariation(pixels: Uint8ClampedArray, tolera
   }
   return varies && saturated / count <= SATURATED_PIXEL_SHARE_LIMIT;
 }
+
+/**
+ * English text of the media cards. `src/i18n/mediaTranslations.ts` uses this table for English and adds
+ * the other languages. This module does not import `i18n.ts`, because node tests import this module.
+ */
+export const MEDIA_TEXT_EN = {
+  "media.badge.curated": "Curated NASA image",
+  "media.badge.dss2": "All-sky DSS2 context",
+  "media.badge.allwise": "AllWISE fallback",
+  "media.source.nasaScience": "NASA Science image",
+  "media.source.dss2": "Explore the DSS2 field in Aladin",
+  "media.source.legacy": "Explore in the DR11 Sky Viewer",
+  "media.source.allwise": "Explore the AllWISE field in Aladin",
+  "media.dss2.title": "{name} all-sky context",
+  "media.dss2.titleMoving": "{name} current sky field",
+  "media.dss2.alt": "DSS2 color sky-survey cutout centered on {name}.",
+  "media.dss2.altMoving": "Archival DSS2 color sky-survey cutout centered on the current modeled sky position of {name}.",
+  "media.legacy.title": "{name} in Legacy Surveys DR11",
+  "media.legacy.titleMoving": "{name} current sky field in Legacy Surveys DR11",
+  "media.legacy.alt": "DESI Legacy Imaging Surveys DR11 color cutout centered on {name}.",
+  "media.legacy.altMoving": "Archival DESI Legacy Imaging Surveys DR11 color cutout centered on the current modeled sky position of {name}.",
+  "media.legacy.footprint": "Coverage follows the DR11 survey footprint.",
+  "media.allwise.title": "{name} in AllWISE infrared",
+  "media.allwise.titleMoving": "{name} current sky field in AllWISE infrared",
+  "media.allwise.alt": "AllWISE infrared color cutout centered on {name}, shown because DR11 did not return a usable field.",
+  "media.allwise.altMoving": "Archival AllWISE infrared color cutout centered on the current modeled sky position of {name}, shown because DR11 did not return a usable field.",
+  "media.allwise.description": "DR11 did not return a usable field at these coordinates, so this card is showing a reliable all-sky infrared comparison from AllWISE.",
+  "media.allwise.descriptionMoving": "DR11 did not return a usable field at these coordinates, so this card is showing an archival all-sky infrared comparison from AllWISE. Because this object moves, the survey image may not contain the object itself.",
+  "media.survey.reference": "Reliable all-sky reference at RA {ra} deg, Dec {dec} deg.",
+  "media.survey.optical": "Optical color cutout at RA {ra} deg, Dec {dec} deg.",
+  "media.survey.moving": "This is an archival field centered on {name}'s current modeled direction; a moving object may not appear in the survey exposure.",
+  "media.survey.reconstructed": "Sky coordinates were reconstructed from the atlas position.",
+} as const;
+
+export type MediaTextKey = keyof typeof MEDIA_TEXT_EN;
+
+/** The text of the media cards in one language. */
+export type MediaText = {
+  translate: (key: MediaTextKey, params?: Record<string, string | number>) => string;
+  /** Title and alternative text of a curated image in that language, when the language has them. */
+  curated: (key: string) => { title: string; alt: string } | undefined;
+};
+
+/** English text. It is the default, so that a caller with no language (a node test) gets the source text. */
+export const ENGLISH_MEDIA_TEXT: MediaText = {
+  translate: (key, params = {}) => MEDIA_TEXT_EN[key].replace(/\{(\w+)\}/g, (_match, name: string) => String(params[name] ?? "")),
+  curated: () => undefined,
+};
+
+/** The source name of the four curated images that are not in the NASA Image and Video Library. */
+const NASA_SCIENCE_SOURCE = "NASA Science image";
 
 type MediaLookupBody = {
   key: string;
@@ -381,6 +426,9 @@ const OBJECT_MEDIA_BY_KEY: Record<string, ObjectMediaItem> = {
   }
 };
 
+/** The keys of the objects that have a curated image. Each locale module has a title and an alternative text for each key. */
+export const CURATED_MEDIA_KEYS: readonly string[] = Object.keys(OBJECT_MEDIA_BY_KEY);
+
 const OBJECT_MEDIA_ALIASES: Record<string, string> = {
   "m31 andromeda galaxy": "m31",
   "andromeda galaxy": "m31",
@@ -410,46 +458,51 @@ const OBJECT_MEDIA_ALIASES: Record<string, string> = {
   "ring nebula": "m57"
 };
 
-export function objectMediaFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMediaItem | null {
-  return objectMediaItemsFor(body, observer)[0] ?? null;
+export function objectMediaFor(body: MediaLookupBody, observer?: MediaObserver, text: MediaText = ENGLISH_MEDIA_TEXT): ObjectMediaItem | null {
+  return objectMediaItemsFor(body, observer, text)[0] ?? null;
 }
 
-export function objectMediaItemsFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMediaItem[] {
+export function objectMediaItemsFor(body: MediaLookupBody, observer?: MediaObserver, text: MediaText = ENGLISH_MEDIA_TEXT): ObjectMediaItem[] {
   const items: ObjectMediaItem[] = [];
-  const curated = curatedMediaFor(body);
-  const primary = curated ?? dss2MediaFor(body, observer);
+  const curated = curatedMediaFor(body, text);
+  const primary = curated ?? dss2MediaFor(body, observer, text);
   if (primary) items.push(primary);
 
-  const survey = legacySurveyMediaFor(body, observer, !curated);
+  const survey = legacySurveyMediaFor(body, observer, !curated, text);
   if (survey) items.push(survey);
 
   return items;
 }
 
-function curatedMediaFor(body: MediaLookupBody): ObjectMediaItem | null {
-  const direct = OBJECT_MEDIA_BY_KEY[body.key.toLowerCase()];
-  if (direct) return direct;
+function curatedMediaFor(body: MediaLookupBody, text: MediaText): ObjectMediaItem | null {
+  const key = curatedMediaKey(body);
+  if (!key) return null;
+  const item = OBJECT_MEDIA_BY_KEY[key];
+  const local = text.curated(key);
+  return {
+    ...item,
+    title: local?.title ?? item.title,
+    alt: local?.alt ?? item.alt,
+    license: item.license === NASA_SCIENCE_SOURCE ? text.translate("media.source.nasaScience") : item.license,
+    badge: text.translate("media.badge.curated"),
+  };
+}
+
+/** The key of the curated image of an object: its own key, or the key that one of its names gives. */
+function curatedMediaKey(body: MediaLookupBody): string | null {
+  const direct = body.key.toLowerCase();
+  if (OBJECT_MEDIA_BY_KEY[direct]) return direct;
 
   const lookupValues = [body.name, ...(body.aliases ?? [])].map((value) => value.trim().toLowerCase()).filter(Boolean);
   for (const value of lookupValues) {
     const key = OBJECT_MEDIA_ALIASES[value];
-    if (key && OBJECT_MEDIA_BY_KEY[key]) return OBJECT_MEDIA_BY_KEY[key];
+    if (key && OBJECT_MEDIA_BY_KEY[key]) return key;
   }
 
   return null;
 }
 
-export function objectMediaStatusFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMediaStatus {
-  const sourceLabel = sourceLabelFor(body);
-  const coordinateLabel = coordinateFor(body, observer) ? "The object has survey-ready sky coordinates." : "The object does not expose survey-ready sky coordinates yet.";
-  return {
-    badge: "Catalog-only object",
-    title: "No image attached yet",
-    description: `${coordinateLabel} Its scientific facts and position are still available from ${sourceLabel}.`
-  };
-}
-
-function dss2MediaFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMediaItem | null {
+function dss2MediaFor(body: MediaLookupBody, observer: MediaObserver | undefined, text: MediaText): ObjectMediaItem | null {
   const coordinate = coordinateFor(body, observer);
   if (!coordinate) return null;
 
@@ -475,19 +528,17 @@ function dss2MediaFor(body: MediaLookupBody, observer?: MediaObserver): ObjectMe
     kind: "survey",
     provider: "dss2",
     imageUrl: surveyImageProxyUrl("dss2", imageParams),
-    title: coordinate.movingTarget ? `${body.name} current sky field` : `${body.name} all-sky context`,
-    alt: coordinate.movingTarget
-      ? `Archival DSS2 color sky-survey cutout centered on the current modeled sky position of ${body.name}.`
-      : `DSS2 color sky-survey cutout centered on ${body.name}.`,
+    title: text.translate(coordinate.movingTarget ? "media.dss2.titleMoving" : "media.dss2.title", { name: body.name }),
+    alt: text.translate(coordinate.movingTarget ? "media.dss2.altMoving" : "media.dss2.alt", { name: body.name }),
     credit: "CDS/Aladin HiPS using DSS2 color survey data",
-    license: "Explore the DSS2 field in Aladin",
+    license: text.translate("media.source.dss2"),
     sourceUrl: `https://aladin.cds.unistra.fr/AladinLite/?${sourceParams.toString()}`,
-    badge: "All-sky DSS2 context",
-    description: surveyDescription(body, coordinate, "Reliable all-sky reference")
+    badge: text.translate("media.badge.dss2"),
+    description: surveyDescription(body, coordinate, "media.survey.reference", text)
   };
 }
 
-function legacySurveyMediaFor(body: MediaLookupBody, observer?: MediaObserver, allowPosition = true): ObjectMediaItem | null {
+function legacySurveyMediaFor(body: MediaLookupBody, observer: MediaObserver | undefined, allowPosition: boolean, text: MediaText): ObjectMediaItem | null {
   const coordinate = coordinateFor(body, observer, allowPosition);
   if (!coordinate) return null;
 
@@ -515,20 +566,18 @@ function legacySurveyMediaFor(body: MediaLookupBody, observer?: MediaObserver, a
     kind: "survey",
     provider: "legacy-dr11",
     imageUrl: surveyImageProxyUrl("legacy-dr11", imageParams),
-    title: coordinate.movingTarget ? `${body.name} current sky field in Legacy Surveys DR11` : `${body.name} in Legacy Surveys DR11`,
-    alt: coordinate.movingTarget
-      ? `Archival DESI Legacy Imaging Surveys DR11 color cutout centered on the current modeled sky position of ${body.name}.`
-      : `DESI Legacy Imaging Surveys DR11 color cutout centered on ${body.name}.`,
+    title: text.translate(coordinate.movingTarget ? "media.legacy.titleMoving" : "media.legacy.title", { name: body.name }),
+    alt: text.translate(coordinate.movingTarget ? "media.legacy.altMoving" : "media.legacy.alt", { name: body.name }),
     credit: "DESI Legacy Imaging Surveys / DOE / NSF / NOIRLab",
-    license: "Explore in the DR11 Sky Viewer",
+    license: text.translate("media.source.legacy"),
     sourceUrl: `https://www.legacysurvey.org/viewer?${sourceParams.toString()}`,
     badge: "Legacy Surveys DR11",
-    description: surveyDescription(body, coordinate, "Optical color cutout") + " Coverage follows the DR11 survey footprint.",
-    fallback: allWiseFallbackFor(coordinate, fov, body.name)
+    description: `${surveyDescription(body, coordinate, "media.survey.optical", text)} ${text.translate("media.legacy.footprint")}`,
+    fallback: allWiseFallbackFor(coordinate, fov, body.name, text)
   };
 }
 
-function allWiseFallbackFor(coordinate: SurveyCoordinate, fov: number, bodyName: string): ObjectMediaFallback {
+function allWiseFallbackFor(coordinate: SurveyCoordinate, fov: number, bodyName: string, text: MediaText): ObjectMediaFallback {
   const imageParams = new URLSearchParams({
     hips: "CDS/P/allWISE/color",
     width: "512",
@@ -549,17 +598,13 @@ function allWiseFallbackFor(coordinate: SurveyCoordinate, fov: number, bodyName:
   return {
     provider: "allwise",
     imageUrl: surveyImageProxyUrl("allwise", imageParams),
-    title: coordinate.movingTarget ? `${bodyName} current sky field in AllWISE infrared` : `${bodyName} in AllWISE infrared`,
-    alt: coordinate.movingTarget
-      ? `Archival AllWISE infrared color cutout centered on the current modeled sky position of ${bodyName}, shown because DR11 did not return a usable field.`
-      : `AllWISE infrared color cutout centered on ${bodyName}, shown because DR11 did not return a usable field.`,
+    title: text.translate(coordinate.movingTarget ? "media.allwise.titleMoving" : "media.allwise.title", { name: bodyName }),
+    alt: text.translate(coordinate.movingTarget ? "media.allwise.altMoving" : "media.allwise.alt", { name: bodyName }),
     credit: "NASA/IPAC AllWISE / CDS Aladin HiPS",
-    license: "Explore the AllWISE field in Aladin",
+    license: text.translate("media.source.allwise"),
     sourceUrl: `https://aladin.cds.unistra.fr/AladinLite/?${sourceParams.toString()}`,
-    badge: "AllWISE fallback",
-    description: coordinate.movingTarget
-      ? "DR11 did not return a usable field at these coordinates, so this card is showing an archival all-sky infrared comparison from AllWISE. Because this object moves, the survey image may not contain the object itself."
-      : "DR11 did not return a usable field at these coordinates, so this card is showing a reliable all-sky infrared comparison from AllWISE."
+    badge: text.translate("media.badge.allwise"),
+    description: text.translate(coordinate.movingTarget ? "media.allwise.descriptionMoving" : "media.allwise.description")
   };
 }
 
@@ -605,15 +650,11 @@ function isMovingTarget(body: MediaLookupBody) {
     || ["asteroid", "comet", "small_body"].includes(body.object_type ?? "");
 }
 
-function surveyDescription(body: MediaLookupBody, coordinate: SurveyCoordinate, prefix: string) {
-  const position = `at RA ${coordinate.raDeg.toFixed(3)} deg, Dec ${coordinate.decDeg.toFixed(3)} deg.`;
-  if (coordinate.movingTarget) {
-    return `${prefix} ${position} This is an archival field centered on ${body.name}'s current modeled direction; a moving object may not appear in the survey exposure.`;
-  }
-  if (coordinate.source === "atlas-position") {
-    return `${prefix} ${position} Sky coordinates were reconstructed from the atlas position.`;
-  }
-  return `${prefix} ${position}`;
+function surveyDescription(body: MediaLookupBody, coordinate: SurveyCoordinate, key: "media.survey.reference" | "media.survey.optical", text: MediaText) {
+  const position = text.translate(key, { ra: coordinate.raDeg.toFixed(3), dec: coordinate.decDeg.toFixed(3) });
+  if (coordinate.movingTarget) return `${position} ${text.translate("media.survey.moving", { name: body.name })}`;
+  if (coordinate.source === "atlas-position") return `${position} ${text.translate("media.survey.reconstructed")}`;
+  return position;
 }
 
 function finiteCoordinate(value: number | null | undefined): number | null {
@@ -639,11 +680,4 @@ function parseAngularMajorArcmin(value: string | null | undefined): number | nul
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function sourceLabelFor(body: MediaLookupBody) {
-  if (body.catalog?.source_type) return body.catalog.source_type.replace(/_/g, " ");
-  if (body.catalog?.catalog_group) return body.catalog.catalog_group.replace(/_/g, " ");
-  if (body.object_type) return `${body.object_type.replace(/_/g, " ")} catalog`;
-  return "the scientific catalog";
 }

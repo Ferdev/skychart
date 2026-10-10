@@ -11,6 +11,8 @@ export type ConstellationRendererOptions = {
   viewport: () => Rect;
   requestRender: () => void;
   hiddenConstellations?: () => ReadonlySet<string>;
+  /** The name of a figure in the application language. The default is the IAU name. */
+  figureName?: (latinName: string) => string;
 };
 
 const ENDPOINT_KEYS = new Set(MAP_CONSTELLATIONS.flatMap((figure) => figure.polylines.flat()));
@@ -95,12 +97,13 @@ export class ConstellationRenderer {
       if (span < 40 || span > Math.max(viewport.width, viewport.height) * 4) continue;
       const x = points.reduce((sum, p) => sum + p.x, 0) / points.length;
       const y = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-      const width = ctx.measureText(figure.name).width + 12;
+      const name = this.options.figureName?.(figure.name) ?? figure.name;
+      const width = ctx.measureText(name).width + 12;
       const rect = { left: x - width / 2, right: x + width / 2, top: y - 10, bottom: y + 10, width, height: 20 };
       if (rect.left < viewport.left || rect.right > viewport.right || rect.top < viewport.top || rect.bottom > viewport.bottom ||
           occupied.some((other) => rectsOverlap(other, rect))) continue;
       occupied.push(rect);
-      ctx.fillText(figure.name, x, y);
+      ctx.fillText(name, x, y);
     }
     ctx.restore();
   }
