@@ -4,12 +4,15 @@ defmodule StarsmapApi.Community.Mailer.Webhook do
     with url when is_binary(url) <- Application.get_env(:starsmap_api, :community_mail_url),
          true <- String.starts_with?(url, "https://"),
          token when is_binary(token) <- Application.get_env(:starsmap_api, :community_mail_token),
+         from when is_binary(from) and from != "" <-
+           Application.get_env(:starsmap_api, :community_mail_from),
          {:ok, status, _, _} when status in 200..299 <-
            :hackney.request(
              :post,
              url,
              [{"authorization", "Bearer " <> token}, {"content-type", "application/json"}],
              Jason.encode!(%{
+               from: from,
                to: email,
                subject: "Cosmic Atlas sign-in code",
                text: "Your code is #{code}. It expires in 10 minutes."

@@ -40,6 +40,7 @@ jobs:
       COMMUNITY_S3_ENDPOINT: ${{ vars.STAGING_COMMUNITY_S3_ENDPOINT }}
       COMMUNITY_S3_REGION: ${{ vars.STAGING_COMMUNITY_S3_REGION }}
       COMMUNITY_MAIL_URL: ${{ vars.STAGING_COMMUNITY_MAIL_URL }}
+      COMMUNITY_MAIL_FROM: ${{ vars.STAGING_COMMUNITY_MAIL_FROM }}
       COMMUNITY_BACKUP_URI: ${{ vars.STAGING_COMMUNITY_BACKUP_URI }}
       COMMUNITY_BACKUP_ENDPOINT: ${{ vars.STAGING_COMMUNITY_BACKUP_ENDPOINT }}
       CATALOG_TILE_MANIFEST_URL: ${{ vars.STAGING_CATALOG_TILE_MANIFEST_URL }}
@@ -101,6 +102,21 @@ jobs:
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::Missing or empty secrets: ${missing[*]}"
             exit 1
+          fi
+          if [ "$COMMUNITY_ENABLED" = "true" ]; then
+            community_missing=()
+            for v in COMMUNITY_DATABASE_URL COMMUNITY_SECRET COMMUNITY_S3_BUCKET COMMUNITY_S3_ACCESS_KEY_ID COMMUNITY_S3_SECRET_ACCESS_KEY COMMUNITY_S3_ENDPOINT COMMUNITY_S3_REGION COMMUNITY_ORIGIN COMMUNITY_MEDIA_URL COMMUNITY_MAIL_URL COMMUNITY_MAIL_TOKEN COMMUNITY_MAIL_FROM; do
+              if [ -z "${!v}" ]; then community_missing+=("$v"); fi
+            done
+            if [ -n "$COMMUNITY_BACKUP_URI" ]; then
+              for v in COMMUNITY_BACKUP_SECRET COMMUNITY_BACKUP_ACCESS_KEY_ID COMMUNITY_BACKUP_SECRET_ACCESS_KEY; do
+                if [ -z "${!v}" ]; then community_missing+=("$v"); fi
+              done
+            fi
+            if [ ${#community_missing[@]} -ne 0 ]; then
+              echo "::error::COMMUNITY_ENABLED is true but these community settings are missing or empty: ${community_missing[*]}"
+              exit 1
+            fi
           fi
 
       - name: Write Kamal secrets
