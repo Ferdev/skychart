@@ -1,6 +1,6 @@
 import { trackAnalytics } from "../analytics";
 import { bindHeaderSearch } from "./headerSearch";
-import { bindSearchPanel } from "./searchPanelBindings";
+import { bindEmptyResultActions, bindSearchPanel } from "./searchPanelBindings";
 import { requestObservation } from "../object/observePanel";
 import type { Body } from "../atlas/contracts";
 import { GUIDED_SETS } from "../atlas/atlasDefinitions";
@@ -198,6 +198,7 @@ export function bindDestinationEvents(options: DestinationEventBindingsOptions) 
     const menu = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-body-filter-menu]");
     if (menu?.value) applyCompareFilter(menu.value as BodyFilter);
   });
+  bindEmptyResultActions({ picker: dom.comparePicker, searchField: dom.compareSearch, pickerConfig: options.comparePickerConfig });
   dom.comparePicker.addEventListener("click", (event) => {
     if ((event.target as HTMLElement).closest("[data-picker-load-more]")) {
       const config = options.comparePickerConfig(); if (config) void options.searchView.loadMore(config); return;

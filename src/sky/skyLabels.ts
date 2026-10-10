@@ -23,7 +23,10 @@ export type SkyLabelArea = {
 
 const LABEL_MAGNITUDE_LIMIT = 4.5;
 const DETAIL_MAGNITUDE_LIMIT = 6.5;
-/** Below this field of view, minor bodies and catalog designations can get a label. */
+/**
+ * At this field of view, minor bodies and catalog designations can get a label.
+ * It is the smallest field of view of the Sky camera (`skyProjection.ts`).
+ */
 export const SKY_DETAIL_FOV_DEG = 20;
 const LABEL_LIMIT = 28;
 const NARROW_LABEL_LIMIT = 12;
@@ -42,10 +45,10 @@ function labelPoint(point: SkyPoint, rule: SkyLabelRule) {
 /**
  * A point can get a label when it is selected, when it is the Sun, a planet, or the Moon,
  * or when it is a bright object with a name. A minor body or a catalog designation
- * gets a label only in a small field of view.
+ * gets a label only at the smallest field of view.
  */
 export function isSkyLabelCandidate(point: SkyPoint, rule: SkyLabelRule): boolean {
-  const detail = rule.fovDeg < SKY_DETAIL_FOV_DEG;
+  const detail = rule.fovDeg <= SKY_DETAIL_FOV_DEG;
   const pointClass = labelClass(labelPoint(point, rule));
   if (pointClass === "selected" || pointClass === "major") return true;
   if ((pointClass === "minor" || pointClass === "designation") && !detail) return false;

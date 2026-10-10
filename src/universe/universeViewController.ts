@@ -38,6 +38,7 @@ import { UniverseExoplanetSystems } from "./universeExoplanets";
 import { universeTargetCardText } from "./universeTargetCard";
 import { UniverseCameraTurn } from "./universeCameraTurn";
 import { EXIT_CONFIRM_WINDOW_MS, ExitConfirmation, universeEscapeAction } from "./universeEscape";
+import { bindViewEscapeKey } from "../atlas/viewEscapeKey";
 import type { Body } from "../atlas/contracts";
 import type { UniverseViewOptions } from "./universeViewOptions";
 
@@ -164,6 +165,7 @@ export class UniverseViewController {
     options.canvas.addEventListener("pointerleave", () => this.hideTooltip());
     options.canvas.addEventListener("wheel", (event) => this.wheel(event), { passive: false });
     options.canvas.addEventListener("keydown", (event) => this.keyDown(event));
+    bindViewEscapeKey({ active: () => this.active, canvas: options.canvas, escape: () => this.escape() });
     window.addEventListener("keyup", (event) => this.keyUp(event));
     window.addEventListener("blur", () => this.stopFlight());
     window.addEventListener("resize", () => this.requestRender());
@@ -628,6 +630,8 @@ export class UniverseViewController {
     this.autopilotStandoffAu = this.autopilotStandoff();
     this.baseRenderKey = "";
     this.updateTarget();
+    // A new target shows the target card only, as a selection does.
+    this.hideObjectInspector(); this.options.closeInspector();
     this.cameraTurn.start();
     this.options.stateChanged("push");
     this.options.canvas.focus({ preventScroll: true });

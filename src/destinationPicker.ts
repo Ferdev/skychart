@@ -481,6 +481,7 @@ export function createDestinationPickerItem(
   const isRecent = Boolean(options.recent);
   const badges = destinationBadges({ isCurrentTarget, isSelected, isFavorite, isFrequent, isRecent });
   const searchLabel = body.name;
+  const localName = localObjectName(body.key, locale(), body.name);
   const searchTokens = destinationSearchTokens(body, classification);
   const sortRank = destinationSortRank(body, classification, {
     isCurrentTarget,
@@ -496,7 +497,7 @@ export function createDestinationPickerItem(
   return {
     key: body.key,
     name: body.name,
-    localName: localObjectName(body.key, locale(), body.name),
+    localName,
     searchLabel,
     type: classification.type,
     typeLabel: classification.label,
@@ -509,7 +510,7 @@ export function createDestinationPickerItem(
     distanceLabel,
     heliocentricDistanceKm: finiteNumber(body.position.heliocentric_distance_km, 0),
     heliocentricDistanceLabel,
-    ariaLabel: destinationAriaLabel(body.name, metaLabel, distanceLabel, badges),
+    ariaLabel: destinationAriaLabel(localName ? `${body.name} ${localName}` : body.name, metaLabel, distanceLabel, badges),
     badges,
     isCurrentTarget,
     isSelected,

@@ -331,7 +331,9 @@ function renderEmptyResult(config: DestinationSearchConfig) {
   const clear = config.clearFilters && config.filter.key !== "all"
     ? `<button type="button" class="secondary-action" data-search-clear-filters>${escapeHtml(t("search.clearFilters"))}</button>`
     : "";
+  // The comparison search does not offer its own object A as an example.
   const examples = EXAMPLE_QUERIES
+    .filter((example) => !config.excludeKeys?.includes(example.toLowerCase()))
     .map((example) => `<button type="button" class="text-action" data-search-example="${escapeHtml(example)}">${escapeHtml(example)}</button>`)
     .join("");
   return `

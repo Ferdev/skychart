@@ -292,6 +292,44 @@ Each row has the translation key, the English text, and the Spanish text. Correc
 | `workspace.nav` | Atlas workspaces | Espacios de trabajo del atlas |
 | `workspace.path` | Workspace path | Ruta del espacio de trabajo |
 
+## Interface text added to this list on 2026-10-10 (31 keys)
+
+The first list did not have these keys. `launch.observeHelp` is an old text that changed on 2026-10-10 (the words for rise and set were wrong). The plural type names are in `src/i18n/typeTranslations.ts`.
+
+| Key | English | Spanish |
+|---|---|---|
+| `compare.copyLink` | Copy comparison link | Copiar enlace de la comparación |
+| `link.opensNewTab` | Opens in a new tab | Se abre en una pestaña nueva |
+| `sky.backToMap` | Back to map | Volver al mapa |
+| `sky.backTo3d` | Back to 3D | Volver a 3D |
+| `universe3d.escapeAgain` | Press Esc again to exit 3D | Pulsa Esc otra vez para salir de 3D |
+| `universe3d.flyThere` | Fly there | Volar hasta allí |
+| `universe3d.jumpThere` | Jump there | Saltar hasta allí |
+| `universe3d.searchRecent` | Recent | Recientes |
+| `universe3d.searchSuggestions` | Suggestions | Sugerencias |
+| `launch.observeHelp` | Use a location to calculate approximate altitude, rise, transit, and set times. Your location is not stored. | Use una ubicación para calcular la altitud aproximada y las horas de salida, tránsito y puesta. Su ubicación no se almacena. |
+| `typePlural.star` | Stars | Estrellas |
+| `typePlural.planet` | Planets | Planetas |
+| `typePlural.moon` | Moons | Lunas |
+| `typePlural.dwarfPlanet` | Dwarf planets | Planetas enanos |
+| `typePlural.galaxy` | Galaxies | Galaxias |
+| `typePlural.quasar` | Quasars | Cuásares |
+| `typePlural.activeGalaxy` | Active galaxies | Galaxias activas |
+| `typePlural.blackHole` | Black holes | Agujeros negros |
+| `typePlural.pulsar` | Pulsars | Púlsares |
+| `typePlural.nebula` | Nebulae | Nebulosas |
+| `typePlural.starCluster` | Star clusters | Cúmulos estelares |
+| `typePlural.xraySource` | X-ray sources | Fuentes de rayos X |
+| `typePlural.xrayExtended` | Extended X-ray sources | Fuentes extensas de rayos X |
+| `typePlural.asterism` | Asterisms | Asterismos |
+| `typePlural.milkyWayPatch` | Milky Way patches | Regiones de la Vía Láctea |
+| `typePlural.asteroid` | Asteroids | Asteroides |
+| `typePlural.comet` | Comets | Cometas |
+| `typePlural.smallBody` | Small bodies | Cuerpos menores |
+| `typePlural.object` | Objects | Objetos |
+| `typePlural.planetCandidate` | Planet candidates | Candidatos a planeta |
+| `typePlural.spacecraft` | Spacecraft | Naves espaciales |
+
 ## Object names (24 bodies)
 
 The catalog has the English names. The search finds a body by its Spanish name, and a result row shows the Spanish name as second text.

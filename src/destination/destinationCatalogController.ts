@@ -190,7 +190,17 @@ export class DestinationCatalogController {
       loadingMessage: this.options.translate("search.loading"),
       fallbackMessage: this.options.translate("search.fallback"),
       queryForSearch: (query) => target && query.toLowerCase() === target.name.toLowerCase() ? "" : query,
+      clearFilters: () => this.clearCompareFilter(),
     };
+  }
+
+  /** Removes the type filter of the comparison search. The query text stays. */
+  clearCompareFilter(): void {
+    this.options.state.activeCompareFilter = "all";
+    this.options.compareSearchState.latestBodies = [];
+    this.options.compareSearchState.activeOptionKey = null;
+    this.updateCompareFilters();
+    void this.updateComparePicker();
   }
 
   updateComparePanel(): void {

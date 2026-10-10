@@ -370,6 +370,15 @@
     border-radius: 18px 18px 0 0;
   }
 
+  /*
+   * A guided tour shows its card as a bar at the bottom of the window (tour-player.css). The sheet is
+   * above the bar and is shorter, so that the map stays in view between the header and the sheet.
+   */
+  #app:has(> .tour-player:not([hidden])) .map-hud[data-workspace-tab="object"] .workspace-panel {
+    bottom: var(--tour-bar-height);
+    height: clamp(120px, calc(100dvh - var(--atlas-bar-bottom, 112px) - var(--tour-bar-height) - 180px), 320px);
+  }
+
   .map-hud[data-workspace-tab="object"] .workspace-titlebar {
     top: 13px;
     right: 13px;

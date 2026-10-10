@@ -516,6 +516,21 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator("#compare-panel")).toContainText("Mars");
     await expect(page.locator("#compare-panel")).toContainText(/True diameter ratio|Current distance/);
 
+    // The distance shows one time. The main unit is AU, so there is no second value in AU.
+    const distance = page.locator("#compare-panel .compare-distance--hero strong");
+    await expect(distance).toHaveText(/ AU$/);
+    await expect(page.locator("#compare-panel .compare-distance--hero small")).toHaveCount(0);
+    const distanceText = (await distance.innerText()).trim();
+    expect((await page.locator("#compare-panel").innerText()).split(distanceText).length - 1, "the distance occurs one time").toBe(1);
+
+    // With a star as object B the main unit is the light-year, and no row repeats the value in light-years.
+    await page.locator("#compare-search").fill("Sirius");
+    await page.locator("#compare-picker [data-body-key]").filter({ hasText: "Sirius" }).first().click();
+    await expect(page.locator("#compare-panel")).toContainText("Sirius");
+    await expect(distance).toHaveText(/ ly$/);
+    await expect(page.locator("#compare-panel .compare-distance--hero small")).toHaveText(/ AU$/);
+    await expect(page.locator("#compare-panel .comparison-list")).not.toContainText("Light-years");
+
     issues.assertClean();
   });
 
@@ -641,6 +656,10 @@ test.describe("Cosmic Atlas browser smoke", () => {
 
     await page.locator("#compare-search").fill("EmptyCompare");
     await expect(page.locator("#compare-picker .empty-state")).toContainText("EmptyCompare");
+    // An example query goes into the comparison field and gives a result.
+    await page.locator("#compare-picker .empty-state [data-search-example]").filter({ hasText: "Mars" }).click();
+    await expect(page.locator("#compare-search")).toHaveValue("Mars");
+    await expect(page.locator('#compare-picker [data-body-key="mars"]')).toBeVisible();
 
     await page.locator("#compare-search").fill("FailCompare");
     await expect(page.locator("#compare-picker .picker-status--fallback")).toContainText("Live catalog search is unavailable");

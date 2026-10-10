@@ -12,13 +12,10 @@ type SearchPanelBindingsOptions = {
   startTour: (slug: string) => void;
 };
 
-/** Controls of the Search panel that are not a result row: the `More types` menu, the empty result, and the tours. */
-export function bindSearchPanel(options: SearchPanelBindingsOptions): void {
-  options.filterButtons.addEventListener("change", (event) => {
-    const menu = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-body-filter-menu]");
-    if (menu?.value) options.applyFilter(menu.value as BodyFilter);
-  });
+type EmptyResultOptions = Pick<SearchPanelBindingsOptions, "picker" | "searchField" | "pickerConfig">;
 
+/** The actions of an empty result: `Clear filters` and the example queries. The comparison search has them also. */
+export function bindEmptyResultActions(options: EmptyResultOptions): void {
   options.picker.addEventListener("click", (event) => {
     const target = event.target as HTMLElement;
     if (target.closest("[data-search-clear-filters]")) {
@@ -31,6 +28,16 @@ export function bindSearchPanel(options: SearchPanelBindingsOptions): void {
     options.searchField.dispatchEvent(new Event("input", { bubbles: true }));
     options.searchField.focus();
   });
+}
+
+/** Controls of the Search panel that are not a result row: the `More types` menu, the empty result, and the tours. */
+export function bindSearchPanel(options: SearchPanelBindingsOptions): void {
+  options.filterButtons.addEventListener("change", (event) => {
+    const menu = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-body-filter-menu]");
+    if (menu?.value) options.applyFilter(menu.value as BodyFilter);
+  });
+
+  bindEmptyResultActions(options);
 
   options.guidedTourList.addEventListener("click", (event) => {
     const link = (event.target as HTMLElement).closest<HTMLAnchorElement>("[data-tour-slug]");

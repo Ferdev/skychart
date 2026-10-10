@@ -189,8 +189,12 @@ test("selected objects open and replay a shareable object-centered sky view", as
   await page.locator("#sky-map").focus();
   await page.locator("#sky-map").press("ArrowRight");
   await expect.poll(async () => Number(await connectorSource.getAttribute("cx"))).not.toBe(sourceX);
-  await page.locator("#close-panel").click();
+  // Escape closes the inspector first, also when the focus is in the inspector and not on the canvas.
+  // Sky view stays open.
+  await page.locator("#close-panel").focus();
+  await page.keyboard.press("Escape");
   await expect(page.locator("#workspace-panel")).toBeHidden();
+  await expect(page.locator("#sky-view")).toBeVisible();
   await expect(page.locator("#sky-view")).not.toHaveAttribute("data-object-inspector", /.+/);
   await expect(skyConnector).toBeHidden();
 

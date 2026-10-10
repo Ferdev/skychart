@@ -110,11 +110,19 @@ export function formatPercent(fraction: number, maximumFractionDigits = 1): stri
 export function formatDistanceKm(kilometers: number, options: { auKm?: number } = {}): string {
   if (!Number.isFinite(kilometers)) return configuration.unknown;
   const auKm = options.auKm && options.auKm > 0 ? options.auKm : DEFAULT_AU_KM;
-  const magnitude = Math.abs(kilometers);
   const { units } = configuration;
-  if (magnitude >= LIGHT_YEAR_KM * 0.1) return `${formatQuantity(kilometers / LIGHT_YEAR_KM)} ${units.ly}`;
-  if (magnitude >= auKm * 0.1) return `${formatQuantity(kilometers / auKm)} ${units.au}`;
+  const unit = distanceUnit(kilometers, options);
+  if (unit === "ly") return `${formatQuantity(kilometers / LIGHT_YEAR_KM)} ${units.ly}`;
+  if (unit === "au") return `${formatQuantity(kilometers / auKm)} ${units.au}`;
   return `${formatQuantity(kilometers)} ${units.km}`;
+}
+
+/** The unit that the distance rule selects: km below 0.1 AU, AU below 0.1 ly, ly from 0.1 ly. */
+export function distanceUnit(kilometers: number, options: { auKm?: number } = {}): "km" | "au" | "ly" {
+  const auKm = options.auKm && options.auKm > 0 ? options.auKm : DEFAULT_AU_KM;
+  const magnitude = Math.abs(kilometers);
+  if (magnitude >= LIGHT_YEAR_KM * 0.1) return "ly";
+  return magnitude >= auKm * 0.1 ? "au" : "km";
 }
 
 /** A distance in astronomical units, shown in km, AU, or ly as its size requires. */

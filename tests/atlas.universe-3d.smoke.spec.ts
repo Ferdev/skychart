@@ -264,7 +264,8 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   // The first press closes the inspector and keeps 3D and its target.
   await page.locator("#universe-details").click();
   await expect(page.locator("#workspace-panel")).toBeVisible();
-  await page.locator("#universe-map").press("Escape");
+  // The focus is on the `Details` button after the click, not on the canvas. The key works there also.
+  await page.keyboard.press("Escape");
   await expect(page.locator("#workspace-panel")).toBeHidden();
   await expect(page.locator("#universe-view")).toBeVisible();
   await expect(page.locator("#universe-target-name")).toHaveText("Fixture A");

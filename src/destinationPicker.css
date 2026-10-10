@@ -14,7 +14,7 @@
 }
 
 .destination-picker__section-title {
-  color: var(--muted, rgba(244, 241, 232, 0.62));
+  color: var(--panel-ink-muted);
   font-size: var(--text-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -40,7 +40,7 @@
   border-radius: 7px;
   padding: 7px 9px;
   background: rgba(244, 241, 232, 0.038);
-  color: var(--text, #f4f1e8);
+  color: var(--panel-ink);
   text-align: left;
 }
 
@@ -116,13 +116,13 @@
 }
 
 .destination-picker__meta {
-  color: var(--muted, rgba(244, 241, 232, 0.62));
+  color: var(--panel-ink-muted);
   font-size: var(--text-xs);
 }
 
 .destination-picker__distance {
-  color: var(--text, #f4f1e8);
-  font-family: var(--font-data, ui-monospace, monospace);
+  color: var(--panel-ink);
+  font-family: ui-monospace, monospace;
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }

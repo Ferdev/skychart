@@ -2,6 +2,7 @@ import { hasBodyPosition } from "../catalog/spacecraftCatalog";
 import { escapeHtml, formatNumber, formatRatio } from "../atlasFormatting";
 import type { Body } from "../atlas/contracts";
 import { classifyBody } from "../destinationPicker";
+import { distanceUnit } from "../format/quantity";
 import { t } from "../i18n";
 import { educationalComparisons } from "../navigationMetrics";
 
@@ -59,9 +60,13 @@ export class ObjectComparisonView {
     }
 
     const distanceKm = this.options.distanceKm(selected, target);
-    const comparisons = educationalComparisons(distanceKm, { auKm: this.options.auKm(), includeMissionComparisons: false }).slice(0, 4);
+    // The distance shows one time. The value in AU is an extra only when the main unit is not AU,
+    // and the light-year row is left out when the main unit is the light-year.
+    const mainUnit = distanceUnit(distanceKm, { auKm: this.options.auKm() });
+    const comparisons = educationalComparisons(distanceKm, { auKm: this.options.auKm(), includeMissionComparisons: false })
+      .filter((comparison) => !(comparison.key === "light_years" && mainUnit === "ly"))
+      .slice(0, 4);
     const sizeComparison = this.sizeModel(selected, target);
-    // The distance shows one time. The value in AU is an extra only when the main unit is not AU.
     const distanceLabel = this.options.formatDistance(distanceKm);
     const auLabel = `${formatNumber(distanceKm / this.options.auKm())} AU`;
     this.options.panel.innerHTML = `
@@ -69,7 +74,7 @@ export class ObjectComparisonView {
         <div class="compare-distance compare-distance--hero">
           <span>${escapeHtml(t("compare.currentDistance"))}</span>
           <strong>${escapeHtml(distanceLabel)}</strong>
-          ${auLabel === distanceLabel ? "" : `<small>${escapeHtml(auLabel)}</small>`}
+          ${mainUnit === "au" ? "" : `<small>${escapeHtml(auLabel)}</small>`}
         </div>
         <div class="compare-pair">
           ${this.renderObject(selected, "A")}

@@ -103,6 +103,8 @@ This combines Direction A's hierarchy with Direction B's spatial connection to t
 
 ## Recommendation
 
+> **Status, October 2026:** the leader line and the panel anchor of Direction D are not in the product any more. The UX review of 2026-10-09 (finding D7) removed them, because the line went across the map. A ring on the object shows the selection in the 2D map, the Sky view, and the 3D view. The inspector header now has the object name on its own row, a one-line subtitle, and the actions in a row below (finding D1). The text below is the original recommendation.
+
 Start with Direction D: implement Direction A's inspector structure and add Direction B's spatial anchor as a desktop enhancement. This preserves the current selection model while making the relationship between the map object and its inspector unambiguous. Borrow Direction C's aligned metric row and compact disclosures where they improve dense object types.
 
 The first implementation slice should:

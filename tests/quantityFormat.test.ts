@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   configureFormat,
+  distanceUnit,
   formatCount,
   formatDateTime,
   formatDistanceAu,
@@ -44,6 +45,10 @@ assert.equal(formatDistanceKm(0.09 * AU_KM), "13.5 million km");
 assert.equal(formatDistanceKm(0.1 * AU_KM), "0.1 AU");
 assert.equal(formatDistanceKm(0.09 * LIGHT_YEAR_KM), "5,692 AU");
 assert.equal(formatDistanceKm(0.1 * LIGHT_YEAR_KM), "0.1 ly");
+assert.equal(distanceUnit(383_400), "km");
+assert.equal(distanceUnit(1.61 * AU_KM), "au");
+assert.equal(distanceUnit(0.09 * LIGHT_YEAR_KM), "au", "below 0.1 ly the unit is AU");
+assert.equal(distanceUnit(0.1 * LIGHT_YEAR_KM), "ly");
 assert.equal(formatDistanceAu(1), "1 AU");
 assert.equal(formatDistanceAu(0), "0 km");
 assert.equal(formatLightYears(0.05), "3,162 AU");

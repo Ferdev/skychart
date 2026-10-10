@@ -3,6 +3,11 @@
  * Position: above the toolbar, in the map area that an open panel does not use.
  * The card does not go across the toolbar, the inspector, or the Share button.
  */
+/* Height of the card when it is a bar below the inspector sheet on a narrow screen. */
+:root {
+  --tour-bar-height: 232px;
+}
+
 .tour-player {
   position: fixed;
   z-index: 12;
@@ -45,7 +50,7 @@
 }
 
 .tour-player h2:focus-visible {
-  outline: 2px solid var(--focus-ring);
+  outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -119,5 +124,35 @@
   .tour-player__actions button,
   .tour-player__head button {
     min-height: 44px;
+  }
+
+  /*
+   * A step that selects an object opens the inspector sheet. The card is then a bar at the bottom of the
+   * window with a fixed height, and the sheet is above it (object-inspector-progressive.css). The toolbar
+   * is not in view while the sheet is open.
+   */
+  #app:has(.map-hud[data-workspace-tab="object"]) > .tour-player:not([hidden]) {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    height: var(--tour-bar-height);
+    max-width: none;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    border-width: 1px 0 0;
+    border-radius: 0;
+  }
+
+  #app:has(.map-hud[data-workspace-tab="object"]) > .tour-player .tour-player__body {
+    overflow-y: auto;
+  }
+
+  #app:has(.map-hud[data-workspace-tab="object"]) > .tour-player .tour-player__dots {
+    display: none;
+  }
+
+  #app:has(.map-hud[data-workspace-tab="object"]) > .tour-player .tour-player__actions {
+    margin-top: 8px;
   }
 }

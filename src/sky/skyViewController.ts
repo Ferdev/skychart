@@ -3,6 +3,7 @@ import { community } from "../community/communityController";
 import type { Body, Ephemeris } from "../atlas/contracts";
 import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
+import { bindViewEscapeKey } from "../atlas/viewEscapeKey";
 import {
   buildSkyPermalink,
   normalizeSkyViewState,
@@ -147,6 +148,7 @@ export class SkyViewController {
     options.canvas.addEventListener("pointerleave", () => this.hideTooltip());
     options.canvas.addEventListener("wheel", (event) => this.wheel(event), { passive: false });
     options.canvas.addEventListener("keydown", (event) => this.keyDown(event));
+    bindViewEscapeKey({ active: () => this.active, canvas: options.canvas, escape: () => this.escape() });
     options.constellationsToggle.addEventListener("change", () => {
       this.options.stateChanged("replace");
       this.requestRender();
@@ -867,15 +869,17 @@ export class SkyViewController {
     this.requestRender();
   }
 
+  /** Escape closes the `More` menu, then the inspector. The next press leaves Sky view. */
+  private escape(): void {
+    if (this.options.moreButton.getAttribute("aria-expanded") === "true") this.setMoreMenu(false);
+    else if (this.options.root.dataset.objectInspector === "true" && !this.options.workspacePanel.hidden) this.options.closeInspector();
+    else this.exit();
+  }
+
   private keyDown(event: KeyboardEvent): void {
     if (!this.active) return;
     const step = event.shiftKey ? 10 : 3;
-    if (event.key === "Escape") {
-      // Escape closes the inspector first. The second press leaves Sky view.
-      if (this.options.root.dataset.objectInspector === "true" && !this.options.workspacePanel.hidden) this.options.closeInspector();
-      else this.exit();
-      return;
-    }
+    if (event.key === "Escape") { event.preventDefault(); this.escape(); return; }
     if (event.key === "ArrowLeft") this.camera.yawDeg -= step;
     else if (event.key === "ArrowRight") this.camera.yawDeg += step;
     else if (event.key === "ArrowUp") this.camera.pitchDeg += step;

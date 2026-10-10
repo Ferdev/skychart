@@ -101,6 +101,30 @@ test.describe("guided tours", () => {
     await expect(page.locator('#map-filter-buttons [aria-pressed="true"]')).toHaveCount(1);
   });
 
+  test("on a phone the tour card and the inspector sheet of a step with an object do not overlap", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/?tour=earth-to-observable-universe&step=0");
+    await expect(page.locator("#loading-screen")).toBeHidden({ timeout: 45_000 });
+    await expect(page.locator("#tour-player h2")).toHaveText("Earth as the starting scale");
+    await expect(page.locator("#selected-summary-name")).toHaveText("Earth");
+    await expect(page.locator("#selected-object-panel")).toBeVisible();
+
+    const card = (await page.locator("#tour-player").boundingBox())!;
+    const sheet = (await page.locator("#workspace-panel").boundingBox())!;
+    const header = (await page.locator(".atlas-bar").boundingBox())!;
+    expect(sheet.y + sheet.height, "the sheet ends where the card starts").toBeLessThanOrEqual(card.y + 1);
+    expect(card.y + card.height, "the card is in the window").toBeLessThanOrEqual(844);
+    expect(sheet.y - (header.y + header.height), "the map shows between the header and the sheet").toBeGreaterThanOrEqual(120);
+    // The step buttons are in the card and work.
+    await expect(page.locator('#tour-player [data-tour-action="next"]')).toBeInViewport({ ratio: 1 });
+    await page.locator('#tour-player [data-tour-action="next"]').click();
+    await expect(page.locator("#tour-player h2")).toHaveText("The planetary neighborhood");
+    // A step with no object closes the sheet, and the card goes back above the toolbar.
+    await expect(page.locator("#selected-object-panel")).toBeHidden();
+    const toolbar = (await page.locator(".atlas-toolbar").boundingBox())!;
+    await expect.poll(async () => { const box = (await page.locator("#tour-player").boundingBox())!; return box.y + box.height; }).toBeLessThanOrEqual(toolbar.y);
+  });
+
   for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
     test(`the tour card has the atlas style and is clear of the controls at ${viewport.width}px`, async ({ page }) => {
       await page.setViewportSize(viewport);

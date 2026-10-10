@@ -108,5 +108,12 @@ def test_each_used_style_token_is_defined():
     defined |= set(re.findall(r"setProperty\(\s*[\"'`](--[\w-]+)", scripts))
     defined |= set(re.findall(r"(--[\w-]+)\s*:", scripts))
     defined |= set(re.findall(r"style=\"[^\"]*?(--[\w-]+)\s*:", html))
-    used_without_fallback = set(re.findall(r"var\(\s*(--[\w-]+)\s*\)", css))
-    assert sorted(used_without_fallback - defined) == []
+    # A token with a fallback value must be defined also: the fallback hides a wrong name.
+    used = set(re.findall(r"var\(\s*(--[\w-]+)\s*[,)]", css))
+    assert sorted(used - defined) == []
+
+
+def test_canvas_text_uses_the_font_stack_of_the_style_sheets():
+    css_stack = re.search(r"--font-sans:\s*([^;]+);", (SRC / "styles" / "foundations.css").read_text()).group(1)
+    canvas_stack = re.search(r"export const FONT_SANS = '([^']+)';", (SRC / "format" / "fonts.ts").read_text()).group(1)
+    assert " ".join(canvas_stack.split()) == " ".join(css_stack.split())
