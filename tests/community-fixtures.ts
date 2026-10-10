@@ -19,8 +19,10 @@ const image = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC",
   "base64",
 );
-export async function communityFixture(page: Page) {
+export async function communityFixture(page: Page, options: { role?: string } = {}) {
   const state = {
+    role: options.role ?? "member",
+    reviews: [] as { path: string; body: { action?: string; reason?: string } }[],
     removed: false,
     indexRequests: 0,
     votes: 3,
@@ -38,7 +40,7 @@ export async function communityFixture(page: Page) {
     else if (path === "/api/community/session" || path === "/api/community/me")
       data = {
         user: state.signed
-          ? { id: "user", handle: "reader", name: "Reader", role: "member" }
+          ? { id: "user", handle: "reader", name: "Reader", role: state.role }
           : null,
         csrf: "test-csrf",
         photos: [],
@@ -47,7 +49,7 @@ export async function communityFixture(page: Page) {
     else if (path === "/api/community/verify") {
       state.signed = true;
       data = {
-        user: { id: "user", handle: "reader", name: "Reader", role: "member" },
+        user: { id: "user", handle: "reader", name: "Reader", role: state.role },
         csrf: "test-csrf",
       };
     } else if (path === "/api/photos/index") {
@@ -65,6 +67,10 @@ export async function communityFixture(page: Page) {
           },
         ],
       };
+    } else if (/^\/api\/community\/photos\/[^/]+\/review$/.test(path)) {
+      const body = route.request().postDataJSON();
+      state.reviews.push({ path, body });
+      if (body?.action === "hide") state.removed = true;
     } else if (path.endsWith("/photos"))
       data = { photos: state.removed ? [] : [photo] };
     else if (path === "/api/photos/" + photo.id)
