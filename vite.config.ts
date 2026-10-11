@@ -34,6 +34,7 @@ export default defineConfig({
       "/catalog-tiles": "http://127.0.0.1:4020",
       "/about": "http://127.0.0.1:4020",
       "/agents": "http://127.0.0.1:4020",
+      "/mcp": "http://127.0.0.1:4020",
       "/llms.txt": "http://127.0.0.1:4020",
       "/openapi.json": "http://127.0.0.1:4020",
       "/o/": "http://127.0.0.1:4020",

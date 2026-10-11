@@ -1,8 +1,7 @@
 defmodule StarsmapApi.Community.MediaWorker do
   @moduledoc "Durable processing; approved derivatives never contain uploaded metadata."
   use Oban.Worker, queue: :media, max_attempts: 3, unique: [keys: [:id], period: 3600]
-  import Ecto.Query
-  alias StarsmapApi.Community.{Photo, Photos, Storage, Ranking}
+  alias StarsmapApi.Community.{Photos, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
   @impl true
   def perform(%Oban.Job{args: %{"id" => id}}) do
@@ -22,40 +21,19 @@ defmodule StarsmapApi.Community.MediaWorker do
       with :ok <- Storage.adapter().download(photo, source),
            {:ok, data} <- decode(source, scratch),
            :ok <- persist(photo, scratch) do
+        # Each photo waits for a moderator. Publication is a moderator decision only
+        # (StarsmapApi.Community.Moderation.review/4).
         case StarsmapApi.Community.transaction(fn ->
                photo = Photos.get(photo.id)
 
-               approved =
-                 Repo.aggregate(
-                   from(p in Photo,
-                     where: p.user_id == ^photo.user_id and not is_nil(p.published_at)
-                   ),
-                   :count
-                 )
-
-               status = if approved >= 3, do: "published", else: "review"
-
                if photo.status == "processing" do
-                 photo =
-                   Repo.update!(
-                     Ecto.Changeset.change(photo,
-                       status: status,
-                       sha256: data["sha256"],
-                       assets: Map.merge(photo.assets, data),
-                       published_at:
-                         if(status == "published", do: StarsmapApi.Community.now(), else: nil)
-                     )
+                 Repo.update!(
+                   Ecto.Changeset.change(photo,
+                     status: "review",
+                     sha256: data["sha256"],
+                     assets: Map.merge(photo.assets, data)
                    )
-
-                 if status == "published" do
-                   {:ok, _} =
-                     Oban.insert(
-                       StarsmapApi.CommunityJobs,
-                       StarsmapApi.Community.PublishWorker.new(%{id: photo.id})
-                     )
-
-                   Ranking.refresh(photo.subject_id)
-                 end
+                 )
 
                  {:ok, _} =
                    Oban.insert(

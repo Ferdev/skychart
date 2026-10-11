@@ -154,7 +154,7 @@ defmodule StarsmapApi.CommunityTest do
     end
   end
 
-  test "fourth approved-author photo publishes through a durable job", %{
+  test "a photographer with approved photos still waits for a moderator", %{
     user: user,
     subject: subject
   } do
@@ -176,13 +176,135 @@ defmodule StarsmapApi.CommunityTest do
     :ok = Storage.Local.put(p.source_key, source, false)
     {:ok, p} = Photos.complete(user, p.id)
     assert :ok = StarsmapApi.Community.MediaWorker.process(p)
-    assert Photos.visible?(Photos.get(p.id))
+    processed = Photos.get(p.id)
+    assert processed.status == "review"
+    assert is_nil(processed.published_at)
+    refute Photos.visible?(processed)
+
+    refute Repo.exists?(
+             from j in Oban.Job, where: j.worker == "StarsmapApi.Community.PublishWorker"
+           )
+
+    assert p.id in Enum.map(Moderation.queue(), & &1.id)
+
+    moderator =
+      Repo.insert!(%User{
+        email: "curator@example.com",
+        handle: "curator",
+        name: "Curator",
+        role: "admin"
+      })
+
+    # Approval needs no typed reason. The audit record gets a default text.
+    assert {:ok, published} = Moderation.review(moderator, p.id, "approve", "")
+    assert Photos.visible?(published)
+    assert [%{action: "approve", reason: "Approved"} | _] = Moderation.log()
 
     assert Repo.exists?(
              from j in Oban.Job, where: j.worker == "StarsmapApi.Community.PublishWorker"
            )
 
     File.rm(source)
+  end
+
+  test "moderators get counts, review signals and lists of each status", %{
+    user: user,
+    subject: subject
+  } do
+    moderator =
+      Repo.insert!(%User{
+        email: "lists@example.com",
+        handle: "lists",
+        name: "Lists",
+        role: "moderator"
+      })
+
+    waiting = photo(user, subject, "review")
+    twin = photo(user, subject, "review")
+    published = photo(user, subject, "published")
+
+    for p <- [waiting, twin],
+        do: Repo.update!(Ecto.Changeset.change(p, sha256: "same", assets: %{"width" => 64}))
+
+    assert {:ok, _} = Moderation.report(published.id, "Wrong credit")
+    assert %{"review" => 2, "published" => 1, "hidden" => 0, "reports" => 1} = Moderation.counts()
+    assert Moderation.pending_count() == 3
+
+    detail = Moderation.detail(Photos.get(waiting.id))
+    assert detail.status == "review"
+    assert detail.width == 64
+    assert detail.author.handle == "author"
+    assert detail.author.published == 1
+    assert [%{id: id, handle: "author"}] = detail.duplicates
+    assert id == twin.id
+
+    assert [%{reason: "Wrong credit", photo: %{reports: [%{reason: "Wrong credit"}]}}] =
+             Moderation.reports()
+
+    # A rejection without a reason fails, because the photographer reads the reason.
+    assert {:error, :not_allowed} = Moderation.review(moderator, waiting.id, "reject", "")
+    assert {:ok, _} = Moderation.review(moderator, waiting.id, "reject", "Wrong object")
+    assert [%{id: rejected}] = Moderation.list("rejected")
+    assert rejected == waiting.id
+    assert Moderation.list("unknown") == []
+
+    assert [%{moderation_reason: "Wrong object", status: "rejected"}] =
+             Photos.mine(user) |> Enum.filter(&(&1.id == waiting.id))
+
+    assert [%{action: "reject", moderator: "Lists", photo_title: "Test photo"} | _] =
+             Moderation.log()
+  end
+
+  test "the address of an administrator gets the role only after verification" do
+    Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
+
+    assert :ok = Accounts.request_code("owner@example.com")
+    assert_receive {:community_code, "owner@example.com", code}
+    assert Repo.get_by!(User, email: "owner@example.com").role == "member"
+    assert {:ok, _, %User{role: "admin"}} = Accounts.verify("owner@example.com", code)
+
+    assert :ok = Accounts.request_code("visitor@example.com")
+    assert_receive {:community_code, "visitor@example.com", code}
+    assert {:ok, _, %User{role: "member"}} = Accounts.verify("visitor@example.com", code)
+  end
+
+  test "newest listing, photographer statistics and coverage totals", %{
+    user: user,
+    subject: subject
+  } do
+    Application.put_env(
+      :starsmap_api,
+      :community_catalog_root,
+      Path.expand("../../../data/catalogs", __DIR__)
+    )
+
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_catalog_root) end)
+
+    old = photo(user, subject, "published")
+
+    Repo.update!(
+      Ecto.Changeset.change(old, published_at: DateTime.add(StarsmapApi.Community.now(), -3600))
+    )
+
+    new = photo(user, subject, "published")
+    photo(user, subject, "review")
+    assert Enum.map(Ranking.ranked("new"), & &1.id) == [new.id, old.id]
+    assert Photos.public(new).object_name == subject.name
+
+    assert %{rank: 1, photos: 2, objects: 1, votes: 0} = Ranking.photographer("author")
+    assert is_nil(Ranking.photographer("nobody"))
+
+    coverage = StarsmapApi.Community.Operations.coverage("messier", "andromeda")
+    assert %{total: 110, covered: 0} = coverage.catalogs["messier"]
+    assert coverage.total > 13_000
+    assert [%{key: "m31", catalog: "messier", constellation: "And"}] = coverage.objects
+    assert coverage.matched == 1
+    all = StarsmapApi.Community.Operations.coverage()
+    assert length(all.objects) == 200
+    # The brightest objects are first.
+    magnitudes = all.objects |> Enum.map(& &1.magnitude) |> Enum.reject(&is_nil/1)
+    assert magnitudes == Enum.sort(magnitudes)
   end
 
   test "rank snapshots preserve first-photo credit and author removals cannot be restored", %{

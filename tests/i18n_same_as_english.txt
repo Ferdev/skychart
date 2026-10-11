@@ -73,3 +73,21 @@ value.no it
 # Media cards, uncertainty sentences, and data labels (second pass, 2026-10-10).
 sourceLink.mission fr
 sourceLink.mission de
+
+# Community photos: words that are the same in that language.
+community.account.note de
+community.code de
+community.code fr
+community.col.constellation fr
+community.col.magnitude fr
+community.col.magnitude pt-BR
+community.col.photos fr
+community.col.type fr
+community.field.image fr
+community.field.licence fr
+community.layer fr
+community.mod.col.date fr
+community.mod.col.moderator de
+community.mod.col.photo fr
+community.nav.menu de
+community.privacy it

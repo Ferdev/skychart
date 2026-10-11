@@ -42,15 +42,18 @@ defmodule StarsmapApiWeb.AgentControllerTest do
     assert body =~ "https://skychart.org/o/ngc-224"
     assert body =~ "/api/agent/v1/view-link"
     assert body =~ "Do not invent layer names or URL parameters"
-    assert body =~ "does not publish an MCP endpoint"
-    assert body =~ "2026-08-31"
+    assert body =~ "public Model Context Protocol server at <code>https://skychart.org/mcp</code>"
+    assert body =~ "<code>search_sky_objects</code>"
+    assert body =~ "<code>measure_object_separation</code>"
+    refute body =~ "does not publish an MCP endpoint"
+    assert body =~ "2026-10-10"
     assert body =~ ~s(rel="alternate" type="application/json" href="/agents.json")
     assert body =~ ~s(rel="service-desc" type="application/vnd.oai.openapi+json;version=3.1")
     assert body =~ ~s(<link rel="canonical" href="https://skychart.org/agents">)
 
     [json_ld] = json_ld_documents(body)
     assert json_ld["@type"] == "TechArticle"
-    assert json_ld["dateModified"] == "2026-08-31"
+    assert json_ld["dateModified"] == "2026-10-10"
     assert json_ld["description"] =~ "Gaia"
   end
 
@@ -61,7 +64,17 @@ defmodule StarsmapApiWeb.AgentControllerTest do
     assert guide["canonical_url"] == "https://skychart.org/agents"
     assert guide["api"]["read_only"] == true
     assert guide["api"]["bounded"] == true
-    assert guide["mcp"] == %{"available" => false, "reviewed" => "2026-08-31"}
+
+    assert guide["mcp"] == %{
+             "available" => true,
+             "endpoint" => "https://skychart.org/mcp",
+             "transport" => "streamable-http",
+             "protocol_versions" => StarsmapApi.Mcp.supported_versions(),
+             "authentication" => "none",
+             "read_only" => true,
+             "tools" => StarsmapApi.Mcp.Tools.names(),
+             "reviewed" => "2026-10-10"
+           }
 
     llms_conn = conn |> recycle() |> get(~p"/llms.txt")
     assert get_resp_header(llms_conn, "content-type") == ["text/plain; charset=utf-8"]
@@ -69,6 +82,8 @@ defmodule StarsmapApiWeb.AgentControllerTest do
     assert llms =~ "https://skychart.org/about"
     assert llms =~ "https://skychart.org/agents"
     assert llms =~ "https://skychart.org/openapi.json"
+    assert llms =~ "https://skychart.org/mcp"
+    assert llms =~ "search_sky_objects"
     refute llms =~ "/o/ngc-224\n-"
 
     openapi_conn = conn |> recycle() |> get(~p"/openapi.json")

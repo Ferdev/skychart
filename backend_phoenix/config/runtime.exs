@@ -175,7 +175,12 @@ if config_env() != :test do
       community_mailer: StarsmapApi.Community.Mailer.Webhook,
       community_mail_url: System.get_env("COMMUNITY_MAIL_URL"),
       community_mail_token: System.get_env("COMMUNITY_MAIL_TOKEN"),
-      community_mail_from: System.get_env("COMMUNITY_MAIL_FROM")
+      community_mail_from: System.get_env("COMMUNITY_MAIL_FROM"),
+      # Accounts with these verified addresses get the admin role at sign-in.
+      community_admin_emails:
+        (System.get_env("COMMUNITY_ADMIN_EMAILS") || "")
+        |> String.split([",", " ", "\n"], trim: true)
+        |> Enum.map(&String.downcase/1)
 
     if config_env() == :prod and System.get_env("COMMUNITY_STORAGE") != "s3",
       do: raise("Production community media requires S3 storage")

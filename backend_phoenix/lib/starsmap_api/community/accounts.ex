@@ -130,7 +130,7 @@ defmodule StarsmapApi.Community.Accounts do
               expires_at: DateTime.add(StarsmapApi.Community.now(), 2_592_000)
             })
 
-            {:ok, secret, user}
+            {:ok, secret, promote(user)}
         end
       end)
 
@@ -179,6 +179,16 @@ defmodule StarsmapApi.Community.Accounts do
     |> Ecto.Changeset.unique_constraint(:handle)
     |> Repo.update()
   end
+
+  # The operator lists the addresses of the administrators (COMMUNITY_ADMIN_EMAILS).
+  # The role is given after the address is verified, never before.
+  defp promote(%User{role: role} = user) when role != "admin" do
+    if user.email in Application.get_env(:starsmap_api, :community_admin_emails, []),
+      do: Repo.update!(Ecto.Changeset.change(user, role: "admin")),
+      else: user
+  end
+
+  defp promote(user), do: user
 
   defp mailer, do: Application.fetch_env!(:starsmap_api, :community_mailer)
 end

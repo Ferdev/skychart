@@ -228,6 +228,100 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
     assert conn |> get("/photos/#{p.id}") |> response(404)
   end
 
+  test "review tools need a moderator, and a moderator gets the count of waiting work", %{
+    conn: conn
+  } do
+    author = Repo.insert!(%User{email: "queue@example.com", handle: "queue", name: "Queue"})
+    {:ok, subject} = Subjects.ensure("moon")
+
+    waiting =
+      Repo.insert!(%Photo{
+        user_id: author.id,
+        subject_id: subject.id,
+        declared_key: "moon",
+        title: "Waiting photo",
+        caption: "",
+        licence: "CC BY 4.0",
+        captured_at: StarsmapApi.Community.now(),
+        status: "review",
+        source_key: "uploads/waiting",
+        size_bytes: 3
+      })
+
+    :ok = Accounts.request_code("member@example.com")
+    assert_receive {:community_code, "member@example.com", code}
+    {:ok, token, member} = Accounts.verify("member@example.com", code)
+    signed = fn -> build_conn() |> put_req_cookie("cosmic-community", token) end
+
+    assert %{"review_count" => 0} =
+             signed.() |> get("/api/community/session") |> json_response(200)
+
+    for path <- ["/review", "/review/photos?status=review", "/review/log"] do
+      assert %{"error" => "not_allowed"} =
+               signed.() |> get("/api/community" <> path) |> json_response(403)
+    end
+
+    assert conn |> get("/api/community/review") |> json_response(401)
+    # A photo that waits for review is not public, also for a signed-in member.
+    assert conn |> get("/api/photos/#{waiting.id}") |> json_response(404)
+    assert signed.() |> get("/api/community/media/#{waiting.id}/320") |> json_response(404)
+
+    Repo.update!(Ecto.Changeset.change(member, role: "admin"))
+
+    assert %{"review_count" => 1} =
+             signed.() |> get("/api/community/session") |> json_response(200)
+
+    assert %{
+             "counts" => %{"review" => 1, "reports" => 0},
+             "photos" => [
+               %{"title" => "Waiting photo", "status" => "review", "author" => author_data}
+             ]
+           } = signed.() |> get("/api/community/review") |> json_response(200)
+
+    assert %{"handle" => "queue", "published" => 0} = author_data
+
+    # Approval with no reason text publishes the photo.
+    assert %{"status" => "published"} =
+             signed.()
+             |> write()
+             |> put_req_header("x-community-csrf", Accounts.csrf(token))
+             |> post("/api/community/photos/#{waiting.id}/review", %{action: "approve"})
+             |> json_response(200)
+
+    assert %{"photos" => [%{"id" => id}]} =
+             signed.()
+             |> get("/api/community/review/photos?status=published")
+             |> json_response(200)
+
+    assert id == waiting.id
+
+    assert %{"actions" => [%{"action" => "approve", "photo_title" => "Waiting photo"}]} =
+             signed.() |> get("/api/community/review/log") |> json_response(200)
+
+    assert %{"photos" => [%{"id" => ^id, "object_name" => "Moon"}]} =
+             conn |> get("/api/community/rankings?period=new") |> json_response(200)
+
+    assert %{"photographer" => %{"handle" => "queue", "photos" => 1}, "photos" => [_]} =
+             conn |> get("/api/community/photographers/queue") |> json_response(200)
+
+    assert conn |> get("/api/community/photographers/nobody") |> json_response(404)
+
+    # The moderator has an account and no photo: the page has zero in each number.
+    assert %{"photographer" => %{"photos" => 0, "h_index" => 0}, "photos" => []} =
+             conn |> get("/api/community/photographers/#{member.handle}") |> json_response(200)
+  end
+
+  test "policy pages have sections and links to each other", %{conn: conn} do
+    body = conn |> get("/community/rules") |> html_response(200)
+    assert body =~ "<h1>Community rules</h1>"
+    assert body =~ "A moderator examines each photo before it becomes public."
+    assert body =~ ~s(<strong aria-current="page">Community rules</strong>)
+    assert body =~ ~s(<a href="/community/terms">Photo publishing terms</a>)
+    assert body =~ ~s(<ol class="steps">)
+    refute conn |> get("/community/terms") |> html_response(200) =~ "first three photos"
+    assert conn |> get("/community/unknown") |> html_response(404)
+  end
+
   defp write(conn),
     do:
       conn
