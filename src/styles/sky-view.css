@@ -3,6 +3,8 @@
   z-index: 70;
   inset: 0;
   display: grid;
+  /* The one column is as wide as the window: a long text in the header or the footer does not make it wider. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
   overflow: hidden;
   color: #eef2ea;
@@ -450,7 +452,8 @@ body[data-sky-view="true"] .science-disclosure {
   display: none;
 }
 
-@media (max-width: 640px) {
+/* Compact window (a phone, a tablet in portrait, or a short window). */
+@media (max-width: 899px), (max-height: 560px) {
   /* One row: back, title, compact time bar, More. */
   .sky-view__header {
     align-items: center;
@@ -502,17 +505,6 @@ body[data-sky-view="true"] .science-disclosure {
     pointer-events: auto;
   }
 
-  /* The time popover has the Now button on a phone. */
-  #sky-time-bar .time-bar__now,
-  #sky-time-bar .time-bar__step-note {
-    display: none;
-  }
-
-  #sky-time-bar .time-bar__date {
-    max-width: 104px;
-    padding-right: 6px;
-    padding-left: 6px;
-  }
 
   .sky-view__more {
     position: relative;
@@ -556,6 +548,20 @@ body[data-sky-view="true"] .science-disclosure {
     width: min(224px, calc(100vw - 24px));
     margin: 0 12px;
   }
+}
+
+@media (max-width: 640px) {
+  /* The time popover has the Now button on a phone. */
+  #sky-time-bar .time-bar__now,
+  #sky-time-bar .time-bar__step-note {
+    display: none;
+  }
+
+  #sky-time-bar .time-bar__date {
+    max-width: 104px;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
 
   .sky-view__footer {
     display: grid;
@@ -569,5 +575,16 @@ body[data-sky-view="true"] .science-disclosure {
 
   .sky-share__actions {
     grid-auto-flow: row;
+  }
+}
+
+/* A short window: the footer is one row with no help text, so that the sky has more room. */
+@media (max-height: 560px) and (min-width: 641px) {
+  .sky-view__footer {
+    padding: 20px 12px 8px;
+  }
+
+  .sky-view__footer > span:first-child {
+    display: none;
   }
 }

@@ -13,7 +13,7 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   body,
   #app {
     overflow: hidden;
@@ -96,7 +96,7 @@
 }
 
 /* Mobile map-first layout: keep the atlas usable before exposing dense controls. */
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   html,
   body,
   #app,
@@ -107,9 +107,9 @@
 
   .scale-rail {
     top: auto;
-    right: 10px;
-    bottom: max(10px, env(safe-area-inset-bottom));
-    left: 10px;
+    right: calc(max(8px, env(safe-area-inset-right)) + var(--workspace-width));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
     width: auto;
     max-height: min(70dvh, 520px);
     padding: 8px 12px 12px;
@@ -223,5 +223,35 @@
   .primary-action,
   .text-action {
     min-height: 44px;
+  }
+}
+
+/*
+ * A short window with room at the side (a phone in landscape): the panel is at the right side of the map
+ * and not a bottom sheet. The header card and the toolbar give way to it (--workspace-width).
+ */
+@media (max-height: 560px) and (min-width: 600px) {
+  #app:has(.map-hud.workspace-open) {
+    --workspace-width: calc(min(400px, 46vw) + 8px);
+  }
+
+  .workspace-panel {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: auto;
+    width: calc(var(--workspace-width) - 8px);
+    border: 1px solid var(--workspace-border);
+    border-radius: 14px;
+  }
+
+  /* The toolbar stays in view at the left of the panel. The presets have no room there. */
+  .map-hud.workspace-open .scale-rail {
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .map-hud.workspace-open .toolbar-bottom {
+    display: none;
   }
 }
