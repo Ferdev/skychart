@@ -578,6 +578,8 @@ export class UniverseViewController {
     this.options.routeLabel.textContent = !result ? this.options.translate("universe3d.minimap")
       : "plan" in result ? this.options.translate("universe3d.routeGravity", { center: result.plan.center.name, duration: formatDuration(result.plan.durationSeconds) })
       : this.options.translate(result.unavailable === "range" ? "universe3d.routeRange" : "universe3d.routeRadial");
+    // The route text of a hidden trip map shows on a phone only when it says something about the route.
+    this.options.routeLabel.dataset.routeInfo = String(result !== null);
     const bodies = [...this.options.bodyByKey().values()].flatMap((body) => bodyToUniversePoint(body) ?? []);
     this.minimap.setScene({ target: this.target, bodies, route: result && "plan" in result ? result.plan.points : null,
       catalog: this.flightCatalogPoints, minimumSpanAu: this.moveStepAu * 4 });

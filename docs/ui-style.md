@@ -114,7 +114,15 @@ A compact window is narrow (899 px or less: a phone, or a tablet in portrait) or
 - The toolbar is across the bottom of the window. It has two rows, and one row on a short window.
 - The inspector is a bottom sheet. It opens short, with the name and the actions of the object. The `Details` button, or a swipe on the sheet header, shows all data (`src/object/objectSheet.ts`). An inspector that the Sky view or the 3D view opens is always full.
 - On a short window that is 600 px wide or more, a panel is at the right side of the map, not a bottom sheet. The header card and the toolbar give way to it (`--workspace-width`).
-- The Sky view and the 3D view have a header of one row with no title block. On a phone the 3D flight controls are one block of two columns, the target card is short, and the trip map starts hidden.
+- The Sky view and the 3D view have a header of one row with no title block.
+- On a phone the 3D target card is one row: the name, the distance, `Fly there`, and `Details`. The switch at the end of the row shows the brightness and the other actions. The 3D flight controls are one block of two columns, and the trip map starts hidden.
+- On a phone in portrait (640 px wide or less) the 3D view has two control areas only, so that most of the window is the view:
+  - The header is one row: exit, find, the time bar, and `More`. The exit and find buttons are icons with a name for a screen reader.
+  - The `More` menu has `Reset flight`, the trip map switch, the position, and the data disclosure with the image credits (`src/universe/universePhoneChrome.ts`). An action of the menu closes it. Escape closes the menu only.
+  - The bottom block has the target card, the flight controls, and a status line of two lines maximum. The controls do not move when the card opens: the card opens up.
+  - A hidden trip map takes no room. Its route text shows only when a gravity route is planned or refused.
+  - With the inspector sheet open, the scene moves up into the band between the header and the sheet.
+- A touch screen does not show the key help in the 3D footer.
 - A window from 900 px to 1180 px wide (a tablet in landscape) has the wide layout with narrow panels.
 - A text that can change (for example the zoom text) is one line with an ellipsis, so that it cannot change the height of a toolbar.
 

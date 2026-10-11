@@ -32,8 +32,11 @@ test.describe("Spanish interface", () => {
     await expect(page.locator("#universe-target")).toBeVisible();
     await expectNoEnglish(page, "#universe-view", [
       "Free-flight view", "3D Universe", "Find destination", "Reset flight", "Exit 3D", "Fly there", "Jump there", "Details", "Inspect in 2D",
-      "Sky from object", "Cruise forward", "Gravity route", "Speed", "Trip map", "Brightness from here", "Catalog positions",
+      "Sky from object", "Cruise forward", "Gravity route", "Speed", "Trip map", "Brightness from here", "Catalog positions", "More",
     ]);
+    // The switch of the target card and the trip map row of the More menu have Spanish names.
+    await expect(page.locator("#universe-target-toggle")).toHaveAttribute("aria-label", "Mostrar todas las acciones");
+    await expect(page.locator("#universe-minimap-menu-toggle")).toHaveText(/el mapa del viaje$/);
     await page.locator("#universe-close").click();
     await expect(page.locator("#universe-view")).toBeHidden();
 

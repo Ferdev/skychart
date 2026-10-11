@@ -5,13 +5,25 @@ import { universeEntryAim, universeEntryState, type EntryAimCandidate } from "..
 import type { UniverseViewState } from "../viewState";
 import { bindMinimapToggle, UniverseHintCard } from "./universeHintCard";
 import { UniverseLabelAreas } from "./universeLabelAreas";
+import { bindTargetCardToggle, bindUniverseMoreMenu } from "./universePhoneChrome";
 import { bodyToUniversePoint } from "./universePointModel";
 import { UniverseTouchControls } from "./universeTouchControls";
 import { UniverseViewController } from "./universeViewController";
 import type { UniverseIntegrationOptions } from "./universeViewOptions";
 
 export function createUniverseViewController(dom: typeof atlasDom, options: UniverseIntegrationOptions): UniverseViewController {
-  bindMinimapToggle(dom.universeMinimapPanel, dom.universeMinimapToggle, options.translate);
+  bindMinimapToggle(dom.universeMinimapPanel, dom.universeMinimapToggle, options.translate, dom.universeMinimapMenuToggle);
+  bindTargetCardToggle(dom.universeTarget, dom.universeTargetToggle, options.translate);
+  bindUniverseMoreMenu({
+    toggle: dom.universeMoreButton,
+    menu: dom.universeMoreMenu,
+    notesSlot: dom.universeMoreNotes,
+    notes: [
+      { note: dom.universePosition, home: dom.universePosition.parentElement! },
+      { note: dom.universeDisclosure, home: dom.universeFooter },
+    ],
+    canvas: dom.universeCanvas,
+  });
   const controller = new UniverseViewController({
     ...options,
     labelAreas: new UniverseLabelAreas(dom.universeView, [dom.universeHeader, dom.universeMinimapPanel, dom.universeFlight, dom.universeTarget, dom.universeHint, dom.universeFooter]),
