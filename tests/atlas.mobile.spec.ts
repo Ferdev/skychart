@@ -416,14 +416,16 @@ test.describe("Cosmic Atlas mobile layout", () => {
     });
   }
 
-  test("the 3D view keeps its centre free of controls on a phone", async ({ page }) => {
+  test("the 3D view on a phone has a header of one row and one block of controls at the bottom", async ({ page }) => {
     const issues = collectBrowserIssues(page);
     await page.locator("#universe-3d-toggle").click();
     await expect(page.locator("#universe-view")).toBeVisible();
     await expect(page.locator("#universe-close")).toBeVisible();
-    // The trip map starts hidden on a phone. Its button shows it.
-    await expect(page.locator("#universe-minimap")).toBeHidden();
-    await expect(page.locator("#universe-minimap-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#universe-close")).toHaveAccessibleName("Exit 3D");
+    await expect(page.locator("#universe-find")).toHaveAccessibleName("Find destination");
+    // The trip map starts hidden on a phone and takes no room. `Reset flight` is in the More menu.
+    await expect(page.locator("#universe-minimap-panel")).toBeHidden();
+    await expect(page.locator("#universe-reset")).toBeHidden();
     const layout = await page.evaluate(() => {
       const box = (selector: string) => {
         const rect = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
@@ -435,15 +437,46 @@ test.describe("Cosmic Atlas mobile layout", () => {
         header: box(".universe-view__header"),
         flightTop: Math.min(...controls.map((rect) => rect.top)),
         flightInside: controls.every((rect) => rect.left >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight),
-        minimap: box("#universe-minimap-panel"),
+        footer: box(".universe-view__footer"),
         centreTarget: document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.id ?? "",
       };
     });
-    expect(layout.header.bottom, "3D header with no title block").toBeLessThanOrEqual(150);
+    expect(layout.header.bottom, "3D header of one row").toBeLessThanOrEqual(64);
     expect(layout.flightTop, "flight controls are in the lower third of the window").toBeGreaterThanOrEqual(844 * 0.66);
     expect(layout.flightInside, "flight controls are in the window").toBe(true);
-    expect(layout.minimap.top, "trip map is below the view centre").toBeGreaterThan(422 + 60);
+    expect(layout.footer.top, "the status line is below the flight controls").toBeGreaterThanOrEqual(layout.flightTop);
+    expect((layout.flightTop - layout.header.bottom) / 844, "part of the window height that is free view").toBeGreaterThan(0.65);
     expect(layout.centreTarget, "the view centre is the 3D canvas").toBe("universe-map");
+
+    // The More menu has `Reset flight`, the trip map switch, the position, and the data disclosure.
+    const more = page.locator("#universe-more-button");
+    await more.click();
+    await expect(more).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#universe-reset")).toBeVisible();
+    await expect(page.locator("#universe-more-menu #universe-position")).toContainText("AU");
+    await expect(page.locator("#universe-more-menu .universe-view__credits")).toBeVisible();
+    await expect(page.locator("#universe-more-menu")).toBeInViewport({ ratio: 1 });
+    // Escape closes the menu only: the 3D view stays, and the exit is not started.
+    await page.keyboard.press("Escape");
+    await expect(more).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#universe-view")).toBeVisible();
+    await expect(page.locator("#universe-status")).not.toHaveText("Press Esc again to exit 3D");
+
+    // The menu shows the trip map. The map is between the view centre and the flight controls.
+    await more.click();
+    await expect(page.locator("#universe-minimap-menu-toggle")).toHaveText("Show trip map");
+    await page.locator("#universe-minimap-menu-toggle").click();
+    await expect(more).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#universe-minimap")).toBeVisible();
+    const map = (await page.locator("#universe-minimap-panel").boundingBox())!;
+    expect(map.y, "trip map is below the view centre").toBeGreaterThan(422 + 60);
+    expect(map.y + map.height, "trip map is above the flight controls").toBeLessThanOrEqual(layout.flightTop);
+    // A trip map that the user shows has its drawing immediately.
+    await expect(page.locator("#universe-minimap")).toHaveAttribute("data-route", /none|direct/);
+    await page.locator("#universe-minimap-toggle").click();
+    await expect(page.locator("#universe-minimap-panel")).toBeHidden();
+    await more.click();
+    await expect(page.locator("#universe-minimap-menu-toggle")).toHaveText("Show trip map");
     await page.locator("#universe-close").click();
     await expect(page.locator("#universe-view")).toBeHidden();
     issues.assertClean();

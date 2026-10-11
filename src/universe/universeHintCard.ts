@@ -55,8 +55,9 @@ const PHONE_WINDOW = "(max-width: 640px), (max-height: 560px)";
 /**
  * The trip map has a button that hides its drawing. The choice stays for the next visit.
  * With no choice, a phone starts with the drawing hidden, because the view has little room.
+ * `menuButton` is the same switch as a row of the `More` menu, for a phone in portrait.
  */
-export function bindMinimapToggle(panel: HTMLElement, button: HTMLButtonElement, translate: Translate): void {
+export function bindMinimapToggle(panel: HTMLElement, button: HTMLButtonElement, translate: Translate, menuButton?: HTMLButtonElement): void {
   const read = () => {
     try {
       const choice = window.localStorage.getItem(MINIMAP_KEY);
@@ -65,17 +66,20 @@ export function bindMinimapToggle(panel: HTMLElement, button: HTMLButtonElement,
   };
   const show = (collapsed: boolean) => {
     panel.dataset.collapsed = String(collapsed);
-    button.setAttribute("aria-expanded", String(!collapsed));
     const label = translate(collapsed ? "universe3d.minimapShow" : "universe3d.minimapHide");
+    for (const control of menuButton ? [button, menuButton] : [button]) control.setAttribute("aria-expanded", String(!collapsed));
     button.setAttribute("aria-label", label);
     button.title = label;
     button.textContent = collapsed ? "+" : "−";
+    if (menuButton) menuButton.textContent = label;
   };
-  button.addEventListener("click", () => {
+  const toggle = () => {
     const collapsed = panel.dataset.collapsed !== "true";
     try { window.localStorage.setItem(MINIMAP_KEY, collapsed ? "collapsed" : "open"); } catch { /* The choice is for this visit only. */ }
     show(collapsed);
-  });
+  };
+  button.addEventListener("click", toggle);
+  menuButton?.addEventListener("click", toggle);
   window.addEventListener("cosmic-atlas:locale-change", () => show(panel.dataset.collapsed === "true"));
   show(read());
 }

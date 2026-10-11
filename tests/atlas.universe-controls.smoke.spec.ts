@@ -263,6 +263,48 @@ test.describe("3D view on a touch screen", () => {
     expect((await page.locator("#universe-close").boundingBox())!.y, "the exit button is above the sheet").toBeLessThan(box.y);
   });
 
+  test("on a phone the target card is one row, and its switch shows all actions", async ({ page, context }) => {
+    await installFixtures(context);
+    await openAtlas(page, START);
+    await page.locator("#universe-3d-toggle").tap();
+    await expect(page.locator("#universe-view")).toBeVisible();
+    await page.locator("#universe-find").tap();
+    await page.locator("#universe-search-results").getByRole("option", { name: /^Earth/ }).tap();
+    await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+
+    const card = page.locator("#universe-target");
+    const toggle = page.locator("#universe-target-toggle");
+    const extras = ["#universe-focus", "#universe-inspect", "#universe-sky", "#universe-target-magnitude"];
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(toggle).toHaveAccessibleName("Show all actions");
+    for (const selector of ["#universe-fly", "#universe-details"]) await expect(page.locator(selector)).toBeVisible();
+    for (const selector of extras) await expect(page.locator(selector)).toBeHidden();
+    const header = (await page.locator(".universe-view__header").boundingBox())!;
+    const speed = (await page.locator(".universe-view__speed").boundingBox())!;
+    const short = (await card.boundingBox())!;
+    expect(short.height, "the short card is one row").toBeLessThanOrEqual(66);
+    expect(short.y + short.height, "the card is above the flight controls").toBeLessThanOrEqual(speed.y);
+    expect((short.y - header.y - header.height) / 844, "part of the window height that is free view, with a target").toBeGreaterThan(0.55);
+    const centre = await page.evaluate(() => document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.id ?? "");
+    expect(centre, "the view centre is the 3D canvas").toBe("universe-map");
+
+    await toggle.tap();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(toggle).toHaveAccessibleName("Show fewer actions");
+    for (const selector of ["#universe-fly", "#universe-details", ...extras]) await expect(page.locator(selector)).toBeVisible();
+    await expect(card).toBeInViewport({ ratio: 1 });
+    const full = (await card.boundingBox())!;
+    // The card opens up: its bottom edge and the flight controls do not move.
+    expect(Math.abs(full.y + full.height - short.y - short.height)).toBeLessThanOrEqual(1);
+    expect((await page.locator(".universe-view__speed").boundingBox())!.y).toBeCloseTo(speed.y, 0);
+    const switchBox = (await toggle.boundingBox())!;
+    expect(Math.min(switchBox.width, switchBox.height)).toBeGreaterThanOrEqual(44);
+
+    await toggle.tap();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    for (const selector of extras) await expect(page.locator(selector)).toBeHidden();
+  });
+
   test("a phone flies with the joystick, and every control is in the window", async ({ page, context }) => {
     await installFixtures(context);
     await openAtlas(page, START);
@@ -272,12 +314,21 @@ test.describe("3D view on a touch screen", () => {
     await expect(page.locator(".universe-view__move-pad")).toBeHidden();
     const joystick = page.locator("#universe-joystick");
     await expect(joystick).toBeVisible();
-    for (const selector of ["#universe-close", "#universe-find", "#universe-reset", "#universe-autopilot", "#universe-joystick", '.universe-view__touch [data-universe-move="up"]', '.universe-view__touch [data-universe-move="down"]']) {
+    const inWindow = async (selector: string) => {
       const box = (await page.locator(selector).boundingBox())!;
       expect(box.x, selector).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width, selector).toBeLessThanOrEqual(390);
       expect(box.y + box.height, selector).toBeLessThanOrEqual(844);
-    }
+      // A touch target is 44 x 44 px minimum.
+      expect(Math.min(box.width, box.height), selector).toBeGreaterThanOrEqual(44);
+    };
+    for (const selector of ["#universe-close", "#universe-find", "#universe-more-button", "#universe-autopilot", "#universe-joystick", '.universe-view__touch [data-universe-move="up"]', '.universe-view__touch [data-universe-move="down"]']) await inWindow(selector);
+    // `Reset flight` and the trip map switch are rows of the More menu.
+    await page.locator("#universe-more-button").tap();
+    await inWindow("#universe-reset");
+    await inWindow("#universe-minimap-menu-toggle");
+    await page.locator("#universe-minimap-menu-toggle").tap();
+    await expect(page.locator("#universe-minimap")).toBeVisible();
     // The joystick does not go across the trip map.
     const stick = (await joystick.boundingBox())!;
     const map = (await page.locator("#universe-minimap-panel").boundingBox())!;

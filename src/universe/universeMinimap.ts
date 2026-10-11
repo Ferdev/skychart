@@ -30,7 +30,12 @@ export class UniverseMinimap {
   private trail: { x: number; y: number }[] = [];
   private scene: MinimapScene = { target: null, route: null, bodies: [], catalog: [], minimumSpanAu: 1 };
 
-  constructor(private readonly canvas: HTMLCanvasElement) {}
+  private last: { position: Vector3; yawDeg: number } | null = null;
+
+  constructor(private readonly canvas: HTMLCanvasElement) {
+    // A hidden trip map has no size and no drawing. It draws when the user shows it.
+    new ResizeObserver(() => { if (this.last && canvas.clientWidth > 0) this.draw(this.last.position, this.last.yawDeg); }).observe(canvas);
+  }
 
   /** Begin a new trip at this position and forget the previous path. */
   restart(position: Vector3): void {
@@ -44,6 +49,7 @@ export class UniverseMinimap {
   /** Draw the scene with the craft at its current position; cheap enough to
    * call on every flight frame so the craft moves smoothly along the route. */
   draw(position: Vector3, yawDeg: number): void {
+    this.last = { position, yawDeg };
     const frame = { ...this.scene, position, yawDeg };
     const width = this.canvas.clientWidth;
     const height = this.canvas.clientHeight;

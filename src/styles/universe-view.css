@@ -112,6 +112,17 @@
 
 .universe-view__actions button { padding: 8px 11px; white-space: nowrap; }
 
+/* On a wide window the menu is not a menu: `Reset flight` is part of the header row. */
+.universe-view__more,
+.universe-view__more-menu { display: contents; }
+
+/* A phone in portrait shows these: the `More` button, its menu rows, the icons, and the switch of the target card. */
+.universe-view__more-toggle,
+.universe-view__menu-only,
+.universe-view__more-notes,
+.universe-view__icon,
+.universe-view__target-toggle { display: none; }
+
 .universe-view__search-dialog {
   z-index: 80;
   width: min(440px, calc(100vw - 24px));
@@ -397,6 +408,11 @@
 
 #universe-status { color: rgba(248, 203, 101, 0.9); }
 
+/* A touch screen has no keys: the key help is not shown, so that the footer text stays below the controls. */
+@media (pointer: coarse) {
+  .universe-view__footer > span:first-child { display: none; }
+}
+
 .universe-view__tooltip {
   position: fixed;
   z-index: 3;
@@ -475,7 +491,8 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   .universe-view__actions { flex-wrap: wrap; gap: 5px; }
   #universe-time-bar { flex: 1 1 auto; }
   #universe-time-bar .time-bar__date { flex: 1 1 0; min-width: 0; }
-  .universe-view__actions > button { flex: 1 1 auto; min-height: 44px; }
+  .universe-view__actions > button,
+  .universe-view__more-menu > button { flex: 1 1 auto; min-height: 44px; }
   .universe-view__speed-caption { display: none; }
   .universe-view__minimap { top: 112px; left: 12px; }
   .universe-view__minimap canvas { width: 220px; height: 160px; }
@@ -513,7 +530,10 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   .universe-view__move-pad { grid-area: touch; }
   /* Two rows always: the gravity route and its help, then the autopilot. */
   .universe-view__autopilot-row { grid-area: autopilot; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; }
-  .universe-view__autopilot-row button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* A touch target is 44 x 44 px minimum. */
+  .universe-view__autopilot-row button { min-width: 0; min-height: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .universe-view__autopilot-row .info-tip { min-width: 44px; }
+  .universe-view__gravity { padding-right: 8px; padding-left: 8px; }
   .universe-view__autopilot { grid-column: 1 / -1; }
   .universe-view__minimap { gap: 4px; padding: 6px; }
   /* The trip map is small, so that it does not cover the view. */
@@ -532,32 +552,123 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
     margin: 0 10px;
     transform: none;
   }
-  /* Each text of the card is one line. All actions stay in view, in two rows. */
-  .universe-view__target { justify-self: start; gap: 3px; padding: 9px 10px; }
-  .universe-view__target > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .universe-view__target-actions button { flex: 1 1 auto; min-height: 40px; }
+  /*
+   * The target card is short: the name, the distance, `Fly there`, and `Details` in one row.
+   * The switch at the end of the row shows the brightness and the other actions.
+   */
+  .universe-view__target {
+    justify-self: start;
+    grid-template-columns: minmax(72px, 1fr) minmax(0, auto);
+    align-items: center;
+    gap: 2px 8px;
+    padding: 8px;
+  }
+  .universe-view__target > strong,
+  .universe-view__target > span { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .universe-view__target-actions { grid-column: 2; grid-row: 1 / span 2; flex-wrap: nowrap; gap: 4px; min-width: 0; margin: 0; }
+  .universe-view__target-actions button { flex: 0 1 auto; min-width: 0; min-height: 44px; padding: 5px 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .universe-view__target .universe-view__target-toggle { display: grid; flex: none; place-items: center; width: 44px; padding: 0; }
+  .universe-view__target-toggle svg { transition: transform 140ms ease; }
+  .universe-view__target[data-expanded="false"] .universe-view__target-extra { display: none; }
+  /* All of the card: each text is a row, and the actions are two rows. The switch stays at the end of the last row. */
+  .universe-view__target[data-expanded="true"] > * { grid-column: 1 / -1; grid-row: auto; }
+  .universe-view__target[data-expanded="true"] > :is(strong, span) { white-space: normal; overflow-wrap: anywhere; }
+  .universe-view__target[data-expanded="true"] .universe-view__target-actions { flex-wrap: wrap; margin-top: 4px; }
+  .universe-view__target[data-expanded="true"] .universe-view__target-actions button { flex: 1 1 auto; }
+  .universe-view__target[data-expanded="true"] .universe-view__target-toggle svg { transform: rotate(180deg); }
   .universe-view__hint { justify-self: center; width: auto; }
 }
 
+/*
+ * A phone in portrait has two control areas only: a header of one row, and one block at the bottom
+ * (the target card, the flight controls, and the status line). All the room between them is the view.
+ */
 @media (max-width: 640px) {
-  /* Two rows: the time bar, then Find, Reset, and Exit. */
-  #universe-time-bar { flex: 1 1 100%; }
+  .universe-view { grid-template-rows: auto minmax(0, 1fr) auto auto auto; }
+
+  /* One row: exit, find, the time bar, and More. The menu of More is above all other controls. */
+  .universe-view__header { z-index: 5; grid-row: 1; gap: 0; padding: 8px 8px 10px; }
+  .universe-view__actions { flex-wrap: nowrap; }
+  .universe-view__actions > button { flex: none; justify-content: center; width: 44px; padding: 0; }
+  .universe-view__icon { display: block; margin: auto; }
+  /* The text of an icon button stays for a screen reader. */
+  .universe-view__action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  #universe-close { order: 1; border-color: #f8cb65; color: #17130c; background: #f8cb65; }
+  #universe-close:hover { color: #17130c; background: #ffe096; }
+  #universe-close:focus-visible { color: #17130c; outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  #universe-find { order: 2; }
+  #universe-time-bar { order: 3; flex: 1 1 0; min-width: 0; gap: 4px; }
+  #universe-time-bar .time-bar__date { padding-right: 6px; padding-left: 6px; }
+  #universe-time-bar .time-bar__step-note { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   /* The time popover has the Now button on a phone. */
   #universe-time-bar .time-bar__now { display: none; }
-  .universe-view__actions > button { min-height: 40px; padding: 6px 8px; font-size: var(--text-xs); }
-  .universe-view__flight { right: 12px; bottom: 78px; left: 12px; }
-  /* The trip map is above the flight controls, at the left. The flight controls have a fixed height here. */
-  .universe-view__minimap { top: auto; bottom: 226px; }
-  .universe-view__footer { display: grid; gap: 3px; padding: 46px 12px 10px; }
+  .universe-view__more { position: relative; display: block; order: 4; flex: none; }
+  .universe-view__actions .universe-view__more-toggle { display: block; min-width: 44px; min-height: 44px; padding: 0 8px; }
+  .universe-view__more-toggle[aria-expanded="true"] { border-color: #f8cb65; color: #f8cb65; }
+  .universe-view__more-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    display: none;
+    gap: 6px;
+    width: min(300px, calc(100vw - 16px));
+    max-height: calc(100dvh - 76px);
+    padding: 8px;
+    overflow: auto;
+    border: 1px solid rgba(130, 203, 179, 0.5);
+    border-radius: 10px;
+    background: #0a1416;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+  }
+  .universe-view__more-toggle[aria-expanded="true"] + .universe-view__more-menu { display: grid; }
+  .universe-view__more-menu > button { display: block; text-align: left; white-space: normal; }
+  /* The position and the data disclosure have no room in the view. They are the last rows of the menu. */
+  .universe-view__more-notes {
+    display: grid;
+    gap: 6px;
+    padding: 8px 4px 2px;
+    border-top: 1px solid rgba(130, 203, 179, 0.2);
+    color: rgba(238, 242, 234, 0.7);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+  }
+  .universe-view__more-notes .universe-view__position { overflow: visible; overflow-wrap: anywhere; text-overflow: clip; white-space: normal; }
+
+  /* The bottom block: the target card, then the flight controls, then the status line. */
+  .universe-view__target { grid-row: 3; align-self: end; justify-self: stretch; width: auto; margin: 0 12px 6px; }
+  .universe-view__flight {
+    position: relative;
+    grid-row: 4;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    padding: 0 12px;
+    background: linear-gradient(0deg, rgba(2, 5, 6, 0.82), rgba(2, 5, 6, 0));
+  }
+  .universe-view__footer {
+    grid-row: 5;
+    display: block;
+    padding: 6px 12px max(8px, env(safe-area-inset-bottom));
+    background: linear-gradient(0deg, rgba(2, 5, 6, 0.94), rgba(2, 5, 6, 0.82));
+  }
   .universe-view__footer > span:first-child { display: none; }
-  .universe-view__target { width: calc(100vw - 20px); }
+  /* The status is two lines at most, so that a long text moves the controls by one line only. */
+  #universe-status { display: -webkit-box; min-height: 1.35em; overflow: hidden; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+
+  /* The open trip map is above the bottom block, at the left. */
+  .universe-view__minimap { position: relative; grid-row: 2; align-self: end; justify-self: start; top: auto; bottom: auto; left: auto; margin: 0 12px 6px; }
+  /* A hidden trip map takes no room: the More menu has its switch. Its route text shows only when a gravity route is planned or refused. */
+  .universe-view__minimap[data-collapsed="true"] { display: none; }
+  .universe-view__minimap[data-collapsed="true"]:has(#universe-route[data-route-info="true"]) { display: grid; }
+  .universe-view__minimap[data-collapsed="true"] .universe-view__minimap-toggle { display: none; }
+  .universe-view__minimap[data-collapsed="true"] figcaption { max-width: calc(100vw - 38px); }
+
   /*
-   * The inspector sheet covers the lower half. The card shows its name and buttons only, and the scene
-   * moves up into the band between the card and the sheet, so that the target at the view centre stays in view.
+   * The inspector sheet covers the lower half, with the bottom block below it. The scene moves up into the
+   * band between the header and the sheet, so that the target at the view centre stays in view.
    */
-  .universe-view[data-object-inspector="true"] .universe-view__target > span { display: none; }
   .universe-view[data-object-inspector="true"] :is(.universe-view__canvas, .universe-view__points, .universe-view__deep-sky, .universe-view__bodies, .universe-selection-connector) {
-    transform: translateY(-64px);
+    transform: translateY(calc(30px - 25dvh));
   }
 }
 
@@ -569,7 +680,7 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   .universe-view__actions { flex-wrap: nowrap; }
   .universe-view__flight { right: max(12px, env(safe-area-inset-right)); bottom: 44px; width: min(370px, 46vw); }
   .universe-view__minimap { top: auto; bottom: 44px; left: max(12px, env(safe-area-inset-left)); }
-  .universe-view__target { width: min(320px, 42vw); margin-left: max(10px, env(safe-area-inset-left)); }
+  .universe-view__target { width: min(380px, 46vw); margin-left: max(10px, env(safe-area-inset-left)); }
   .universe-view__footer { gap: 12px; padding: 20px 12px 8px; }
   .universe-view__footer > span:first-child { display: none; }
   #universe-status { flex: none; }
