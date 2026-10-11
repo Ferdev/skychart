@@ -1,4 +1,5 @@
 import type { Body } from "../atlas/contracts";
+import { isCompactWindow } from "../atlas/windowLayout";
 import { expandedRect, pointInRect, type Rect, type ScreenPoint } from "../geometry";
 
 type SelectionConnectorViewOptions = {
@@ -27,7 +28,7 @@ export class SelectionConnectorView {
     if (
       !body
       || !this.options.active()
-      || window.innerWidth < 900
+      || isCompactWindow()
       || this.options.workspacePanel.hidden
       || this.options.bodyInfo.hidden
     ) {

@@ -84,6 +84,30 @@ export async function selectCatalogObject(page: Page, query: string, key: string
   await expect(page.locator("#selected-summary-name")).toContainText(expectedName);
 }
 
+/**
+ * On a compact window the inspector opens as a short sheet with the name and the actions of the object.
+ * The Details button shows all data. A wide window has no such button, and the inspector is always full.
+ */
+export async function expandObjectSheet(page: Page) {
+  const toggle = page.locator("#object-sheet-toggle");
+  if (!(await toggle.isVisible())) return;
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".object-inspector-footer")).toBeVisible();
+}
+
+/** On a wide window the language menu is in the header card. On a compact window it is a row in Settings. */
+export async function selectLanguage(page: Page, locale: string) {
+  const menu = page.locator("#locale-select");
+  const inSettings = !(await menu.isVisible());
+  if (inSettings) await page.locator("#map-settings-toggle").click();
+  await menu.selectOption(locale);
+  await expect(page.locator("html")).toHaveAttribute("lang", locale);
+  if (!inSettings) return;
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#map-settings")).toBeHidden();
+}
+
 export function skyEphemerisFixture(timestamp: string) {
   const position = (xAu: number) => ({
     x_au: xAu, y_au: 0, z_au: 0,

@@ -1,4 +1,5 @@
 import { keepPopoverNear } from "./popoverPlacement";
+import { compactWindowQuery } from "./windowLayout";
 
 type ShareButtonPlacementOptions = {
   /** The element that holds the Share button. */
@@ -7,18 +8,16 @@ type ShareButtonPlacementOptions = {
   popover: HTMLElement;
   /** Place of the Share button on a wide window: the toolbar row, next to Settings. */
   toolbarSlot: HTMLElement;
-  /** Place of the Share button on a narrow window: the header row. */
+  /** Place of the Share button on a compact window: the header row. */
   headerSlot: HTMLElement;
 };
-
-const NARROW_WINDOW = "(max-width: 899px)";
 
 /**
  * The Share button is part of the layout (toolbar or header), not a fixed button in a corner,
  * so that it cannot sit on top of a panel. Its popover opens next to it.
  */
 export function bindShareButtonPlacement(options: ShareButtonPlacementOptions): void {
-  const narrow = window.matchMedia(NARROW_WINDOW);
+  const narrow = compactWindowQuery();
   const place = () => {
     const slot = narrow.matches ? options.headerSlot : options.toolbarSlot;
     if (options.control.parentElement !== slot) slot.append(options.control);
