@@ -229,17 +229,28 @@
 .community-account-actions [hidden] {
   display: none;
 }
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
+  /* The compact header card is one row: the menu button is the last control of the row. */
+  .community-account-actions {
+    flex: none;
+    padding-top: 0;
+    border-top: 0;
+  }
   .community-account-actions .community-menu-toggle {
     display: inline-flex;
-    margin-right: auto;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    border-color: var(--panel-line-strong);
+    border-radius: var(--radius-md);
+    background: rgba(12, 16, 13, 0.82);
+    font-weight: 700;
   }
   .community-menu {
     position: absolute;
     top: calc(100% + 6px);
-    left: 0;
+    right: 0;
     z-index: 11;
-    min-width: 100%;
     width: max-content;
     max-width: calc(100vw - 20px);
     display: none;
@@ -253,8 +264,27 @@
     box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
     backdrop-filter: blur(16px);
   }
+  .community-menu button,
+  .community-menu a {
+    min-height: 44px;
+  }
   .community-account-actions[data-open] .community-menu {
     display: flex;
+  }
+  /* A phone has no room for the text: the button shows a picture mark. Its name stays for a screen reader. */
+  @container atlas-bar (max-width: 470px) {
+    .community-account-actions .community-menu-toggle {
+      width: 44px;
+      padding: 0;
+      font-size: 0;
+    }
+    .community-account-actions .community-menu-toggle::before {
+      content: "";
+      width: 18px;
+      height: 18px;
+      background: currentColor;
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round'%3E%3Crect x='2.5' y='3.5' width='15' height='13' rx='2'/%3E%3Ccircle cx='7' cy='8' r='1.5'/%3E%3Cpath d='m3 14.5 4.5-4 3.5 3 2.5-2 3.5 3'/%3E%3C/svg%3E") center / contain no-repeat;
+    }
   }
 }
 .community-dialog button:focus-visible,
@@ -263,7 +293,7 @@
   outline: 2px solid #afe5c2;
   outline-offset: 3px;
 }
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   .community-dialog {
     padding: 18px;
   }

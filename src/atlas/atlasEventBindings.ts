@@ -3,7 +3,9 @@ import { decodeViewState, type DisplayLayer } from "../viewState";
 import type { MapInteractionController } from "../navigation/mapInteractionController";
 import type { SizeMode, ZoomPreset } from "./contracts";
 import type { atlasDom } from "./atlasDom";
+import { bindLocaleControlPlacement } from "./localeControlPlacement";
 import { bindShareButtonPlacement } from "./shareButtonPlacement";
+import { bindObjectSheet } from "../object/objectSheet";
 
 interface AtlasEventState {
   sizeMode: SizeMode;
@@ -34,6 +36,8 @@ interface AtlasEventBindingsOptions {
   requestRender: (withData?: boolean) => void;
   scheduleViewStateReplace: () => void;
   viewSkySelected: () => void;
+  /** The inspector sheet of a compact window has a new height. */
+  objectSheetChanged: () => void;
   translate: (key: string) => string;
 }
 
@@ -49,6 +53,14 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
   bindShareButtonPlacement({
     control: dom.shareControl, button: dom.shareMenuButton, popover: dom.sharePopover,
     toolbarSlot: dom.shareSlotToolbar, headerSlot: dom.shareSlotHeader,
+  });
+  bindLocaleControlPlacement({
+    control: dom.localeControl, header: dom.atlasBar, headerTools: dom.atlasBarTools, settingsSlot: dom.settingsLanguageSlot,
+  });
+  bindObjectSheet({
+    panel: dom.workspacePanel, toggle: dom.objectSheetToggle,
+    swipeAreas: [dom.objectSheetGrip, dom.selectedObjectHeader],
+    changed: options.objectSheetChanged,
   });
   dom.exportButton.addEventListener("click", options.exportCurrentView);
   window.addEventListener("popstate", () => {

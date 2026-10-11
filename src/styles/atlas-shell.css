@@ -50,6 +50,28 @@
   font-size: var(--text-sm);
 }
 
+/* On a compact window the language menu is a row in Settings (localeControlPlacement.ts). */
+.settings-language-slot {
+  padding: 8px 4px;
+  border-top: 1px solid var(--panel-line);
+}
+
+.settings-language-slot[hidden] {
+  display: none;
+}
+
+.settings-language-slot .locale-control {
+  justify-content: space-between;
+  color: var(--map-ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.settings-language-slot .locale-control select {
+  min-height: 44px;
+  max-width: 60%;
+}
+
 /* Wide header: title, search field, and language in the first row, and the time bar in the second row. */
 .atlas-bar__title {
   grid-row: 1;
@@ -134,11 +156,19 @@
   pointer-events: auto;
 }
 
-/* A narrow header card (phone, or a wide panel on a small window): the search field has its own row, and the time bar is compact. */
+/* A narrow header card (a wide panel on a small window): the search field and the compact time bar are the second row. */
 @container atlas-bar (max-width: 600px) {
-  .header-search {
+  .atlas-bar__tools {
     grid-row: 2;
     grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .header-search {
+    flex: 1 1 150px;
   }
 
   .time-bar__size,
@@ -152,59 +182,46 @@
   }
 }
 
-@media (max-width: 899px) {
+/*
+ * Compact window (a phone, a tablet in portrait, or a short window): the card is one row of tools,
+ * so that it covers little of the map. The language menu is in Settings (localeControlPlacement.ts).
+ */
+@media (max-width: 899px), (max-height: 560px) {
   .atlas-bar {
-    top: max(10px, env(safe-area-inset-top));
-    right: 10px;
-    left: 10px;
+    top: max(8px, env(safe-area-inset-top));
+    right: calc(max(8px, env(safe-area-inset-right)) + var(--workspace-width));
+    left: max(8px, env(safe-area-inset-left));
     width: auto;
-    gap: 8px 10px;
-    padding: 9px 10px;
+    max-width: 720px;
+    display: flex;
+    align-items: stretch;
+    gap: 5px;
+    padding: 6px;
     border-radius: 14px;
     background: rgba(8, 10, 9, 0.82);
     box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28);
   }
 
-  .atlas-bar .eyebrow {
-    display: none;
-  }
-
-  .atlas-bar h1 {
-    font-size: 1rem;
-  }
-
-  .locale-control > span {
+  /* The title stays for a screen reader. */
+  .atlas-bar__title {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  .locale-control select {
-    max-width: 118px;
-  }
-
-  .atlas-bar {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .locale-control {
-    grid-column: 2;
   }
 
   /* One row: search button, time bar, Share button. */
   .atlas-bar__tools {
-    grid-row: 2;
-    grid-column: 1 / -1;
+    flex: 1 1 0;
     display: flex;
     align-items: stretch;
     gap: 5px;
     min-width: 0;
   }
 
-  /* On a phone the search field is one 44 px button with the search mark. The text goes into the Search sheet. */
+  /* The search field is one 44 px button with the search mark. The text goes into the Search sheet. */
   .header-search {
     flex: 0 0 44px;
     min-width: 44px;
@@ -240,6 +257,26 @@
   /* The Now button shows only when the time is not the current time. */
   .atlas-bar .time-bar[data-time-state="now"] .time-bar__now {
     display: none;
+  }
+
+  /* A card with room (a tablet) shows the search field with its text. */
+  @container atlas-bar (min-width: 560px) {
+    .header-search {
+      flex: 1 1 180px;
+      justify-content: flex-start;
+      max-width: 280px;
+      padding: 0 10px;
+    }
+
+    .header-search input {
+      position: static;
+      opacity: 1;
+      cursor: text;
+    }
+
+    .atlas-bar .time-bar {
+      flex: 1 1 auto;
+    }
   }
 }
 

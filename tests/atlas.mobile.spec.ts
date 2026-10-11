@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
+import { collectBrowserIssues, expandObjectSheet, openAtlas, selectCatalogObject, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
 
 test.describe("Cosmic Atlas mobile layout", () => {
   test.beforeEach(async ({ page, request }) => {
@@ -218,30 +218,61 @@ test.describe("Cosmic Atlas mobile layout", () => {
     await expect(page.locator("#selected-summary-name")).toContainText("Jupiter");
     await expect(page.locator("#selection-connector")).toBeHidden();
 
+    // The sheet opens short: the name and the actions of the object. The map has most of the window.
+    const toggle = page.locator("#object-sheet-toggle");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#center-selected")).toBeVisible();
+    await expect(page.locator("#body-info")).toBeHidden();
+    const short = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry());
+    expect(short.workspaceTop, "mobile object sheet top").not.toBeNull();
+    expect(844 - short.workspaceTop!, "the short sheet covers less than a quarter of the window").toBeLessThan(211);
+    expect(short.usable.height, "free map area with the short sheet").toBeGreaterThan(500);
+    expect(short.selected!.y, "selected object must stay above the short sheet").toBeLessThan(short.workspaceTop! - 12);
+
+    // The Details button shows all data. The selected object stays in view above the tall sheet.
+    await expandObjectSheet(page);
+    await expect(page.locator("#body-info")).toBeVisible();
     const geometry = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry());
-    expect(geometry.workspaceTop, "mobile object sheet top").not.toBeNull();
     expect(geometry.workspaceTop!, "object sheet should leave a meaningful map region visible").toBeGreaterThan(320);
     expect(geometry.selected, "selected object screen position").not.toBeNull();
-    expect(geometry.selected!.x).toBeGreaterThanOrEqual(geometry.usable.left + 12);
-    expect(geometry.selected!.x).toBeLessThanOrEqual(geometry.usable.right - 12);
-    expect(geometry.selected!.y).toBeGreaterThanOrEqual(geometry.usable.top + 12);
-    expect(geometry.selected!.y).toBeLessThanOrEqual(geometry.usable.bottom - 12);
-    expect(geometry.selected!.y, "selected object must stay above the detail sheet").toBeLessThan(geometry.workspaceTop! - 12);
+    // The camera can move to the object when the tall sheet covers it: wait for the end of the move.
+    await expect.poll(async () => {
+      const { selected, usable, workspaceTop } = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry());
+      return selected!.x >= usable.left + 12 && selected!.x <= usable.right - 12
+        && selected!.y >= usable.top + 12 && selected!.y <= usable.bottom - 12 && selected!.y < workspaceTop! - 12;
+    }, { message: "selected object must stay in the free map area above the detail sheet" }).toBe(true);
 
+    const selected = (await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry())).selected!;
     const hitTarget = await page.evaluate(({ x, y }) => {
       const element = document.elementFromPoint(x, y);
       return { id: element?.id ?? "", insideWorkspace: Boolean(element?.closest("#workspace-panel")) };
-    }, geometry.selected!);
+    }, selected);
     expect(hitTarget).toEqual({ id: "map", insideWorkspace: false });
 
     await expect(page.locator("#body-popover")).toHaveCount(0);
 
+    // The button closes the tall sheet again.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator("#body-info")).toBeHidden();
+
+    // A phone in landscape has no room for a bottom sheet: the inspector is a panel at the side of the map.
     await page.setViewportSize({ width: 844, height: 390 });
     await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
-    const landscape = await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.selectionGeometry());
-    expect(landscape.workspaceTop, "landscape object sheet top").not.toBeNull();
-    expect(landscape.usable.bottom, "usable map must stop above the sheet even when less than 160px tall").toBeLessThanOrEqual(landscape.workspaceTop! - 10);
-    expect(landscape.selected!.y).toBeLessThan(landscape.workspaceTop! - 10);
+    await expect(toggle).toBeHidden();
+    await expect(page.locator("#body-info")).toBeVisible();
+    const landscape = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>("#workspace-panel")!.getBoundingClientRect();
+      const toolbar = document.querySelector<HTMLElement>(".scale-rail")!.getBoundingClientRect();
+      const header = document.querySelector<HTMLElement>(".atlas-bar")!.getBoundingClientRect();
+      return { ...window.__ATLAS_DIAGNOSTICS__!.selectionGeometry(), panelLeft: panel.left, panelBottom: panel.bottom, toolbarRight: toolbar.right, headerRight: header.right };
+    });
+    expect(landscape.panelLeft, "the side panel leaves more than half of the window to the map").toBeGreaterThan(422);
+    expect(landscape.panelBottom).toBeLessThanOrEqual(390);
+    expect(landscape.usable.right, "usable map must stop at the left of the side panel").toBeLessThanOrEqual(landscape.panelLeft - 10);
+    expect(landscape.usable.height, "free map height in landscape").toBeGreaterThan(200);
+    expect(landscape.headerRight, "header card is at the left of the side panel").toBeLessThanOrEqual(landscape.panelLeft);
+    expect(landscape.toolbarRight, "toolbar is at the left of the side panel").toBeLessThanOrEqual(landscape.panelLeft);
     issues.assertClean();
   });
 
@@ -249,6 +280,7 @@ test.describe("Cosmic Atlas mobile layout", () => {
     await openAtlas(page, "/?perf=1");
     const issues = collectBrowserIssues(page);
     await selectCatalogObject(page, "Mars", "mars");
+    await expandObjectSheet(page);
     const bodyInfo = page.locator("#body-info");
     const metrics = () => bodyInfo.evaluate((element) => {
       const rect = element.getBoundingClientRect();
@@ -307,6 +339,7 @@ test.describe("Cosmic Atlas mobile layout", () => {
   test("shows the comparison header in full on a narrow screen", async ({ page }) => {
     await openAtlas(page);
     await selectCatalogObject(page, "Jupiter", "jupiter");
+    await expandObjectSheet(page);
     await page.locator("#compare-selected").click();
     await expect(page.locator("#compare-heading")).toBeVisible();
     await page.locator("#compare-search").fill("Mars");
@@ -328,6 +361,92 @@ test.describe("Cosmic Atlas mobile layout", () => {
     for (const selector of ["#share-compare", "#clear-compare"]) {
       expect((await page.locator(selector).boundingBox())!.height, `${selector} touch target`).toBeGreaterThanOrEqual(44);
     }
+  });
+
+  test("the header card is one row, and the language menu is in Settings", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    const header = (await page.locator(".atlas-bar").boundingBox())!;
+    expect(header.height, "header card of one row").toBeLessThanOrEqual(60);
+    // The title stays for a screen reader.
+    await expect(page.getByRole("heading", { level: 1, name: "Cosmic Atlas" })).toHaveCount(1);
+    for (const selector of [".header-search", "#time-date", "#share-menu-button"]) {
+      const box = (await page.locator(selector).boundingBox())!;
+      expect(box.y, `${selector} is in the header row`).toBeGreaterThanOrEqual(header.y);
+      expect(box.y + box.height, `${selector} is in the header row`).toBeLessThanOrEqual(header.y + header.height);
+      expect(box.height, `${selector} touch target`).toBeGreaterThanOrEqual(44);
+    }
+
+    await expect(page.locator(".atlas-bar #locale-select")).toHaveCount(0);
+    await page.locator("#map-settings-toggle").click();
+    const language = page.locator("#map-settings #locale-select");
+    await language.scrollIntoViewIfNeeded();
+    await expect(language).toBeVisible();
+    expect((await language.boundingBox())!.height, "language menu touch target").toBeGreaterThanOrEqual(44);
+    await language.selectOption("es");
+    await expect(page.locator("html")).toHaveAttribute("lang", "es");
+    await expect(page.locator("#map-settings-title")).toHaveText("Ajustes");
+    await language.selectOption("en");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    issues.assertClean();
+  });
+
+  for (const viewport of [{ width: 844, height: 390 }, { width: 932, height: 430 }, { width: 768, height: 1024 }]) {
+    test(`the controls leave most of a ${viewport.width} x ${viewport.height} window to the map`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await openAtlas(page, "/?perf=1");
+      const issues = collectBrowserIssues(page);
+      const layout = await page.evaluate(() => {
+        const header = document.querySelector<HTMLElement>(".atlas-bar")!.getBoundingClientRect();
+        const toolbar = document.querySelector<HTMLElement>(".scale-rail")!.getBoundingClientRect();
+        const { usable } = window.__ATLAS_DIAGNOSTICS__!.selectionGeometry();
+        const centre = { x: (usable.left + usable.right) / 2, y: (usable.top + usable.bottom) / 2 };
+        return {
+          headerHeight: header.height, toolbarHeight: toolbar.height, toolbarBottom: toolbar.bottom, toolbarRight: toolbar.right,
+          usableHeight: usable.height, centreTarget: document.elementFromPoint(centre.x, centre.y)?.id ?? "",
+        };
+      });
+      expect(layout.headerHeight, "header card of one row").toBeLessThanOrEqual(60);
+      expect(layout.toolbarBottom).toBeLessThanOrEqual(viewport.height);
+      expect(layout.toolbarRight).toBeLessThanOrEqual(viewport.width);
+      // A short window has a toolbar of one row. A tablet in portrait has two rows.
+      expect(layout.toolbarHeight, "toolbar height").toBeLessThanOrEqual(viewport.height <= 560 ? 62 : 124);
+      expect(layout.usableHeight / viewport.height, "part of the window height that is free map").toBeGreaterThan(viewport.height <= 560 ? 0.6 : 0.75);
+      expect(layout.centreTarget, "the centre of the free area is the map").toBe("map");
+      issues.assertClean();
+    });
+  }
+
+  test("the 3D view keeps its centre free of controls on a phone", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    await page.locator("#universe-3d-toggle").click();
+    await expect(page.locator("#universe-view")).toBeVisible();
+    await expect(page.locator("#universe-close")).toBeVisible();
+    // The trip map starts hidden on a phone. Its button shows it.
+    await expect(page.locator("#universe-minimap")).toBeHidden();
+    await expect(page.locator("#universe-minimap-toggle")).toHaveAttribute("aria-expanded", "false");
+    const layout = await page.evaluate(() => {
+      const box = (selector: string) => {
+        const rect = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+        return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+      };
+      const controls = [...document.querySelectorAll<HTMLElement>(".universe-view__flight > *")].filter((control) => control.getClientRects().length > 0)
+        .map((control) => control.getBoundingClientRect());
+      return {
+        header: box(".universe-view__header"),
+        flightTop: Math.min(...controls.map((rect) => rect.top)),
+        flightInside: controls.every((rect) => rect.left >= 0 && rect.right <= window.innerWidth && rect.bottom <= window.innerHeight),
+        minimap: box("#universe-minimap-panel"),
+        centreTarget: document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)?.id ?? "",
+      };
+    });
+    expect(layout.header.bottom, "3D header with no title block").toBeLessThanOrEqual(150);
+    expect(layout.flightTop, "flight controls are in the lower third of the window").toBeGreaterThanOrEqual(844 * 0.66);
+    expect(layout.flightInside, "flight controls are in the window").toBe(true);
+    expect(layout.minimap.top, "trip map is below the view centre").toBeGreaterThan(422 + 60);
+    expect(layout.centreTarget, "the view centre is the 3D canvas").toBe("universe-map");
+    await page.locator("#universe-close").click();
+    await expect(page.locator("#universe-view")).toBeHidden();
+    issues.assertClean();
   });
 
   test("pinches the atlas itself to zoom on touch screens", async ({ page }) => {
