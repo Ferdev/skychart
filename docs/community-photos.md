@@ -10,6 +10,33 @@ and a list of deep-sky objects that have no photo. The client refreshes the comp
 cover index every 60 seconds. Movement uses existing positions and makes no photo
 index request. The photos layer is stored in the `L=` URL parameter.
 
+## Interface
+
+The community area uses the tokens, the control classes, and the number and date
+functions of `docs/ui-style.md`. Its text is in `src/i18n/communityTranslations.ts`
+(keys `community.*`, nine locales). The guard tests of the interface include it.
+
+- **Header row** (`.community-bar` in the header card): `Gallery`, `Photographers`,
+  `Coverage`, `Rules`, `Review` (moderators only, with the count of waiting work),
+  and the account. Below 900 px one button opens the row as a menu.
+- **Community window** (`src/community/communityHub.ts`): one window with a tab
+  for each part.
+  - `Gallery`: all published photos, ordered by appreciations, by trend, or newest first.
+  - `Photographers`: the listing, and the page of one photographer with the statistics.
+  - `Coverage`: the progress of the Messier, NGC, and IC catalogs, and the objects
+    with no photo (brightest first). A text filter and a catalog filter go to the
+    server. Each row can open the object or the publish form.
+  - `Rules`: a short version of the rules, with links to the four policy pages.
+  - `My photos`: the status of each photo of the signed-in person, the reason of a
+    moderator for a rejected or hidden photo, the profile, and the account data.
+  - `Review`: the tools of a moderator (see "Curation").
+- **Photo viewer**: the photo, the photographer, the appreciation button, the
+  details, and the actions. From a list, the arrow keys go to the previous and the
+  next photo. `Open object` selects the object in the atlas with no page load.
+- **Object inspector**: the `Community photos` section follows the `Media` section.
+- **Addresses**: `/photos/<id>` opens the viewer on top of the atlas, and
+  `/u/<handle>` opens the page of the photographer in the community window.
+
 ## Data and identity
 
 `CommunityRepo` uses a separate database. Its migrations are in
@@ -76,6 +103,7 @@ Set the corresponding `STAGING_` or `PRODUCTION_` GitHub variables/secrets below
 | `COMMUNITY_MEDIA_URL` | variable | Separate HTTPS media/CDN origin |
 | `COMMUNITY_MAIL_URL`, `COMMUNITY_MAIL_TOKEN` | variable, secret | HTTPS mail endpoint and Bearer token |
 | `COMMUNITY_MAIL_FROM` | variable | Sender address, for example `Cosmic Atlas <login@example.org>` |
+| `COMMUNITY_ADMIN_EMAILS` | secret | Optional. Email addresses that get the `admin` role at sign-in, with a comma between them |
 | `COMMUNITY_BACKUP_URI`, `COMMUNITY_BACKUP_ENDPOINT` | variables | Off-host backup prefix and S3 endpoint |
 | `COMMUNITY_BACKUP_SECRET` | secret | Independent backup encryption password |
 | `COMMUNITY_BACKUP_ACCESS_KEY_ID`, `COMMUNITY_BACKUP_SECRET_ACCESS_KEY` | secrets | Separate backup credentials |
@@ -122,8 +150,8 @@ JPEG, PNG and single-frame TIFF: at most 60,000,000 bytes and 120,000,000 pixels
 Each account can reserve 20 uploads per rolling 24 hours. The author must confirm
 publishing rights, choose a licence, and enter a capture time. Synthetic AI images
 are not accepted. Composite/strong processing must be declared. Capture time is
-UTC. The first three published photos need review; later photos publish after
-processing. Rejected submissions do not count as approvals.
+UTC. Each photo needs the approval of a moderator before it is public. Processing
+never publishes a photo.
 
 The worker verifies signatures/dimensions, converts to sRGB, strips metadata,
 keeps a full-resolution PNG master, and makes WebP images of 96, 320 and 1600 px.
@@ -133,7 +161,24 @@ signal, not proof of ownership. Successful sources are removed after seven days.
 Abandoned and failed uploads are also cleaned daily. Account removal revokes
 sessions, anonymizes identity, hides public photos and queues removal of all media.
 
-Grant the first moderator role after the owner has verified their account:
+## Curation
+
+Each photo has the status `review` after processing. It is not in a gallery, on the
+map, or in the cover index, and its image files are not in the public prefix. Only
+the photographer and the moderators can read its private derivative.
+
+### Who can curate
+
+An account with the role `admin` or `moderator` gets the `Review` button in the
+header row and the `Review` tab in the community window. There are two procedures
+to give the role.
+
+1. Set the secret `COMMUNITY_ADMIN_EMAILS` (`STAGING_` or `PRODUCTION_` prefix in
+   GitHub) to the email addresses of the administrators, with a comma between
+   them. Deploy. Each of these accounts gets the role `admin` at its next sign-in,
+   after the code from the email is verified. The value is a secret, because the
+   deployment log shows clear variables.
+2. Or give the role by hand after the owner has verified their account:
 
 ```bash
 docker exec <web container> env -u PHX_SERVER /app/bin/starsmap_api eval \
@@ -142,14 +187,39 @@ docker exec <web container> env -u PHX_SERVER /app/bin/starsmap_api eval \
 
 Plain `eval` tries to start a second web server on the port that is already in
 use (`env -u PHX_SERVER` prevents that), and `rpc` cannot connect to the running
-node in this container setup.
+node in this container setup. This is an operator release command, not a public
+API. Use it with the role `member` to remove the role: the secret gives the role
+and does not remove it.
 
-This is an operator release command, not a public API. The Review dialog supports
-approvals, reports, hiding, rejection, account suspension/restoration and vote
-cancellation. Each action has a reason and an audit record. Authors see the latest
-moderation reason in their private account data. The terms/rules/privacy/takedown
-pages are initial product texts. Add the operator contact and obtain legal review
-before opening public registration.
+### Review tools
+
+The `Review` tab has these sections. Each number is the count of that section.
+
+| Section | Content | Actions |
+| --- | --- | --- |
+| Waiting | Photos that wait for a decision, oldest first | `Approve`, `Reject` |
+| Reports | Published photos with an open report | `Keep photo`, `Hide` |
+| Published | Published photos, newest decision first | `Hide` |
+| Hidden, Rejected | Photos that are not public | `Restore` |
+| Decision log | The last 50 audit records | none |
+| Members | An account, by its public handle | `Suspend`, `Restore`, `Cancel votes` |
+
+A card shows the photo, the object, the capture and submission times, the licence,
+the pixel size, the equipment, the processing, the caption, and the open reports.
+It shows the photographer with the counts of published and of rejected or hidden
+photos and the date of the account. It gives a warning if the same file is in a
+different photo. A similarity hash is in `photos.assets`; it is a review signal,
+not proof of ownership.
+
+`Approve` and `Restore` need no text. `Reject` and `Hide` need a reason, and the
+photographer reads that reason in `My photos`. Each action has an audit record.
+`Keep photo` closes the open reports of a photo and keeps it public. A moderator
+can also hide a public photo from the photo viewer. The header button shows the
+count of waiting photos and open reports; the server sends it with the session of
+a moderator.
+
+The terms/rules/privacy/takedown pages are initial product texts. Add the operator
+contact and obtain legal review before opening public registration.
 
 ## Permission-reviewed seed photos
 
@@ -165,7 +235,8 @@ Run with queues disabled in the importing process:
 StarsmapApi.Release.import_community("/private/seed-photos.json", "owner-handle")
 ```
 
-This uses the same quota, decode, storage and moderation path as an upload. It
+This uses the same quota, decode, storage and moderation path as an upload. The
+named moderator approves each photo of the manifest. It
 keeps the declared target and credits. Initial real photos are an external input;
 this change does not add images from photographers without permission.
 

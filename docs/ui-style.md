@@ -111,4 +111,15 @@ These texts are not translated, by decision: unit symbols (`km`, `AU`, `ly`, `ma
 
 - `tests/ui_consistency_guardrail_test.py`: one number formatter, no exponent form, no text below 12 px (style sheets and canvas), one sans-serif stack, and no style token that is used and not defined.
 - `tests/i18nParity.test.ts`: each English key has its own value in each of the eight other locales. `tests/i18n_same_as_english.txt` lists the keys that can be equal to English.
-- `src/styles/community.css` (plan 24) is not in the scope of these guards.
+- The community photo area (`src/community/`, `src/styles/community.css`) is in the scope of these guards.
+
+## Windows
+
+A modal window of a feature uses `openDialog` from `src/community/communityUi.ts`.
+
+- The window is a `dialog` in `#app`, so that its controls get the base look.
+- The header has a small label (`.eyebrow`), the title, and a close button (`.icon-button`).
+- The surface is `--panel-background` with a `--panel-line-strong` border and `--radius-lg`.
+- A window with more than one part has tabs with the look of the tabs of the object inspector.
+- A status text is in the status line at the bottom of the window (`role="status"`).
+- One group of choices of which one is active is a row of `.secondary-action` buttons with `aria-pressed`.

@@ -20,8 +20,13 @@ defmodule StarsmapApiWeb.CommunityPageController do
         "dateCreated" => DateTime.to_iso8601(data.captured_at)
       }
 
+      # The application opens this photo in its viewer. This article is the text for a crawler
+      # and for a browser with no JavaScript.
       body =
-        "<article class=\"object-page\"><a href=\"/\">Cosmic Atlas</a><h1>#{h(data.title)}</h1><figure><img src=\"#{h(data.image_url)}\" alt=\"#{h(data.title)}\"><figcaption>#{h(data.author.name)} · #{h(data.licence)} · #{DateTime.to_date(data.captured_at)}</figcaption></figure><p>#{h(data.caption)}</p><a href=\"/o/#{URI.encode(data.declared_key, &URI.char_unreserved?/1)}\">Explore this object and its photos</a></article>"
+        "<article class=\"object-page\"><nav aria-label=\"Breadcrumb\"><a href=\"/\">Cosmic Atlas</a> / <span>Community photos</span></nav>" <>
+          "<h1>#{h(data.title)}</h1><figure><img src=\"#{h(data.image_url)}\" alt=\"#{h(data.title)}\">" <>
+          "<figcaption><a href=\"/u/#{h(data.author.handle)}\">#{h(data.author.name)}</a> · #{h(data.licence)} · #{DateTime.to_date(data.captured_at)}</figcaption></figure>" <>
+          "<p>#{h(data.caption)}</p><a href=\"/o/#{URI.encode(data.declared_key, &URI.char_unreserved?/1)}\">Explore #{h(data.object_name || "this object")} and its photos</a></article>"
 
       html(
         conn,
@@ -67,7 +72,7 @@ defmodule StarsmapApiWeb.CommunityPageController do
           StarsmapApiWeb.ServerShell.render!(
             title: "#{user.name} — Cosmic Atlas",
             body:
-              "<article class=\"object-page\"><h1>#{h(user.name)}</h1><div class=\"community-photo-grid\">#{cards}</div></article>"
+              "<article class=\"object-page\"><nav aria-label=\"Breadcrumb\"><a href=\"/\">Cosmic Atlas</a> / <span>Community photos</span></nav><h1>#{h(user.name)}</h1><p>@#{h(user.handle)}</p><div class=\"community-photo-grid\">#{cards}</div></article>"
           )
         )
     end
