@@ -410,6 +410,7 @@
                 </div>
               </div>
             </section>
+            <div id="settings-language-slot" class="settings-language-slot" hidden></div>
             <nav class="settings-footer-links" aria-label="About Cosmic Atlas" data-i18n-attrs="aria-label:settings.aboutLinks">
               <a href="/methodology" data-analytics-event="methodology" data-i18n="launch.methodology">Methodology</a>
               <a href="/about" data-i18n="launch.aboutCredits">About · data credits</a>
@@ -423,6 +424,7 @@
 
 
         <aside class="workspace-panel" id="workspace-panel" aria-label="Atlas workspace" data-i18n-attrs="aria-label:workspace.label" hidden>
+          <div id="workspace-sheet-grip" class="workspace-sheet-grip" aria-hidden="true"></div>
           <div class="workspace-titlebar">
             <div class="workspace-path" aria-label="Workspace path" data-i18n-attrs="aria-label:workspace.path">
               <button id="workspace-search-link" class="workspace-search-link" type="button" hidden data-i18n="workspace.search">Search</button>
@@ -444,9 +446,10 @@
                 <button id="center-selected" class="text-action" type="button" data-i18n="object.center">Center</button>
                 <button id="zoom-selected" class="text-action" type="button" data-i18n="object.zoom">Zoom</button>
                 <button id="view-sky-selected" class="text-action" type="button" aria-label="View sky from here" data-i18n="sky.action" data-i18n-attrs="aria-label:sky.actionLabel">Sky</button>
+                <button id="object-sheet-toggle" class="text-action object-sheet-toggle" type="button" aria-controls="object-workspace-stage" aria-expanded="false" data-i18n="universe3d.details">Details</button>
               </div>
             </div>
-            <div class="object-workspace-stage">
+            <div id="object-workspace-stage" class="object-workspace-stage">
               <div id="body-info" class="selected-object-details"></div>
               <section id="selection-compare" class="selection-compare" aria-label="Compare selected object" data-i18n-attrs="aria-label:compare.label" hidden>
               <div class="selection-compare-head">

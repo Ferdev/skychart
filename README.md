@@ -257,7 +257,7 @@ At interstellar and deep-sky scale, the scale grid and labels switch to light-ye
 
 ## Time Controls
 
-The time bar is in the header of each view. Its date button opens the date and time field. The step buttons, the step size, `Play`, and `Now` are in the bar on a wide window; on a narrow window the step size, `Play`, and `Now` are in the date popover. `Play` moves the time one step each second and stops after 120 steps.
+The time bar is in the header of each view. Its date button opens the date and time field. The step buttons, the step size, `Play`, and `Now` are in the bar on a wide window; on a narrow or short window the step size, `Play`, and `Now` are in the date popover. `Play` moves the time one step each second and stops after 120 steps.
 
 The timestamp input is treated as UTC. Changing time recomputes every dynamic celestial body from the ephemeris source, reusing deterministic local cache entries when present. Static nearby-star and Messier catalog objects remain fixed at their catalog positions.
 

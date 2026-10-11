@@ -693,6 +693,7 @@ function bindEvents() {
     updateSizeModes, updateDisplayToggles, updatePerformanceHud: updatePerfHud, updateAllUi, resizeCanvas,
     requestRender: (data = false) => requestRender(data ? { data: true } : {}),
     scheduleViewStateReplace, translate: t,
+    objectSheetChanged: () => { const body = selectedBody(); if (body) cameraController.centerIfOutOfView(body); requestRender({ data: true }); },
     viewSkySelected: () => { const body = selectedBody(); if (body && bodyCanObserveSky(body)) { const origin = universeView?.state(); universeView?.close({ updateHistory: false }); void skyView?.open(body, undefined, skyReturnTo3d(origin)); } },
   });
 }

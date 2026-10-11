@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
+import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable, expandObjectSheet } from "./atlas-test-utils";
 
 async function scrollMetrics(page: Page, selector: string) {
   return page.locator(selector).evaluate((element) => ({
@@ -99,6 +99,8 @@ test.describe("object inspector scroll on a tablet", () => {
     await skipIfAtlasUnavailable(request);
     await openAtlas(page);
     await selectCatalogObject(page, "Mars", "mars");
+    // A tablet in portrait opens the inspector as a short sheet. The Details button shows all data.
+    await expandObjectSheet(page);
     for (const view of ["overview", "position", "sources"]) {
       await page.locator(`#body-info [data-object-view="${view}"]`).click();
       await expect(page.locator(`#object-view-panel-${view}`)).toBeVisible();

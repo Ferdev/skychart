@@ -255,11 +255,11 @@
   color: var(--map-ink);
 }
 
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   .scale-rail.atlas-toolbar {
     width: auto;
     max-height: none;
-    padding: 6px 10px;
+    padding: 6px 8px;
     gap: 5px;
     border-radius: 14px;
     overflow: visible;
@@ -272,20 +272,18 @@
   .toolbar-settings-button svg { display: none; }
   .share-trigger span { display: none; }
   .share-trigger { min-width: 44px; }
+  /* The switches and the presets are one row when they fit (a tablet). */
   .toolbar-bottom { gap: 5px; padding-top: 4px; }
-  .toolbar-quick-layers { width: 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); }
-  .toolbar-quick-layers label { min-height: 44px; }
-  /* The four presets are one row of equal width. */
-  .atlas-toolbar .zoom-presets { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .atlas-toolbar .zoom-presets button { min-width: 0; min-height: 44px; padding: 0 4px; }
+  .toolbar-quick-layers label { min-height: 44px; padding: 0 8px; }
+  .atlas-toolbar .zoom-presets button { min-height: 44px; padding: 0 8px; }
   .atlas-toolbar .zoom-presets button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .map-settings { width: calc(100vw - 20px); border-radius: 16px; padding: 12px; }
+  .map-settings { width: min(420px, calc(100vw - 20px)); border-radius: 16px; padding: 12px; }
   .map-settings .scale-collapse__toggle { min-height: 44px; }
 }
 
-/* A narrow toolbar (an open panel on a small window): the quick layers and the presets each have a row. */
+/* A narrow toolbar (an open panel on a small window): the quick layers are one row of equal width, and the presets have a row. */
 @container (max-width: 550px) {
-  .toolbar-quick-layers { width: 100%; display: grid; grid-template-columns: max-content minmax(0, 1fr) minmax(0, 1fr); }
+  .toolbar-quick-layers { width: 100%; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
   .toolbar-quick-layers label { gap: 4px; padding: 0 4px; }
   .atlas-toolbar .zoom-presets { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .atlas-toolbar .zoom-presets button { min-width: 0; padding: 0 4px; }
@@ -301,6 +299,19 @@
 @media (max-width: 519px) {
   .toolbar-quick-layers { display: none; }
   /* The value only: "View =" has no room next to the slider. */
+  .zoom-view-words { display: none; }
+}
+
+/*
+ * A short window (a phone in landscape): the toolbar is one row. The quick layer toggles are in Settings,
+ * and the presets are at the end of the row.
+ */
+@media (max-height: 560px) and (min-width: 600px) {
+  .scale-rail.atlas-toolbar { display: flex; align-items: center; gap: 10px; }
+  .toolbar-zoom { flex: 1 1 0; min-width: 0; }
+  .toolbar-bottom { flex: none; padding: 0 0 0 10px; border-top: 0; border-left: 1px solid rgba(238, 230, 206, 0.1); }
+  .toolbar-quick-layers { display: none; }
+  .atlas-toolbar .zoom-presets { width: auto; display: flex; }
   .zoom-view-words { display: none; }
 }
 

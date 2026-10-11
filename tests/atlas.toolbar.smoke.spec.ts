@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openAtlas, skyEphemerisFixture } from "./atlas-test-utils";
+import { openAtlas, selectLanguage, skyEphemerisFixture } from "./atlas-test-utils";
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680 }, { width: 390, height: 844 }, { width: 320, height: 740 }]) {
   test.describe(`toolbar at ${viewport.width}px`, () => {
@@ -92,7 +92,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
       await page.locator('[aria-controls="scale-map-overlays"]').click();
       await expect(page.locator('input[data-layer="orbits"]')).not.toBeChecked();
       await page.keyboard.press("Escape");
-      await page.locator("#locale-select").selectOption("de");
+      await selectLanguage(page, "de");
       await expect(settingsToggle).toHaveText("Einstellungen");
       const overflow = () => toolbar.locator("button, label, input[type=range]").evaluateAll(elements => elements
         .filter(element => element.getClientRects().length > 0)
@@ -104,7 +104,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
       const presetRows = () => toolbar.locator("[data-zoom-preset]").evaluateAll(buttons => new Set(buttons.map(button => Math.round(button.getBoundingClientRect().top))).size);
       expect(await overflow(), "German controls stay inside the viewport").toBe(false);
       expect(await presetRows(), "German presets are on one line").toBe(1);
-      await page.locator("#locale-select").selectOption("es");
+      await selectLanguage(page, "es");
       await expect(page.locator("html")).toHaveAttribute("lang", "es");
       expect(await overflow(), "Spanish controls stay inside the viewport").toBe(false);
       expect(await presetRows(), "Spanish presets are on one line").toBe(1);
@@ -114,7 +114,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 900, height: 680
         .filter(span => span.getClientRects().length > 0 && span.scrollWidth > span.clientWidth + 1 && window.innerWidth >= 900)
         .map(span => span.textContent));
       expect(cutTexts, "no Spanish text of the wide toolbar is cut").toEqual([]);
-      await page.locator("#locale-select").selectOption("de");
+      await selectLanguage(page, "de");
       await expect(settingsToggle).toHaveText("Einstellungen");
       await settingsToggle.click();
       await page.locator('[aria-controls="scale-constellations"]').click();

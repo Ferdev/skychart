@@ -45,6 +45,16 @@ export class AtlasCameraController {
     }
   }
 
+  /** Centers on a body that is not in the free map area, for example after a taller sheet covers it. */
+  centerIfOutOfView(body: Body, marginPx = 16) {
+    if (!hasBodyPosition(body)) return;
+    const camera = this.options.camera();
+    const area = this.options.viewport();
+    const offsetX = Math.abs(body.position.x_au - camera.xAu) * camera.pxPerAu;
+    const offsetY = Math.abs(body.position.y_au - camera.yAu) * camera.pxPerAu;
+    if (offsetX > area.width / 2 - marginPx || offsetY > area.height / 2 - marginPx) this.centerOnBody(body, false, true);
+  }
+
   /** The camera that shows one object in full. See `fitCameraForBody` for the rule. */
   localCamera(body: Body): Camera {
     const current = this.options.camera();

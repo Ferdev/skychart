@@ -128,7 +128,7 @@
 }
 
 /* Compact bar: the 2D header on a narrow window, and the Sky and 3D headers below 1280 px. */
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   .atlas-bar .time-bar__size,
   .atlas-bar .time-bar__play,
   .atlas-bar .time-bar__step-label {
@@ -160,7 +160,7 @@
   }
 }
 
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   .time-bar button {
     min-width: 44px;
     min-height: 44px;

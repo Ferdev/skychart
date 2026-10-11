@@ -110,7 +110,7 @@
   min-height: 36px;
 }
 
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   /* Bottom centre, above the toolbar. */
   .tour-player {
     right: 8px;
@@ -154,5 +154,37 @@
 
   #app:has(.map-hud[data-workspace-tab="object"]) > .tour-player .tour-player__actions {
     margin-top: 8px;
+  }
+}
+
+/*
+ * A short window (a phone in landscape): the card is a narrow column at the left, above the toolbar,
+ * so that it does not cover the centre of the map. The inspector is a side panel, so the card is not a bar.
+ */
+@media (max-height: 560px) and (min-width: 600px) {
+  .tour-player,
+  #app:has(.map-hud[data-workspace-tab="object"]) > .tour-player:not([hidden]) {
+    right: auto;
+    bottom: calc(var(--atlas-toolbar-clearance, 64px) + 8px);
+    left: max(8px, env(safe-area-inset-left));
+    display: block;
+    width: min(300px, 38vw);
+    height: auto;
+    max-width: none;
+    max-height: calc(100dvh - var(--atlas-bar-bottom, 60px) - var(--atlas-toolbar-clearance, 64px) - 24px);
+    margin: 0;
+    padding: 10px 12px;
+    overflow-y: auto;
+    border-width: 1px;
+    border-radius: var(--radius-lg);
+  }
+
+  .tour-player h2 {
+    margin: 6px 0 4px;
+    font-size: var(--text-md);
+  }
+
+  .tour-player .tour-player__dots {
+    display: none;
   }
 }

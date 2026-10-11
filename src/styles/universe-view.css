@@ -3,6 +3,8 @@
   z-index: 72;
   inset: 0;
   display: grid;
+  /* The one column is as wide as the window: a long text in the header or the footer does not make it wider. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr auto;
   overflow: hidden;
   color: #eef2ea;
@@ -457,10 +459,27 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
 }
 /* The flight panel and the target card do not move when the inspector opens: the inspector is above them. */
 
-@media (max-width: 899px) {
-  /* On a narrow window the inspector is a bottom sheet of half the height at most. */
+/*
+ * Compact window (a phone, a tablet in portrait, or a short window): the header has no title block,
+ * so that the controls cover little of the view. The Exit button says which view this is.
+ */
+@media (max-width: 899px), (max-height: 560px) {
+  /* The inspector is a bottom sheet of half the height at most. */
   .universe-view[data-object-inspector="true"] ~ #controls .workspace-panel { top: auto; width: auto; max-height: 50dvh; }
   .universe-selection-connector { display: none; }
+  .universe-view__header { flex-direction: column-reverse; align-items: stretch; gap: 4px; padding: 8px 10px 14px; }
+  .universe-view__eyebrow { display: none; }
+  /* The title stays for a screen reader. */
+  .universe-view__header h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .universe-view__position { max-width: none; margin: 0; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
+  .universe-view__actions { flex-wrap: wrap; gap: 5px; }
+  #universe-time-bar { flex: 1 1 auto; }
+  #universe-time-bar .time-bar__date { flex: 1 1 0; min-width: 0; }
+  .universe-view__actions > button { flex: 1 1 auto; min-height: 44px; }
+  .universe-view__speed-caption { display: none; }
+  .universe-view__minimap { top: 112px; left: 12px; }
+  .universe-view__minimap canvas { width: 220px; height: 160px; }
+  .universe-view__minimap figcaption { max-width: 220px; }
 }
 
 @media (max-height: 780px) and (min-width: 641px) {
@@ -473,25 +492,33 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   .universe-view__minimap figcaption { max-width: 200px; }
 }
 
-@media (max-width: 640px) {
-  .universe-view__header { flex-wrap: wrap; gap: 5px; padding: 12px; }
-  /* Two rows: the time bar, then Find, Reset, and Exit. */
-  .universe-view__actions { flex-wrap: wrap; width: 100%; gap: 5px; }
-  #universe-time-bar { flex: 1 1 100%; }
-  #universe-time-bar .time-bar__date { flex: 1 1 0; min-width: 0; }
-  /* The time popover has the Now button on a phone. */
-  #universe-time-bar .time-bar__now { display: none; }
-  .universe-view__actions button { flex: 1; min-height: 36px; padding: 6px 8px; font-size: var(--text-xs); }
-  .universe-view__position { max-width: calc(100vw - 160px); font-size: var(--text-xs); }
-  .universe-view__flight { right: 12px; bottom: 78px; }
-  .universe-view__speed { width: 216px; padding: 7px 9px 6px; }
-  .universe-view__autopilot-row { flex-wrap: wrap; justify-content: flex-end; max-width: 216px; }
-  .universe-view__minimap { left: 12px; top: auto; bottom: 78px; gap: 4px; padding: 6px; font-size: var(--text-xs); }
-  /* The trip map is small, so that the joystick has room next to it. */
+/*
+ * A phone, in portrait or in landscape. The flight controls are one block of two columns: the speed and
+ * the autopilot buttons, and the joystick. The target card is short, so that the view centre stays free.
+ */
+@media (max-width: 640px), (max-height: 560px) {
+  .universe-view__flight {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      ". note"
+      "speed touch"
+      "autopilot touch";
+    align-items: end;
+    justify-items: stretch;
+    gap: 6px 10px;
+  }
+  .universe-view__speed { grid-area: speed; width: auto; padding: 7px 9px 6px; }
+  .universe-view__flight-note { grid-area: note; justify-self: end; max-width: 172px; }
+  .universe-view__touch,
+  .universe-view__move-pad { grid-area: touch; }
+  /* Two rows always: the gravity route and its help, then the autopilot. */
+  .universe-view__autopilot-row { grid-area: autopilot; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px; }
+  .universe-view__autopilot-row button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .universe-view__autopilot { grid-column: 1 / -1; }
+  .universe-view__minimap { gap: 4px; padding: 6px; }
+  /* The trip map is small, so that it does not cover the view. */
   .universe-view__minimap canvas { width: 130px; height: 80px; }
   .universe-view__minimap figcaption { max-width: 130px; }
-  .universe-view__footer { display: grid; gap: 3px; padding: 46px 12px 10px; }
-  .universe-view__footer > span:first-child { display: none; }
   /* The target card and the hint card start below the header, which has a different height in each language. */
   .universe-view__target,
   .universe-view__hint {
@@ -502,10 +529,28 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
     top: auto;
     bottom: auto;
     left: auto;
-    margin: 4px 12px 0;
+    margin: 0 10px;
     transform: none;
   }
-  .universe-view__target { justify-self: start; width: min(280px, calc(100vw - 24px)); }
+  /* Each text of the card is one line. All actions stay in view, in two rows. */
+  .universe-view__target { justify-self: start; gap: 3px; padding: 9px 10px; }
+  .universe-view__target > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .universe-view__target-actions button { flex: 1 1 auto; min-height: 40px; }
+  .universe-view__hint { justify-self: center; width: auto; }
+}
+
+@media (max-width: 640px) {
+  /* Two rows: the time bar, then Find, Reset, and Exit. */
+  #universe-time-bar { flex: 1 1 100%; }
+  /* The time popover has the Now button on a phone. */
+  #universe-time-bar .time-bar__now { display: none; }
+  .universe-view__actions > button { min-height: 40px; padding: 6px 8px; font-size: var(--text-xs); }
+  .universe-view__flight { right: 12px; bottom: 78px; left: 12px; }
+  /* The trip map is above the flight controls, at the left. The flight controls have a fixed height here. */
+  .universe-view__minimap { top: auto; bottom: 226px; }
+  .universe-view__footer { display: grid; gap: 3px; padding: 46px 12px 10px; }
+  .universe-view__footer > span:first-child { display: none; }
+  .universe-view__target { width: calc(100vw - 20px); }
   /*
    * The inspector sheet covers the lower half. The card shows its name and buttons only, and the scene
    * moves up into the band between the card and the sheet, so that the target at the view centre stays in view.
@@ -514,8 +559,26 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   .universe-view[data-object-inspector="true"] :is(.universe-view__canvas, .universe-view__points, .universe-view__deep-sky, .universe-view__bodies, .universe-selection-connector) {
     transform: translateY(-64px);
   }
-  .universe-view__hint { justify-self: center; width: auto; }
-  .universe-view__speed-caption { display: none; }
+}
+
+/* A phone in landscape: the header is one row, and the flight controls are at the right. */
+@media (max-height: 560px) and (min-width: 641px) {
+  .universe-view__header { padding: 8px 10px; }
+  /* The row of actions has no room for the position text. The trip map shows the position. */
+  .universe-view__position { display: none; }
+  .universe-view__actions { flex-wrap: nowrap; }
+  .universe-view__flight { right: max(12px, env(safe-area-inset-right)); bottom: 44px; width: min(370px, 46vw); }
+  .universe-view__minimap { top: auto; bottom: 44px; left: max(12px, env(safe-area-inset-left)); }
+  .universe-view__target { width: min(320px, 42vw); margin-left: max(10px, env(safe-area-inset-left)); }
+  .universe-view__footer { gap: 12px; padding: 20px 12px 8px; }
+  .universe-view__footer > span:first-child { display: none; }
+  #universe-status { flex: none; }
+  /* The inspector is a side panel (responsive.css), so the scene does not move. */
+  .universe-view[data-object-inspector="true"] ~ #controls .workspace-panel {
+    top: max(8px, env(safe-area-inset-top));
+    width: calc(var(--workspace-width) - 8px);
+    max-height: none;
+  }
 }
 
 .universe-view__credits { color: inherit; pointer-events: auto; }

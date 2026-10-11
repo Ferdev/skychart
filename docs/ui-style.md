@@ -102,9 +102,20 @@ These texts are not translated, by decision: unit symbols (`km`, `AU`, `ly`, `ma
 
 ## Layout
 
-- The header card (`.atlas-bar`) has the title, the search field, the language, and the time bar. Its width gives way to an open panel (`--workspace-width`).
+- On a wide window the header card (`.atlas-bar`) has the title, the search field, the language, and the time bar. Its width gives way to an open panel (`--workspace-width`).
 - Script-set layout tokens: `--atlas-bar-bottom` (bottom edge of the header), `--atlas-toolbar-height`, and `--atlas-toolbar-clearance` (distance from the window bottom to the top of the toolbar). The tour card uses the last one to stay above the toolbar.
 - Below 520 px the toolbar has no layer switches. They are in Settings (`Map overlays`).
+
+### Compact window
+
+A compact window is narrow (899 px or less: a phone, or a tablet in portrait) or short (560 px or less: a phone in landscape). `src/atlas/windowLayout.ts` has the condition for scripts, and the style sheets use the same media query. The rule of the compact layout is that the controls cover little of the map.
+
+- The header card is one row: search, time bar, `Share`, and the community menu. The title stays for a screen reader. The language menu is a row in Settings (`localeControlPlacement.ts`).
+- The toolbar is across the bottom of the window. It has two rows, and one row on a short window.
+- The inspector is a bottom sheet. It opens short, with the name and the actions of the object. The `Details` button, or a swipe on the sheet header, shows all data (`src/object/objectSheet.ts`). An inspector that the Sky view or the 3D view opens is always full.
+- On a short window that is 600 px wide or more, a panel is at the right side of the map, not a bottom sheet. The header card and the toolbar give way to it (`--workspace-width`).
+- The Sky view and the 3D view have a header of one row with no title block. On a phone the 3D flight controls are one block of two columns, the target card is short, and the trip map starts hidden.
+- A window from 900 px to 1180 px wide (a tablet in landscape) has the wide layout with narrow panels.
 - A text that can change (for example the zoom text) is one line with an ellipsis, so that it cannot change the height of a toolbar.
 
 ## Guard tests
