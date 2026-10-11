@@ -28,6 +28,9 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "Joystick: move forward, back, left, and right",
     "universe3d.minimapHide": "Hide trip map",
     "universe3d.minimapShow": "Show trip map",
+    "universe3d.more": "More",
+    "universe3d.targetMore": "Show all actions",
+    "universe3d.targetLess": "Show fewer actions",
   },
   es: {
     "universe3d.label": "Navegador del universo en 3D",
@@ -115,6 +118,9 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "Joystick: mover adelante, atrás, izquierda y derecha",
     "universe3d.minimapHide": "Ocultar el mapa del viaje",
     "universe3d.minimapShow": "Mostrar el mapa del viaje",
+    "universe3d.more": "Más",
+    "universe3d.targetMore": "Mostrar todas las acciones",
+    "universe3d.targetLess": "Mostrar menos acciones",
   },
   fr: {
     "universe3d.label": "Navigateur de l’univers en 3D",
@@ -201,6 +207,9 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "Joystick : avancer, reculer, aller à gauche et à droite",
     "universe3d.minimapHide": "Masquer la carte du trajet",
     "universe3d.minimapShow": "Afficher la carte du trajet",
+    "universe3d.more": "Plus",
+    "universe3d.targetMore": "Afficher toutes les actions",
+    "universe3d.targetLess": "Afficher moins d’actions",
   },
   de: {
     "universe3d.label": "3D-Universumsnavigator",
@@ -287,6 +296,9 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "Joystick: vor, zurück, links und rechts bewegen",
     "universe3d.minimapHide": "Reisekarte ausblenden",
     "universe3d.minimapShow": "Reisekarte anzeigen",
+    "universe3d.more": "Mehr",
+    "universe3d.targetMore": "Alle Aktionen anzeigen",
+    "universe3d.targetLess": "Weniger Aktionen anzeigen",
   },
   "pt-BR": {
     "universe3d.label": "Navegador do universo em 3D",
@@ -374,6 +386,9 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "Joystick: mover para frente, para trás, esquerda e direita",
     "universe3d.minimapHide": "Ocultar o mapa da viagem",
     "universe3d.minimapShow": "Mostrar o mapa da viagem",
+    "universe3d.more": "Mais",
+    "universe3d.targetMore": "Mostrar todas as ações",
+    "universe3d.targetLess": "Mostrar menos ações",
   },
   it: {
     "universe3d.label": "Navigatore dell’universo in 3D",
@@ -461,6 +476,9 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "Joystick: muovi avanti, indietro, a sinistra e a destra",
     "universe3d.minimapHide": "Nascondi la mappa del viaggio",
     "universe3d.minimapShow": "Mostra la mappa del viaggio",
+    "universe3d.more": "Altro",
+    "universe3d.targetMore": "Mostra tutte le azioni",
+    "universe3d.targetLess": "Mostra meno azioni",
   },
   "zh-Hans": {
     "universe3d.label": "3D 宇宙导航器",
@@ -548,6 +566,9 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "摇杆：向前、向后、向左、向右移动",
     "universe3d.minimapHide": "隐藏行程图",
     "universe3d.minimapShow": "显示行程图",
+    "universe3d.more": "更多",
+    "universe3d.targetMore": "显示全部操作",
+    "universe3d.targetLess": "显示较少操作",
   },
   ja: {
     "universe3d.label": "3D宇宙ナビゲーター",
@@ -635,6 +656,9 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "ジョイスティック：前後左右に移動",
     "universe3d.minimapHide": "航路マップを隠す",
     "universe3d.minimapShow": "航路マップを表示",
+    "universe3d.more": "その他",
+    "universe3d.targetMore": "すべての操作を表示",
+    "universe3d.targetLess": "操作を減らして表示",
   },
   ko: {
     "universe3d.label": "3D 우주 탐색기",
@@ -722,5 +746,8 @@ export const UNIVERSE3D_TRANSLATIONS: Record<string, Record<string, string>> = {
     "universe3d.joystick": "조이스틱: 앞, 뒤, 왼쪽, 오른쪽으로 이동",
     "universe3d.minimapHide": "여정 지도 숨기기",
     "universe3d.minimapShow": "여정 지도 표시",
+    "universe3d.more": "더 보기",
+    "universe3d.targetMore": "모든 작업 표시",
+    "universe3d.targetLess": "작업 간략히 표시",
   },
 };
