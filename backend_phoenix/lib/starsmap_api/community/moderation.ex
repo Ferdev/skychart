@@ -1,14 +1,148 @@
 defmodule StarsmapApi.Community.Moderation do
   @moduledoc "Audited publication, takedown, and anonymous reports."
   import Ecto.Query
-  alias StarsmapApi.Community.{Photo, Photos, Action, Report, Ranking, Storage}
+  alias StarsmapApi.Community.{Photo, Photos, Action, Report, Ranking, Storage, User}
   alias StarsmapApi.CommunityRepo, as: Repo
 
-  def queue,
-    do:
+  @listed ["review", "published", "hidden", "rejected"]
+
+  def queue, do: list("review", 0, 50)
+
+  @doc "Photos of one status for moderators. The review queue shows the oldest photo first."
+  def list(status, offset \\ 0, limit \\ 24)
+
+  def list(status, offset, limit)
+      when status in @listed and is_integer(offset) and offset >= 0 do
+    order = if status == "review", do: [asc: :inserted_at], else: [desc: :updated_at]
+
+    Repo.all(
+      from p in Photo,
+        where: p.status == ^status,
+        order_by: ^order,
+        offset: ^offset,
+        limit: ^limit
+    )
+  end
+
+  def list(_, _, _), do: []
+
+  @doc "Number of photos for each status, and the number of open reports."
+  def counts do
+    photos =
       Repo.all(
-        from p in Photo, where: p.status == "review", order_by: [asc: p.inserted_at], limit: 50
+        from p in Photo,
+          where: p.status in @listed,
+          group_by: p.status,
+          select: {p.status, count()}
       )
+      |> Map.new()
+
+    @listed
+    |> Map.new(&{&1, Map.get(photos, &1, 0)})
+    |> Map.put(
+      "reports",
+      Repo.aggregate(from(r in Report, where: is_nil(r.resolved_at)), :count)
+    )
+  end
+
+  @doc "Work that waits for a moderator: photos in review and open reports."
+  def pending_count do
+    counts = counts()
+    counts["review"] + counts["reports"]
+  end
+
+  @doc "Private view of a photo for moderators: the public payload and the review signals."
+  def detail(photo) do
+    author = Repo.get!(User, photo.user_id)
+
+    by_status =
+      Repo.all(
+        from p in Photo,
+          where: p.user_id == ^author.id and p.status in @listed,
+          group_by: p.status,
+          select: {p.status, count()}
+      )
+      |> Map.new()
+
+    # The same source bytes in a different photo is a review signal, not proof of a copy.
+    duplicates =
+      if photo.sha256,
+        do:
+          Repo.all(
+            from p in Photo,
+              join: u in User,
+              on: u.id == p.user_id,
+              where: p.sha256 == ^photo.sha256 and p.id != ^photo.id,
+              order_by: [asc: p.inserted_at],
+              limit: 5,
+              select: %{id: p.id, title: p.title, status: p.status, handle: u.handle}
+          ),
+        else: []
+
+    last =
+      Repo.one(
+        from a in Action,
+          left_join: u in User,
+          on: u.id == a.user_id,
+          where: a.photo_id == ^photo.id,
+          order_by: [desc: a.inserted_at],
+          limit: 1,
+          select: %{action: a.action, reason: a.reason, at: a.inserted_at, moderator: u.name}
+      )
+
+    Photos.public(photo)
+    |> Map.merge(%{
+      status: photo.status,
+      submitted_at: photo.inserted_at,
+      size_bytes: photo.size_bytes,
+      width: photo.assets["width"],
+      height: photo.assets["height"],
+      author: %{
+        handle: author.handle,
+        name: author.name,
+        joined_at: author.inserted_at,
+        suspended: author.suspended,
+        published: Map.get(by_status, "published", 0),
+        rejected: Map.get(by_status, "rejected", 0) + Map.get(by_status, "hidden", 0)
+      },
+      duplicates: duplicates,
+      reports:
+        Repo.all(
+          from r in Report,
+            where: r.photo_id == ^photo.id and is_nil(r.resolved_at),
+            order_by: [asc: r.inserted_at],
+            select: %{reason: r.reason, at: r.inserted_at}
+        ),
+      last_action: last
+    })
+  end
+
+  @doc "Recent audit records, newest first."
+  def log(limit \\ 50) do
+    Repo.all(
+      from a in Action,
+        left_join: u in User,
+        on: u.id == a.user_id,
+        left_join: p in Photo,
+        on: p.id == a.photo_id,
+        order_by: [desc: a.inserted_at],
+        limit: ^limit,
+        select: %{
+          action: a.action,
+          reason: a.reason,
+          at: a.inserted_at,
+          moderator: u.name,
+          photo_id: p.id,
+          photo_title: p.title
+        }
+    )
+  end
+
+  # Approval and restoration get a default audit text. Hiding and rejection need a reason,
+  # because the photographer reads it.
+  def review(user, id, action, reason)
+      when action in ["approve", "restore"] and reason in [nil, ""],
+      do: review(user, id, action, if(action == "approve", do: "Approved", else: "Restored"))
 
   def review(user, id, action, reason)
       when action in ["approve", "hide", "reject", "restore"] and is_binary(reason) do
@@ -103,7 +237,7 @@ defmodule StarsmapApi.Community.Moderation do
       from r in Report, where: is_nil(r.resolved_at), order_by: [asc: r.inserted_at], limit: 50
     )
     |> Enum.map(fn r ->
-      %{id: r.id, reason: r.reason, photo: Photos.public(Photos.get(r.photo_id))}
+      %{id: r.id, reason: r.reason, at: r.inserted_at, photo: detail(Photos.get(r.photo_id))}
     end)
   end
 

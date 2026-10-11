@@ -31,18 +31,35 @@ defmodule StarsmapApiWeb.CommunityController do
     end
   end
 
+  # The account data with the photographer's own photos, for the account view.
   def me(conn, _) do
     conn = put_resp_header(conn, "cache-control", "no-store")
 
     if conn.assigns.community_user,
       do:
-        json(conn, %{
-          user: Accounts.public(conn.assigns.community_user),
-          csrf: Accounts.csrf(conn.assigns.community_secret),
-          photos: Photos.mine(conn.assigns.community_user)
-        }),
-      else: json(conn, %{user: nil, csrf: "", photos: []})
+        json(
+          conn,
+          Map.put(identity(conn), :photos, Photos.mine(conn.assigns.community_user))
+        ),
+      else: json(conn, %{user: nil, csrf: "", photos: [], review_count: 0})
   end
+
+  # The identity only. The client reads it at each start and at each refresh of a moderator.
+  def session(conn, _) do
+    conn = put_resp_header(conn, "cache-control", "no-store")
+
+    if conn.assigns.community_user,
+      do: json(conn, identity(conn)),
+      else: json(conn, %{user: nil, csrf: "", review_count: 0})
+  end
+
+  defp identity(conn),
+    do: %{
+      user: Accounts.public(conn.assigns.community_user),
+      csrf: Accounts.csrf(conn.assigns.community_secret),
+      # Photos and reports that wait for this moderator. A member gets zero.
+      review_count: if(moderator?(conn), do: Moderation.pending_count(), else: 0)
+    }
 
   def logout(conn, _) do
     Accounts.logout(conn.assigns.community_secret)
@@ -136,8 +153,40 @@ defmodule StarsmapApiWeb.CommunityController do
   def vote_state(conn, %{"id" => id}),
     do: json(conn, %{present: Ranking.voted?(conn.assigns.community_user, id) == true})
 
-  def coverage(conn, _), do: json(conn, %{objects: StarsmapApi.Community.Operations.coverage()})
+  def coverage(conn, params),
+    do: json(conn, StarsmapApi.Community.Operations.coverage(params["catalog"], params["q"]))
+
   def photographers(conn, _), do: json(conn, %{photographers: Ranking.photographers()})
+
+  def photographer(conn, %{"handle" => handle}) do
+    case StarsmapApi.CommunityRepo.get_by(StarsmapApi.Community.User,
+           handle: handle,
+           suspended: false
+         ) do
+      nil ->
+        error(conn, :not_found, :not_found)
+
+      user ->
+        # An account that has no published photo has a page with zero in each number.
+        stats =
+          Ranking.photographer(handle) ||
+            %{
+              handle: user.handle,
+              name: user.name,
+              h_index: 0,
+              photos: 0,
+              objects: 0,
+              votes: 0,
+              covers: 0,
+              first_photos: 0
+            }
+
+        json(conn, %{
+          photographer: Map.put(stats, :joined_at, user.inserted_at),
+          photos: user.id |> Photos.by_author() |> Enum.take(48) |> Enum.map(&Photos.public/1)
+        })
+    end
+  end
 
   def cancel_votes(conn, %{"handle" => handle} = p),
     do:
@@ -153,6 +202,12 @@ defmodule StarsmapApiWeb.CommunityController do
   def report(conn, %{"id" => id} = p),
     do: respond(conn, Moderation.report(id, p["reason"]), fn _ -> %{ok: true} end)
 
+  def rankings(conn, %{"period" => "new"} = params),
+    do:
+      json(conn, %{
+        photos: params["offset"] |> offset() |> Photos.recent() |> Enum.map(&Photos.public/1)
+      })
+
   def rankings(conn, params),
     do:
       json(conn, %{
@@ -163,10 +218,28 @@ defmodule StarsmapApiWeb.CommunityController do
     if moderator?(conn),
       do:
         json(conn, %{
+          counts: Moderation.counts(),
           reports: Moderation.reports(),
-          photos:
-            Enum.map(Moderation.queue(), &Map.merge(Photos.public(&1), %{status: &1.status}))
+          photos: Enum.map(Moderation.queue(), &Moderation.detail/1)
         }),
+      else: error(conn, :forbidden, :not_allowed)
+  end
+
+  def review_list(conn, params) do
+    if moderator?(conn),
+      do:
+        json(conn, %{
+          photos:
+            params["status"]
+            |> Moderation.list(offset(params["offset"]))
+            |> Enum.map(&Moderation.detail/1)
+        }),
+      else: error(conn, :forbidden, :not_allowed)
+  end
+
+  def review_log(conn, _) do
+    if moderator?(conn),
+      do: json(conn, %{actions: Moderation.log()}),
       else: error(conn, :forbidden, :not_allowed)
   end
 
@@ -293,6 +366,13 @@ defmodule StarsmapApiWeb.CommunityController do
   defp respond(conn, {:error, reason}, _),
     do:
       error(conn, :unprocessable_entity, if(is_atom(reason), do: reason, else: :invalid_request))
+
+  defp offset(value) do
+    case Integer.parse(to_string(value || "0")) do
+      {number, ""} when number in 0..10_000 -> number
+      _ -> 0
+    end
+  end
 
   defp moderator?(conn),
     do: conn.assigns.community_user && conn.assigns.community_user.role in ["admin", "moderator"]

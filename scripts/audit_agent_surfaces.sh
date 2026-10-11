@@ -35,6 +35,26 @@ fetch "/api/agent/v1/objects/search?q=Andromeda&limit=3" "$audit_tmp/search.json
 fetch "/api/agent/v1/objects/ngc-224" "$audit_tmp/object.json"
 fetch "/api/agent/v1/view-link?center_x_au=0&center_y_au=0&zoom=24&time=now&layers=grid%2Clabels" "$audit_tmp/view.json"
 
+mcp() {
+  local method="$1"
+  local params="$2"
+  local destination="$3"
+  local name_header=()
+  if [[ -n "${4:-}" ]]; then name_header=(--header "Mcp-Name: $4"); fi
+  curl --fail --silent --show-error --request POST "${base_url}/mcp" \
+    --header "Content-Type: application/json" \
+    --header "Accept: application/json, text/event-stream" \
+    --header "MCP-Protocol-Version: 2026-07-28" \
+    --header "Mcp-Method: ${method}" \
+    "${name_header[@]}" \
+    --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"${method}\",\"params\":{${params}\"_meta\":{\"io.modelcontextprotocol/protocolVersion\":\"2026-07-28\",\"io.modelcontextprotocol/clientCapabilities\":{}}}}" \
+    --output "$destination"
+}
+
+mcp "server/discover" "" "$audit_tmp/mcp-discover.json"
+mcp "tools/list" "" "$audit_tmp/mcp-tools.json"
+mcp "tools/call" '"name":"search_sky_objects","arguments":{"q":"Andromeda","limit":3},' "$audit_tmp/mcp-search.json" "search_sky_objects"
+
 assert_text "$audit_tmp/robots.txt" "Allow: /api/agent/"
 assert_text "$audit_tmp/sitemap.xml" "/sitemaps/pages.xml"
 assert_text "$audit_tmp/pages.xml" "/agents"
@@ -57,7 +77,19 @@ invariant(Object.keys(openapi.paths).length === 4, "OpenAPI must expose exactly 
 
 const guide = read("agents.json");
 invariant(guide.api?.read_only === true && guide.api?.bounded === true, "Agent guide must describe a bounded read-only API");
-invariant(guide.mcp?.available === false, "Agent guide must not claim an unavailable MCP endpoint");
+invariant(guide.mcp?.available === true && guide.mcp?.read_only === true, "Agent guide must describe the read-only MCP endpoint");
+
+const discover = read("mcp-discover.json").result;
+invariant(discover?.resultType === "complete" && discover.supportedVersions.includes("2026-07-28"), "MCP discovery must name the current protocol revision");
+invariant(Object.keys(discover.capabilities).join() === "tools", "MCP server must offer tools only");
+
+const mcpTools = read("mcp-tools.json").result.tools;
+invariant(mcpTools.map((tool) => tool.name).join() === guide.mcp.tools.join(), "MCP tool list must agree with the agent guide");
+invariant(mcpTools.every((tool) => tool.annotations?.readOnlyHint === true), "Each MCP tool must be read-only");
+
+const mcpSearch = read("mcp-search.json").result;
+invariant(mcpSearch?.isError === false, "MCP search tool call failed");
+invariant(JSON.stringify(mcpSearch.structuredContent.results) === JSON.stringify(read("search.json").results), "MCP and REST search results must agree");
 
 const catalogs = read("catalogs.json");
 invariant(catalogs.catalogs.length > 0 && catalogs.catalogs.length <= 30, "Catalog response must be bounded");

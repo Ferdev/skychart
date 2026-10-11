@@ -6,9 +6,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 STYLE_SHEETS = sorted((SRC / "styles").glob("*.css")) + [SRC / "destinationPicker.css", SRC / "styles.css"]
-# Plan 24 (community photos) owns this area. Its small text is reported, not changed here.
-COMMUNITY_SHEET = SRC / "styles" / "community.css"
-COMMUNITY_SOURCE = SRC / "community"
 
 # The export footer is a fixed English provenance line in the image file.
 DIRECT_FORMAT_EXEMPT = {SRC / "exportCompositor.ts"}
@@ -20,7 +17,7 @@ ROOT_FONT_PX = 16
 
 def typescript_sources():
     for path in sorted(SRC.rglob("*.ts")):
-        if COMMUNITY_SOURCE in path.parents or (SRC / "format") in path.parents:
+        if (SRC / "format") in path.parents:
             continue
         yield path
 
@@ -60,8 +57,6 @@ def small_sizes(value: str):
 def test_style_sheets_have_no_text_below_12_px():
     problems = []
     for sheet in STYLE_SHEETS:
-        if sheet == COMMUNITY_SHEET:
-            continue
         css = re.sub(r"/\*.*?\*/", "", sheet.read_text(), flags=re.S)
         for match in re.finditer(r"(?<![-\w])font-size:\s*([^;}]+)", css):
             problems += [f"{sheet.name}: font-size {size}" for size in small_sizes(match.group(1))]
@@ -91,8 +86,6 @@ def test_canvas_text_is_12_px_or_larger():
 def test_one_sans_serif_font_stack():
     problems = []
     for path in [*STYLE_SHEETS, *typescript_sources(), ROOT / "index.html"]:
-        if path == COMMUNITY_SHEET:
-            continue
         text = path.read_text()
         if re.search(r"\bGeorgia\b", text) or re.search(r"(?<![-\w])serif\b", text):
             problems.append(str(path.relative_to(ROOT)))

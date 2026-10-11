@@ -137,6 +137,7 @@ defmodule StarsmapApi.Community.Photos do
 
   def public(photo) do
     author = Repo.get!(User, photo.user_id)
+    subject = Repo.get(StarsmapApi.Community.Subject, photo.subject_id)
 
     Map.take(photo, [
       :id,
@@ -151,6 +152,7 @@ defmodule StarsmapApi.Community.Photos do
       :published_at
     ])
     |> Map.merge(%{
+      object_name: subject && subject.name,
       author: Map.take(author, [:handle, :name]),
       votes: Ranking.vote_count(photo.id),
       thumbnail_url: Storage.media_url(photo.id, "320"),
@@ -160,6 +162,7 @@ defmodule StarsmapApi.Community.Photos do
     })
   end
 
+  @doc "The photographer's own photos, with the private status and the last moderator text."
   def mine(user),
     do:
       Repo.all(
@@ -174,9 +177,28 @@ defmodule StarsmapApi.Community.Photos do
               limit: 1
           )
 
-        Map.take(p, [:id, :title, :status, :inserted_at])
-        |> Map.put(:moderation_reason, if(action, do: action.reason, else: nil))
+        subject = Repo.get(StarsmapApi.Community.Subject, p.subject_id)
+
+        Map.take(p, [:id, :title, :status, :inserted_at, :declared_key, :published_at])
+        |> Map.merge(%{
+          object_name: subject && subject.name,
+          # The owner can read the private derivative while the photo is not public.
+          thumbnail_url: if(p.sha256, do: Storage.media_url(p.id, "320"), else: nil),
+          votes: if(p.status == "published", do: Ranking.vote_count(p.id), else: 0),
+          moderation_reason: if(action, do: action.reason, else: nil)
+        })
       end)
+
+  @doc "Published photos, newest first."
+  def recent(offset \\ 0, limit \\ 24) when is_integer(offset) and offset >= 0 do
+    Repo.all(
+      from [p, _] in published(),
+        order_by: [desc: p.published_at, desc: p.id],
+        offset: ^offset,
+        limit: ^limit,
+        select: p
+    )
+  end
 
   def by_author(id),
     do:

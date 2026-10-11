@@ -1,3 +1,4 @@
+import { COMMUNITY_TRANSLATIONS } from "./communityTranslations";
 import { DATA_LABEL_TRANSLATIONS } from "./dataLabelTranslations";
 import { FIELD_TRANSLATIONS } from "./fieldTranslations";
 import { OBJECT_TRANSLATIONS } from "./objectTranslations";
@@ -21,6 +22,7 @@ const AREAS: readonly Record<string, Record<string, string>>[] = [
   SKY_TRANSLATIONS,
   UNIVERSE3D_TRANSLATIONS,
   DATA_LABEL_TRANSLATIONS,
+  COMMUNITY_TRANSLATIONS,
 ];
 
 /** The text of all area modules, merged for each locale. `i18n.ts` puts it on top of the main table. */

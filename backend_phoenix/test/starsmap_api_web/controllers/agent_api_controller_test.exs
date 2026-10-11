@@ -76,6 +76,20 @@ defmodule StarsmapApiWeb.AgentApiControllerTest do
     assert error["error"]["code"] == "object_not_found"
   end
 
+  test "object details are available for ephemeris bodies and spacecraft", %{conn: conn} do
+    mars = conn |> get(~p"/api/agent/v1/objects/mars") |> json_response(200)
+    assert mars["object"]["name"] == "Mars"
+    assert mars["object"]["identifiers"] == %{}
+    assert mars["object"]["astrometry"]["ra_deg"] == nil
+    assert mars["provenance"]["source_type"] == "JPL ephemeris"
+
+    voyager =
+      conn |> recycle() |> get(~p"/api/agent/v1/objects/spacecraft-31") |> json_response(200)
+
+    assert voyager["object"]["name"] == "Voyager 1"
+    assert voyager["object"]["identifiers"] == %{"horizons_id" => "-31"}
+  end
+
   test "catalog list is finite and separates catalog IDs from view-layer IDs", %{conn: conn} do
     payload = conn |> get(~p"/api/agent/v1/catalogs") |> json_response(200)
 

@@ -1,7 +1,9 @@
-import { cx } from "./copy";
+import { t } from "../i18n";
+
 export type Photo = {
   id: string;
   declared_key: string;
+  object_name?: string | null;
   title: string;
   caption: string;
   licence: string;
@@ -32,9 +34,89 @@ export type Cover = {
   new_photo_until?: string | null;
 };
 export type User = { id: string; handle: string; name: string; role: string };
+/** A photo of the signed-in photographer, with its private status. */
+export type OwnPhoto = {
+  id: string;
+  title: string;
+  status: string;
+  declared_key?: string;
+  object_name?: string | null;
+  thumbnail_url?: string | null;
+  votes?: number;
+  inserted_at?: string;
+  moderation_reason?: string | null;
+};
+export type Photographer = {
+  handle: string;
+  name: string;
+  h_index: number;
+  photos: number;
+  objects?: number;
+  votes?: number;
+  covers?: number;
+  first_photos?: number;
+  rank?: number;
+  joined_at?: string;
+};
+export type CoverageObject = {
+  key: string;
+  name: string;
+  catalog?: string;
+  type?: string | null;
+  constellation?: string | null;
+  magnitude?: number | null;
+};
+export type Coverage = {
+  total?: number;
+  covered?: number;
+  matched?: number;
+  catalogs?: Record<string, { total: number; covered: number }>;
+  objects: CoverageObject[];
+};
+/** The private view of a photo for a moderator. */
+export type ReviewPhoto = Photo & {
+  status?: string;
+  submitted_at?: string;
+  width?: number | null;
+  height?: number | null;
+  author: Photo["author"] & { joined_at?: string; suspended?: boolean; published?: number; rejected?: number };
+  duplicates?: { id: string; title: string; status: string; handle: string }[];
+  reports?: { reason: string; at?: string }[];
+  last_action?: { action: string; reason: string; at: string; moderator?: string | null } | null;
+};
+export type ReviewQueue = {
+  counts?: Record<string, number>;
+  photos: ReviewPhoto[];
+  reports: { id?: string; reason: string; at?: string; photo: ReviewPhoto }[];
+};
+export type ReviewAction = {
+  action: string;
+  reason: string;
+  at: string;
+  moderator?: string | null;
+  photo_id?: string | null;
+  photo_title?: string | null;
+};
+
+/** Error codes of the server that have a text of their own. Other codes get the general text. */
+const ERROR_KEYS = new Set([
+  "account_too_new",
+  "vote_not_allowed",
+  "solver_unavailable",
+  "mail_unavailable",
+  "sign_in_required",
+  "invalid_code",
+  "invalid_metadata",
+  "upload_quota",
+  "not_ready",
+  "invalid_wcs",
+]);
+
 export class CommunityApi {
   user: User | null = null;
   csrf = "";
+  /** Photos and reports that wait for this moderator. Zero for a member. */
+  reviewCount = 0;
   async request<T>(
     path: string,
     method = "GET",
@@ -57,36 +139,35 @@ export class CommunityApi {
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
-      const messages: Record<string, string> = {
-        account_too_new: "You can vote 24 hours after creating your account.",
-        vote_not_allowed: "You cannot vote on this photo.",
-        solver_unavailable: "The plate solver is not configured for this site.",
-        mail_unavailable:
-          "Email delivery is unavailable. Please try again later.",
-        sign_in_required: "Please sign in first.",
-        invalid_code: "The code is incorrect or expired.",
-        invalid_metadata:
-          "Check the photo details and confirm your rights to publish.",
-        upload_quota: "You reached the limit of 20 uploads per day.",
-        not_ready: "Wait for image processing to finish.",
-        invalid_wcs: "Use valid square-pixel TAN sky coordinates.",
-      };
-      throw new Error(
-        cx(messages[payload.error] ?? "Request failed. Please try again."),
-      );
+      throw new Error(t(ERROR_KEYS.has(payload.error) ? `community.error.${payload.error}` : "community.error.generic"));
     }
     return response.json() as Promise<T>;
   }
   async session() {
     try {
-      const data = await this.request<{ user: User; csrf: string }>(
+      const data = await this.request<{ user: User | null; csrf: string; review_count?: number }>(
         "/api/community/session",
       );
       this.user = data.user;
       this.csrf = data.csrf;
+      this.reviewCount = data.review_count ?? 0;
     } catch {
       this.user = null;
       this.csrf = "";
+      this.reviewCount = 0;
     }
   }
+  get moderator() {
+    return ["admin", "moderator"].includes(this.user?.role ?? "");
+  }
+  signOutLocally() {
+    this.user = null;
+    this.csrf = "";
+    this.reviewCount = 0;
+  }
+}
+
+/** The text of an error for the status line of a window. */
+export function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : t("community.error.generic");
 }

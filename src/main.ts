@@ -574,6 +574,8 @@ const spacecraftLoader = new SpacecraftLoader((bodies) => {
   updateAllUi();
   requestRender();
 }, () => selectedKey);
+// A link to an object in a community window selects the object here, with no new page load.
+community.selectObject = (key) => selectBodyByKey(key, { center: true, zoom: "local" });
 const deferredEphemerisLoader = new AtlasDeferredEphemerisController({
   serverBootObjectKey, hasBody: (key) => bodyByKey.has(key), restoreSelection: restoreSelectionFromViewState,
   selectServerBoot: (key) => selectBodyByKey(key, { center: true, zoom: "local" }),
