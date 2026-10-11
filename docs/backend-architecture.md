@@ -79,6 +79,7 @@ See [Catalog Tile Format](tile-format.md) for the SMP3 and SMPK1 contracts.
 - `GET /api/observe`
 - `GET /api/now`
 - `GET /feed.xml`
+- `POST /mcp` (the public [MCP server](mcp-server.md))
 
 Development-only dynamic point endpoints remain available as a fallback when
 no static manifest is configured. Maintained staging and production builds use

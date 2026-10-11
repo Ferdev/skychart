@@ -44,7 +44,8 @@ defmodule StarsmapApi.AgentInterface do
              object_type: object.object_type,
              catalog_id: object.catalog_group,
              astrometry: object.astrometry,
-             identifiers: object.external_ids,
+             # A core Solar System body has `identifiers`; a catalog record has `external_ids`.
+             identifiers: Map.get(object, :external_ids) || Map.get(object, :identifiers, %{}),
              semantics: object.semantics
            },
            provenance: %{

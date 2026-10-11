@@ -235,6 +235,10 @@ See [Backend Architecture](docs/backend-architecture.md) for the service split
 and [Scientific Methodology](docs/scientific-methodology.md) for coordinate,
 epoch, distance, and selection conventions.
 
+Phoenix also serves a public, read-only [MCP server](docs/mcp-server.md) at
+`/mcp`. An AI assistant can use it to search the atlas, read object records,
+get Solar System positions, measure separations, and build atlas and Sky links.
+
 ## Coordinate System
 
 Positions are computed as heliocentric ecliptic Cartesian coordinates:

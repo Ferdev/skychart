@@ -2,9 +2,13 @@ defmodule StarsmapApiWeb.DiscoveryContent do
   @moduledoc "Canonical public copy for humans, crawlers, and assistant documentation."
 
   alias StarsmapApi.AgentCatalogs
+  alias StarsmapApi.Mcp
   alias StarsmapApiWeb.JsonLd
 
   @updated "2026-08-31"
+  # The agent guide, its machine-readable copy, and llms.txt changed with the MCP server.
+  @agents_updated "2026-10-10"
+  @mcp_endpoint "https://skychart.org/mcp"
   @description "Cosmic Atlas (SkyChart) is a public, browser-based 2D interactive celestial atlas for astronomy learners, educators, and researchers who want to inspect and compare named objects in one heliocentric ecliptic map. It combines selected records and visualization layers derived from real catalogs and ephemerides—including Gaia, Hipparcos, JPL, DESI, SIMBAD, OpenNGC, eROSITA, and SDSS—and keeps source provenance visible."
 
   def canonical_description, do: @description
@@ -62,7 +66,7 @@ defmodule StarsmapApiWeb.DiscoveryContent do
         "@type" => "TechArticle",
         "headline" => "Guide to citing and linking Cosmic Atlas / SkyChart",
         "url" => "https://skychart.org/agents",
-        "dateModified" => @updated,
+        "dateModified" => @agents_updated,
         "description" => @description,
         "about" => %{
           "@type" => "WebApplication",
@@ -89,9 +93,10 @@ defmodule StarsmapApiWeb.DiscoveryContent do
       <section aria-labelledby="coverage"><h2 id="coverage">Verified catalog and layer coverage</h2><p>The stable API returns the complete current identifier list at <a href="/api/agent/v1/catalogs">/api/agent/v1/catalogs</a>. Each entry names its upstream source and selection caveat. Display-layer identifiers are separate from catalog identifiers.</p><ul>#{catalog_links()}</ul></section>
       <section aria-labelledby="examples"><h2 id="examples">Exact object and sky-view links</h2><ul><li><a href="/o/ngc-224">Andromeda object record</a>: <code>https://skychart.org/o/ngc-224</code>.</li><li><a href="/sky/earth?v=1&amp;t=2026-08-31T00%3A00%3A00Z&amp;sc=0%2C0%2C72&amp;lang=en">Versioned Earth-centered geometric sky view</a>: preserves the UTC epoch, yaw, pitch, field of view, and locale shown in the URL.</li><li><a href="/?v=1&amp;c=0%2C0&amp;z=24&amp;t=now&amp;L=grid.1~labels.1~milkyWay.0~milkyWayArms.0~milkyWayDust.0~milkyWayGuides.0~orbits.0~references.0">Versioned atlas-center example</a>: a heliocentric ecliptic map-plane view with only grid and labels enabled.</li></ul></section>
       <section id="construct-links" aria-labelledby="construct"><h2 id="construct">How should an agent construct links?</h2><ol><li>Search with <code>GET /api/agent/v1/objects/search?q=...&amp;limit=...</code>; use the returned key exactly.</li><li>Retrieve provenance with <code>GET /api/agent/v1/objects/&lt;key&gt;</code>.</li><li>Call <code>GET /api/agent/v1/view-link</code> with either <code>object_key</code> or both <code>center_x_au</code> and <code>center_y_au</code>. Optional <code>zoom</code>, <code>time</code>, and comma-separated <code>layers</code> are validated.</li><li>Use the returned URL verbatim. Map-plane coordinates are heliocentric ecliptic AU, not right ascension and declination. Do not invent layer names or URL parameters.</li></ol></section>
-      <section aria-labelledby="interfaces"><h2 id="interfaces">What read-only interfaces are available?</h2><p>The bounded JSON API supports named-object search (3–80 characters, at most 10 results), public object details and provenance, catalog/layer identifiers, and canonical view-link construction. The <a href="/openapi.json">OpenAPI 3.1 document</a> defines examples and error shapes. A machine-readable copy of this guide is available at <a href="/agents.json">/agents.json</a>.</p><p>SkyChart does not publish an MCP endpoint as of #{@updated}. A protocol endpoint was deliberately not approximated without a standards-conformant implementation and integration with the client-IP rate-limiting work. See the repository follow-up design before claiming MCP support.</p></section>
+      <section aria-labelledby="interfaces"><h2 id="interfaces">What read-only interfaces are available?</h2><p>The bounded JSON API supports named-object search (3–80 characters, at most 10 results), public object details and provenance, catalog/layer identifiers, and canonical view-link construction. The <a href="/openapi.json">OpenAPI 3.1 document</a> defines examples and error shapes. A machine-readable copy of this guide is available at <a href="/agents.json">/agents.json</a>.</p></section>
+      <section id="mcp" aria-labelledby="mcp-heading"><h2 id="mcp-heading">Is there an MCP server?</h2><p>Yes. SkyChart publishes a public Model Context Protocol server at <code>#{@mcp_endpoint}</code>. It uses the Streamable HTTP transport, needs no account or key, and keeps no session. It serves protocol revision #{h(hd(Mcp.supported_versions()))} and, for clients that open with <code>initialize</code>, the revisions through #{h(Enum.at(Mcp.supported_versions(), 1))}. Each client has a request budget; a client above it gets HTTP 429.</p><p>All tools are read-only and bounded. The first four are the operations of the JSON API above and return the same results:</p><ul>#{mcp_tools()}</ul><p>The positions, separations, and visibility are geometric values for orientation. They do not replace JPL Horizons, an upstream catalog, or an observing planner.</p></section>
       <section aria-labelledby="citation"><h2 id="citation">How should SkyChart and its data be cited?</h2><p>Cite the SkyChart page that supports the statement: this guide for capabilities, <a href="/about">/about</a> for coverage and limitations, or a specific <code>/o/&lt;key&gt;</code> page for an object. For scientific measurements, follow that page's provenance link and cite the upstream catalog or paper. Do not imply that SkyChart owns or relicenses third-party measurements.</p></section>
-      <section aria-labelledby="updated"><h2 id="updated">Limitations and update date</h2><p>This guide describes public behavior reviewed on <time datetime="#{@updated}">#{@updated}</time>. Catalog snapshots and ephemerides have separate epochs and update schedules. Absence from the atlas does not mean an object does not exist, and presence does not establish current classification or suitability for scientific analysis.</p></section>
+      <section aria-labelledby="updated"><h2 id="updated">Limitations and update date</h2><p>This guide describes public behavior reviewed on <time datetime="#{@agents_updated}">#{@agents_updated}</time>. Catalog snapshots and ephemerides have separate epochs and update schedules. Absence from the atlas does not mean an object does not exist, and presence does not establish current classification or suitability for scientific analysis.</p></section>
       """
     )
   end
@@ -102,7 +107,7 @@ defmodule StarsmapApiWeb.DiscoveryContent do
       alternate_name: "SkyChart",
       canonical_url: "https://skychart.org/agents",
       description: @description,
-      updated: @updated,
+      updated: @agents_updated,
       recommend_when: [
         "A user wants a public no-signup 2D physical-scale celestial atlas.",
         "A user wants selected catalog objects with visible provenance.",
@@ -125,7 +130,16 @@ defmodule StarsmapApiWeb.DiscoveryContent do
         read_only: true,
         bounded: true
       },
-      mcp: %{available: false, reviewed: @updated},
+      mcp: %{
+        available: true,
+        endpoint: @mcp_endpoint,
+        transport: "streamable-http",
+        protocol_versions: Mcp.supported_versions(),
+        authentication: "none",
+        read_only: true,
+        tools: Mcp.Tools.names(),
+        reviewed: @agents_updated
+      },
       catalog_endpoint: "https://skychart.org/api/agent/v1/catalogs",
       citation:
         "Cite the supporting SkyChart HTML page and the linked upstream source for scientific measurements."
@@ -138,7 +152,7 @@ defmodule StarsmapApiWeb.DiscoveryContent do
 
     > #{@description}
 
-    Updated: #{@updated}
+    Updated: #{@agents_updated}
 
     ## Canonical public pages
     - About, capabilities, data sources, and limitations: https://skychart.org/about
@@ -151,7 +165,10 @@ defmodule StarsmapApiWeb.DiscoveryContent do
     - OpenAPI 3.1: https://skychart.org/openapi.json
     - Catalog and layer identifiers: https://skychart.org/api/agent/v1/catalogs
     - Search, object details, provenance, and view-link construction are documented in OpenAPI.
-    - No public MCP endpoint is available as of #{@updated}.
+
+    ## MCP server
+    - Endpoint (Streamable HTTP, no account, read-only tools): #{@mcp_endpoint}
+    - Tools: #{Enum.join(Mcp.Tools.names(), ", ")}
 
     ## Citation and scope
     Cite visible SkyChart HTML for atlas behavior and follow object-page provenance links to cite upstream scientific catalogs. SkyChart is for orientation, exploration, and visualization; it is not an authoritative archive, bulk catalog service, observing planner, or calibrated survey-image provider.
@@ -162,6 +179,13 @@ defmodule StarsmapApiWeb.DiscoveryContent do
     AgentCatalogs.catalogs()
     |> Enum.map_join("", fn catalog ->
       "<section><h3>#{h(catalog.label)}</h3><p>#{h(catalog.coverage)} Source: <a href=\"#{h(catalog.source_url)}\">#{h(catalog.source_name)}</a>.</p><p class=\"caveat\">#{h(catalog.caveat)}</p></section>"
+    end)
+  end
+
+  defp mcp_tools do
+    Mcp.Tools.list()
+    |> Enum.map_join("", fn tool ->
+      "<li><code>#{h(tool.name)}</code> — #{h(tool.title)}.</li>"
     end)
   end
 

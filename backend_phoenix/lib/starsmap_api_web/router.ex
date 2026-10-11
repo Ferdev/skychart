@@ -25,6 +25,18 @@ defmodule StarsmapApiWeb.Router do
     get "/sky/:key/card.png", SkyShareController, :card
   end
 
+  # A tool call can start a database search or an ephemeris calculation, so MCP has
+  # its own budget for each client, smaller than the budget of the JSON API.
+  pipeline :mcp do
+    plug StarsmapApiWeb.Plugs.RateLimit, capacity: 120, refill_per_second: 2.0, scope: :mcp
+  end
+
+  scope "/", StarsmapApiWeb do
+    pipe_through :mcp
+    post "/mcp", McpController, :message
+    match :*, "/mcp", McpController, :method_not_allowed
+  end
+
   scope "/", StarsmapApiWeb do
     get "/catalog-tiles/v1/*path", CatalogTileProxyController, :show
 
