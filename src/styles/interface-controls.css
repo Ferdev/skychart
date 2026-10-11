@@ -75,7 +75,7 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   .selection-compare-actions .label-wide {
     display: none;
   }

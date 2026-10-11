@@ -125,7 +125,7 @@
   background: rgba(242, 237, 223, 0.04);
 }
 
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   .object-workspace .selected-object-header {
     gap: 10px;
     padding: 14px 16px 12px;
@@ -354,7 +354,7 @@
   }
 }
 
-@media (max-width: 899px) {
+@media (max-width: 899px), (max-height: 560px) {
   .selection-connector {
     display: none;
   }
@@ -403,6 +403,107 @@
 
   .compare-selected-action {
     min-height: 48px;
+  }
+}
+
+/* The grip and the Details button are parts of the bottom sheet only. */
+.workspace-sheet-grip,
+.object-sheet-toggle {
+  display: none;
+}
+
+/*
+ * The panel is a bottom sheet (a compact window that is not short). The sheet opens short, with the name
+ * and the actions of the object, so that the map stays in view. The Details button, or a swipe on the
+ * header, shows all data (objectSheet.ts). An inspector that the Sky view or the 3D view opens is always full.
+ */
+@media (max-width: 899px) and (min-height: 561px), (max-width: 599px) {
+  #app:not(:has(> [data-object-inspector="true"])) .map-hud[data-workspace-tab="object"] .workspace-sheet-grip {
+    position: absolute;
+    z-index: 6;
+    top: 0;
+    left: 50%;
+    display: block;
+    width: 120px;
+    height: 22px;
+    transform: translateX(-50%);
+    touch-action: none;
+  }
+
+  .workspace-sheet-grip::before {
+    content: "";
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(242, 237, 223, 0.32);
+    transform: translateX(-50%);
+  }
+
+  #app:not(:has(> [data-object-inspector="true"])) .object-workspace .selected-object-header {
+    padding-top: 20px;
+    touch-action: none;
+  }
+
+  #app:not(:has(> [data-object-inspector="true"])) .object-workspace .object-sheet-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-left: auto;
+  }
+
+  .object-sheet-toggle::after {
+    content: "";
+    width: 7px;
+    height: 7px;
+    margin-top: 4px;
+    border-top: 2px solid currentColor;
+    border-left: 2px solid currentColor;
+    transform: rotate(45deg);
+  }
+
+  .object-sheet-toggle[aria-expanded="true"]::after {
+    margin-top: -4px;
+    transform: rotate(225deg);
+  }
+
+  #app:not(:has(> [data-object-inspector="true"])) .map-hud[data-workspace-tab="object"] .workspace-panel[data-sheet="peek"] {
+    height: auto;
+  }
+
+  #app:not(:has(> [data-object-inspector="true"])) .workspace-panel[data-sheet="peek"] :is(.object-workspace-stage, .object-inspector-footer) {
+    display: none;
+  }
+
+  #app:not(:has(> [data-object-inspector="true"])) .workspace-panel[data-sheet="peek"] .selected-object-header {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    border-bottom: 0;
+  }
+}
+
+/* A short window: the inspector is a side panel (responsive.css). */
+@media (max-height: 560px) and (min-width: 600px) {
+  .map-hud[data-workspace-tab="object"] .workspace-panel,
+  #app:has(> .tour-player:not([hidden])) .map-hud[data-workspace-tab="object"] .workspace-panel {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: auto;
+    width: calc(var(--workspace-width) - 8px);
+    height: auto;
+    max-height: none;
+    border-radius: 14px;
+  }
+
+  .object-workspace .selected-object-header {
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .object-view-tabs button {
+    min-width: 0;
   }
 }
 

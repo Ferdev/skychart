@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, openSearchWorkspace, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
+import { collectBrowserIssues, expandObjectSheet, openAtlas, openSearchWorkspace, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -60,6 +60,9 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768
 
       await selectCatalogObject(page, "Mars", "mars", "Mars");
       await expectNoOverlap(page, "inspector");
+      // A compact window opens the inspector as a short sheet. The Details button shows all data.
+      await expandObjectSheet(page);
+      await expectNoOverlap(page, "inspector with all data");
 
       await page.locator("#compare-selected").click();
       await expect(page.locator("#selection-compare")).toBeVisible();

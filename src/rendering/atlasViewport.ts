@@ -1,4 +1,5 @@
 import type { Camera } from "../atlas/contracts";
+import { isCompactWindow } from "../atlas/windowLayout";
 import type { Rect, ScreenPoint } from "../geometry";
 import type { WebglPointRenderer } from "../webglPointRenderer";
 
@@ -46,7 +47,7 @@ export class AtlasViewport {
   /** Rendering extends beside desktop controls; centering still uses rect(). */
   renderRect(): Rect {
     const rect = this.rect();
-    if (window.innerWidth < 900) return rect;
+    if (isCompactWindow()) return rect;
     const bottom = Math.max(rect.bottom, window.innerHeight - 10);
     return { ...rect, bottom, height: bottom - rect.top };
   }
@@ -107,19 +108,22 @@ export class AtlasViewport {
     const workspaceRect = workspace?.getBoundingClientRect();
     const barRect = bar?.getBoundingClientRect();
     const scaleRailRect = scaleRail?.getBoundingClientRect();
-    const isWide = window.innerWidth >= 900;
+    const compact = isCompactWindow();
     const topBoundary = barRect?.bottom ?? 0;
-    const workspaceLeft = workspaceRect?.left;
-    const right = isWide && typeof workspaceLeft === "number" && Number.isFinite(workspaceLeft) && workspaceLeft > 0
-      ? Math.max(240, workspaceLeft - 12)
+    // A panel that is not as wide as the window is at the side of the map. A panel as wide as the window is a bottom sheet.
+    const sidePanelLeft = workspaceRect && workspaceRect.left > 0 && workspaceRect.width < window.innerWidth - 40
+      ? workspaceRect.left
+      : undefined;
+    const right = typeof sidePanelLeft === "number" && Number.isFinite(sidePanelLeft)
+      ? Math.max(240, sidePanelLeft - 12)
       : window.innerWidth;
     const top = Math.max(0, topBoundary + 8);
-    const mobileObjectSheetTop = !isWide && this.options.activeTab() === "object" ? workspaceRect?.top : undefined;
-    const desktopObjectBottom = isWide && this.options.activeTab() === "object"
+    const objectSheetTop = compact && sidePanelLeft === undefined && this.options.activeTab() === "object" ? workspaceRect?.top : undefined;
+    const desktopObjectBottom = !compact && this.options.activeTab() === "object"
       ? scaleRailRect?.top
       : undefined;
-    const bottomBoundary = !isWide
-      ? Math.min(scaleRailRect?.top ?? window.innerHeight, mobileObjectSheetTop ?? window.innerHeight)
+    const bottomBoundary = compact
+      ? Math.min(scaleRailRect?.top ?? window.innerHeight, objectSheetTop ?? window.innerHeight)
       : desktopObjectBottom ?? window.innerHeight;
     const bottom = Math.max(top + 1, bottomBoundary - 10);
     return {

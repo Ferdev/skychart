@@ -49,9 +49,20 @@ export class UniverseHintCard {
 
 const MINIMAP_KEY = "cosmic-atlas:universe-minimap";
 
-/** The trip map has a button that hides its drawing. The choice stays for the next visit. */
+/** A phone, in portrait or in landscape. The 3D style sheet uses the same condition. */
+const PHONE_WINDOW = "(max-width: 640px), (max-height: 560px)";
+
+/**
+ * The trip map has a button that hides its drawing. The choice stays for the next visit.
+ * With no choice, a phone starts with the drawing hidden, because the view has little room.
+ */
 export function bindMinimapToggle(panel: HTMLElement, button: HTMLButtonElement, translate: Translate): void {
-  const read = () => { try { return window.localStorage.getItem(MINIMAP_KEY) === "collapsed"; } catch { return false; } };
+  const read = () => {
+    try {
+      const choice = window.localStorage.getItem(MINIMAP_KEY);
+      return choice ? choice === "collapsed" : window.matchMedia(PHONE_WINDOW).matches;
+    } catch { return false; }
+  };
   const show = (collapsed: boolean) => {
     panel.dataset.collapsed = String(collapsed);
     button.setAttribute("aria-expanded", String(!collapsed));
