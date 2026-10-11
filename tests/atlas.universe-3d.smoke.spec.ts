@@ -158,7 +158,10 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await expect(page.locator("#universe-speed")).toHaveText("0 km/s · 0 c", { timeout: 30_000 });
   await expect(page.locator("#universe-speed-gauge")).toHaveAttribute("aria-valuenow", "0.000");
   // The flight above can end at the target, where the autopilot has nothing to do. Start again from the entry position.
+  // On a narrow window `Reset flight` is a row of the More menu, and the menu closes after the action.
+  await page.locator("#universe-more-button").click();
   await page.locator("#universe-reset").click();
+  await expect(page.locator("#universe-more-button")).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("#universe-autopilot")).toBeEnabled();
   const beforeAutopilot = await page.locator("#universe-position").textContent();
   await page.locator("#universe-autopilot").click();
