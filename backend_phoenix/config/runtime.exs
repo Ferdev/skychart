@@ -177,6 +177,7 @@ if config_env() != :test do
       community_mail_token: System.get_env("COMMUNITY_MAIL_TOKEN"),
       community_mail_from: System.get_env("COMMUNITY_MAIL_FROM"),
       # Accounts with these verified addresses get the admin role at sign-in.
+      # They also get the notices about new users and photos that wait for review.
       community_admin_emails:
         (System.get_env("COMMUNITY_ADMIN_EMAILS") || "")
         |> String.split([",", " ", "\n"], trim: true)
@@ -234,7 +235,7 @@ if config_env() != :test do
         else: cron
 
     config :starsmap_api, StarsmapApi.CommunityJobs,
-      queues: if(worker, do: [media: 1, publish: 1], else: false),
+      queues: if(worker, do: [media: 1, publish: 1, mail: 1], else: false),
       plugins:
         if(worker,
           do: [

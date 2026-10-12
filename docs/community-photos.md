@@ -103,7 +103,7 @@ Set the corresponding `STAGING_` or `PRODUCTION_` GitHub variables/secrets below
 | `COMMUNITY_MEDIA_URL` | variable | Separate HTTPS media/CDN origin |
 | `COMMUNITY_MAIL_URL`, `COMMUNITY_MAIL_TOKEN` | variable, secret | HTTPS mail endpoint and Bearer token |
 | `COMMUNITY_MAIL_FROM` | variable | Sender address, for example `Cosmic Atlas <login@example.org>` |
-| `COMMUNITY_ADMIN_EMAILS` | secret | Optional. Email addresses that get the `admin` role at sign-in, with a comma between them |
+| `COMMUNITY_ADMIN_EMAILS` | secret | Optional. Email addresses that get the `admin` role at sign-in, with a comma between them. These addresses also get the administrator notices |
 | `COMMUNITY_BACKUP_URI`, `COMMUNITY_BACKUP_ENDPOINT` | variables | Off-host backup prefix and S3 endpoint |
 | `COMMUNITY_BACKUP_SECRET` | secret | Independent backup encryption password |
 | `COMMUNITY_BACKUP_ACCESS_KEY_ID`, `COMMUNITY_BACKUP_SECRET_ACCESS_KEY` | secrets | Separate backup credentials |
@@ -113,6 +113,15 @@ The app sends a POST with a Bearer token and the JSON body
 must send the mail and return HTTP 2xx. It must not log the code. This shape
 matches Resend's `POST https://api.resend.com/emails`. So `COMMUNITY_MAIL_URL`
 can be that address, and `COMMUNITY_MAIL_TOKEN` can be a Resend send-only API key.
+
+The same endpoint sends the administrator notices. Each address in
+`COMMUNITY_ADMIN_EMAILS` gets one mail when a new user signs in for the first
+time, and one mail when a photo gets the status `review`. A notice contains the
+handle and the display name of the user. It never contains the email address of
+the user. The worker (`COMMUNITY_WORKER=true`) sends the notices from the `mail`
+queue and tries again when the endpoint is not available. If
+`COMMUNITY_ADMIN_EMAILS` is empty, the app sends no notices.
+
 Email enumeration responses are generic. Codes expire after ten minutes and five
 failed attempts. The database limits requests to ten per email per rolling day.
 Sessions expire after 30 days and are revocable. Production cookies are HttpOnly,
