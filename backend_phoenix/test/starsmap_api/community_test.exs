@@ -116,6 +116,8 @@ defmodule StarsmapApi.CommunityTest do
   test "real image processing creates stripped derivatives and requires initial review", %{
     user: user
   } do
+    Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
     source = Path.join(Storage.root(), "test-source-#{Ecto.UUID.generate()}.png")
     File.mkdir_p!(Path.dirname(source))
     {_, 0} = System.cmd("vips", ["black", source, "64", "32", "--bands", "3"])
@@ -137,6 +139,15 @@ defmodule StarsmapApi.CommunityTest do
     processed = Photos.get(photo.id)
     assert processed.status == "review"
     assert processed.sha256
+
+    assert [%{"event" => "photo_review", "id" => id, "to" => "owner@example.com"}] =
+             Repo.all(
+               from j in Oban.Job,
+                 where: j.worker == "StarsmapApi.Community.AdminNotifier",
+                 select: j.args
+             )
+
+    assert id == photo.id
     assert processed.assets["perceptual_hash"] =~ ~r/^[0-9a-f]{16}$/
     assert processed.assets["dominant_color"] =~ ~r/^#[0-9a-f]{6}$/
     assert processed.assets["width"] == 64
@@ -267,6 +278,96 @@ defmodule StarsmapApi.CommunityTest do
     assert :ok = Accounts.request_code("visitor@example.com")
     assert_receive {:community_code, "visitor@example.com", code}
     assert {:ok, _, %User{role: "member"}} = Accounts.verify("visitor@example.com", code)
+  end
+
+  test "the administrators get one notice for the first sign-in of a new user" do
+    Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
+    notices = from j in Oban.Job, where: j.worker == "StarsmapApi.Community.AdminNotifier"
+
+    assert :ok = Accounts.request_code("visitor@example.com")
+    assert_receive {:community_code, "visitor@example.com", code}
+    # An address that is not verified is not a new user.
+    refute Repo.exists?(notices)
+    assert {:ok, _, visitor} = Accounts.verify("visitor@example.com", code)
+    assert visitor.first_sign_in_at
+
+    assert [%Oban.Job{queue: "mail", args: args} = job] = Repo.all(notices)
+    assert args == %{"event" => "new_user", "id" => visitor.id, "to" => "owner@example.com"}
+    assert :ok = StarsmapApi.Community.AdminNotifier.perform(job)
+    assert_receive {:community_notice, "owner@example.com", "Cosmic Atlas: new user", text}
+    assert text =~ visitor.handle
+    refute text =~ "visitor@example.com"
+
+    # The next sign-in of the same account sends no notice.
+    Repo.update_all(StarsmapApi.Community.Token, set: [inserted_at: ~U[2026-01-01 00:00:00Z]])
+    assert :ok = Accounts.request_code("visitor@example.com")
+    assert_receive {:community_code, "visitor@example.com", code}
+    assert {:ok, _, _} = Accounts.verify("visitor@example.com", code)
+    assert [_] = Repo.all(notices)
+
+    # The sign-in of an administrator sends no notice.
+    assert :ok = Accounts.request_code("owner@example.com")
+    assert_receive {:community_code, "owner@example.com", code}
+    assert {:ok, _, %User{role: "admin"}} = Accounts.verify("owner@example.com", code)
+    assert [_] = Repo.all(notices)
+
+    # An address that the operator removed from the list gets no mail.
+    Application.put_env(:starsmap_api, :community_admin_emails, [])
+    assert :ok = StarsmapApi.Community.AdminNotifier.perform(job)
+    refute_receive {:community_notice, _, _, _}
+  end
+
+  test "no notice is queued when no administrator address is configured" do
+    assert :ok = Accounts.request_code("visitor@example.com")
+    assert_receive {:community_code, "visitor@example.com", code}
+    assert {:ok, _, _} = Accounts.verify("visitor@example.com", code)
+
+    refute Repo.exists?(
+             from j in Oban.Job, where: j.worker == "StarsmapApi.Community.AdminNotifier"
+           )
+  end
+
+  test "the administrators get a notice for each photo that waits for review", %{
+    user: user,
+    subject: subject
+  } do
+    Application.put_env(:starsmap_api, :community_admin_emails, [
+      "owner@example.com",
+      "second@example.com"
+    ])
+
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
+    photo = photo(user, subject, "review")
+
+    assert {:ok, :ok} =
+             StarsmapApi.Community.transaction(fn ->
+               StarsmapApi.Community.AdminNotifier.enqueue("photo_review", photo.id)
+             end)
+
+    jobs =
+      Repo.all(
+        from j in Oban.Job,
+          where: j.worker == "StarsmapApi.Community.AdminNotifier",
+          order_by: j.id
+      )
+
+    assert ["owner@example.com", "second@example.com"] = Enum.map(jobs, & &1.args["to"])
+    assert :ok = StarsmapApi.Community.AdminNotifier.perform(hd(jobs))
+
+    assert_receive {:community_notice, "owner@example.com",
+                    "Cosmic Atlas: photo waiting for review", text}
+
+    assert text =~ photo.title
+    assert text =~ "Photographer: author (Author)"
+    assert text =~ "http://www.example.com"
+    refute text =~ user.email
+    refute_receive {:community_notice, "second@example.com", _, _}
+
+    # A photo that a moderator already examined needs no notice.
+    Repo.update!(Ecto.Changeset.change(photo, status: "published"))
+    assert :ok = StarsmapApi.Community.AdminNotifier.perform(List.last(jobs))
+    refute_receive {:community_notice, _, _, _}
   end
 
   test "newest listing, photographer statistics and coverage totals", %{

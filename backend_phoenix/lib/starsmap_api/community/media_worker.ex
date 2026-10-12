@@ -42,6 +42,8 @@ defmodule StarsmapApi.Community.MediaWorker do
                        schedule_in: 604_800
                      )
                    )
+
+                 StarsmapApi.Community.AdminNotifier.enqueue("photo_review", photo.id)
                end
              end) do
           {:ok, _} -> :ok
