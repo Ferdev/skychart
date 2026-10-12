@@ -51,4 +51,11 @@ defmodule StarsmapApi.Community.MailerWebhookTest do
     Application.delete_env(:starsmap_api, :community_mail_token)
     assert {:error, :mail_unavailable} = Webhook.deliver("reader@example.com", "123456")
   end
+
+  test "a notice uses the same settings checks as a sign-in code" do
+    Application.delete_env(:starsmap_api, :community_mail_from)
+
+    assert {:error, :mail_unavailable} =
+             Webhook.notify("owner@example.com", "Cosmic Atlas: new user", "Text")
+  end
 end
