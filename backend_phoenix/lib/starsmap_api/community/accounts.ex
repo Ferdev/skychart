@@ -1,7 +1,7 @@
 defmodule StarsmapApi.Community.Accounts do
   @moduledoc "Atomic email-code verification and revocable opaque sessions."
   import Ecto.Query
-  alias StarsmapApi.Community.{User, Token}
+  alias StarsmapApi.Community.{User, Token, AdminNotifier}
   alias StarsmapApi.CommunityRepo, as: Repo
 
   def request_code(email) when is_binary(email) do
@@ -130,7 +130,7 @@ defmodule StarsmapApi.Community.Accounts do
               expires_at: DateTime.add(StarsmapApi.Community.now(), 2_592_000)
             })
 
-            {:ok, secret, promote(user)}
+            {:ok, secret, user |> promote() |> first_sign_in()}
         end
       end)
 
@@ -189,6 +189,18 @@ defmodule StarsmapApi.Community.Accounts do
   end
 
   defp promote(user), do: user
+
+  # The account is new until its first verified sign-in. The administrators get
+  # one notice for it, and no notice for the sign-in of another administrator.
+  defp first_sign_in(%User{first_sign_in_at: nil} = user) do
+    user =
+      Repo.update!(Ecto.Changeset.change(user, first_sign_in_at: StarsmapApi.Community.now()))
+
+    if user.role != "admin", do: AdminNotifier.enqueue("new_user", user.id)
+    user
+  end
+
+  defp first_sign_in(user), do: user
 
   defp mailer, do: Application.fetch_env!(:starsmap_api, :community_mailer)
 end

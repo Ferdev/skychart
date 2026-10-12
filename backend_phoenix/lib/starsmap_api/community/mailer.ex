@@ -1,6 +1,14 @@
 defmodule StarsmapApi.Community.Mailer.Webhook do
   @moduledoc "Private mail delivery adapter. Credentials and codes are never logged."
-  def deliver(email, code) do
+  def deliver(email, code),
+    do:
+      notify(
+        email,
+        "Cosmic Atlas sign-in code",
+        "Your code is #{code}. It expires in 10 minutes."
+      )
+
+  def notify(email, subject, text) do
     with url when is_binary(url) <- Application.get_env(:starsmap_api, :community_mail_url),
          true <- String.starts_with?(url, "https://"),
          token when is_binary(token) <- Application.get_env(:starsmap_api, :community_mail_token),
@@ -14,8 +22,8 @@ defmodule StarsmapApi.Community.Mailer.Webhook do
              Jason.encode!(%{
                from: from,
                to: email,
-               subject: "Cosmic Atlas sign-in code",
-               text: "Your code is #{code}. It expires in 10 minutes."
+               subject: subject,
+               text: text
              }),
              [:with_body, {:connect_timeout, 5000}, {:recv_timeout, 5000}]
            ) do
@@ -31,6 +39,13 @@ defmodule StarsmapApi.Community.Mailer.Test do
   def deliver(email, code) do
     if pid = Application.get_env(:starsmap_api, :community_test_mail_pid),
       do: send(pid, {:community_code, email, code})
+
+    :ok
+  end
+
+  def notify(email, subject, text) do
+    if pid = Application.get_env(:starsmap_api, :community_test_mail_pid),
+      do: send(pid, {:community_notice, email, subject, text})
 
     :ok
   end
