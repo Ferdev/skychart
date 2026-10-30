@@ -1,11 +1,15 @@
 defmodule StarsmapApi.Community.Operations do
   @moduledoc "Operator commands for role grants and permission-reviewed seed photos."
   import Ecto.Query
-  alias StarsmapApi.Community.{User, Photos, MediaWorker, Moderation, Storage}
+  alias StarsmapApi.Community.{Accounts, User, Photos, MediaWorker, Moderation, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
 
   def role(handle, role) when role in ["admin", "moderator", "member"] do
     user = Repo.get_by!(User, handle: handle)
+
+    if role == "admin" and not Accounts.admin_address?(user.email),
+      do: raise("Add the address to COMMUNITY_ADMIN_EMAILS to give the admin role")
+
     Repo.update!(Ecto.Changeset.change(user, role: role))
     :ok
   end
