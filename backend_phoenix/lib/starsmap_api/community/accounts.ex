@@ -130,7 +130,7 @@ defmodule StarsmapApi.Community.Accounts do
               expires_at: DateTime.add(StarsmapApi.Community.now(), 2_592_000)
             })
 
-            {:ok, secret, user |> promote() |> first_sign_in()}
+            {:ok, secret, user |> revoke_unlisted_admin() |> promote() |> first_sign_in()}
         end
       end)
 
@@ -152,6 +152,7 @@ defmodule StarsmapApi.Community.Accounts do
             t.expires_at > ^StarsmapApi.Community.now() and not u.suspended,
         select: u
     )
+    |> revoke_unlisted_admin()
   end
 
   def authenticate(_), do: nil
@@ -170,12 +171,15 @@ defmodule StarsmapApi.Community.Accounts do
 
   def public(user), do: Map.take(user, [:id, :handle, :name, :role])
 
+  def admin_address?(email),
+    do: email in Application.get_env(:starsmap_api, :community_admin_emails, [])
+
   def update_profile(user, attrs) do
     user
     |> Ecto.Changeset.cast(attrs, [:name, :handle])
     |> Ecto.Changeset.validate_required([:name, :handle])
     |> Ecto.Changeset.validate_length(:name, min: 1, max: 80)
-    |> Ecto.Changeset.validate_format(:handle, ~r/^[a-z][a-z0-9-]{2,39}$/)
+    |> Ecto.Changeset.validate_format(:handle, ~r/\A[a-z][a-z0-9-]{2,39}\z/)
     |> Ecto.Changeset.unique_constraint(:handle)
     |> Repo.update()
   end
@@ -183,12 +187,21 @@ defmodule StarsmapApi.Community.Accounts do
   # The operator lists the addresses of the administrators (COMMUNITY_ADMIN_EMAILS).
   # The role is given after the address is verified, never before.
   defp promote(%User{role: role} = user) when role != "admin" do
-    if user.email in Application.get_env(:starsmap_api, :community_admin_emails, []),
+    if admin_address?(user.email),
       do: Repo.update!(Ecto.Changeset.change(user, role: "admin")),
       else: user
   end
 
   defp promote(user), do: user
+
+  # The list is the only source of the role, so an open session does not keep it.
+  defp revoke_unlisted_admin(%User{role: "admin"} = user) do
+    if admin_address?(user.email),
+      do: user,
+      else: Repo.update!(Ecto.Changeset.change(user, role: "member"))
+  end
+
+  defp revoke_unlisted_admin(user), do: user
 
   # The account is new until its first verified sign-in. The administrators get
   # one notice for it, and no notice for the sign-in of another administrator.

@@ -128,7 +128,17 @@ if config_env() != :test do
   config :starsmap_api, :community_enabled, community_enabled
 
   if community_enabled do
-    database = System.fetch_env!("COMMUNITY_DATABASE_URL")
+    # A deployment can pass an unset secret or variable as an empty string.
+    community_env = fn name ->
+      value = System.get_env(name)
+      if is_binary(value) and String.trim(value) != "", do: value
+    end
+
+    required_community_env = fn name ->
+      community_env.(name) || raise "environment variable #{name} is missing or blank"
+    end
+
+    database = required_community_env.("COMMUNITY_DATABASE_URL")
 
     catalog_uri = URI.parse(System.get_env("DATABASE_URL") || "")
     community_uri = URI.parse(database)
@@ -141,12 +151,12 @@ if config_env() != :test do
     repo_options = [url: database, pool_size: 3]
 
     repo_options =
-      if socket = System.get_env("COMMUNITY_PGSOCKET_DIR"),
+      if socket = community_env.("COMMUNITY_PGSOCKET_DIR"),
         do: Keyword.put(repo_options, :socket_dir, socket),
         else: repo_options
 
     config :starsmap_api, StarsmapApi.CommunityRepo, repo_options
-    origin = System.get_env("COMMUNITY_ORIGIN") || "https://#{System.get_env("PHX_HOST")}"
+    origin = community_env.("COMMUNITY_ORIGIN") || "https://#{System.get_env("PHX_HOST")}"
     uri = URI.parse(origin)
 
     if uri.scheme not in ["http", "https"] or is_nil(uri.host) or uri.path not in [nil, ""] or
@@ -156,7 +166,7 @@ if config_env() != :test do
     if config_env() == :prod and uri.scheme != "https",
       do: raise("Production community requires an HTTPS origin")
 
-    secret = System.fetch_env!("COMMUNITY_SECRET")
+    secret = required_community_env.("COMMUNITY_SECRET")
     if byte_size(secret) < 32, do: raise("COMMUNITY_SECRET requires at least 32 bytes")
 
     config :starsmap_api,
@@ -164,22 +174,23 @@ if config_env() != :test do
       community_cookie_secure: config_env() == :prod,
       community_secret: secret,
       community_media_root:
-        System.get_env("COMMUNITY_MEDIA_ROOT") || "/tmp/cosmic-atlas-community",
-      community_media_url: System.get_env("COMMUNITY_MEDIA_URL") || "/api/community/media",
+        community_env.("COMMUNITY_MEDIA_ROOT") || "/tmp/cosmic-atlas-community",
+      community_media_url: community_env.("COMMUNITY_MEDIA_URL") || "/api/community/media",
       community_storage:
         if(System.get_env("COMMUNITY_STORAGE") == "s3",
           do: StarsmapApi.Community.Storage.S3,
           else: StarsmapApi.Community.Storage.Local
         ),
-      community_s3_bucket: System.get_env("COMMUNITY_S3_BUCKET"),
+      community_s3_bucket: community_env.("COMMUNITY_S3_BUCKET"),
       community_mailer: StarsmapApi.Community.Mailer.Webhook,
-      community_mail_url: System.get_env("COMMUNITY_MAIL_URL"),
-      community_mail_token: System.get_env("COMMUNITY_MAIL_TOKEN"),
-      community_mail_from: System.get_env("COMMUNITY_MAIL_FROM"),
+      community_mail_url: community_env.("COMMUNITY_MAIL_URL"),
+      community_mail_token: community_env.("COMMUNITY_MAIL_TOKEN"),
+      community_mail_from: community_env.("COMMUNITY_MAIL_FROM"),
       # Accounts with these verified addresses get the admin role at sign-in.
+      # An account whose address is not in this list loses the role at its next request.
       # They also get the notices about new users and photos that wait for review.
       community_admin_emails:
-        (System.get_env("COMMUNITY_ADMIN_EMAILS") || "")
+        (community_env.("COMMUNITY_ADMIN_EMAILS") || "")
         |> String.split([",", " ", "\n"], trim: true)
         |> Enum.map(&String.downcase/1)
 
@@ -189,16 +200,13 @@ if config_env() != :test do
     if System.get_env("COMMUNITY_STORAGE") == "s3" do
       for name <-
             ~w(COMMUNITY_S3_BUCKET COMMUNITY_S3_ACCESS_KEY_ID COMMUNITY_S3_SECRET_ACCESS_KEY),
-          do: System.fetch_env!(name)
+          do: required_community_env.(name)
     end
 
     if config_env() == :prod do
       for name <-
             ~w(COMMUNITY_MAIL_URL COMMUNITY_MAIL_TOKEN COMMUNITY_MAIL_FROM COMMUNITY_MEDIA_URL),
-          do: System.fetch_env!(name)
-
-      if System.fetch_env!("COMMUNITY_MAIL_FROM") == "",
-        do: raise("COMMUNITY_MAIL_FROM must not be empty")
+          do: required_community_env.(name)
 
       for name <- ~w(COMMUNITY_MAIL_URL COMMUNITY_MEDIA_URL) do
         if URI.parse(System.fetch_env!(name)).scheme != "https",
@@ -207,12 +215,12 @@ if config_env() != :test do
     end
 
     config :ex_aws,
-      access_key_id: System.get_env("COMMUNITY_S3_ACCESS_KEY_ID"),
-      secret_access_key: System.get_env("COMMUNITY_S3_SECRET_ACCESS_KEY"),
-      region: System.get_env("COMMUNITY_S3_REGION") || "us-east-1",
+      access_key_id: community_env.("COMMUNITY_S3_ACCESS_KEY_ID"),
+      secret_access_key: community_env.("COMMUNITY_S3_SECRET_ACCESS_KEY"),
+      region: community_env.("COMMUNITY_S3_REGION") || "us-east-1",
       http_client: StarsmapApi.Community.Storage.S3.HttpClient
 
-    if endpoint = System.get_env("COMMUNITY_S3_ENDPOINT") do
+    if endpoint = community_env.("COMMUNITY_S3_ENDPOINT") do
       uri = URI.parse(endpoint)
       if uri.scheme not in ["https", "http"] or is_nil(uri.host), do: raise("Invalid S3 endpoint")
 
@@ -230,7 +238,7 @@ if config_env() != :test do
     ]
 
     cron =
-      if System.get_env("COMMUNITY_BACKUP_URI") not in [nil, ""],
+      if community_env.("COMMUNITY_BACKUP_URI"),
         do: [{"0 2 * * *", StarsmapApi.Community.BackupWorker} | cron],
         else: cron
 

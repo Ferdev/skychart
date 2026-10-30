@@ -3,10 +3,28 @@ defmodule StarsmapApi.Community.MediaWorker do
   use Oban.Worker, queue: :media, max_attempts: 3, unique: [keys: [:id], period: 3600]
   alias StarsmapApi.Community.{Photos, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
+
+  # community_media.py exits with this code only when the upload cannot be decoded.
+  # Any other exit is a worker fault, such as an out-of-memory kill, and is retried.
+  @invalid_image_exit 65
+
   @impl true
-  def perform(%Oban.Job{args: %{"id" => id}}) do
+  def perform(%Oban.Job{args: %{"id" => id}} = job) do
     photo = Photos.get(id)
-    if photo && photo.status == "processing", do: process(photo), else: :ok
+
+    if photo && photo.status == "processing" do
+      case process(photo) do
+        # No other job ends the photo, so it must not stay in "processing".
+        {:error, {:decoder_exit, _}} = error when job.attempt >= job.max_attempts ->
+          fail(photo)
+          error
+
+        result ->
+          result
+      end
+    else
+      :ok
+    end
   end
 
   def process(photo) do
@@ -51,7 +69,7 @@ defmodule StarsmapApi.Community.MediaWorker do
         end
       else
         {:error, :invalid_image} ->
-          Repo.update!(Ecto.Changeset.change(Photos.get(photo.id), status: "failed"))
+          fail(photo)
           {:cancel, "Image rejected by the decoder"}
 
         error ->
@@ -69,8 +87,16 @@ defmodule StarsmapApi.Community.MediaWorker do
            Path.join(scratch, "output")
          ]) do
       {json, 0} -> Jason.decode(json)
-      _ -> {:error, :invalid_image}
+      {_, @invalid_image_exit} -> {:error, :invalid_image}
+      {_, status} -> {:error, {:decoder_exit, status}}
     end
+  end
+
+  defp fail(photo) do
+    photo = Photos.get(photo.id)
+
+    if photo && photo.status == "processing",
+      do: Repo.update!(Ecto.Changeset.change(photo, status: "failed"))
   end
 
   defp persist(photo, scratch) do
