@@ -124,6 +124,8 @@ queue and tries again when the endpoint is not available. If
 
 Email enumeration responses are generic. Codes expire after ten minutes and five
 failed attempts. The database limits requests to ten per email per rolling day.
+A code that the mail service did not accept is deleted: it does not count against
+this limit or the 60-second wait, and the user gets the `mail_unavailable` error.
 Sessions expire after 30 days and are revocable. Production cookies are HttpOnly,
 Secure, SameSite=Lax and have the `__Host-` prefix. Every write checks the exact
 origin. Authenticated writes also require a session-bound CSRF token and JSON.

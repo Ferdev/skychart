@@ -35,8 +35,9 @@ There are three button classes:
 | `.text-action` | Quiet | Actions in a row of tools, and actions of low weight. |
 
 - Hover and the active state are different. Hover is a light surface. Gold is for the active state only.
-- A button with an on state has `aria-pressed`. Do not show a state by colour only.
-- A touch target is 44 x 44 px minimum on a phone.
+- A button with an on state has `aria-pressed`. Do not show a state by colour only. A mark for the on state is a CSS shape with empty `content`, as on `.universe-view__gravity`, because text in `content` goes into the accessible name.
+- A touch target is 44 x 44 px minimum on a phone. The 3D header, the close button of the 3D search, and the button of the 3D hint card have this size on each touch screen (`pointer: coarse`), also on a tablet.
+- The flight keys of the 3D view go to the canvas. A control of the view that does not open a panel or a window gives the focus back to the canvas (`canvas.focus({ preventScroll: true })`), so that the keys work at once.
 
 ## Links
 

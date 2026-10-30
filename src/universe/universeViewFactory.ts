@@ -12,7 +12,7 @@ import { UniverseViewController } from "./universeViewController";
 import type { UniverseIntegrationOptions } from "./universeViewOptions";
 
 export function createUniverseViewController(dom: typeof atlasDom, options: UniverseIntegrationOptions): UniverseViewController {
-  bindMinimapToggle(dom.universeMinimapPanel, dom.universeMinimapToggle, options.translate, dom.universeMinimapMenuToggle);
+  bindMinimapToggle(dom.universeMinimapPanel, dom.universeMinimapToggle, dom.universeCanvas, options.translate, dom.universeMinimapMenuToggle);
   bindTargetCardToggle(dom.universeTarget, dom.universeTargetToggle, options.translate);
   bindUniverseMoreMenu({
     toggle: dom.universeMoreButton,
@@ -27,7 +27,7 @@ export function createUniverseViewController(dom: typeof atlasDom, options: Univ
   const controller = new UniverseViewController({
     ...options,
     labelAreas: new UniverseLabelAreas(dom.universeView, [dom.universeHeader, dom.universeMinimapPanel, dom.universeFlight, dom.universeTarget, dom.universeHint, dom.universeFooter]),
-    hintCard: new UniverseHintCard({ card: dom.universeHint, text: dom.universeHintText, closeButton: dom.universeHintClose, translate: options.translate }),
+    hintCard: new UniverseHintCard({ card: dom.universeHint, text: dom.universeHintText, closeButton: dom.universeHintClose, canvas: dom.universeCanvas, translate: options.translate }),
     flightNote: dom.universeFlightNote,
     detailsButton: dom.universeDetails,
     root: dom.universeView,
