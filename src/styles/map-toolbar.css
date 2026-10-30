@@ -181,9 +181,16 @@
   font-weight: 550;
 }
 
+.atlas-toolbar .zoom-presets button:hover {
+  background: var(--panel-surface-strong);
+}
+
+/* Gold is the current preset, and the underline shows it without colour. A hover is only a light surface. */
 .atlas-toolbar .zoom-presets button.active {
-  background: rgba(238, 230, 206, 0.1);
-  color: var(--map-ink);
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  background: rgba(239, 196, 104, 0.14);
+  box-shadow: inset 0 -2px 0 var(--accent-strong);
 }
 
 .atlas-toolbar button:hover,

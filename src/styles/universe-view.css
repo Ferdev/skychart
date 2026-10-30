@@ -143,7 +143,9 @@
 .universe-view__search-dialog input { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid rgba(130, 203, 179, 0.45); border-radius: 6px; color: #eef2ea; background: #02090b; }
 .universe-view__search-results { display: grid; gap: 6px; min-height: 36px; max-height: 380px; margin-top: 12px; overflow: auto; color: #b9cac5; }
 .universe-view__search-results button { padding: 9px 10px; text-align: left; }
-.universe-view__search-results button:hover, .universe-view__search-results button:focus-visible { border-color: #f8cb65; color: #f8cb65; }
+.universe-view__search-results button:hover { background-image: var(--panel-hover-layer); }
+/* The list clips what is outside of it, so the focus ring stays inside the row. */
+.universe-view__search-results button:focus-visible { outline-offset: -2px; }
 .universe-view__search-results [role="group"] { display: grid; gap: 6px; }
 .universe-view__search-section { margin: 6px 0 0; color: #9fb3ad; font-size: var(--text-xs); font-weight: 760; text-transform: uppercase; }
 .universe-view__search-option { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; }
@@ -151,13 +153,9 @@
 .universe-view__search-option.is-active { border-color: #f8cb65; color: #f8cb65; background: #14292d; }
 .universe-view__search-option[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 
-.universe-view__actions button:hover,
-.universe-view__actions button:focus-visible,
-.universe-view__flight button:hover,
-.universe-view__flight button:focus-visible {
-  border-color: #f8cb65;
-  color: #f8cb65;
-  outline: none;
+.universe-view__actions button:hover:not(:disabled),
+.universe-view__flight button:hover:not(:disabled) {
+  background-image: var(--panel-hover-layer);
 }
 
 .universe-view__flight {
@@ -213,7 +211,7 @@
   pointer-events: auto;
 }
 
-.universe-view__minimap-toggle:hover { border-color: #f8cb65; color: #f8cb65; }
+.universe-view__minimap-toggle:hover { background-image: var(--panel-hover-layer); }
 
 /* A touch screen gets a 44 px target. */
 @media (pointer: coarse) {
@@ -459,8 +457,7 @@
   font-size: var(--text-xs);
   font-weight: 700;
 }
-.universe-view__target-actions button:hover,
-.universe-view__target-actions button:focus-visible { border-color: #f8cb65; color: #f8cb65; }
+.universe-view__target-actions button:hover:not(:disabled) { background-image: var(--panel-hover-layer); }
 .universe-view__target-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
 
 body[data-universe-view="true"] .atlas-footer,
@@ -595,7 +592,6 @@ body[data-universe-view="true"] .science-disclosure { visibility: hidden; }
   .universe-view__action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   #universe-close { order: 1; border-color: #f8cb65; color: #17130c; background: #f8cb65; }
   #universe-close:hover { color: #17130c; background: #ffe096; }
-  #universe-close:focus-visible { color: #17130c; outline: 2px solid var(--focus-ring); outline-offset: 2px; }
   #universe-find { order: 2; }
   #universe-time-bar { order: 3; flex: 1 1 0; min-width: 0; gap: 4px; }
   #universe-time-bar .time-bar__date { padding-right: 6px; padding-left: 6px; }

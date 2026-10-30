@@ -25,8 +25,7 @@
 
 .time-bar button:hover:not(:disabled),
 .time-bar select:hover:not(:disabled) {
-  border-color: rgba(239, 196, 104, 0.5);
-  background: rgba(36, 40, 32, 0.92);
+  background-image: var(--panel-hover-layer);
 }
 
 .time-bar__step {
