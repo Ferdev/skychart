@@ -5,6 +5,7 @@ defmodule StarsmapApiWeb.CatalogController do
   alias StarsmapApi.Catalog.PublicObjects
   alias StarsmapApi.Catalog.Search
   alias StarsmapApi.Catalog.SnapshotStore
+  alias StarsmapApi.Catalog.TargetMatch
 
   def summary(conn, _params) do
     json(conn, SnapshotStore.summary())
@@ -97,6 +98,21 @@ defmodule StarsmapApiWeb.CatalogController do
         conn
         |> put_status(:bad_request)
         |> json(%{error: Atom.to_string(reason), parameter: key})
+    end
+  end
+
+  def match(conn, params) do
+    case TargetMatch.run(params["rows"], radius_arcmin: params["radius_arcmin"]) do
+      {:ok, payload} ->
+        json(conn, payload)
+
+      {:error, {:too_many_rows, limit}} ->
+        conn
+        |> put_status(:request_entity_too_large)
+        |> json(%{error: "too_many_rows", limit: limit})
+
+      {:error, :invalid_rows} ->
+        conn |> put_status(:bad_request) |> json(%{error: "invalid_rows"})
     end
   end
 

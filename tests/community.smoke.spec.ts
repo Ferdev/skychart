@@ -92,6 +92,7 @@ test("disabled community keeps the atlas usable", async ({ page }) => {
   await expect(page.locator(".community-bar")).toHaveCount(0);
   await expect(page.locator(".community-opacity")).toHaveCount(0);
   await expect(page.locator(".community-toggle")).toBeHidden();
+  await expect(page.locator("#sky-photos-toggle, #sky-photo-opacity")).toHaveCount(0);
 });
 
 test("community controls and upload fields follow the atlas language", async ({page}) => {
@@ -263,7 +264,7 @@ test("the community window shows the gallery, the photographers, and the coverag
   await page.locator('[data-community-tab="gallery"]').click();
   const hub = page.getByRole("dialog", { name: "Community photos" });
   const tabs = hub.getByRole("tab");
-  await expect(tabs).toHaveText(["Gallery", "Photographers", "Coverage", "Rules", "My photos"]);
+  await expect(tabs).toHaveText(["Gallery", "Photographers", "Coverage", "Rules", "Tours", "My photos"]);
   await expect(hub.getByRole("tab", { name: "Gallery" })).toHaveAttribute("aria-selected", "true");
   const card = hub.locator(".community-card").first();
   await expect(card).toContainText("Sun portrait");

@@ -2,6 +2,8 @@ defmodule StarsmapApi.SkyEvents do
   import Ecto.Query
   alias StarsmapApi.{Repo, SkyEvents.SkyEvent}
 
+  @calendar_limit 300
+
   def list_upcoming(now \\ DateTime.utc_now()) do
     Repo.all(
       from e in SkyEvent,
@@ -19,6 +21,28 @@ defmodule StarsmapApi.SkyEvents do
     error in Postgrex.Error ->
       if undefined_table?(error), do: [], else: reraise(error, __STACKTRACE__)
   end
+
+  @doc "Events for a calendar subscription. A calendar keeps recent events, and a filter applies before the limit."
+  def list_for_calendar(kinds, now \\ DateTime.utc_now()) do
+    recent =
+      from e in SkyEvent,
+        where: e.starts_at >= ^DateTime.add(now, -30 * 86_400, :second),
+        order_by: [desc: e.starts_at],
+        limit: 1_000
+
+    Repo.all(if(kinds == [], do: recent, else: where(recent, [e], e.kind in ^kinds)))
+    |> one_row_per_object_and_day()
+    |> Enum.take(-@calendar_limit)
+  rescue
+    error in Postgrex.Error ->
+      if undefined_table?(error), do: [], else: reraise(error, __STACKTRACE__)
+  end
+
+  @doc "The atlas page of the object of an event, or the page of its source."
+  def public_url(%{catalog_key: key}) when is_binary(key),
+    do: "https://skychart.org/o/" <> URI.encode_www_form(key)
+
+  def public_url(event), do: event.source_url
 
   def last_refreshed_at do
     Repo.one(from e in SkyEvent, select: max(e.updated_at))

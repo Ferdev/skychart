@@ -3,6 +3,10 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
   alias StarsmapApi.Community.{Accounts, Photos, User, Subjects, Photo}
   alias StarsmapApi.CommunityRepo, as: Repo
 
+  defmodule FailingMailer do
+    def deliver(_email, _code), do: {:error, :mail_unavailable}
+  end
+
   setup do
     Application.put_env(:starsmap_api, :community_test_mail_pid, self())
     StarsmapApiWeb.Plugs.RateLimit.reset()
@@ -32,6 +36,20 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
              |> put_req_header("content-type", "application/json")
              |> post("/api/community/code", %{email: "reader@example.com"})
              |> json_response(403)
+  end
+
+  test "a retry after a failed delivery reports the mail error, not a sent code", %{conn: conn} do
+    mailer = Application.fetch_env!(:starsmap_api, :community_mailer)
+    Application.put_env(:starsmap_api, :community_mailer, FailingMailer)
+    on_exit(fn -> Application.put_env(:starsmap_api, :community_mailer, mailer) end)
+
+    for _ <- 1..2 do
+      assert %{"error" => "mail_unavailable"} =
+               conn
+               |> write()
+               |> post("/api/community/code", %{email: "retry@example.com"})
+               |> json_response(503)
+    end
   end
 
   test "typed-code login sets an HttpOnly cookie and authenticated writes need CSRF", %{
@@ -353,4 +371,365 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       conn
       |> put_req_header("origin", "http://www.example.com")
       |> put_req_header("content-type", "application/json")
+
+  describe "the Sky overlay" do
+    setup do
+      author =
+        Repo.insert!(%User{email: "sky@example.com", handle: "sky-author", name: "Sky Author"})
+
+      {:ok, subject} = Subjects.ensure("moon")
+      {:ok, author: author, subject: subject}
+    end
+
+    defp solved(extra \\ %{}) do
+      Map.merge(
+        %{
+          "ra_deg" => 10.0,
+          "dec_deg" => 41.0,
+          "pixel_scale_arcsec" => 3.6,
+          "rotation_deg" => 0.0,
+          "width" => 1600,
+          "height" => 1200,
+          "cd" => [-0.001, 0.0, 0.0, 0.001],
+          "crpix" => [800.5, 600.5],
+          "projection" => "TAN",
+          "frame" => "ICRS",
+          "epoch" => "J2000",
+          "source" => "Astrometry.net",
+          "status" => "solved"
+        },
+        extra
+      )
+    end
+
+    defp photo(context, attrs) do
+      Repo.insert!(
+        struct!(
+          %Photo{
+            user_id: context.author.id,
+            subject_id: context.subject.id,
+            declared_key: "moon",
+            title: "Sky photo",
+            licence: "CC BY 4.0",
+            captured_at: DateTime.utc_now(),
+            source_key: "uploads/x",
+            size_bytes: 10,
+            status: "published",
+            published_at: DateTime.utc_now(),
+            wcs: solved()
+          },
+          attrs
+        )
+      )
+    end
+
+    defp overlay(conn, query \\ "ra=12&dec=40&radius=30"),
+      do: conn |> get("/api/photos/sky?" <> query) |> json_response(200) |> Map.fetch!("photos")
+
+    test "only a published photo with a solver solution is in the response", context do
+      shown = photo(context, %{title: "Shown"})
+      photo(context, %{title: "Hidden", status: "hidden"})
+      photo(context, %{title: "Rejected", status: "rejected"})
+      photo(context, %{title: "Waiting", status: "review"})
+      photo(context, %{title: "Unsolved", wcs: nil})
+      photo(context, %{title: "Author", wcs: solved(%{"status" => "author_supplied"})})
+      photo(context, %{title: "No matrix", wcs: Map.delete(solved(), "cd")})
+      photo(context, %{title: "Other frame", wcs: solved(%{"frame" => "FK4"})})
+
+      assert [item] = overlay(context.conn)
+      assert item["id"] == shown.id
+      assert item["author"] == "Sky Author"
+      assert item["image_url"] == "/api/community/media/#{shown.id}/1600"
+      assert item["wcs"]["cd"] == [-0.001, 0.0, 0.0, 0.001]
+      refute Map.has_key?(item, "caption") or Map.has_key?(item, "in_frame")
+    end
+
+    test "a photo of a suspended author leaves the overlay", context do
+      photo(context, %{})
+      assert [_] = overlay(context.conn)
+      Repo.update!(Ecto.Changeset.change(context.author, suspended: true))
+      assert [] = overlay(context.conn)
+    end
+
+    test "a footprint outside the area is not in the response", context do
+      photo(context, %{wcs: solved(%{"ra_deg" => 200.0, "dec_deg" => -40.0})})
+      assert [] = overlay(context.conn)
+      assert [_] = overlay(context.conn, "ra=199&dec=-41&radius=1")
+    end
+
+    test "the area crosses right ascension zero", context do
+      photo(context, %{wcs: solved(%{"ra_deg" => 359.0, "dec_deg" => 0.0})})
+      assert [_] = overlay(context.conn, "ra=1&dec=0&radius=5")
+    end
+
+    test "the response has a limit, and an invalid area is refused", context do
+      for _ <- 1..3, do: photo(context, %{})
+      assert length(overlay(context.conn)) == 3
+      assert StarsmapApi.Community.SkyOverlay.limit() == 200
+
+      for query <- [
+            "ra=400&dec=0&radius=10",
+            "ra=1&dec=95&radius=10",
+            "ra=1&dec=0",
+            "ra=x&dec=0&radius=1"
+          ] do
+        assert %{"error" => "invalid_area"} =
+                 context.conn |> get("/api/photos/sky?" <> query) |> json_response(400)
+      end
+    end
+  end
+
+  describe "shared tours" do
+    @view "v=1&c=0,0&z=24&t=now&L=grid.1"
+
+    setup %{conn: conn} do
+      author = sign_in("tour-author@example.com")
+      {:ok, conn: conn, author: author}
+    end
+
+    defp sign_in(email) do
+      :ok = Accounts.request_code(email)
+      assert_receive {:community_code, ^email, code}
+      {:ok, token, user} = Accounts.verify(email, code)
+      %{user: user, token: token, csrf: Accounts.csrf(token)}
+    end
+
+    defp as(conn, account) do
+      conn
+      |> put_req_cookie("cosmic-community", account.token)
+      |> put_req_header("origin", "http://www.example.com")
+      |> put_req_header("content-type", "application/json")
+      |> put_req_header("x-community-csrf", account.csrf)
+    end
+
+    defp tour_body(extra \\ %{}) do
+      Map.merge(
+        %{
+          title: "Lesson one",
+          description: "A short lesson",
+          steps: [
+            %{viewState: @view, title: "Start", body: "<b>not markup</b>"},
+            %{viewState: @view <> "&sky=earth&sc=10,10,40", title: "Sky", body: ""}
+          ]
+        },
+        extra
+      )
+    end
+
+    defp create(conn, account, extra \\ %{}) do
+      conn |> as(account) |> post("/api/community/tours", tour_body(extra)) |> json_response(200)
+    end
+
+    defp token(tour), do: String.replace_prefix(tour["url"], "/?tour=shared-", "")
+
+    defp public(conn, tour), do: get(conn, "/api/community/shared-tours/#{token(tour)}")
+
+    defp report(conn, tour) do
+      conn
+      |> put_req_header("origin", "http://www.example.com")
+      |> put_req_header("content-type", "application/json")
+      |> post("/api/community/shared-tours/#{token(tour)}/report", %{reason: "not suitable"})
+    end
+
+    defp moderator do
+      account = sign_in("tour-moderator@example.com")
+      user = Repo.update!(Ecto.Changeset.change(account.user, role: "moderator"))
+      %{account | user: user}
+    end
+
+    test "a tour opens signed out, with the step format of the player", %{
+      conn: conn,
+      author: author
+    } do
+      tour = create(conn, author)
+      assert tour["url"] =~ ~r/^\/\?tour=shared-[0-9a-f]{32}$/
+
+      payload = conn |> public(tour) |> json_response(200)
+      assert payload["slug"] == "shared-" <> token(tour)
+      assert payload["author"] == "Photographer"
+
+      assert hd(payload["steps"]) == %{
+               "viewState" => @view,
+               "title" => "Start",
+               "body" => "<b>not markup</b>"
+             }
+
+      refute Map.has_key?(payload, "user_id") or Map.has_key?(payload, "id")
+    end
+
+    test "only the author can change or delete a tour", %{conn: conn, author: author} do
+      tour = create(conn, author)
+      other = sign_in("other@example.com")
+
+      assert conn
+             |> as(other)
+             |> patch("/api/community/tours/#{tour["id"]}", tour_body(%{title: "No"}))
+             |> json_response(422)
+
+      assert conn
+             |> as(other)
+             |> delete("/api/community/tours/#{tour["id"]}")
+             |> json_response(422)
+
+      changed =
+        conn
+        |> as(author)
+        |> patch("/api/community/tours/#{tour["id"]}", tour_body(%{title: "Yes"}))
+        |> json_response(200)
+
+      assert changed["title"] == "Yes" and changed["url"] == tour["url"]
+
+      assert conn
+             |> as(author)
+             |> delete("/api/community/tours/#{tour["id"]}")
+             |> json_response(200)
+
+      assert conn |> public(tour) |> json_response(404)
+    end
+
+    test "a signed-out person cannot create a tour", %{conn: conn} do
+      response =
+        conn
+        |> put_req_header("origin", "http://www.example.com")
+        |> put_req_header("content-type", "application/json")
+        |> post("/api/community/tours", tour_body())
+
+      assert json_response(response, 401)["error"] == "sign_in_required"
+    end
+
+    test "invalid tours are refused", %{conn: conn, author: author} do
+      bad = [
+        %{title: ""},
+        %{title: String.duplicate("x", 121)},
+        %{steps: []},
+        %{steps: for(_ <- 1..31, do: %{viewState: @view, title: "x"})},
+        %{steps: [%{viewState: "javascript:alert(1)", title: "x"}]},
+        %{steps: [%{viewState: @view <> "&tour=other", title: "x"}]},
+        %{steps: [%{viewState: "v=1&c=0&z=24&t=now&L=", title: "x"}]},
+        %{steps: [%{viewState: "v=1&c=0,0&z=-1&t=now&L=", title: "x"}]},
+        %{steps: [%{viewState: @view, title: ""}]}
+      ]
+
+      for extra <- bad do
+        assert %{"error" => "invalid_tour"} =
+                 conn
+                 |> as(author)
+                 |> post("/api/community/tours", tour_body(extra))
+                 |> json_response(422)
+      end
+    end
+
+    test "a report holds the tour until a moderator decides", %{conn: conn, author: author} do
+      tour = create(conn, author)
+      assert report(conn, tour) |> json_response(200)
+      assert conn |> public(tour) |> json_response(404)
+
+      mod = moderator()
+
+      assert %{"tours" => [item]} =
+               conn |> as(mod) |> get("/api/community/review/tours") |> json_response(200)
+
+      assert item["status"] == "held"
+      assert [%{"reason" => "not suitable"}] = item["reports"]
+
+      assert %{"counts" => %{"tours" => 1}} =
+               conn |> as(mod) |> get("/api/community/review") |> json_response(200)
+
+      assert %{"review_count" => 1} =
+               conn |> as(mod) |> get("/api/community/session") |> json_response(200)
+
+      assert %{"status" => "shared"} =
+               conn
+               |> as(mod)
+               |> post("/api/community/tours/#{tour["id"]}/review", %{action: "keep"})
+               |> json_response(200)
+
+      assert conn |> public(tour) |> json_response(200)
+
+      assert %{"tours" => []} =
+               conn |> as(mod) |> get("/api/community/review/tours") |> json_response(200)
+
+      # A kept tour stays open after a new report, and the report waits in the queue.
+      assert report(conn, tour) |> json_response(200)
+      assert conn |> public(tour) |> json_response(200)
+
+      assert %{"tours" => [_]} =
+               conn |> as(mod) |> get("/api/community/review/tours") |> json_response(200)
+    end
+
+    test "a tour that a moderator hid stops opening and the author reads the reason", %{
+      conn: conn,
+      author: author
+    } do
+      tour = create(conn, author)
+      mod = moderator()
+
+      assert conn
+             |> as(mod)
+             |> post("/api/community/tours/#{tour["id"]}/review", %{
+               action: "hide",
+               reason: "Off topic"
+             })
+             |> json_response(200)
+
+      assert conn |> public(tour) |> json_response(404)
+      assert report(conn, tour) |> json_response(422)
+
+      assert %{"tours" => [own]} =
+               conn |> as(author) |> get("/api/community/tours") |> json_response(200)
+
+      assert own["status"] == "hidden" and own["moderation_reason"] == "Off topic"
+
+      assert %{"actions" => [%{"action" => "tour_hide", "photo_title" => "Lesson one"} | _]} =
+               conn |> as(mod) |> get("/api/community/review/log") |> json_response(200)
+
+      assert conn
+             |> as(mod)
+             |> post("/api/community/tours/#{tour["id"]}/review", %{action: "restore"})
+             |> json_response(200)
+
+      assert conn |> public(tour) |> json_response(200)
+    end
+
+    test "a member cannot review a tour", %{conn: conn, author: author} do
+      tour = create(conn, author)
+
+      assert conn
+             |> as(author)
+             |> post("/api/community/tours/#{tour["id"]}/review", %{
+               action: "hide",
+               reason: "Off topic"
+             })
+             |> json_response(422)
+
+      assert conn |> as(author) |> get("/api/community/review/tours") |> json_response(403)
+    end
+
+    test "a tour of a suspended author does not open", %{conn: conn, author: author} do
+      tour = create(conn, author)
+      Repo.update!(Ecto.Changeset.change(author.user, suspended: true))
+      assert conn |> public(tour) |> json_response(404)
+    end
+
+    test "the export has the tours and account removal deletes them", %{
+      conn: conn,
+      author: author
+    } do
+      tour = create(conn, author)
+
+      assert %{"tours" => [exported]} =
+               conn |> as(author) |> get("/api/community/export") |> json_response(200)
+
+      assert exported["id"] == tour["id"] and length(exported["steps"]) == 2
+
+      assert conn |> as(author) |> delete("/api/community/account") |> json_response(200)
+      assert conn |> public(tour) |> json_response(404)
+      assert Repo.aggregate(StarsmapApi.Community.Tour, :count) == 0
+    end
+
+    test "the shell of a shared tour has a noindex header", %{conn: conn} do
+      response = get(conn, "/?tour=shared-0123456789abcdef0123456789abcdef")
+      assert get_resp_header(response, "x-robots-tag") == ["noindex"]
+    end
+  end
 end

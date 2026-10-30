@@ -16,6 +16,12 @@ defmodule StarsmapApiWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # A night plan calculates thousands of altitude curves, so it has a budget of its own.
+  pipeline :night_plan do
+    plug :accepts, ["json"]
+    plug StarsmapApiWeb.Plugs.RateLimit, capacity: 20, refill_per_second: 0.33, scope: :night_plan
+  end
+
   pipeline :sky_card do
     plug StarsmapApiWeb.Plugs.RateLimit, capacity: 30, refill_per_second: 0.25
   end
@@ -23,6 +29,16 @@ defmodule StarsmapApiWeb.Router do
   scope "/", StarsmapApiWeb do
     pipe_through :sky_card
     get "/sky/:key/card.png", SkyShareController, :card
+  end
+
+  # A calendar client sends `Accept: text/calendar`, so this route has no HTML content negotiation.
+  pipeline :calendar do
+    plug StarsmapApiWeb.Plugs.RateLimit, capacity: 60, refill_per_second: 1.0, scope: :calendar
+  end
+
+  scope "/", StarsmapApiWeb do
+    pipe_through :calendar
+    get "/calendar.ics", NowController, :calendar
   end
 
   # A tool call can start a database search or an ephemeris calculation, so MCP has
@@ -69,6 +85,28 @@ defmodule StarsmapApiWeb.Router do
     get "/health", HealthController, :show
   end
 
+  # A list can start hundreds of searches, so a client has a small budget of lists.
+  pipeline :catalog_match do
+    plug :accepts, ["json"]
+
+    plug StarsmapApiWeb.Plugs.RateLimit,
+      capacity: 12,
+      refill_per_second: 0.2,
+      scope: :catalog_match
+  end
+
+  scope "/api", StarsmapApiWeb do
+    pipe_through :catalog_match
+
+    post "/catalog/match", CatalogController, :match
+  end
+
+  scope "/api", StarsmapApiWeb do
+    pipe_through :night_plan
+
+    post "/observe/plan", PythonProxyController, :night_plan
+  end
+
   scope "/api", StarsmapApiWeb do
     pipe_through :api
 
@@ -105,6 +143,16 @@ defmodule StarsmapApiWeb.Router do
     plug StarsmapApiWeb.Plugs.CommunityAccess
   end
 
+  # A class opens one shared tour from one address, so this limit is for each tour reader.
+  pipeline :community_shared_tour do
+    plug :accepts, ["json"]
+
+    plug StarsmapApiWeb.Plugs.CommunityAccess,
+      capacity: 240,
+      refill_per_second: 4.0,
+      scope: :shared_tour
+  end
+
   pipeline :community_html do
     plug StarsmapApiWeb.Plugs.CommunityAccess
     plug StarsmapApiWeb.Plugs.FramePolicy
@@ -128,6 +176,7 @@ defmodule StarsmapApiWeb.Router do
   scope "/api", StarsmapApiWeb do
     pipe_through :community_public
     get "/photos/index", CommunityController, :index
+    get "/photos/sky", CommunityController, :sky
     get "/objects/:key/photos", CommunityController, :gallery
     get "/photos/:id", CommunityController, :show
     get "/community/rankings", CommunityController, :rankings
@@ -137,7 +186,13 @@ defmodule StarsmapApiWeb.Router do
     post "/community/code", CommunityController, :code
     post "/community/verify", CommunityController, :verify
     post "/photos/:id/report", CommunityController, :report
+    post "/community/shared-tours/:token/report", CommunityController, :report_tour
     put "/community/upload/:id", CommunityController, :upload
+  end
+
+  scope "/api/community", StarsmapApiWeb do
+    pipe_through :community_shared_tour
+    get "/shared-tours/:token", CommunityController, :shared_tour
   end
 
   scope "/api/community", StarsmapApiWeb do
@@ -159,6 +214,12 @@ defmodule StarsmapApiWeb.Router do
     get "/review/photos", CommunityController, :review_list
     get "/review/log", CommunityController, :review_log
     post "/photos/:id/review", CommunityController, :review
+    get "/review/tours", CommunityController, :review_tours
+    post "/tours/:id/review", CommunityController, :review_tour
+    get "/tours", CommunityController, :tours
+    post "/tours", CommunityController, :create_tour
+    patch "/tours/:id", CommunityController, :update_tour
+    delete "/tours/:id", CommunityController, :delete_tour
     post "/users/:handle/suspension", CommunityController, :suspend
     post "/users/:handle/cancel-votes", CommunityController, :cancel_votes
   end

@@ -952,6 +952,8 @@ export class UniverseViewController {
       this.close();
     } else {
       this.options.status.textContent = this.options.translate("universe3d.escapeAgain");
+      // The first press can start a catalog reload. Its routine message does not replace this one.
+      this.statusHold.hold(EXIT_CONFIRM_WINDOW_MS);
       window.setTimeout(() => {
         if (this.active && !this.exitConfirmation.armed && this.options.status.textContent === this.options.translate("universe3d.escapeAgain")) this.options.status.textContent = "";
       }, EXIT_CONFIRM_WINDOW_MS + 50);
