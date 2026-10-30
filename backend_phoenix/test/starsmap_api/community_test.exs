@@ -157,6 +157,30 @@ defmodule StarsmapApi.CommunityTest do
     File.rm(source)
   end
 
+  test "a corrupt upload fails the photo and cancels the job", %{user: user} do
+    photo = processing_photo(user, <<0x89, "PNG\r\n", 0x1A, "\nnot a real image">>)
+
+    assert {:cancel, "Image rejected by the decoder"} = media_attempt(photo, 1)
+    assert Photos.get(photo.id).status == "failed"
+  end
+
+  test "a killed decoder keeps the photo for a retry and fails it after the last attempt", %{
+    user: user
+  } do
+    photo = processing_photo(user, "any bytes")
+    use_killed_decoder()
+
+    assert {:error, {:decoder_exit, status}} = media_attempt(photo, 1)
+    assert status not in [0, 65]
+    assert Photos.get(photo.id).status == "processing"
+
+    assert {:error, {:decoder_exit, ^status}} = media_attempt(photo, 2)
+    assert Photos.get(photo.id).status == "processing"
+
+    assert {:error, {:decoder_exit, ^status}} = media_attempt(photo, 3)
+    assert Photos.get(photo.id).status == "failed"
+  end
+
   test "media and solver scripts resolve inside this checkout" do
     for script <- ["community_media.py", "community_solve.py"] do
       path = StarsmapApi.Community.backend_script(script)
@@ -434,6 +458,17 @@ defmodule StarsmapApi.CommunityTest do
     assert Ranking.photographers() == []
   end
 
+  test "a handle that ends with a newline is rejected", %{user: user} do
+    assert {:error, changeset} =
+             Accounts.update_profile(user, %{"name" => "Author", "handle" => "valid-handle\n"})
+
+    assert changeset.errors[:handle]
+    assert Repo.get!(User, user.id).handle == "author"
+
+    assert {:ok, %User{handle: "valid-handle"}} =
+             Accounts.update_profile(user, %{"name" => "Author", "handle" => "valid-handle"})
+  end
+
   test "disposable mail domains are blocked before an account is created" do
     assert {:error, :invalid_email} = Accounts.request_code("reader@mailinator.com")
     refute Repo.get_by(User, email: "reader@mailinator.com")
@@ -576,6 +611,54 @@ defmodule StarsmapApi.CommunityTest do
 
     assert {:error, :invalid_wcs} =
              StarsmapApi.Community.Astrometry.validate(Map.put(w, "width", 200_000_000))
+  end
+
+  defp processing_photo(user, bytes) do
+    source = Path.join(Storage.root(), "test-source-#{Ecto.UUID.generate()}")
+    File.mkdir_p!(Path.dirname(source))
+    File.write!(source, bytes)
+    on_exit(fn -> File.rm(source) end)
+
+    {:ok, photo} =
+      Photos.create(user, %{
+        "key" => "moon",
+        "size_bytes" => byte_size(bytes),
+        "title" => "Moon fixture",
+        "licence" => "All rights reserved",
+        "captured_at" => "2026-10-08T00:00:00Z",
+        "rights_confirmed" => true
+      })
+
+    :ok = Storage.Local.put(photo.source_key, source, false)
+    {:ok, processing} = Photos.complete(user, photo.id)
+    processing
+  end
+
+  defp media_attempt(photo, attempt) do
+    StarsmapApi.Community.MediaWorker.perform(%Oban.Job{
+      args: %{"id" => photo.id},
+      attempt: attempt,
+      max_attempts: 3
+    })
+  end
+
+  # The same end as an out-of-memory kill: the kernel stops the decoder with a signal.
+  defp use_killed_decoder do
+    root = Path.join(Storage.root(), "test-decoder-#{Ecto.UUID.generate()}")
+    File.mkdir_p!(root)
+
+    File.write!(
+      Path.join(root, "community_media.py"),
+      "import os, signal\nos.kill(os.getpid(), signal.SIGKILL)\n"
+    )
+
+    previous = Application.fetch_env!(:starsmap_api, :community_backend_root)
+    Application.put_env(:starsmap_api, :community_backend_root, root)
+
+    on_exit(fn ->
+      Application.put_env(:starsmap_api, :community_backend_root, previous)
+      File.rm_rf(root)
+    end)
   end
 
   defp photo(user, subject, status) do
