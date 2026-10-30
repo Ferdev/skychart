@@ -51,9 +51,20 @@ export class UniverseMinimap {
   draw(position: Vector3, yawDeg: number): void {
     this.last = { position, yawDeg };
     const frame = { ...this.scene, position, yawDeg };
+    const route = frame.route ?? (frame.target ? [frame.position, frame.target.position] : []);
+    const fit = [this.start, frame.position, ...route, ...(frame.target ? [frame.target.position] : [])];
+    const xs = fit.map((point) => point.x);
+    const ys = fit.map((point) => point.y);
+    const center = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+    const span = Math.max((Math.max(...xs) - Math.min(...xs)) * 0.65, (Math.max(...ys) - Math.min(...ys)) * 0.65, frame.minimumSpanAu);
+    // The path grows while the map is hidden too, so it is complete when the user shows the map.
+    this.record(frame.position, span);
     const width = this.canvas.clientWidth;
     const height = this.canvas.clientHeight;
     this.canvas.dataset.position = `${frame.position.x},${frame.position.y},${frame.position.z}`;
+    this.canvas.dataset.spanAu = String(span);
+    this.canvas.dataset.trailPoints = String(this.trail.length);
+    this.canvas.dataset.route = frame.route ? "gravity" : frame.target ? "direct" : "none";
     const context = this.canvas.getContext("2d");
     if (!context || width === 0 || height === 0) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -61,18 +72,11 @@ export class UniverseMinimap {
       this.canvas.width = Math.round(width * dpr);
       this.canvas.height = Math.round(height * dpr);
     }
-    const route = frame.route ?? (frame.target ? [frame.position, frame.target.position] : []);
-    const fit = [this.start, frame.position, ...route, ...(frame.target ? [frame.target.position] : [])];
-    const xs = fit.map((point) => point.x);
-    const ys = fit.map((point) => point.y);
-    const center = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
-    const span = Math.max((Math.max(...xs) - Math.min(...xs)) * 0.65, (Math.max(...ys) - Math.min(...ys)) * 0.65, frame.minimumSpanAu);
     const pxPerAu = Math.min(width, height) / 2 / span;
     const screen = (point: { x: number; y: number }) => ({
       x: width / 2 + (point.x - center.x) * pxPerAu, y: height / 2 - (point.y - center.y) * pxPerAu,
     });
     const visible = (point: { x: number; y: number }) => point.x >= 0 && point.x <= width && point.y >= 0 && point.y <= height;
-    this.record(frame.position, span);
 
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     context.clearRect(0, 0, width, height);
@@ -174,10 +178,6 @@ export class UniverseMinimap {
     context.lineTo(8 + barPx, height - 12);
     context.stroke();
     context.fillText(formatDistanceAu(stepAu), 8, height - 19);
-
-    this.canvas.dataset.spanAu = String(span);
-    this.canvas.dataset.trailPoints = String(this.trail.length);
-    this.canvas.dataset.route = frame.route ? "gravity" : frame.target ? "direct" : "none";
   }
 
   private record(position: Vector3, span: number): void {

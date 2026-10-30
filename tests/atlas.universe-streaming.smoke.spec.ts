@@ -179,6 +179,30 @@ test("thrusters accelerate while held and autopilot decelerates into its destina
   issues.assertClean();
 });
 
+test("the trip map records the path flown while it is collapsed", async ({ page, context }) => {
+  test.setTimeout(120_000);
+  const issues = collectBrowserIssues(page);
+  await installFixtures(context, []);
+  await openAtlas(page, `/?${new URLSearchParams({ v: "1", c: "-10,0", z: "20", t: "2026-08-26T12:00:00.000Z", o: "earth", L: "" })}`);
+  await page.locator("#universe-3d-toggle").click();
+  await expect(page.locator("#universe-target-name")).toHaveText("Earth");
+  const minimap = page.locator("#universe-minimap");
+  await page.locator("#universe-gravity").click();
+  await expect(minimap).toHaveAttribute("data-route", "gravity");
+
+  await page.locator("#universe-minimap-toggle").click();
+  await expect(minimap).toBeHidden();
+  const trailPoints = async () => Number(await minimap.getAttribute("data-trail-points"));
+  const before = await trailPoints();
+  await page.locator("#universe-autopilot").click();
+  await expect.poll(trailPoints, { timeout: 60_000 }).toBeGreaterThan(before + 8);
+
+  await page.locator("#universe-minimap-toggle").click();
+  await expect(minimap).toBeVisible();
+  expect(await trailPoints()).toBeGreaterThan(before + 8);
+  issues.assertClean();
+});
+
 test("trip map, light-speed mark, gravity route and the 2D start crosshair", async ({ page, context }, testInfo) => {
   test.setTimeout(240_000);
   const issues = collectBrowserIssues(page);

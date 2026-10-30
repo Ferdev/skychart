@@ -14,8 +14,26 @@ resource.setrlimit(resource.RLIMIT_CPU, (90, 90))
 resource.setrlimit(resource.RLIMIT_FSIZE, (512 * 1024 * 1024, 512 * 1024 * 1024))
 os.environ.update(VIPS_CONCURRENCY='1', VIPS_BLOCK_UNTRUSTED='1', VIPS_DISC_THRESHOLD='32m')
 
+# MediaWorker fails the photo for this exit code only and retries every other
+# non-zero exit. Python itself exits with 1 for an uncaught exception.
+INVALID_IMAGE_EXIT = 65
+# vips also exits with 1 when the worker has no memory, threads or disk space.
+WORKER_FAULTS = (b'memory', b'resource temporarily unavailable', b'no space left', b'failed to map segment')
+
+class InvalidImage(ValueError):
+    """The upload is at fault, so another attempt cannot succeed."""
+
 def run(*args):
     return subprocess.run(args, check=True, capture_output=True, timeout=40).stdout.decode().strip()
+
+def run_on_upload(*args):
+    try:
+        return run(*args)
+    except subprocess.CalledProcessError as error:
+        message = (error.stderr or b'').lower()
+        if error.returncode == 1 and not any(fault in message for fault in WORKER_FAULTS):
+            raise InvalidImage('The image cannot be decoded') from error
+        raise
 
 def clean_png(path):
     # Some libvips versions retain arbitrary PNG text even with [strip]. Keep
@@ -50,22 +68,22 @@ def clean_png(path):
 def process(source, output):
     data = source.read_bytes()
     if not 0 < len(data) <= 60_000_000:
-        raise ValueError('File size exceeds the upload limit')
+        raise InvalidImage('File size exceeds the upload limit')
     suffix = '.jpg' if data[:3] == b'\xff\xd8\xff' else '.png' if data[:8] == b'\x89PNG\r\n\x1a\n' else '.tif' if data[:4] in (b'II*\0', b'MM\0*') else None
     if suffix is None:
-        raise ValueError('Use JPEG, PNG, or TIFF')
+        raise InvalidImage('Use JPEG, PNG, or TIFF')
     output.mkdir(parents=True, exist_ok=True)
     input_path = output / ('input' + suffix)
     input_path.write_bytes(data)
-    width = int(run('vipsheader', '-f', 'width', str(input_path)))
-    height = int(run('vipsheader', '-f', 'height', str(input_path)))
+    width = int(run_on_upload('vipsheader', '-f', 'width', str(input_path)))
+    height = int(run_on_upload('vipsheader', '-f', 'height', str(input_path)))
     if width <= 0 or height <= 0 or width * height > 120_000_000:
-        raise ValueError('Image exceeds 120 megapixels')
+        raise InvalidImage('Image exceeds 120 megapixels')
     pages = subprocess.run(['vipsheader','-f','n-pages',str(input_path)], capture_output=True, timeout=10)
     if pages.returncode == 0 and int(pages.stdout) > 1:
-        raise ValueError('Use a single-frame image')
+        raise InvalidImage('Use a single-frame image')
     # Thumbnail performs autorotation and profile conversion without enlarging.
-    run('vips', 'thumbnail', str(input_path), str(output / 'master.png') + '[strip]', str(max(width,height)), '--height', str(max(width,height)), '--size', 'down', '--export-profile', 'srgb', '--fail-on', 'error')
+    run_on_upload('vips', 'thumbnail', str(input_path), str(output / 'master.png') + '[strip]', str(max(width,height)), '--height', str(max(width,height)), '--size', 'down', '--export-profile', 'srgb', '--fail-on', 'error')
     clean_png(output / 'master.png')
     for size in (96, 320, 1600):
         run('vips', 'thumbnail', str(output / 'master.png'), str(output / f'{size}.webp') + '[strip,Q=85]', str(size), '--height', str(size), '--size', 'down', '--fail-on', 'error')
@@ -93,6 +111,9 @@ def process(source, output):
 if __name__ == '__main__':
     try:
         print(json.dumps(process(Path(sys.argv[1]), Path(sys.argv[2]))))
+    except InvalidImage as error:
+        print(json.dumps({'error': str(error)[:200]}))
+        sys.exit(INVALID_IMAGE_EXIT)
     except (ValueError, OSError, subprocess.SubprocessError) as error:
         print(json.dumps({'error': str(error)[:200]}))
         sys.exit(1)
