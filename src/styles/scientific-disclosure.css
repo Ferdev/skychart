@@ -1,6 +1,6 @@
 
 
-.science-caveat { margin-top: 10px; color: #514c40; }
+.science-caveat { margin-top: 10px; color: var(--panel-ink-muted); }
 .science-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
 .science-layer-disclosure #science-layer-disclosure { max-height: 280px; overflow: auto; }
 .science-layer-disclosure section { padding: 10px 0; border-bottom: 1px solid rgba(21, 23, 20, .16); }
