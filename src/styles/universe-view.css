@@ -335,6 +335,22 @@
 .universe-view__hint p { margin: 0; color: rgba(238, 242, 234, 0.84); font-size: var(--text-sm); line-height: 1.5; }
 .universe-view__hint button { justify-self: end; min-height: 36px; }
 
+/* A touch screen gets a 44 px target. The id is for the time bar: its style sheet is after this one. */
+@media (pointer: coarse) {
+  .universe-view__actions button,
+  .universe-view__search-heading button,
+  .universe-view__hint button,
+  #universe-time-bar :is(button, select) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* The wider controls stay in the window: the title block gives room first, then the date. */
+  .universe-view__header > :first-child { flex-shrink: 1000; }
+  .universe-view__actions { min-width: 0; }
+  #universe-time-bar { flex: 1 1 auto; }
+  #universe-time-bar .time-bar__date { flex: 1 1 0; }
+}
+
 /* Touch controls: a joystick and two buttons. A fine pointer has the key pad. */
 .universe-view__touch { display: none; align-items: center; gap: 10px; }
 
@@ -366,6 +382,17 @@
 
 .universe-view__gravity { padding: 8px 12px; }
 .universe-view__gravity[aria-pressed="true"] { border-color: #82cbb3 !important; color: #82cbb3 !important; background: rgba(130, 203, 179, 0.18) !important; }
+/* A check mark shows the on state with no colour. It is drawn with a border, so the name of the button stays the same. */
+.universe-view__gravity[aria-pressed="true"]::before {
+  content: "";
+  display: inline-block;
+  width: 0.4em;
+  height: 0.75em;
+  margin: 0 0.55em 0.1em 0.1em;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
 
 .universe-view__move-pad {
   display: grid;

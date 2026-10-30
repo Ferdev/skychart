@@ -4,6 +4,8 @@ export type HintCardOptions = {
   card: HTMLElement;
   text: HTMLElement;
   closeButton: HTMLButtonElement;
+  /** The focus goes back to the view when the card closes, so that the flight keys work at once. */
+  canvas: HTMLElement;
   translate: Translate;
   /** True when the main pointer is a finger. The card then shows the touch gestures. */
   coarsePointer?: () => boolean;
@@ -34,6 +36,7 @@ export class UniverseHintCard {
 
   private dismiss(): void {
     this.hide();
+    this.options.canvas.focus({ preventScroll: true });
     try { (this.options.storage ?? window.localStorage).setItem(SEEN_KEY, "1"); } catch { /* Private mode: the card shows again next time. */ }
   }
 
@@ -56,8 +59,9 @@ const PHONE_WINDOW = "(max-width: 640px), (max-height: 560px)";
  * The trip map has a button that hides its drawing. The choice stays for the next visit.
  * With no choice, a phone starts with the drawing hidden, because the view has little room.
  * `menuButton` is the same switch as a row of the `More` menu, for a phone in portrait.
+ * The focus goes back to `canvas` after a click on `button`, so that the flight keys work at once. The menu does the same for `menuButton`.
  */
-export function bindMinimapToggle(panel: HTMLElement, button: HTMLButtonElement, translate: Translate, menuButton?: HTMLButtonElement): void {
+export function bindMinimapToggle(panel: HTMLElement, button: HTMLButtonElement, canvas: HTMLElement, translate: Translate, menuButton?: HTMLButtonElement): void {
   const read = () => {
     try {
       const choice = window.localStorage.getItem(MINIMAP_KEY);
@@ -78,7 +82,10 @@ export function bindMinimapToggle(panel: HTMLElement, button: HTMLButtonElement,
     try { window.localStorage.setItem(MINIMAP_KEY, collapsed ? "collapsed" : "open"); } catch { /* The choice is for this visit only. */ }
     show(collapsed);
   };
-  button.addEventListener("click", toggle);
+  button.addEventListener("click", () => {
+    toggle();
+    canvas.focus({ preventScroll: true });
+  });
   menuButton?.addEventListener("click", toggle);
   window.addEventListener("cosmic-atlas:locale-change", () => show(panel.dataset.collapsed === "true"));
   show(read());

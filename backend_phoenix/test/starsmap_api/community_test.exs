@@ -10,10 +10,15 @@ defmodule StarsmapApi.CommunityTest do
     Subjects,
     Moderation,
     Ranking,
-    Storage
+    Storage,
+    Token
   }
 
   alias StarsmapApi.CommunityRepo, as: Repo
+
+  defmodule FailingMailer do
+    def deliver(_email, _code), do: {:error, :mail_unavailable}
+  end
 
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
@@ -701,6 +706,31 @@ defmodule StarsmapApi.CommunityTest do
              Moderation.review(mod, p.id, "restore", "Cannot restore author removals")
 
     assert Ranking.photographers() == []
+  end
+
+  test "a failed delivery counts against neither request limit" do
+    mailer = Application.fetch_env!(:starsmap_api, :community_mailer)
+    Application.put_env(:starsmap_api, :community_mailer, FailingMailer)
+    on_exit(fn -> Application.put_env(:starsmap_api, :community_mailer, mailer) end)
+
+    # More retries than the daily limit, all of them inside the 60-second wait.
+    for _ <- 1..11 do
+      assert {:error, :mail_unavailable} = Accounts.request_code("retry@example.com")
+    end
+
+    assert Repo.aggregate(from(t in Token, where: t.context == "code"), :count) == 0
+
+    Application.put_env(:starsmap_api, :community_mailer, mailer)
+    assert :ok = Accounts.request_code("retry@example.com")
+    assert_receive {:community_code, "retry@example.com", code}
+    assert {:ok, _token, _user} = Accounts.verify("retry@example.com", code)
+  end
+
+  test "a sent code still holds the next request" do
+    assert :ok = Accounts.request_code("reader@example.com")
+    assert_receive {:community_code, "reader@example.com", _code}
+    assert {:error, :rate_limited} = Accounts.request_code("reader@example.com")
+    refute_received {:community_code, _, _}
   end
 
   test "a handle that ends with a newline is rejected", %{user: user} do

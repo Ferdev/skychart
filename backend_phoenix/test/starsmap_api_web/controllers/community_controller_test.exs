@@ -3,6 +3,10 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
   alias StarsmapApi.Community.{Accounts, Photos, User, Subjects, Photo}
   alias StarsmapApi.CommunityRepo, as: Repo
 
+  defmodule FailingMailer do
+    def deliver(_email, _code), do: {:error, :mail_unavailable}
+  end
+
   setup do
     Application.put_env(:starsmap_api, :community_test_mail_pid, self())
     StarsmapApiWeb.Plugs.RateLimit.reset()
@@ -32,6 +36,20 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
              |> put_req_header("content-type", "application/json")
              |> post("/api/community/code", %{email: "reader@example.com"})
              |> json_response(403)
+  end
+
+  test "a retry after a failed delivery reports the mail error, not a sent code", %{conn: conn} do
+    mailer = Application.fetch_env!(:starsmap_api, :community_mailer)
+    Application.put_env(:starsmap_api, :community_mailer, FailingMailer)
+    on_exit(fn -> Application.put_env(:starsmap_api, :community_mailer, mailer) end)
+
+    for _ <- 1..2 do
+      assert %{"error" => "mail_unavailable"} =
+               conn
+               |> write()
+               |> post("/api/community/code", %{email: "retry@example.com"})
+               |> json_response(503)
+    end
   end
 
   test "typed-code login sets an HttpOnly cookie and authenticated writes need CSRF", %{
