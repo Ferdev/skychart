@@ -103,7 +103,8 @@ defmodule StarsmapApi.CommunityTest do
         email: "voter@example.com",
         handle: "voter",
         name: "Voter",
-        inserted_at: DateTime.add(StarsmapApi.Community.now(), -172_800)
+        inserted_at: DateTime.add(StarsmapApi.Community.now(), -172_800),
+        first_sign_in_at: DateTime.add(StarsmapApi.Community.now(), -172_800)
       })
 
     assert {:ok, %{votes: 1}} = Ranking.vote(voter, photo.id, true)
@@ -111,6 +112,67 @@ defmodule StarsmapApi.CommunityTest do
     assert {:ok, %{votes: 0}} = Ranking.vote(voter, photo.id, false)
     young = Repo.insert!(%User{email: "young@example.com", handle: "young", name: "Young"})
     assert {:error, :account_too_new} = Ranking.vote(young, photo.id, true)
+  end
+
+  test "the age of an account for votes starts at its first verified sign-in", %{
+    user: user,
+    subject: subject
+  } do
+    photo = photo(user, subject, "published")
+    two_days_ago = DateTime.add(StarsmapApi.Community.now(), -172_800)
+
+    # An old row is a new account when the address is verified only now.
+    assert :ok = Accounts.request_code("aged@example.com")
+    assert_receive {:community_code, "aged@example.com", code}
+
+    Repo.get_by!(User, email: "aged@example.com")
+    |> Ecto.Changeset.change(inserted_at: two_days_ago)
+    |> Repo.update!()
+
+    assert {:ok, _, aged} = Accounts.verify("aged@example.com", code)
+    assert aged.first_sign_in_at
+    assert {:error, :account_too_new} = Ranking.vote(aged, photo.id, true)
+
+    never_signed_in =
+      Repo.insert!(%User{
+        email: "unverified@example.com",
+        handle: "unverified",
+        name: "Unverified",
+        inserted_at: two_days_ago
+      })
+
+    assert {:error, :account_too_new} = Ranking.vote(never_signed_in, photo.id, true)
+
+    # The same account can vote 24 hours after its first sign-in.
+    aged = Repo.update!(Ecto.Changeset.change(aged, first_sign_in_at: two_days_ago))
+    assert {:ok, %{votes: 1}} = Ranking.vote(aged, photo.id, true)
+  end
+
+  test "a vote has no weight until 24 hours after the first sign-in of the voter", %{
+    user: user,
+    subject: subject
+  } do
+    photo = photo(user, subject, "published")
+
+    voter =
+      Repo.insert!(%User{
+        email: "recent@example.com",
+        handle: "recent",
+        name: "Recent",
+        inserted_at: DateTime.add(StarsmapApi.Community.now(), -172_800),
+        first_sign_in_at: StarsmapApi.Community.now()
+      })
+
+    Repo.insert!(%StarsmapApi.Community.Vote{user_id: voter.id, photo_id: photo.id})
+    refute Map.has_key?(Ranking.scores(), photo.id)
+
+    Repo.update!(
+      Ecto.Changeset.change(voter,
+        first_sign_in_at: DateTime.add(StarsmapApi.Community.now(), -172_800)
+      )
+    )
+
+    assert_in_delta Ranking.scores()[photo.id].score, 1.0, 0.0001
   end
 
   test "real image processing creates stripped derivatives and requires initial review", %{
@@ -187,21 +249,15 @@ defmodule StarsmapApi.CommunityTest do
         File.rm_rf(fixture)
       end)
 
-      hung_source = Path.join(fixture, "hung-source")
-      File.write!(hung_source, "HANG")
-      {:ok, hung: uploaded(user, hung_source), pids: pids, fixture: fixture}
+      {:ok, hung: processing_photo(user, "HANG"), pids: pids}
     end
 
     test "the job ends at the limit, the decoder stops and the next photo starts", %{
       user: user,
       hung: hung,
-      pids: pids,
-      fixture: fixture
+      pids: pids
     } do
-      source = Path.join(fixture, "next-source")
-      File.write!(source, "NEXT")
-      next = uploaded(user, source)
-
+      next = processing_photo(user, "NEXT")
       started = System.monotonic_time(:second)
 
       assert %{failure: 1, success: 1} =
@@ -219,21 +275,44 @@ defmodule StarsmapApi.CommunityTest do
                      j.worker == "StarsmapApi.Community.MediaWorker" and j.state == "retryable"
                )
 
-      assert error =~ "decode_timeout"
+      assert error =~ "{:decoder_exit, :timeout}"
       assert Path.wildcard(Path.join(Storage.root(), "scratch/#{hung.id}-*")) == []
 
       for pid <- pids |> File.read!() |> String.split(), do: assert(stopped?(pid))
     end
 
     test "a timeout on the last attempt fails the photo", %{hung: hung} do
-      job = %Oban.Job{args: %{"id" => hung.id}, attempt: 3, max_attempts: 3}
-      assert {:error, :decode_timeout} = StarsmapApi.Community.MediaWorker.perform(job)
+      assert {:error, {:decoder_exit, :timeout}} = media_attempt(hung, 3)
       assert Photos.get(hung.id).status == "failed"
     end
   end
 
   test "the Oban timeout of the media job comes after the decoder limit" do
     assert StarsmapApi.Community.MediaWorker.timeout(%Oban.Job{}) > :timer.seconds(125)
+  end
+
+  test "a corrupt upload fails the photo and cancels the job", %{user: user} do
+    photo = processing_photo(user, <<0x89, "PNG\r\n", 0x1A, "\nnot a real image">>)
+
+    assert {:cancel, "Image rejected by the decoder"} = media_attempt(photo, 1)
+    assert Photos.get(photo.id).status == "failed"
+  end
+
+  test "a killed decoder keeps the photo for a retry and fails it after the last attempt", %{
+    user: user
+  } do
+    photo = processing_photo(user, "any bytes")
+    use_killed_decoder()
+
+    assert {:error, {:decoder_exit, status}} = media_attempt(photo, 1)
+    assert status not in [0, 65]
+    assert Photos.get(photo.id).status == "processing"
+
+    assert {:error, {:decoder_exit, ^status}} = media_attempt(photo, 2)
+    assert Photos.get(photo.id).status == "processing"
+
+    assert {:error, {:decoder_exit, ^status}} = media_attempt(photo, 3)
+    assert Photos.get(photo.id).status == "failed"
   end
 
   test "media and solver scripts resolve inside this checkout" do
@@ -359,6 +438,64 @@ defmodule StarsmapApi.CommunityTest do
     assert {:ok, _, %User{role: "member"}} = Accounts.verify("visitor@example.com", code)
   end
 
+  test "an administrator whose address left the list is a member at the next request" do
+    Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
+
+    assert :ok = Accounts.request_code("owner@example.com")
+    assert_receive {:community_code, "owner@example.com", code}
+    assert {:ok, token, %User{role: "admin"}} = Accounts.verify("owner@example.com", code)
+    assert %User{role: "admin"} = Accounts.authenticate(token)
+
+    Application.put_env(:starsmap_api, :community_admin_emails, ["other@example.com"])
+    assert %User{role: "member"} = Accounts.authenticate(token)
+    assert Repo.get_by!(User, email: "owner@example.com").role == "member"
+
+    # An open session does not get the role again. The next sign-in gives it.
+    Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
+    assert %User{role: "member"} = Accounts.authenticate(token)
+    Repo.update_all(StarsmapApi.Community.Token, set: [inserted_at: ~U[2026-01-01 00:00:00Z]])
+    assert :ok = Accounts.request_code("owner@example.com")
+    assert_receive {:community_code, "owner@example.com", code}
+    assert {:ok, _, %User{role: "admin"}} = Accounts.verify("owner@example.com", code)
+  end
+
+  test "a sign-in does not keep the role of an address that is not in the list" do
+    Repo.insert!(%User{
+      email: "former@example.com",
+      handle: "former",
+      name: "Former",
+      role: "admin"
+    })
+
+    assert :ok = Accounts.request_code("former@example.com")
+    assert_receive {:community_code, "former@example.com", code}
+    assert {:ok, token, %User{role: "member"}} = Accounts.verify("former@example.com", code)
+    assert Repo.get_by!(User, email: "former@example.com").role == "member"
+    assert %User{role: "member"} = Accounts.authenticate(token)
+  end
+
+  test "the list does not change the role of a moderator" do
+    assert :ok = Accounts.request_code("helper@example.com")
+    assert_receive {:community_code, "helper@example.com", code}
+    assert {:ok, token, helper} = Accounts.verify("helper@example.com", code)
+    assert :ok = StarsmapApi.Community.Operations.role(helper.handle, "moderator")
+    assert %User{role: "moderator"} = Accounts.authenticate(token)
+  end
+
+  test "the operator command gives the admin role only to a listed address", %{user: user} do
+    assert_raise RuntimeError, ~r/COMMUNITY_ADMIN_EMAILS/, fn ->
+      StarsmapApi.Community.Operations.role(user.handle, "admin")
+    end
+
+    assert Repo.get!(User, user.id).role == "member"
+
+    Application.put_env(:starsmap_api, :community_admin_emails, [user.email])
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
+    assert :ok = StarsmapApi.Community.Operations.role(user.handle, "admin")
+    assert Repo.get!(User, user.id).role == "admin"
+  end
+
   test "the administrators get one notice for the first sign-in of a new user" do
     Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
     on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
@@ -449,6 +586,59 @@ defmodule StarsmapApi.CommunityTest do
     refute_receive {:community_notice, _, _, _}
   end
 
+  test "a notice keeps each value from a user on one line", %{user: user, subject: subject} do
+    Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
+    deliver = &StarsmapApi.Community.AdminNotifier.perform/1
+
+    # The handle pattern accepted a final newline before, so stored handles can have one.
+    user =
+      Repo.update!(
+        Ecto.Changeset.change(user, handle: "author\n", name: "Author\nTime: yesterday")
+      )
+
+    photo =
+      photo(user, subject, "review")
+      |> Ecto.Changeset.change(
+        title: "Moon\r\n\nApproved\u2028Open https://forged.example\u0085\u202Eend\u2029",
+        declared_key: "moon\n"
+      )
+      |> Repo.update!()
+
+    assert :ok =
+             deliver.(%Oban.Job{
+               args: %{"event" => "photo_review", "id" => photo.id, "to" => "owner@example.com"}
+             })
+
+    assert_receive {:community_notice, _, "Cosmic Atlas: photo waiting for review", text}
+    lines = String.split(text, "\n")
+
+    assert length(lines) == 9
+    assert "Title: Moon Approved Open https://forged.example end" in lines
+    assert "Photographer: author (Author Time: yesterday)" in lines
+    refute text =~ ~r/[\r\x{85}\x{2028}\x{2029}\x{202E}]/u
+
+    assert :ok =
+             deliver.(%Oban.Job{
+               args: %{"event" => "new_user", "id" => user.id, "to" => "owner@example.com"}
+             })
+
+    assert_receive {:community_notice, _, "Cosmic Atlas: new user", text}
+    lines = String.split(text, "\n")
+    assert "Handle: author" in lines
+    assert "Name: Author Time: yesterday" in lines
+
+    long = Repo.update!(Ecto.Changeset.change(photo, title: String.duplicate("a", 500)))
+
+    assert :ok =
+             deliver.(%Oban.Job{
+               args: %{"event" => "photo_review", "id" => long.id, "to" => "owner@example.com"}
+             })
+
+    assert_receive {:community_notice, _, "Cosmic Atlas: photo waiting for review", text}
+    assert ("Title: " <> String.duplicate("a", 200)) in String.split(text, "\n")
+  end
+
   test "newest listing, photographer statistics and coverage totals", %{
     user: user,
     subject: subject
@@ -513,6 +703,17 @@ defmodule StarsmapApi.CommunityTest do
     assert Ranking.photographers() == []
   end
 
+  test "a handle that ends with a newline is rejected", %{user: user} do
+    assert {:error, changeset} =
+             Accounts.update_profile(user, %{"name" => "Author", "handle" => "valid-handle\n"})
+
+    assert changeset.errors[:handle]
+    assert Repo.get!(User, user.id).handle == "author"
+
+    assert {:ok, %User{handle: "valid-handle"}} =
+             Accounts.update_profile(user, %{"name" => "Author", "handle" => "valid-handle"})
+  end
+
   test "disposable mail domains are blocked before an account is created" do
     assert {:error, :invalid_email} = Accounts.request_code("reader@mailinator.com")
     refute Repo.get_by(User, email: "reader@mailinator.com")
@@ -571,7 +772,8 @@ defmodule StarsmapApi.CommunityTest do
         email: "weighted@example.com",
         handle: "weighted",
         name: "Weighted",
-        inserted_at: DateTime.add(StarsmapApi.Community.now(), -172_800)
+        inserted_at: DateTime.add(StarsmapApi.Community.now(), -172_800),
+        first_sign_in_at: DateTime.add(StarsmapApi.Community.now(), -172_800)
       })
 
     assert {:ok, _} = Ranking.vote(voter, first.id, true)
@@ -657,20 +859,52 @@ defmodule StarsmapApi.CommunityTest do
              StarsmapApi.Community.Astrometry.validate(Map.put(w, "width", 200_000_000))
   end
 
-  defp uploaded(user, source) do
+  defp processing_photo(user, bytes) do
+    source = Path.join(Storage.root(), "test-source-#{Ecto.UUID.generate()}")
+    File.mkdir_p!(Path.dirname(source))
+    File.write!(source, bytes)
+    on_exit(fn -> File.rm(source) end)
+
     {:ok, photo} =
       Photos.create(user, %{
         "key" => "moon",
-        "size_bytes" => File.stat!(source).size,
-        "title" => "Decoder fixture",
-        "licence" => "CC BY 4.0",
+        "size_bytes" => byte_size(bytes),
+        "title" => "Moon fixture",
+        "licence" => "All rights reserved",
         "captured_at" => "2026-10-08T00:00:00Z",
         "rights_confirmed" => true
       })
 
     :ok = Storage.Local.put(photo.source_key, source, false)
-    {:ok, photo} = Photos.complete(user, photo.id)
-    photo
+    {:ok, processing} = Photos.complete(user, photo.id)
+    processing
+  end
+
+  defp media_attempt(photo, attempt) do
+    StarsmapApi.Community.MediaWorker.perform(%Oban.Job{
+      args: %{"id" => photo.id},
+      attempt: attempt,
+      max_attempts: 3
+    })
+  end
+
+  # The same end as an out-of-memory kill: the kernel stops the decoder with a signal.
+  defp use_killed_decoder do
+    root = Path.join(Storage.root(), "test-decoder-#{Ecto.UUID.generate()}")
+    File.mkdir_p!(root)
+
+    File.write!(
+      Path.join(root, "community_media.py"),
+      "import os, signal\nos.kill(os.getpid(), signal.SIGKILL)\n"
+    )
+
+    previous = Application.fetch_env!(:starsmap_api, :community_backend_root)
+    Application.put_env(:starsmap_api, :community_backend_root, root)
+
+    on_exit(fn ->
+      Application.put_env(:starsmap_api, :community_backend_root, previous)
+      File.rm_rf(root)
+    end)
   end
 
   # A stopped orphan stays a zombie until PID 1 collects it. A zombie does not run.

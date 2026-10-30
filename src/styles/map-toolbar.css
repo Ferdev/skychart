@@ -278,6 +278,7 @@
   .toolbar-bottom { gap: 5px; padding-top: 4px; }
   .toolbar-quick-layers label { min-height: 44px; padding: 0 8px; }
   .atlas-toolbar .zoom-presets button { min-height: 44px; padding: 0 8px; }
+  .atlas-toolbar .zoom-presets button.active { border-color: rgba(239, 196, 104, 0.52); }
   .atlas-toolbar .zoom-presets button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .map-settings { width: min(420px, calc(100vw - 20px)); border-radius: 16px; padding: 12px; }
   .map-settings .scale-collapse__toggle { min-height: 44px; }

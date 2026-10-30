@@ -4,6 +4,10 @@ defmodule StarsmapApi.Community.MediaWorker do
   alias StarsmapApi.Community.{Photos, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
 
+  # community_media.py exits with this code only when the upload cannot be decoded.
+  # Any other exit is a worker fault, such as an out-of-memory kill, and is retried.
+  @invalid_image_exit 65
+
   # A hung decode must not keep the single slot of the media queue. A 42 MP photo took
   # 47 seconds on half a CPU, and each decoder step stops at 40 seconds by itself.
   @decode_limit_seconds 120
@@ -21,9 +25,9 @@ defmodule StarsmapApi.Community.MediaWorker do
 
     if photo && photo.status == "processing" do
       case process(photo) do
-        # No retry follows the last attempt, so the photo must not stay in "processing".
-        {:error, :decode_timeout} = error when job.attempt >= job.max_attempts ->
-          mark_failed(photo)
+        # No other job ends the photo, so it must not stay in "processing".
+        {:error, {:decoder_exit, _}} = error when job.attempt >= job.max_attempts ->
+          fail(photo)
           error
 
         result ->
@@ -76,7 +80,7 @@ defmodule StarsmapApi.Community.MediaWorker do
         end
       else
         {:error, :invalid_image} ->
-          mark_failed(photo)
+          fail(photo)
           {:cancel, "Image rejected by the decoder"}
 
         error ->
@@ -85,10 +89,6 @@ defmodule StarsmapApi.Community.MediaWorker do
     after
       File.rm_rf(scratch)
     end
-  end
-
-  defp mark_failed(photo) do
-    Repo.update!(Ecto.Changeset.change(Photos.get(photo.id), status: "failed"))
   end
 
   # A closed port does not stop an OS process, so the limit is on the decoder itself.
@@ -106,12 +106,18 @@ defmodule StarsmapApi.Community.MediaWorker do
            Path.join(scratch, "output")
          ]) do
       {json, 0} -> Jason.decode(json)
-      # 124: SIGTERM stopped the decoder. 137: SIGKILL stopped it.
-      {_, status} when status in [124, 137] -> {:error, :decode_timeout}
-      # `timeout` could not start the decoder. The image is not at fault.
-      {_, status} when status in 125..127 -> {:error, :decoder_unavailable}
-      _ -> {:error, :invalid_image}
+      {_, @invalid_image_exit} -> {:error, :invalid_image}
+      # `timeout` exits with 124 after its SIGTERM. After a SIGKILL the exit is 137.
+      {_, 124} -> {:error, {:decoder_exit, :timeout}}
+      {_, status} -> {:error, {:decoder_exit, status}}
     end
+  end
+
+  defp fail(photo) do
+    photo = Photos.get(photo.id)
+
+    if photo && photo.status == "processing",
+      do: Repo.update!(Ecto.Changeset.change(photo, status: "failed"))
   end
 
   defp persist(photo, scratch) do

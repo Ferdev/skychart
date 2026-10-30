@@ -15,7 +15,7 @@ defmodule StarsmapApi.Community.Mailer.Webhook do
          from when is_binary(from) and from != "" <-
            Application.get_env(:starsmap_api, :community_mail_from),
          {:ok, status, _, _} when status in 200..299 <-
-           :hackney.request(
+           http_client().request(
              :post,
              url,
              [{"authorization", "Bearer " <> token}, {"content-type", "application/json"}],
@@ -32,6 +32,8 @@ defmodule StarsmapApi.Community.Mailer.Webhook do
       _ -> {:error, :mail_unavailable}
     end
   end
+
+  defp http_client, do: Application.get_env(:starsmap_api, :community_mail_http_client, :hackney)
 end
 
 defmodule StarsmapApi.Community.Mailer.Test do
