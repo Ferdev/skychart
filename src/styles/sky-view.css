@@ -118,8 +118,7 @@
 
 .sky-view__more-menu button:hover,
 .sky-view__more-toggle:hover {
-  border-color: rgba(239, 196, 104, 0.5);
-  background: rgba(36, 40, 32, 0.92);
+  background-image: var(--panel-hover-layer);
 }
 
 .sky-view__back {

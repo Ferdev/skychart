@@ -42,11 +42,6 @@
     padding: 10px 12px;
   }
 
-  .quick-focus {
-    max-height: 66px;
-    overflow: auto;
-  }
-
   .tab-panel {
     padding: 12px;
   }
