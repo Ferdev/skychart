@@ -11,8 +11,7 @@ defmodule StarsmapApi.Community.Ranking do
       if not Photos.visible?(photo) or photo.user_id == user.id,
         do: Repo.rollback(:vote_not_allowed)
 
-      if DateTime.diff(StarsmapApi.Community.now(), user.inserted_at) < 86400,
-        do: Repo.rollback(:account_too_new)
+      if too_new?(user), do: Repo.rollback(:account_too_new)
 
       if present do
         change =
@@ -32,6 +31,12 @@ defmodule StarsmapApi.Community.Ranking do
       %{votes: vote_count(photo.id)}
     end)
   end
+
+  # The age starts at the first verified sign-in. An unverified row does not get older.
+  defp too_new?(%User{first_sign_in_at: nil}), do: true
+
+  defp too_new?(%User{first_sign_in_at: at}),
+    do: DateTime.diff(StarsmapApi.Community.now(), at) < 86400
 
   def refresh_author(user_id) do
     Repo.all(
@@ -145,7 +150,7 @@ defmodule StarsmapApi.Community.Ranking do
           FROM photo_votes v JOIN users u ON u.id=v.user_id JOIN photos p ON p.id=v.photo_id
           JOIN users a ON a.id=p.user_id
           WHERE NOT u.suspended AND NOT a.suspended AND p.status='published'
-          AND u.inserted_at <= now() - interval '24 hours'
+          AND u.first_sign_in_at <= now() - interval '24 hours'
         )
         SELECT photo_id, sum(weight)::float,
         CASE WHEN count(*) >= 3 THEN sum(weight * power(2.0, -extract(epoch FROM (now()-inserted_at))/259200.0))::float ELSE 0 END
