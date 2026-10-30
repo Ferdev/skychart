@@ -25,6 +25,9 @@ function overlayPhoto(id: string, ra: number, dec: number, scaleDeg: number) {
 }
 
 async function overlayFixture(page: Page, photos: unknown[]) {
+  await page.route("**/api/community/config", (route) => route.fulfill({ json: { enabled: true } }));
+  await page.route("**/api/community/session", (route) => route.fulfill({ json: { user: null, csrf: "", review_count: 0 } }));
+  await page.route("**/api/photos/index?**", (route) => route.fulfill({ json: { version: 1, more: false, items: [] } }));
   await page.route("**/overlay-image.png", (route) => route.fulfill({ contentType: "image/png", body: image }));
   const state = { requests: 0 };
   await page.route("**/api/photos/sky?**", (route) => {

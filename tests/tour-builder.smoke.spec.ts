@@ -107,3 +107,27 @@ test("a shared tour moves across the map, Sky view, and the 3D view, with the ti
   await expect(player.getByRole("heading")).toHaveText("Sky step", { timeout: 20_000 });
   await expect(page.locator("#sky-view")).toBeVisible();
 });
+
+test("a step that the user skips during the camera move does not lose the time of the tour", async ({ page }) => {
+  test.setTimeout(120_000);
+  const state = await tourFixture(page);
+  const time = encodeURIComponent("2026-10-30T20:00:00.000Z");
+  const base = `v=1&c=1,1&z=24&t=${time}&L=grid.1`;
+  state.tours = [{ title: "Quick steps", description: "", steps: [
+    { viewState: base, title: "First step", body: "" },
+    { viewState: `${base}&sky=earth&sc=82.0,-28.7,40.0`, title: "Second step", body: "" },
+  ] }];
+  // The click comes as soon as the card shows, while the camera of the first step still moves.
+  await page.addInitScript(() => {
+    const timer = window.setInterval(() => {
+      const next = document.querySelector<HTMLButtonElement>("#tour-player [data-tour-action='next']");
+      if (!next) return;
+      window.clearInterval(timer);
+      next.click();
+    }, 10);
+  });
+  await openAtlas(page, `/?tour=shared-${token}`);
+  await expect(page.locator("#tour-player").getByRole("heading")).toHaveText("Second step", { timeout: 20_000 });
+  await expect(page.locator("#sky-time-bar .time-bar__date-text")).toContainText("8:00");
+  await expect(page.locator("#sky-time-bar")).toHaveAttribute("data-time-state", "not-now");
+});

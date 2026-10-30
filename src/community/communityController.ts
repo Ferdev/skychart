@@ -442,6 +442,8 @@ export class CommunityController {
       await this.api.session();
       this.paintAccount();
       await this.refresh();
+      // Sky view can be open from the start of the page, before the community is on.
+      this.overlayChanged?.();
       if (this.pendingMount)
         this.mount(
           this.pendingMount.host,

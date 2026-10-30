@@ -42,6 +42,9 @@ async function moveAndSample(page: Page) {
 test("200 footprints in view stay near the frame rate of the same Sky view with no photos", async ({ page }) => {
   test.setTimeout(180_000);
   let photos: unknown[] = [];
+  await page.route("**/api/community/config", (route) => route.fulfill({ json: { enabled: true } }));
+  await page.route("**/api/community/session", (route) => route.fulfill({ json: { user: null, csrf: "", review_count: 0 } }));
+  await page.route("**/api/photos/index?**", (route) => route.fulfill({ json: { version: 1, more: false, items: [] } }));
   await page.route("**/overlay-image.png", (route) => route.fulfill({ contentType: "image/png", body: image }));
   await page.route("**/api/photos/sky?**", (route) => route.fulfill({ json: { photos } }));
   await openAtlas(page, EARTH_SKY);

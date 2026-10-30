@@ -60,6 +60,12 @@ export class AtlasViewStateController {
     this.pendingSelectionState = bootState;
   }
 
+  /**
+   * A tour step changed the time of the view, and the atlas did not load that time yet.
+   * The user can skip a step during its camera move, so the next step must do this load.
+   */
+  private tourTimePending = false;
+
   get restoring(): boolean {
     return this.historyRestoreInProgress;
   }
@@ -186,7 +192,7 @@ export class AtlasViewStateController {
   async navigateTour(view: ViewState, navigation: TourNavigationOptions): Promise<void> {
     if (navigation.restoring) this.historyRestoreInProgress = true;
     const start = { ...this.options.state.camera };
-    const oldTime = this.options.state.viewTime;
+    if (this.options.state.viewTime !== view.time) this.tourTimePending = true;
     this.applyFields(view);
     const target = { ...this.options.state.camera };
     if (navigation.animate) {
@@ -204,7 +210,7 @@ export class AtlasViewStateController {
     }
     if (navigation.signal.aborted) return this.finishTourRestore(navigation);
     // A step of a member's tour can have a fixed time.
-    if (oldTime !== view.time) await this.options.loadAtlas(view.time === "now" ? undefined : view.time);
+    if (this.tourTimePending) await this.loadPendingTourTime();
     if (navigation.signal.aborted) return this.finishTourRestore(navigation);
     // A step with no object must not show the object of the step before it.
     if (!view.objectKey && !view.compare) this.options.dismissSelection();
@@ -238,8 +244,15 @@ export class AtlasViewStateController {
   endTour(): void {
     // A step that the close stopped must not keep address updates off.
     this.historyRestoreInProgress = false;
+    if (this.tourTimePending) void this.loadPendingTourTime();
     if (!this.isTourUrl() || !this.options.hasEphemeris()) return;
     history.replaceState(null, "", this.currentUrl());
+  }
+
+  private async loadPendingTourTime(): Promise<void> {
+    this.tourTimePending = false;
+    const time = this.options.state.viewTime;
+    await this.options.loadAtlas(time === "now" ? undefined : time);
   }
 
   private finishTourRestore(navigation: TourNavigationOptions): void {
