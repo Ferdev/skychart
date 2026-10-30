@@ -11,7 +11,7 @@ import { dataLabelText } from "./i18n/dataLabels";
 import { WebglPointRenderer } from "./webglPointRenderer";
 import { installAnalytics, trackEvent } from "./analytics";
 import { initializeErrorReporting } from "./errorReporting";
-import { decodeSkyPermalink, decodeViewState, skyPermalinkToViewState, type BodyFilter, type DisplayLayer, type ViewState } from "./viewState";
+import { decodeSkyPermalink, decodeViewState, encodeViewState, skyPermalinkToViewState, type BodyFilter, type DisplayLayer, type ViewState } from "./viewState";
 import { TourPlayer } from "./tourPlayer";
 import { bodyDistanceKm as calculateBodyDistanceKm, formatLightYears, formatNumber } from "./atlasFormatting";
 import { formatDateTime } from "./format/quantity";
@@ -36,6 +36,11 @@ import { atlasDom } from "./atlas/atlasDom";
 import { AtlasRefreshScheduler } from "./atlas/atlasRefreshScheduler";
 import { UniverseEntryMarker } from "./atlas/universeEntryMarker";
 import { loadNowEvents } from "./atlas/nowEventsView";
+import { bindCalendarSubscribe } from "./atlas/nowCalendarView";
+import { NightPlannerPanel } from "./sky/nightPlannerPanel";
+import { TargetListPanel } from "./destination/targetListPanel";
+import { targetListLayer } from "./destination/targetListLayer";
+import { targetDirection, type PlanTarget } from "./sky/nightPlannerModel";
 import { updateScienceLayerDisclosure } from "./atlas/scienceLayerDisclosure";
 import { FEATURED_KEYS, TIME_STEPS, universeShellForRadius, zoomPresetBodies } from "./atlas/atlasDefinitions";
 import { followCuratedSummaryLocale, mediaTextFor } from "./object/curatedSummaryLocales";
@@ -419,7 +424,7 @@ const exoplanetSystems = new ExoplanetSystemNavigator({
   root: bodyInfo, mapper: catalogObjectMapper, body: (key) => bodyByKey.get(key), bodies: () => ephemeris?.bodies ?? [], mergeBodies, viewport: usableViewportRect, maximumZoom: MAX_ZOOM,
   animateCameraTo: (target) => { activeZoomPreset = null; updateZoomPresetButtons(); animateCameraTo(target, LOCAL_ZOOM_DURATION_MS, scheduleViewStateReplace); },
 });
-const tourPlayer = new TourPlayer({ navigate: (state, options) => viewStateController.navigateTour(state, options), prewarm: (state) => viewStateController.prewarmTour(state), track: (event, properties) => trackEvent(event, properties), translate: t, closed: () => viewStateController.endTour() });
+const tourPlayer = new TourPlayer({ navigate: (state, options) => viewStateController.navigateTour(state, options), prewarm: (state) => viewStateController.prewarmTour(state), track: (event, properties) => trackEvent(event, properties), translate: t, closed: () => viewStateController.endTour(), report: (slug) => community.reportTour(slug, () => tourPlayer.close()) });
 const objectInspection: ObjectInspectionView = new ObjectInspectionView({
   bodyInfo,
   hydrationStates: objectDetailHydrationStates,
@@ -531,6 +536,15 @@ const viewStateController = new AtlasViewStateController({
   animateCameraTo,
   skyState: () => skyView?.state(), restoreSky: (state) => skyView?.restore(state) ?? Promise.resolve(), universeState: () => universeView?.state(), restoreUniverse: (state) => universeView?.restore(state),
 }, bootViewState);
+/** A row of the planner sets the atlas time to the best moment and opens the target in the sky of Earth. */
+async function openPlannerTarget(target: PlanTarget) {
+  await loadAtlas(target.best_utc);
+  const earth = bodyByKey.get("earth");
+  if (earth) await skyView?.openTarget(earth, targetDirection(target), target.key);
+}
+const nightPlanner = new NightPlannerPanel({ openTarget: openPlannerTarget });
+const targetListPanel = new TargetListPanel({ selectObject: (key) => { void selectBodyByKey(key, { center: true, zoom: "local" }); } });
+atlasDom.targetListOpen.addEventListener("click", () => targetListPanel.open());
 skyView = createSkyViewController(atlasDom, {
   bodyByKey: () => bodyByKey,
   ephemeris: () => ephemeris,
@@ -538,6 +552,7 @@ skyView = createSkyViewController(atlasDom, {
   selectBody: selectBodyByKey,
   stateChanged: (mode) => mode === "push" ? pushCurrentViewState() : scheduleViewStateReplace(),
   resolveObserver: async (key) => bodyByKey.get(key) ?? (await objectHydrator.hydrateMany([key]))[0] ?? null,
+  openPlanner: () => nightPlanner.open(),
   catalogRelease: () => catalogPointManifest.value?.version,
   locale, closeInspector: () => setActiveTab(null),
 });
@@ -576,6 +591,19 @@ const spacecraftLoader = new SpacecraftLoader((bodies) => {
 }, () => selectedKey);
 // A link to an object in a community window selects the object here, with no new page load.
 community.selectObject = (key) => selectBodyByKey(key, { center: true, zoom: "local" });
+// A step of a member's tour has the same state as a shared view, with no tour of its own.
+community.tours.captureView = () => encodeViewState({ ...viewStateController.current(), tour: undefined, step: undefined });
+community.tours.preview = (tour) => { setActiveTab(null); void tourPlayer.preview(tour); };
+// The photos layer of Sky view is the same `L=` layer as the switch of the map toolbar.
+community.skyLayerChanged = (shown) => {
+  atlasState.displayLayers = { ...atlasState.displayLayers, photos: shown };
+  community.showMarkers = shown;
+  updateDisplayToggles();
+  requestRender();
+  community.overlayChanged?.();
+  scheduleViewStateReplace();
+};
+targetListLayer.changed = () => requestRender();
 const deferredEphemerisLoader = new AtlasDeferredEphemerisController({
   serverBootObjectKey, hasBody: (key) => bodyByKey.has(key), restoreSelection: restoreSelectionFromViewState,
   selectServerBoot: (key) => selectBodyByKey(key, { center: true, zoom: "local" }),
@@ -596,6 +624,7 @@ bindEvents();
 initializeUi();
 void loadCatalogTileManifest();
 void loadNowEvents(nowStatus, nowEvents, atlasDom.nowShowAll);
+bindCalendarSubscribe(atlasDom.nowSubscribe);
 loadAtlas(viewTime === "now" ? undefined : viewTime);
 requestRender({ data: true });
 
@@ -771,6 +800,7 @@ function render() {
       if (displayLayers.constellations) { constellationRenderer.draw(displayLayers.labels); atlasOverlay.addNote(t("constellations.mapNote")); }
       atlasOverlay.drawComparisonGuide();
       atlasOverlay.drawBodies(); atlasOverlay.finishFrame();
+      targetListLayer.drawMap(ctx, worldToScreen);
       if (displayLayers.labels) atlasOverlay.drawLabels(); else atlasOverlay.clearLabels();
       if (displayLayers.references) atlasOverlay.drawEdgeReferences();
     } else {
@@ -850,7 +880,7 @@ async function updateComparePicker() { await destinationController.updateCompare
 
 
 function updateSizeModes() { controlView.updateSizeModes(sizeMode); }
-function updateDisplayToggles() { controlView.updateDisplayToggles(displayLayers, perfEnabled); }
+function updateDisplayToggles() { controlView.updateDisplayToggles(displayLayers, perfEnabled); community.setSkyLayer(displayLayers.photos ?? false); }
 
 function updateScaleUi() {
   const scaleAu = currentViewWidthAu();

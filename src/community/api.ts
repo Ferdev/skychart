@@ -33,6 +33,17 @@ export type Cover = {
   new_photo?: Photo | null;
   new_photo_until?: string | null;
 };
+/** A photo of the Sky overlay: an approved public image with a solver solution. */
+export type OverlayPhoto = {
+  id: string;
+  title: string;
+  author: string;
+  licence: string;
+  captured_at: string;
+  wcs: import("./photoFootprint").Wcs;
+  thumbnail_url: string;
+  image_url: string;
+};
 export type User = { id: string; handle: string; name: string; role: string };
 /** A photo of the signed-in photographer, with its private status. */
 export type OwnPhoto = {
@@ -98,6 +109,23 @@ export type ReviewAction = {
   photo_title?: string | null;
 };
 
+/** A tour of the signed-in person. */
+export type OwnTour = {
+  id: string;
+  title: string;
+  description: string;
+  steps: import("../tourPlayer").TourStep[];
+  status: string;
+  moderation_reason?: string | null;
+  url: string;
+  updated_at?: string;
+};
+/** A tour in the review tools. */
+export type ReviewTour = OwnTour & {
+  author: { handle: string; name: string };
+  reports: { reason: string; at?: string }[];
+};
+
 /** Error codes of the server that have a text of their own. Other codes get the general text. */
 const ERROR_KEYS = new Set([
   "account_too_new",
@@ -110,6 +138,8 @@ const ERROR_KEYS = new Set([
   "upload_quota",
   "not_ready",
   "invalid_wcs",
+  "invalid_tour",
+  "tour_quota",
 ]);
 
 export class CommunityApi {

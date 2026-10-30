@@ -432,3 +432,21 @@ instead of leaving a broken image or pretending the fallback is DR11.
 
 Each object record retains its own source metadata and external identifiers so
 users can inspect the originating archive.
+
+## Night planner
+
+The planner uses the J2000 catalog positions of the Messier and OpenNGC tables, and
+leaves out an OpenNGC row with a Messier number. The night runs from local solar noon
+of the chosen date to the next local solar noon. Dusk and dawn are the moments when
+the geometric center of the Sun crosses -18, -12, or -6 degrees, or -0.8333 degrees
+for sunset, from DE440s through Skyfield. The observing window is the darkest of
+these intervals that the night has, and the result names that interval. A site with
+the midnight Sun has no window and no targets.
+
+Target altitudes are sampled every five minutes or less, from dusk to dawn, with the
+geodetic zenith of the site and a linear crossing between two samples. Targets rank
+by the time above the minimum altitude, then by brightness. Refraction, aberration,
+local obstructions, weather, and light pollution are not modeled. Moon separation
+is the topocentric separation at the highest altitude of the target in the window.
+Dusk, dawn, moonrise, and separation are checked against JPL Horizons values in
+`tests/night_planner_test.py`.

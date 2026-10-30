@@ -138,6 +138,7 @@ defmodule StarsmapApiWeb.McpControllerTest do
                "list_sky_catalogs",
                "create_sky_view_link",
                "create_object_sky_link",
+               "match_sky_objects",
                "get_solar_system_positions",
                "measure_object_separation",
                "get_object_visibility",
@@ -452,6 +453,34 @@ defmodule StarsmapApiWeb.McpControllerTest do
         })
 
       assert missing["structuredContent"]["error"]["code"] == "visibility_not_available"
+    end
+
+    test "match_sky_objects uses the batch match and has a smaller limit", %{conn: conn} do
+      result =
+        call_tool(conn, "match_sky_objects", %{
+          "targets" => [
+            %{"name" => "NGC 224"},
+            %{"name" => "Nothing here"},
+            %{"ra_deg" => 10.684, "dec_deg" => 41.27}
+          ]
+        })
+
+      assert result["isError"] == false
+      assert %{"rows" => [first, second, third], "counts" => counts} = result["structuredContent"]
+      assert first["status"] == "matched" and first["object"]["key"] == "ngc-224"
+      assert first["object"]["object_url"] =~ "/o/ngc-224"
+      assert second["status"] == "unmatched"
+      assert third["duplicate_of"] == 0
+      assert_in_delta third["separation_arcsec"], 3.6, 0.1
+      assert counts == %{"matched" => 2, "unmatched" => 1}
+
+      oversized =
+        call_tool(recycle(conn), "match_sky_objects", %{
+          "targets" => List.duplicate(%{"name" => "NGC 224"}, 51)
+        })
+
+      assert oversized["isError"] == true
+      assert oversized["structuredContent"]["error"]["code"] == "too_many_targets"
     end
 
     test "list_sky_events and list_guided_tours", %{conn: conn} do

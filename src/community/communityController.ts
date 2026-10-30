@@ -2,18 +2,22 @@ import { footprintDirections } from "./photoFootprint";
 import { canvasFont } from "../format/fonts";
 import { formatCount } from "../format/quantity";
 import { t } from "../i18n";
-import { CommunityApi, errorText, type Photo, type Cover } from "./api";
+import { CommunityApi, errorText, type OverlayPhoto, type Photo, type Cover } from "./api";
 import { CommunityHub, type HubTab } from "./communityHub";
+import type { TourBuilderHost } from "./tourBuilder";
 import { dateText, emptyState, h, licenceText, photoCard } from "./communityUi";
 import { PhotoIndex } from "./photoIndex";
 import { PhotoDialogs, type DialogHost } from "./photoDialogs";
 import { planeCorners, planeTransform } from "./photoPlane";
+import { overlayArea, overlayPlacements, quadContains, type OverlayArea, type OverlayPlacement } from "./photoOverlay";
+import type { SkyCamera } from "../sky/skyProjection";
 type Marker = { key: string; x: number; y: number };
 /** Size of a map card and the free space around it, for the overlap test. */
 const MARKER_WIDTH = 168;
 const MARKER_HEIGHT = 52;
 /** The teal of the interface (`--spectral-teal`), for the footprint lines on the Sky canvas. */
 const FOOTPRINT_COLOR = "#82cbb3";
+const OVERLAY_RETRY_MS = 30_000;
 export class CommunityController {
   readonly api = new CommunityApi();
   readonly index = new PhotoIndex();
@@ -30,7 +34,9 @@ export class CommunityController {
     void this.refresh();
     this.hub.refresh();
   });
-  readonly hub: CommunityHub = new CommunityHub(this.api, this.dialogs, () => void this.refresh(), this.host);
+  /** The tour builder works with the atlas through these two functions, which `main.ts` sets. */
+  readonly tours: TourBuilderHost = { captureView: null, preview: null };
+  readonly hub: CommunityHub = new CommunityHub(this.api, this.dialogs, () => void this.refresh(), this.host, this.tours);
   enabled = false;
   showMarkers = false;
   opacity = 0.65;
@@ -121,7 +127,8 @@ export class CommunityController {
       for (const point of frame.points) {
         const cover = this.index.get(point.key);
         const wcs = cover?.cover?.wcs;
-        if (!wcs || seen.has(cover!.subject_id) || seen.size >= 24) continue;
+        // A solver solution is on the Sky overlay, with the viewer behind it.
+        if (!wcs || wcs.status === "solved" || seen.has(cover!.subject_id) || seen.size >= 24) continue;
         seen.add(cover!.subject_id);
         const corners = footprintDirections(wcs).map(project);
         if (corners.length !== 4 || corners.some((p) => !p)) continue;
@@ -142,6 +149,153 @@ export class CommunityController {
       }
     context.restore();
   }
+  /** Sky view repaints when this is set: a new overlay response, a new opacity, or a new state of the layer. */
+  overlayChanged: (() => void) | null = null;
+  private overlayLayer: HTMLElement | null = null;
+  private readonly overlayImages = new Map<string, HTMLElement>();
+  private readonly overlayCache = new Map<string, OverlayPhoto[]>();
+  private overlayKey = "";
+  private overlayRequest: AbortController | null = null;
+  private overlayVersion = -1;
+  private overlayRetryAt = 0;
+  private overlayPlaced: OverlayPlacement[] = [];
+
+  /** The photos layer of the Sky view filters. `main.ts` sets it, because the layer is part of the view state. */
+  skyLayerChanged: ((shown: boolean) => void) | null = null;
+  private skyLayerToggle: HTMLInputElement | null = null;
+
+  setSkyLayer(shown: boolean) {
+    this.skyLayerShown = shown;
+    if (this.skyLayerToggle) this.skyLayerToggle.checked = shown;
+  }
+  private skyLayerShown = false;
+
+  /** The layer switch and the opacity control of the Sky view filters, with the community on. */
+  private buildSkyControls(mapSlider: HTMLInputElement) {
+    const after = document.querySelector("#sky-constellations-toggle")?.closest("label");
+    if (!after) return null;
+    const toggle = document.createElement("label");
+    toggle.className = "sky-view__filter";
+    toggle.innerHTML = `<input id="sky-photos-toggle" type="checkbox"><span data-i18n="community.layer">${h(t("community.layer"))}</span>`;
+    const input = toggle.querySelector("input")!;
+    input.checked = this.skyLayerShown;
+    input.onchange = () => this.skyLayerChanged?.(input.checked);
+    this.skyLayerToggle = input;
+    const control = document.createElement("label");
+    control.className = "community-sky-opacity";
+    control.innerHTML = `<span data-i18n="community.opacity">${h(t("community.opacity"))}</span><input id="sky-photo-opacity" type="range" min="0" max="1" step="0.05" value="${mapSlider.value}">`;
+    after.after(toggle, control);
+    return control.querySelector("input");
+  }
+
+  /** The aligned images and the footprints of the Sky overlay. The photos stay in the view from Earth. */
+  renderSkyOverlay(context: CanvasRenderingContext2D, root: HTMLElement, camera: SkyCamera, width: number, height: number, observerKey: string) {
+    const shown = this.enabled && this.showMarkers && observerKey === "earth";
+    if (shown) this.requestOverlay(overlayArea(camera, width, height));
+    const photos = shown ? this.overlayCache.get(this.overlayKey) ?? [] : [];
+    this.overlayPlaced = overlayPlacements(photos, camera, width, height);
+    this.paintOverlayImages(root);
+    if (!this.overlayPlaced.length) return;
+    context.save();
+    context.strokeStyle = FOOTPRINT_COLOR;
+    context.fillStyle = FOOTPRINT_COLOR;
+    context.lineWidth = 1;
+    context.globalAlpha = Math.max(0.35, this.opacity);
+    context.font = canvasFont(12);
+    for (const place of this.overlayPlaced) {
+      context.beginPath();
+      place.corners.forEach((point, index) => (index === 0 ? context.moveTo(point.x, point.y) : context.lineTo(point.x, point.y)));
+      context.closePath();
+      context.stroke();
+      if (place.labelled) context.fillText(t("community.footprint.solved"), place.corners[3].x + 4, place.corners[3].y - 4);
+    }
+    context.restore();
+  }
+
+  /** A click on the sky with no object: the smallest footprint at that place opens the photo viewer. */
+  openFootprintAt(point: { x: number; y: number }) {
+    const place = [...this.overlayPlaced].reverse().find((item) => quadContains(item.corners, point));
+    if (place) this.openOverlayPhoto(place.photo.id);
+  }
+
+  private openOverlayPhoto(id: string) {
+    void this.api.request<Photo>(`/api/photos/${encodeURIComponent(id)}`).then((photo) => this.dialogs.photo(photo)).catch(() => undefined);
+  }
+
+  /** The area changes in steps, so a small movement of the view makes no request. */
+  private requestOverlay(area: OverlayArea) {
+    if (area.key === this.overlayKey && (this.overlayCache.has(area.key) || this.overlayRequest)) return;
+    // A failed request must not repeat with each frame of a movement.
+    if (Date.now() < this.overlayRetryAt) return;
+    this.overlayRequest?.abort();
+    this.overlayRequest = null;
+    this.overlayKey = area.key;
+    if (this.overlayCache.has(area.key)) return;
+    const request = new AbortController();
+    this.overlayRequest = request;
+    void this.api
+      .request<{ photos: OverlayPhoto[] }>(`/api/photos/sky?ra=${area.ra}&dec=${area.dec}&radius=${area.radius}`, "GET", undefined, request.signal)
+      .then((data) => {
+        if (this.overlayCache.size >= 16) this.overlayCache.clear();
+        this.overlayCache.set(area.key, data.photos);
+        this.overlayChanged?.();
+      })
+      .catch(() => {
+        /* Photo failures never stop scientific navigation. */
+        if (!request.signal.aborted) this.overlayRetryAt = Date.now() + OVERLAY_RETRY_MS;
+      })
+      .finally(() => {
+        if (this.overlayRequest === request) this.overlayRequest = null;
+      });
+  }
+
+  private paintOverlayImages(root: HTMLElement) {
+    if (!this.overlayLayer && !this.overlayPlaced.length) return;
+    if (!this.overlayLayer) {
+      this.overlayLayer = document.createElement("div");
+      this.overlayLayer.className = "community-sky-overlay";
+      root.querySelector("canvas")?.after(this.overlayLayer);
+    }
+    const kept = new Set<string>();
+    for (const place of this.overlayPlaced) {
+      if (!place.image && !place.focusable) continue;
+      kept.add(place.photo.id);
+      let element = this.overlayImages.get(place.photo.id);
+      if (!element) {
+        element = document.createElement("div");
+        element.innerHTML = `<button type="button" class="community-sky-photo__focus">${h(`${place.photo.title} · ${place.photo.author}`)}</button>`;
+        element.querySelector("button")!.onclick = () => this.openOverlayPhoto(place.photo.id);
+        this.overlayLayer.append(element);
+        this.overlayImages.set(place.photo.id, element);
+      }
+      const center = place.center;
+      element.className = "community-sky-photo";
+      element.querySelector<HTMLElement>(".community-sky-photo__focus")!.style.transform = `translate(${Math.round(center.x)}px,${Math.round(center.y)}px)`;
+      const matrix = place.image ? planeTransform(place.corners) : null;
+      let image = element.querySelector("img");
+      if (!matrix) {
+        image?.remove();
+        continue;
+      }
+      if (!image) {
+        image = document.createElement("img");
+        image.crossOrigin = "anonymous";
+        image.alt = "";
+        image.decoding = "async";
+        element.prepend(image);
+      }
+      const source = place.size > 320 ? place.photo.image_url : place.photo.thumbnail_url;
+      if (image.getAttribute("src") !== source) image.src = source;
+      image.style.transform = matrix;
+      image.style.opacity = String(this.opacity);
+    }
+    for (const [id, element] of this.overlayImages)
+      if (!kept.has(id)) {
+        element.remove();
+        this.overlayImages.delete(id);
+      }
+  }
+
   private galleryKey = "";
   private photos: Photo[] = [];
   private galleryMore = false;
@@ -184,6 +338,13 @@ export class CommunityController {
     document.querySelectorAll<HTMLDialogElement>("dialog.community-dialog").forEach((dialog) => dialog.close());
     if (this.selectObject) void this.selectObject(key);
     else window.location.assign(`/o/${encodeURIComponent(key)}`);
+  }
+  /** The report form of a shared tour. A report closes the player, because the tour is on hold for a moderator. */
+  reportTour(slug: string, closePlayer: () => void) {
+    this.dialogs.reasonForm(t("community.report"), t("community.sendReport"), t("community.tours.report.help"), async (reason) => {
+      await this.api.request(`/api/community/shared-tours/${encodeURIComponent(slug.replace(/^shared-/, ""))}/report`, "POST", { reason });
+      closePlayer();
+    });
   }
   /** The account button shows the name of the signed-in person. The review button is for moderators. */
   private paintAccount() {
@@ -266,9 +427,18 @@ export class CommunityController {
       slider.max = "1";
       slider.step = ".05";
       slider.value = String(this.opacity);
-      slider.oninput = () => (this.opacity = Number(slider.value));
       opacity.append(slider);
       document.querySelector("#scale-map-overlays")?.append(opacity);
+      const skySlider = this.buildSkyControls(slider);
+      for (const input of [slider, skySlider]) {
+        if (!input) continue;
+        input.oninput = () => {
+          this.opacity = Number(input.value);
+          slider.value = input.value;
+          if (skySlider) skySlider.value = input.value;
+          this.overlayChanged?.();
+        };
+      }
       await this.api.session();
       this.paintAccount();
       await this.refresh();
@@ -317,6 +487,13 @@ export class CommunityController {
       }
       for (const [mode, frame] of this.lastFrames)
         this.render(mode, frame.root, frame.points, frame.enabled);
+      // A takedown changes the index version, so the overlay asks the server again.
+      if (this.overlayVersion !== this.index.version) {
+        this.overlayVersion = this.index.version;
+        this.overlayCache.clear();
+        this.overlayKey = "";
+        this.overlayChanged?.();
+      }
       if (this.galleryKey) await this.loadGallery(this.galleryKey);
     } catch {
       /* Photo failures never stop scientific navigation. */

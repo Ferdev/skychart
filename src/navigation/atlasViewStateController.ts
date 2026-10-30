@@ -186,6 +186,7 @@ export class AtlasViewStateController {
   async navigateTour(view: ViewState, navigation: TourNavigationOptions): Promise<void> {
     if (navigation.restoring) this.historyRestoreInProgress = true;
     const start = { ...this.options.state.camera };
+    const oldTime = this.options.state.viewTime;
     this.applyFields(view);
     const target = { ...this.options.state.camera };
     if (navigation.animate) {
@@ -201,6 +202,9 @@ export class AtlasViewStateController {
       this.options.updateScale();
       this.options.requestRender(true);
     }
+    if (navigation.signal.aborted) return this.finishTourRestore(navigation);
+    // A step of a member's tour can have a fixed time.
+    if (oldTime !== view.time) await this.options.loadAtlas(view.time === "now" ? undefined : view.time);
     if (navigation.signal.aborted) return this.finishTourRestore(navigation);
     // A step with no object must not show the object of the step before it.
     if (!view.objectKey && !view.compare) this.options.dismissSelection();

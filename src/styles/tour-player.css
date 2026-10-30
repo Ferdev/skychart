@@ -22,6 +22,12 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
+/* A step can show Sky view or the 3D view. Both cover the map, so the card goes above them. */
+body[data-sky-view] .tour-player,
+body[data-universe-view] .tour-player {
+  z-index: 73;
+}
+
 .tour-player[hidden] {
   display: none;
 }

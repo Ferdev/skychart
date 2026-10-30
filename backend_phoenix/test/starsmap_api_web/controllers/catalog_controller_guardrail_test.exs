@@ -58,4 +58,55 @@ defmodule StarsmapApiWeb.CatalogControllerGuardrailTest do
 
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
+
+  describe "POST /api/catalog/match" do
+    setup do
+      StarsmapApi.AgentSkyFixtures.seed_catalog()
+      StarsmapApiWeb.Plugs.RateLimit.reset()
+      :ok
+    end
+
+    defp match(conn, body) do
+      conn
+      |> put_req_header("content-type", "application/json")
+      |> post("/api/catalog/match", body)
+    end
+
+    test "a batch gives one row for each input, with the source", %{conn: conn} do
+      payload =
+        conn |> match(%{rows: [%{name: "NGC 224"}, %{name: "Nothing"}]}) |> json_response(200)
+
+      assert [
+               %{"status" => "matched", "object" => %{"key" => "ngc-224"}},
+               %{"status" => "unmatched"}
+             ] = payload["rows"]
+
+      assert payload["limit"] == 500
+    end
+
+    test "an oversized list has a clear error", %{conn: conn} do
+      rows = for _ <- 1..501, do: %{name: "M31"}
+
+      assert %{"error" => "too_many_rows", "limit" => 500} =
+               conn |> match(%{rows: rows}) |> json_response(413)
+
+      assert %{"error" => "invalid_rows"} = conn |> match(%{rows: []}) |> json_response(400)
+    end
+
+    test "the rate limit refuses a client that sends too many lists", %{conn: conn} do
+      original = System.get_env("RATE_LIMIT_CAPACITY_OVERRIDE")
+      System.put_env("RATE_LIMIT_CAPACITY_OVERRIDE", "1")
+
+      on_exit(fn ->
+        if original,
+          do: System.put_env("RATE_LIMIT_CAPACITY_OVERRIDE", original),
+          else: System.delete_env("RATE_LIMIT_CAPACITY_OVERRIDE")
+
+        StarsmapApiWeb.Plugs.RateLimit.reset()
+      end)
+
+      assert conn |> match(%{rows: [%{name: "NGC 224"}]}) |> json_response(200)
+      assert conn |> match(%{rows: [%{name: "NGC 224"}]}) |> response(429)
+    end
+  end
 end

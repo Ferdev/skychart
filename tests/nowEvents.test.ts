@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { uniqueNowEvents, type NowEvent } from "../src/atlas/nowEvents.ts";
+import { calendarAddress, uniqueNowEvents, webcalAddress, type NowEvent } from "../src/atlas/nowEvents.ts";
 
 function event(title: string, startsAt: string, url = "/o/x"): NowEvent {
   return { title, summary: "", starts_at: startsAt, url, catalog_key: null };
@@ -26,3 +26,11 @@ assert.equal(uniqueNowEvents([event("Launch", "soon"), event("Launch", "soon"), 
 assert.deepEqual(uniqueNowEvents([]), []);
 
 console.log("now events tests passed");
+
+// All types together need no filter. A choice of one type is in the address.
+{
+  assert.equal(calendarAddress("https://skychart.org", ["close_approach", "new_exoplanet"]), "https://skychart.org/calendar.ics");
+  assert.equal(calendarAddress("https://skychart.org", ["new_exoplanet"]), "https://skychart.org/calendar.ics?types=new_exoplanet");
+  assert.equal(webcalAddress("https://skychart.org/calendar.ics?types=new_exoplanet"), "webcal://skychart.org/calendar.ics?types=new_exoplanet");
+  assert.equal(webcalAddress("http://127.0.0.1:4020/calendar.ics"), "webcal://127.0.0.1:4020/calendar.ics");
+}

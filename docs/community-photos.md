@@ -27,6 +27,7 @@ functions of `docs/ui-style.md`. Its text is in `src/i18n/communityTranslations.
     with no photo (brightest first). A text filter and a catalog filter go to the
     server. Each row can open the object or the publish form.
   - `Rules`: a short version of the rules, with links to the four policy pages.
+  - `Tours`: the tour builder (see "Shared tours").
   - `My photos`: the status of each photo of the signed-in person, the reason of a
     moderator for a rejected or hidden photo, the profile, and the account data.
   - `Review`: the tools of a moderator (see "Curation").
@@ -208,6 +209,7 @@ The `Review` tab has these sections. Each number is the count of that section.
 | --- | --- | --- |
 | Waiting | Photos that wait for a decision, oldest first | `Approve`, `Reject` |
 | Reports | Published photos with an open report | `Keep photo`, `Hide` |
+| Tours | Shared tours with an open report, and hidden tours | `Keep tour`, `Hide`, `Restore` |
 | Published | Published photos, newest decision first | `Hide` |
 | Hidden, Rejected | Photos that are not public | `Restore` |
 | Decision log | The last 50 audit records | none |
@@ -275,10 +277,57 @@ Solver results retain the CD matrix and reference pixel, including parity and
 noncentral reference pixels. SIP/distorted solutions are not shown as TAN. Named
 Messier/OpenNGC context labels are limited to 50 per image from at most 1000
 candidates. They are annotations, not measurements or a complete source extract.
-The Sky view shows labelled footprints from Earth only. The 3D view can show one
+The Sky view shows labelled footprints from Earth only (see "Sky overlay"). The 3D view can show one
 selected static photo plane at its catalog distance, labelled “view from Earth”.
 Moving bodies stay cards. Survey comparison opens the existing credited DSS2
 field separately; orientation can differ. Opacity does not alter catalog data.
+
+### Sky overlay
+
+`GET /api/photos/sky?ra=&dec=&radius=` returns at most 200 compact items for one
+area of the sky. It returns a published photo of an active account with a solution
+of the plate solver (`wcs.status` is `solved`, with a TAN projection, ICRS, J2000,
+a CD matrix, and a reference pixel). An author-supplied solution is not checked
+against the stars, so it stays a labelled footprint of a cover and is not aligned.
+The geometry was already in `photos.wcs`; migration `20261030000000` adds only a
+partial index.
+
+Sky view shows the overlay from Earth, under the photos layer of the `L=` parameter.
+A photo with a size of 48 px or more on the screen is an aligned image, and the six
+largest photos in view have an image. A smaller photo is a footprint. The sky of
+Sky view and a TAN photo are both gnomonic, so a `matrix3d` homography of the four
+corners is exact for each pixel. An image is an approved derivative and blends with
+the canvas, so catalog points stay visible through it. The `Photo opacity` control
+is in the Sky view filters and in the map overlays. A click on a footprint, or Enter
+on its keyboard stop, opens the photo viewer. An object at that place has priority.
+
+The query area changes in steps of 10 degrees, so a small movement makes no request.
+A new index version clears the area cache, so a takedown leaves the overlay at the
+next refresh. The minimum field of view of Sky view is 20 degrees, so a photo that
+is narrower than about 1 degree stays a footprint.
+
+## Shared tours
+
+A signed-in person can build a guided tour in the `Tours` tab of the community
+window. `Add step` captures the state of a shared view: the 2D map, Sky view, or the
+3D view. Each step has a title and a caption. The steps can move up and down, and
+`Preview` plays the draft from memory in the tour player. The draft stays when the
+window closes, so that the person can move the map and add the next step.
+
+`tours` in `CommunityRepo` holds at most 50 tours for each account, with at most 30
+steps. `/?tour=shared-<token>` opens a tour in the same player as a published tour.
+The token is random, the address is unlisted, and the page has `X-Robots-Tag:
+noindex`. Analytics record the name `shared`, not the token. Step text is plain
+text; the player and the review tools escape it.
+
+A report puts the tour in the state `held`, so it stops opening for visitors until a
+moderator decides. An unlisted tour has few readers and text from one person, so a
+report acts at once, and it does not wait in a queue as a report of a photo does.
+`Keep tour` opens it again. A tour that a moderator kept stays open after a new
+report, and the report waits in the queue, so that one reader cannot close a lesson
+again and again. `Hide` closes a tour, and the author reads the reason in `Tours`.
+Each decision has an audit record. Account export includes the tours, and account
+removal deletes them.
 
 ## Backup and recovery
 

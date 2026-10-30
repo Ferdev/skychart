@@ -1,7 +1,7 @@
 defmodule StarsmapApi.Community.Moderation do
   @moduledoc "Audited publication, takedown, and anonymous reports."
   import Ecto.Query
-  alias StarsmapApi.Community.{Photo, Photos, Action, Report, Ranking, Storage, User}
+  alias StarsmapApi.Community.{Photo, Photos, Action, Report, Ranking, Storage, Tour, Tours, User}
   alias StarsmapApi.CommunityRepo, as: Repo
 
   @listed ["review", "published", "hidden", "rejected"]
@@ -43,12 +43,13 @@ defmodule StarsmapApi.Community.Moderation do
       "reports",
       Repo.aggregate(from(r in Report, where: is_nil(r.resolved_at)), :count)
     )
+    |> Map.put("tours", max(Tours.open_report_count(), Tours.held_count()))
   end
 
   @doc "Work that waits for a moderator: photos in review and open reports."
   def pending_count do
     counts = counts()
-    counts["review"] + counts["reports"]
+    counts["review"] + counts["reports"] + counts["tours"]
   end
 
   @doc "Private view of a photo for moderators: the public payload and the review signals."
@@ -125,6 +126,8 @@ defmodule StarsmapApi.Community.Moderation do
         on: u.id == a.user_id,
         left_join: p in Photo,
         on: p.id == a.photo_id,
+        left_join: t in Tour,
+        on: t.id == a.tour_id,
         order_by: [desc: a.inserted_at],
         limit: ^limit,
         select: %{
@@ -133,7 +136,7 @@ defmodule StarsmapApi.Community.Moderation do
           at: a.inserted_at,
           moderator: u.name,
           photo_id: p.id,
-          photo_title: p.title
+          photo_title: coalesce(p.title, t.title)
         }
     )
   end

@@ -227,3 +227,79 @@
 .compare-picker .destination-picker__section {
   gap: 5px;
 }
+
+/* The `Subscribe` control of the `Happening now` section (src/atlas/nowCalendarView.ts). */
+.now-subscribe {
+  margin: 0 0 8px;
+  font-size: var(--text-sm);
+}
+
+.now-subscribe summary {
+  width: fit-content;
+  color: var(--link);
+  cursor: pointer;
+}
+
+.now-subscribe__body {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  background: var(--panel-surface);
+}
+
+.now-subscribe fieldset {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.now-subscribe legend,
+.now-subscribe__address {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.now-subscribe fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--panel-ink);
+}
+
+.now-subscribe__address {
+  display: grid;
+  gap: 4px;
+}
+
+.now-subscribe__address input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.now-subscribe__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.now-subscribe__status {
+  margin: 0;
+  color: var(--accent-strong);
+  font-size: var(--text-xs);
+}
+
+.now-subscribe__status:empty {
+  display: none;
+}
+
+.target-list-open {
+  justify-self: start;
+  margin-top: 6px;
+}

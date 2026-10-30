@@ -177,6 +177,50 @@
         }
       }
     },
+    "/calendar.ics": {
+      "get": {
+        "operationId": "subscribeSkyEventCalendar",
+        "tags": ["SkyChart agents"],
+        "summary": "Subscribe to sky events as an iCalendar feed",
+        "description": "Returns near-Earth object close approaches and newly confirmed exoplanets as an RFC 5545 calendar for a subscription. An event keeps its UID when its time changes, so a calendar updates the entry in place. The response has an ETag and can be cached for one hour.",
+        "parameters": [
+          {
+            "name": "types",
+            "in": "query",
+            "description": "Comma-separated event types. The default is all types.",
+            "schema": {"type": "string"},
+            "example": "close_approach,new_exoplanet"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The calendar.",
+            "headers": {
+              "ETag": {"schema": {"type": "string"}},
+              "Cache-Control": {"schema": {"type": "string"}}
+            },
+            "content": {"text/calendar": {"schema": {"type": "string"}}}
+          },
+          "304": {"description": "The copy of the client is current."},
+          "400": {
+            "description": "An unknown event type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["error", "accepted"],
+                  "properties": {
+                    "error": {"type": "string"},
+                    "accepted": {"type": "array", "items": {"type": "string", "enum": ["close_approach", "new_exoplanet"]}}
+                  }
+                }
+              }
+            }
+          },
+          "429": {"$ref": "#/components/responses/RateLimited"}
+        }
+      }
+    },
     "/api/agent/v1/view-link": {
       "get": {
         "operationId": "createSkyViewLink",

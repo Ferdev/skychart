@@ -1,6 +1,11 @@
 defmodule StarsmapApiWeb.PageController do
   use StarsmapApiWeb, :controller
 
+  # The address of a shared tour is unlisted, so a search engine must not keep it.
+  def index(conn, %{"tour" => "shared-" <> _}) do
+    conn |> put_resp_header("x-robots-tag", "noindex") |> send_shell(:atlas)
+  end
+
   def index(conn, _params) do
     send_shell(conn, :atlas)
   end
