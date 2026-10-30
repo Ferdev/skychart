@@ -100,7 +100,8 @@ defmodule StarsmapApiWeb.AgentControllerTest do
                "/api/agent/v1/catalogs",
                "/api/agent/v1/objects/search",
                "/api/agent/v1/objects/{key}",
-               "/api/agent/v1/view-link"
+               "/api/agent/v1/view-link",
+               "/calendar.ics"
              ])
   end
 

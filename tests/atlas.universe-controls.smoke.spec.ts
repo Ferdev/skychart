@@ -1,4 +1,4 @@
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { collectBrowserIssues, openAtlas, skyEphemerisFixture } from "./atlas-test-utils";
 
 const START = "/?v=1&c=-5,0&z=24&t=2026-08-26T12:00:00.000Z&L=&perf=1";
@@ -38,6 +38,14 @@ async function enter3d(page: Page) {
   await expect(page.locator("#universe-status")).toHaveText("1 sampled catalog positions loaded");
 }
 
+async function expectFlightKeysWork(page: Page) {
+  await expect(page.locator("#universe-map")).toBeFocused();
+  await page.keyboard.down("w");
+  await expect(page.locator("#universe-speed")).not.toHaveText("0 km/s · 0 c");
+  await page.keyboard.up("w");
+  await expect(page.locator("#universe-speed")).toHaveText("0 km/s · 0 c", { timeout: 30_000 });
+}
+
 async function chooseFixtureA(page: Page) {
   await page.locator("#universe-find").click();
   await page.locator("#universe-search-input").fill("Fixture A");
@@ -66,10 +74,48 @@ test.describe("3D view controls", () => {
 
     await page.locator("#universe-hint-close").click();
     await expect(hint).toBeHidden();
+    // The flight keys work at once, with no click on the view.
+    await expectFlightKeysWork(page);
     await page.locator("#universe-close").click();
     await enter3d(page);
     await expect(hint).toBeHidden();
     issues.assertClean();
+  });
+
+  test("the gravity route shows its on state with a mark, and keeps its name", async ({ page }) => {
+    await openAtlas(page, START);
+    await enter3d(page);
+    const gravity = page.locator("#universe-gravity");
+    const mark = () => gravity.evaluate((button) => getComputedStyle(button, "::before").content);
+    await expect(gravity).toHaveAccessibleName("Gravity route");
+    expect(await mark()).toBe("none");
+    await gravity.click();
+    await expect(gravity).toHaveAttribute("aria-pressed", "true");
+    await expect(gravity).toHaveAccessibleName("Gravity route");
+    // The mark is a CSS shape with no text. Text would go into the accessible name.
+    expect(await mark()).toBe('""');
+    await gravity.click();
+    await expect(gravity).toHaveAttribute("aria-pressed", "false");
+    expect(await mark()).toBe("none");
+  });
+
+  test("the Escape message stays when the catalog reload ends after it", async ({ page }) => {
+    await openAtlas(page, START);
+    await enter3d(page);
+    await chooseFixtureA(page);
+    await page.locator("#universe-fly").click();
+    await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
+    // The first press stops the flight and starts a reload. The second press comes before the reload ends.
+    const reload = page.waitForResponse("**/api/catalog/sky**");
+    await page.locator("#universe-map").press("Escape");
+    await page.locator("#universe-map").press("Escape");
+    await expect(page.locator("#universe-status")).toHaveText("Press Esc again to exit 3D");
+    await reload;
+    await page.waitForTimeout(200);
+    await expect(page.locator("#universe-status")).toHaveText("Press Esc again to exit 3D");
+    await expect(page.locator("#universe-view")).toBeVisible();
+    await page.locator("#universe-map").press("Escape");
+    await expect(page.locator("#universe-view")).toBeHidden();
   });
 
   test("the autopilot says what it does with no target, with a target, and at the target", async ({ page }) => {
@@ -126,6 +172,7 @@ test.describe("3D view controls", () => {
     await expect(page.locator("#universe-minimap")).toBeHidden();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(toggle).toHaveAccessibleName("Show trip map");
+    await expectFlightKeysWork(page);
     // The choice stays after a reload.
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#load-state")).toHaveText("ready", { timeout: 45_000 });
@@ -133,6 +180,52 @@ test.describe("3D view controls", () => {
     await expect(page.locator("#universe-minimap")).toBeHidden();
     await page.locator("#universe-minimap-toggle").click();
     await expect(page.locator("#universe-minimap")).toBeVisible();
+  });
+});
+
+for (const viewport of [{ width: 390, height: 844 }, { width: 844, height: 390 }, { width: 1366, height: 1024 }]) {
+  test.describe(`3D view on a touch screen of ${viewport.width} x ${viewport.height} px`, () => {
+    test.use({ viewport, isMobile: viewport.width < 900, hasTouch: true });
+
+    test("the header, the search close button, and the hint button are 44 px targets", async ({ page, context }) => {
+      await installFixtures(context);
+      await page.addInitScript(() => sessionStorage.setItem("test:keep-universe-hint", "1"));
+      await openAtlas(page, START);
+      await page.locator("#universe-3d-toggle").tap();
+      await expect(page.locator("#universe-view")).toBeVisible();
+      const expectTarget = async (control: Locator) => {
+        const box = (await control.boundingBox())!;
+        const name = await control.evaluate((element) => element.id || element.className);
+        expect(Math.min(box.width, box.height), name).toBeGreaterThanOrEqual(44);
+        expect(box.x + box.width, name).toBeLessThanOrEqual(viewport.width);
+        return box;
+      };
+
+      const header = await page.locator(".universe-view__actions :is(button, select):visible").all();
+      expect(header.length).toBeGreaterThan(3);
+      const tops = new Set<number>();
+      for (const control of header) tops.add(Math.round((await expectTarget(control)).y));
+      expect(tops.size, "the header is one row").toBe(1);
+
+      await expectTarget(page.locator("#universe-hint-close"));
+      await page.locator("#universe-hint-close").tap();
+      await page.locator("#universe-find").tap();
+      await expectTarget(page.locator("#universe-search-close"));
+    });
+  });
+}
+
+test.describe("3D view on a touch tablet in French", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, hasTouch: true });
+
+  test("the 44 px controls of a long header stay in the window", async ({ page, context }) => {
+    await installFixtures(context);
+    await openAtlas(page, START);
+    await page.locator("#locale-select").selectOption("fr");
+    await page.locator("#universe-3d-toggle").tap();
+    await expect(page.locator("#universe-view")).toBeVisible();
+    const close = (await page.locator("#universe-close").boundingBox())!;
+    expect(close.x + close.width).toBeLessThanOrEqual(1280);
   });
 });
 

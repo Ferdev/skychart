@@ -40,6 +40,7 @@ A local server (`mix phx.server`) serves the same endpoint at
 | `get_object_visibility` | `AgentSky.visibility/1` | One modeled object and one place; the current time only. |
 | `list_sky_events` | `AgentSky.events/1` | 1–50 stored events. |
 | `list_guided_tours` | `AgentSky.tours/0` | The published tours. |
+| `match_sky_objects` | `AgentInterface.match/1` over `TargetMatch.run/2` | 50 names or J2000 positions; no list is stored. |
 
 The first four tools are the operations of the REST agent API (`/api/agent/v1`,
 see `/openapi.json`). They take the same parameter names and return the same

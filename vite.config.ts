@@ -30,6 +30,7 @@ export default defineConfig({
       "/api/trails": ephemerisApi,
       "/api/observe": ephemerisApi,
       "/api/now": "http://127.0.0.1:4020",
+      "/calendar.ics": "http://127.0.0.1:4020",
       "/api/events": "http://127.0.0.1:4020",
       "/catalog-tiles": "http://127.0.0.1:4020",
       "/about": "http://127.0.0.1:4020",

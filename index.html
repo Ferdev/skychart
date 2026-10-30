@@ -146,6 +146,7 @@
             <div class="sky-view__more">
               <button id="sky-more-button" class="sky-view__more-toggle" type="button" aria-expanded="false" aria-controls="sky-more-menu" data-i18n="sky.more">More</button>
               <div id="sky-more-menu" class="sky-view__more-menu">
+                <button id="sky-planner-button" class="sky-view__planner-button" type="button" aria-haspopup="dialog" data-i18n="planner.open">Planner</button>
                 <button id="sky-share-button" class="sky-view__share-button" type="button" aria-haspopup="dialog" aria-expanded="false" data-i18n="sky.shareAction" data-i18n-attrs="aria-label:sky.shareAction">Share this sky</button>
                 <button id="sky-view-reset" type="button" data-i18n="sky.reset">Reset view</button>
               </div>
@@ -505,13 +506,14 @@
                 <button id="focus-body" class="primary-action" type="button" data-i18n="search.focus">Go</button>
               </div>
               <div class="quick-focus" id="quick-focus-buttons" aria-label="Featured objects" data-i18n-attrs="aria-label:search.featured" hidden></div>
+              <button id="target-list-open" class="text-action target-list-open" type="button" aria-haspopup="dialog" data-i18n="targetList.open">Import list</button>
             </section>
             <section class="scope-section" aria-label="Catalog scope" data-i18n-attrs="aria-label:search.scope">
               <div class="body-picker-filters" id="body-filter-buttons" aria-label="Object filters" data-i18n-attrs="aria-label:search.filters"></div>
             </section>
             <div class="search-scroll" id="search-scroll">
               <div class="search-discovery" id="search-discovery">
-            <section class="workspace-section now-panel" aria-labelledby="now-heading"><div class="section-heading"><span id="now-heading" data-i18n="launch.happeningNow">Happening now</span><a href="/feed.xml" data-i18n="launch.atomFeed">Atom feed</a></div><p id="now-status" role="status" data-i18n="launch.eventsLoading">Loading current events…</p><ol id="now-events" class="now-events"></ol><button id="now-show-all" class="text-action" type="button" aria-controls="now-events" aria-expanded="false" hidden>Show all</button></section>
+            <section class="workspace-section now-panel" aria-labelledby="now-heading"><div class="section-heading"><span id="now-heading" data-i18n="launch.happeningNow">Happening now</span><a href="/feed.xml" data-i18n="launch.atomFeed">Atom feed</a></div><details id="now-subscribe" class="now-subscribe"></details><p id="now-status" role="status" data-i18n="launch.eventsLoading">Loading current events…</p><ol id="now-events" class="now-events"></ol><button id="now-show-all" class="text-action" type="button" aria-controls="now-events" aria-expanded="false" hidden>Show all</button></section>
             <section class="workspace-section explore-section" aria-label="Explore domains" data-i18n-attrs="aria-label:explore.label">
               <div class="section-heading">
                 <span data-i18n="explore.title">Explore</span>

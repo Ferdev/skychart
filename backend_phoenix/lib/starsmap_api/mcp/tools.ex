@@ -141,6 +141,46 @@ defmodule StarsmapApi.Mcp.Tools do
         ["observer_key"]
       ),
       tool(
+        "match_sky_objects",
+        "Match a list of targets to catalog objects",
+        "Resolve a list of object names or J2000 positions to catalog objects, in one call. Each row reports matched, ambiguous, or unmatched, with the catalog source, the object key, and for a position the angular separation from the nearest object. The list is not stored.",
+        %{
+          targets: %{
+            type: "array",
+            minItems: 1,
+            maxItems: AgentInterface.max_match_targets(),
+            items: %{
+              type: "object",
+              properties: %{
+                name: %{type: "string", maxLength: 120, description: "Name or designation."},
+                ra_deg: %{
+                  type: "number",
+                  minimum: 0,
+                  maximum: 360,
+                  description: "J2000 right ascension."
+                },
+                dec_deg: %{
+                  type: "number",
+                  minimum: -90,
+                  maximum: 90,
+                  description: "J2000 declination."
+                }
+              },
+              additionalProperties: false
+            },
+            description: "Each item has name, or both ra_deg and dec_deg."
+          },
+          radius_arcmin: %{
+            type: "number",
+            exclusiveMinimum: 0,
+            maximum: 60,
+            default: 5,
+            description: "Search radius of a position, in arcminutes."
+          }
+        },
+        ["targets"]
+      ),
+      tool(
         "get_solar_system_positions",
         "Get Solar System positions",
         "Get where the Sun, the planets, the Moon, Pluto, major moons, and tracked spacecraft are at a given time: heliocentric ecliptic position, distance from the Sun, distance from Earth, and light-travel time from Earth.",
@@ -253,6 +293,7 @@ defmodule StarsmapApi.Mcp.Tools do
     do: arguments |> comma_separated("layers") |> AgentInterface.view_link()
 
   defp run("create_object_sky_link", arguments), do: AgentSky.sky_link(arguments)
+  defp run("match_sky_objects", arguments), do: AgentInterface.match(arguments)
   defp run("get_solar_system_positions", arguments), do: AgentSky.positions(arguments)
   defp run("measure_object_separation", arguments), do: AgentSky.separation(arguments)
   defp run("get_object_visibility", arguments), do: AgentSky.visibility(arguments)

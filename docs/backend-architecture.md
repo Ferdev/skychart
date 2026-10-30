@@ -55,7 +55,25 @@ the scientific Python ecosystem:
 - offline source normalization and validation.
 
 The browser-facing endpoints are proxied through Phoenix, including
-`/api/ephemeris`, `/api/orbits`, `/api/trails`, and `/api/observe`.
+`/api/ephemeris`, `/api/orbits`, `/api/trails`, `/api/observe`, and
+`/api/observe/plan`.
+
+`POST /api/observe/plan` is the batch of the night planner
+(`backend/night_planner.py`). It ranks Messier and OpenNGC targets for one site
+and one night. The site is in the request body, so it is in no address and no
+log line. Phoenix filters the parameters and the Python service does not write
+the result to the payload cache.
+
+`POST /api/catalog/match` is the batch of a target list
+(`StarsmapApi.Catalog.TargetMatch`): at most 500 rows of names or J2000
+positions, with a rate limit of its own. The list is not stored. The MCP tool
+`match_sky_objects` calls the same function, with at most 50 rows.
+
+`GET /calendar.ics` is an iCalendar subscription over `sky_events`. The UID of
+an entry comes from the identity of the event, so that a new predicted time
+changes the entry in place. A calendar keeps the events of the last 30 days,
+because a subscribed calendar removes each entry that leaves the feed. The
+optional `types` parameter selects `close_approach` and `new_exoplanet`.
 
 ## Static catalog tiles
 
@@ -78,7 +96,10 @@ See [Catalog Tile Format](tile-format.md) for the SMP3 and SMPK1 contracts.
 - `GET /api/trails`
 - `GET /api/observe`
 - `GET /api/now`
+- `POST /api/observe/plan`
+- `POST /api/catalog/match`
 - `GET /feed.xml`
+- `GET /calendar.ics`
 - `POST /mcp` (the public [MCP server](mcp-server.md))
 
 Development-only dynamic point endpoints remain available as a fallback when

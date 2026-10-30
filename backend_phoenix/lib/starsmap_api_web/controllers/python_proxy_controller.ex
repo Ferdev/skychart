@@ -6,6 +6,7 @@ defmodule StarsmapApiWeb.PythonProxyController do
   @default_request_timeout 90_000
   @minimum_request_timeout 5_000
   @maximum_request_timeout 180_000
+  @night_plan_fields ~w(latitude_deg longitude_deg date min_altitude_deg max_magnitude min_size_arcmin max_size_arcmin types limit)
 
   def spacecraft(conn, _params), do: proxy(conn, "/api/spacecraft")
   def ephemeris(conn, _params), do: proxy(conn, "/api/ephemeris")
@@ -15,11 +16,17 @@ defmodule StarsmapApiWeb.PythonProxyController do
   def trails(conn, _params), do: proxy(conn, "/api/trails")
   def observe(conn, _params), do: proxy(conn, "/api/observe")
 
-  defp proxy(conn, path) do
+  # The site of a night plan goes in the request body, so it is in no address and no log line.
+  def night_plan(conn, _params) do
+    body = conn.body_params |> Map.take(@night_plan_fields) |> Jason.encode!()
+    proxy(%{conn | query_string: ""}, "/api/observe/plan", body)
+  end
+
+  defp proxy(conn, path, body \\ nil) do
     url = target_url(conn, path)
     request_id = request_id(conn)
 
-    with {:ok, status, headers, body} <- request(url, request_id) do
+    with {:ok, status, headers, body} <- request(url, request_id, body) do
       content_type = response_content_type(headers)
 
       if status >= 500 do
@@ -47,7 +54,7 @@ defmodule StarsmapApiWeb.PythonProxyController do
     end
   end
 
-  defp request(url, request_id) do
+  defp request(url, request_id, body) do
     uri = URI.parse(url)
 
     with :ok <- validate_uri(uri),
@@ -59,7 +66,7 @@ defmodule StarsmapApiWeb.PythonProxyController do
              request_timeout()
            ) do
       try do
-        with :ok <- :gen_tcp.send(socket, request_bytes(uri, request_id)),
+        with :ok <- :gen_tcp.send(socket, request_bytes(uri, request_id, body)),
              {:ok, response} <- recv_all(socket, <<>>) do
           parse_response(response)
         end
@@ -72,7 +79,7 @@ defmodule StarsmapApiWeb.PythonProxyController do
   defp validate_uri(%URI{scheme: "http", host: host}) when is_binary(host), do: :ok
   defp validate_uri(uri), do: {:error, {:unsupported_proxy_target, URI.to_string(uri)}}
 
-  defp request_bytes(uri, request_id) do
+  defp request_bytes(uri, request_id, body) do
     path =
       case uri.path do
         nil -> "/"
@@ -95,7 +102,7 @@ defmodule StarsmapApiWeb.PythonProxyController do
       end
 
     [
-      "GET ",
+      if(body, do: "POST ", else: "GET "),
       target,
       " HTTP/1.1\r\n",
       "Host: ",
@@ -105,7 +112,12 @@ defmodule StarsmapApiWeb.PythonProxyController do
       "X-Request-ID: ",
       request_id,
       "\r\n",
-      "Connection: close\r\n\r\n"
+      if(body,
+        do: "Content-Type: application/json\r\nContent-Length: #{byte_size(body)}\r\n",
+        else: ""
+      ),
+      "Connection: close\r\n\r\n",
+      body || ""
     ]
   end
 

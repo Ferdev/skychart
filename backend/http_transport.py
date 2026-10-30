@@ -17,6 +17,7 @@ from backend.catalog_sources import (
     catalog_summary_payload,
 )
 from backend.errors import QueryInputError
+from backend.night_planner import MAX_BODY_BYTES, night_plan_payload
 from backend.payload_cache import cache_key_payload, cached_payload
 from backend.request_query import (
     parse_bool_param,
@@ -58,6 +59,22 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(HTTPStatus.NO_CONTENT)
         self.end_headers()
+
+    def do_POST(self) -> None:
+        # The site is in the body, so no log line or cache key holds it.
+        if urlparse(self.path).path != "/api/observe/plan":
+            self.respond({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= MAX_BODY_BYTES:
+                raise QueryInputError("the request body has an invalid size")
+            self.respond(night_plan_payload(json.loads(self.rfile.read(length))))
+        except (QueryInputError, ValueError) as exc:
+            self.respond({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+        except Exception:
+            self.log_internal_error("night plan calculation")
+            self.respond({"error": "night plan calculation failed", "request_id": self.request_id()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)

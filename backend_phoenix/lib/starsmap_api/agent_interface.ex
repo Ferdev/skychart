@@ -4,6 +4,9 @@ defmodule StarsmapApi.AgentInterface do
   alias StarsmapApi.AgentCatalogs
   alias StarsmapApi.Catalog.PublicObjects
   alias StarsmapApi.Catalog.Search
+  alias StarsmapApi.Catalog.TargetMatch
+
+  @max_match_targets 50
 
   @min_query_length 3
   @max_query_length 80
@@ -28,6 +31,51 @@ defmodule StarsmapApi.AgentInterface do
          documentation_url: absolute_url("/agents")
        }}
     end
+  end
+
+  def max_match_targets, do: @max_match_targets
+
+  @doc "The batch match of `TargetMatch`, with a smaller bound and a compact row for a model."
+  def match(params) when is_map(params) do
+    case TargetMatch.run(params["targets"],
+           max_rows: @max_match_targets,
+           radius_arcmin: params["radius_arcmin"]
+         ) do
+      {:ok, payload} ->
+        {:ok,
+         %{
+           rows: Enum.map(payload.rows, &match_row/1),
+           counts: payload.counts,
+           radius_arcmin: payload.radius_arcmin,
+           limitation:
+             "A position matches the nearest catalog object inside the radius. A match is not an identification; check the source catalog.",
+           documentation_url: absolute_url("/agents")
+         }}
+
+      {:error, {:too_many_rows, limit}} ->
+        error(:too_many_targets, "A list has at most #{limit} targets.", "targets")
+
+      {:error, :invalid_rows} ->
+        error(:invalid_targets, "targets must be a list with at least one item.", "targets")
+    end
+  end
+
+  def match(_), do: error(:invalid_parameters, "Match parameters must be an object.")
+
+  defp match_row(row) do
+    row
+    |> Map.take([:row, :input, :status, :reason, :separation_arcsec, :candidates, :duplicate_of])
+    |> Map.merge(if(row[:object], do: %{object: match_object(row.object)}, else: %{}))
+  end
+
+  defp match_object(object) do
+    object
+    |> Map.take([:key, :name, :object_type, :catalog_group, :source])
+    |> Map.merge(%{
+      ra_deg: object.astrometry.ra_deg,
+      dec_deg: object.astrometry.dec_deg,
+      object_url: absolute_url("/o/" <> URI.encode_www_form(object.key))
+    })
   end
 
   def object(key) when is_binary(key) do

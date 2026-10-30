@@ -73,11 +73,11 @@ defmodule StarsmapApi.Community.Accounts do
             expires_at: DateTime.add(StarsmapApi.Community.now(), 600)
           })
 
-          :ok
+          id
         end)
 
       case result do
-        {:ok, :ok} -> mailer().deliver(email, code)
+        {:ok, id} -> deliver_code(email, code, id)
         _ -> {:error, :rate_limited}
       end
     end
@@ -214,6 +214,18 @@ defmodule StarsmapApi.Community.Accounts do
   end
 
   defp first_sign_in(user), do: user
+
+  # A code that was not sent counts against neither limit, so the user can try again at once.
+  defp deliver_code(email, code, id) do
+    case mailer().deliver(email, code) do
+      :ok ->
+        :ok
+
+      error ->
+        Repo.delete_all(from t in Token, where: t.id == ^id)
+        error
+    end
+  end
 
   defp mailer, do: Application.fetch_env!(:starsmap_api, :community_mailer)
 end

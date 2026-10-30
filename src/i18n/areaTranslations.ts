@@ -1,12 +1,15 @@
 import { COMMUNITY_TRANSLATIONS } from "./communityTranslations";
 import { DATA_LABEL_TRANSLATIONS } from "./dataLabelTranslations";
 import { FIELD_TRANSLATIONS } from "./fieldTranslations";
+import { NOW_CALENDAR_TRANSLATIONS } from "./nowCalendarTranslations";
 import { OBJECT_TRANSLATIONS } from "./objectTranslations";
+import { PLANNER_TRANSLATIONS } from "./plannerTranslations";
 import { SEARCH_TRANSLATIONS } from "./searchTranslations";
 import { SETTINGS_TRANSLATIONS } from "./settingsTranslations";
 import { SHELL_TRANSLATIONS } from "./shellTranslations";
 import { SKY_TRANSLATIONS } from "./skyTranslations";
 import { TYPE_TRANSLATIONS } from "./typeTranslations";
+import { TARGET_LIST_TRANSLATIONS } from "./targetListTranslations";
 import { UNIVERSE3D_TRANSLATIONS } from "./universe3dTranslations";
 
 const LOCALE_CODES = ["en", "es", "fr", "de", "pt-BR", "it", "zh-Hans", "ja", "ko"] as const;
@@ -23,6 +26,9 @@ const AREAS: readonly Record<string, Record<string, string>>[] = [
   UNIVERSE3D_TRANSLATIONS,
   DATA_LABEL_TRANSLATIONS,
   COMMUNITY_TRANSLATIONS,
+  PLANNER_TRANSLATIONS,
+  TARGET_LIST_TRANSLATIONS,
+  NOW_CALENDAR_TRANSLATIONS,
 ];
 
 /** The text of all area modules, merged for each locale. `i18n.ts` puts it on top of the main table. */
