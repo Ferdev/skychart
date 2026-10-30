@@ -187,6 +187,7 @@ if config_env() != :test do
       community_mail_token: community_env.("COMMUNITY_MAIL_TOKEN"),
       community_mail_from: community_env.("COMMUNITY_MAIL_FROM"),
       # Accounts with these verified addresses get the admin role at sign-in.
+      # An account whose address is not in this list loses the role at its next request.
       # They also get the notices about new users and photos that wait for review.
       community_admin_emails:
         (community_env.("COMMUNITY_ADMIN_EMAILS") || "")

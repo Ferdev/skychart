@@ -7,6 +7,8 @@ defmodule StarsmapApi.Community.AdminNotifier do
   alias StarsmapApi.Community.{Photo, Subject, User}
   alias StarsmapApi.CommunityRepo, as: Repo
 
+  @field_limit 200
+
   @doc "Queue one mail for each administrator. Call it in the transaction that records the event."
   def enqueue(event, id) when event in ["new_user", "photo_review"] do
     for to <- recipients() do
@@ -36,8 +38,8 @@ defmodule StarsmapApi.Community.AdminNotifier do
          """
          A new user signed in for the first time.
 
-         Handle: #{user.handle}
-         Name: #{user.name}
+         Handle: #{field(user.handle)}
+         Name: #{field(user.name)}
          Time: #{time(user.first_sign_in_at)}
 
          #{origin()}
@@ -57,9 +59,9 @@ defmodule StarsmapApi.Community.AdminNotifier do
        """
        A photo waits for review.
 
-       Title: #{photo.title}
-       Object: #{(subject && subject.name) || photo.declared_key}
-       Photographer: #{author.handle} (#{author.name})
+       Title: #{field(photo.title)}
+       Object: #{field((subject && subject.name) || photo.declared_key)}
+       Photographer: #{field(author.handle)} (#{field(author.name)})
        Time: #{time(photo.updated_at)}
 
        Sign in and select Review: #{origin()}
@@ -67,6 +69,15 @@ defmodule StarsmapApi.Community.AdminNotifier do
     else
       _ -> nil
     end
+  end
+
+  # A value from a user stays on its line, so it cannot look like text of the notice.
+  defp field(value) do
+    value
+    |> to_string()
+    |> String.replace(~r/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/u, " ")
+    |> String.trim()
+    |> String.slice(0, @field_limit)
   end
 
   defp time(%DateTime{} = at), do: Calendar.strftime(at, "%Y-%m-%d %H:%M UTC")
