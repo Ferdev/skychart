@@ -99,6 +99,25 @@ test.describe("3D view controls", () => {
     expect(await mark()).toBe("none");
   });
 
+  test("the Escape message stays when the catalog reload ends after it", async ({ page }) => {
+    await openAtlas(page, START);
+    await enter3d(page);
+    await chooseFixtureA(page);
+    await page.locator("#universe-fly").click();
+    await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
+    // The first press stops the flight and starts a reload. The second press comes before the reload ends.
+    const reload = page.waitForResponse("**/api/catalog/sky**");
+    await page.locator("#universe-map").press("Escape");
+    await page.locator("#universe-map").press("Escape");
+    await expect(page.locator("#universe-status")).toHaveText("Press Esc again to exit 3D");
+    await reload;
+    await page.waitForTimeout(200);
+    await expect(page.locator("#universe-status")).toHaveText("Press Esc again to exit 3D");
+    await expect(page.locator("#universe-view")).toBeVisible();
+    await page.locator("#universe-map").press("Escape");
+    await expect(page.locator("#universe-view")).toBeHidden();
+  });
+
   test("the autopilot says what it does with no target, with a target, and at the target", async ({ page }) => {
     const issues = collectBrowserIssues(page);
     await openAtlas(page, START);
