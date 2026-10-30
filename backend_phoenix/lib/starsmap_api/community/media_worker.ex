@@ -3,10 +3,35 @@ defmodule StarsmapApi.Community.MediaWorker do
   use Oban.Worker, queue: :media, max_attempts: 3, unique: [keys: [:id], period: 3600]
   alias StarsmapApi.Community.{Photos, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
+
+  # A hung decode must not keep the single slot of the media queue. A 42 MP photo took
+  # 47 seconds on half a CPU, and each decoder step stops at 40 seconds by itself.
+  @decode_limit_seconds 120
+  @decode_kill_after_seconds 5
+
+  # A backstop: it stops only the job process. It has room for the decoder limit and
+  # for 5 storage calls of 30 seconds each. The decoder limit comes first, so that
+  # process/1 can remove the scratch files.
+  @impl Oban.Worker
+  def timeout(_job), do: :timer.minutes(5)
+
   @impl true
-  def perform(%Oban.Job{args: %{"id" => id}}) do
+  def perform(%Oban.Job{args: %{"id" => id}} = job) do
     photo = Photos.get(id)
-    if photo && photo.status == "processing", do: process(photo), else: :ok
+
+    if photo && photo.status == "processing" do
+      case process(photo) do
+        # No retry follows the last attempt, so the photo must not stay in "processing".
+        {:error, :decode_timeout} = error when job.attempt >= job.max_attempts ->
+          mark_failed(photo)
+          error
+
+        result ->
+          result
+      end
+    else
+      :ok
+    end
   end
 
   def process(photo) do
@@ -51,7 +76,7 @@ defmodule StarsmapApi.Community.MediaWorker do
         end
       else
         {:error, :invalid_image} ->
-          Repo.update!(Ecto.Changeset.change(Photos.get(photo.id), status: "failed"))
+          mark_failed(photo)
           {:cancel, "Image rejected by the decoder"}
 
         error ->
@@ -62,13 +87,29 @@ defmodule StarsmapApi.Community.MediaWorker do
     end
   end
 
+  defp mark_failed(photo) do
+    Repo.update!(Ecto.Changeset.change(Photos.get(photo.id), status: "failed"))
+  end
+
+  # A closed port does not stop an OS process, so the limit is on the decoder itself.
+  # `timeout` signals its whole process group, which includes the vips processes.
   defp decode(source, scratch) do
-    case System.cmd("python3", [
+    limit =
+      Application.get_env(:starsmap_api, :community_decode_limit_seconds, @decode_limit_seconds)
+
+    case System.cmd("timeout", [
+           "--kill-after=#{@decode_kill_after_seconds}",
+           to_string(limit),
+           "python3",
            StarsmapApi.Community.backend_script("community_media.py"),
            source,
            Path.join(scratch, "output")
          ]) do
       {json, 0} -> Jason.decode(json)
+      # 124: SIGTERM stopped the decoder. 137: SIGKILL stopped it.
+      {_, status} when status in [124, 137] -> {:error, :decode_timeout}
+      # `timeout` could not start the decoder. The image is not at fault.
+      {_, status} when status in 125..127 -> {:error, :decoder_unavailable}
       _ -> {:error, :invalid_image}
     end
   end

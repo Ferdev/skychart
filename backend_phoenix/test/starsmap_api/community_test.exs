@@ -157,6 +157,85 @@ defmodule StarsmapApi.CommunityTest do
     File.rm(source)
   end
 
+  describe "with a decoder that hangs" do
+    setup %{user: user} do
+      root = Application.fetch_env!(:starsmap_api, :community_backend_root)
+      fixture = Path.join(System.tmp_dir!(), "hung-decoder-#{Ecto.UUID.generate()}")
+      pids = Path.join(fixture, "pids")
+      File.mkdir_p!(fixture)
+
+      File.write!(Path.join(fixture, "community_media.py"), """
+      import os, subprocess, sys, time
+      source, output = sys.argv[1:]
+      if open(source, 'rb').read(4) == b'HANG':
+          child = subprocess.Popen(['sleep', '60'])
+          with open(#{inspect(pids)}, 'w') as file:
+              file.write(f'{os.getpid()} {child.pid}')
+          time.sleep(60)
+      os.makedirs(output)
+      for name in ('master.png', '96.webp', '320.webp', '1600.webp'):
+          open(os.path.join(output, name), 'w').close()
+      print('{"sha256": "next"}')
+      """)
+
+      Application.put_env(:starsmap_api, :community_backend_root, fixture)
+      Application.put_env(:starsmap_api, :community_decode_limit_seconds, 2)
+
+      on_exit(fn ->
+        Application.put_env(:starsmap_api, :community_backend_root, root)
+        Application.delete_env(:starsmap_api, :community_decode_limit_seconds)
+        File.rm_rf(fixture)
+      end)
+
+      hung_source = Path.join(fixture, "hung-source")
+      File.write!(hung_source, "HANG")
+      {:ok, hung: uploaded(user, hung_source), pids: pids, fixture: fixture}
+    end
+
+    test "the job ends at the limit, the decoder stops and the next photo starts", %{
+      user: user,
+      hung: hung,
+      pids: pids,
+      fixture: fixture
+    } do
+      source = Path.join(fixture, "next-source")
+      File.write!(source, "NEXT")
+      next = uploaded(user, source)
+
+      started = System.monotonic_time(:second)
+
+      assert %{failure: 1, success: 1} =
+               Oban.drain_queue(StarsmapApi.CommunityJobs, queue: :media)
+
+      assert System.monotonic_time(:second) - started < 10
+
+      assert Photos.get(hung.id).status == "processing"
+      assert Photos.get(next.id).status == "review"
+
+      assert [%Oban.Job{errors: [%{"error" => error}]}] =
+               Repo.all(
+                 from j in Oban.Job,
+                   where:
+                     j.worker == "StarsmapApi.Community.MediaWorker" and j.state == "retryable"
+               )
+
+      assert error =~ "decode_timeout"
+      assert Path.wildcard(Path.join(Storage.root(), "scratch/#{hung.id}-*")) == []
+
+      for pid <- pids |> File.read!() |> String.split(), do: assert(stopped?(pid))
+    end
+
+    test "a timeout on the last attempt fails the photo", %{hung: hung} do
+      job = %Oban.Job{args: %{"id" => hung.id}, attempt: 3, max_attempts: 3}
+      assert {:error, :decode_timeout} = StarsmapApi.Community.MediaWorker.perform(job)
+      assert Photos.get(hung.id).status == "failed"
+    end
+  end
+
+  test "the Oban timeout of the media job comes after the decoder limit" do
+    assert StarsmapApi.Community.MediaWorker.timeout(%Oban.Job{}) > :timer.seconds(125)
+  end
+
   test "media and solver scripts resolve inside this checkout" do
     for script <- ["community_media.py", "community_solve.py"] do
       path = StarsmapApi.Community.backend_script(script)
@@ -576,6 +655,42 @@ defmodule StarsmapApi.CommunityTest do
 
     assert {:error, :invalid_wcs} =
              StarsmapApi.Community.Astrometry.validate(Map.put(w, "width", 200_000_000))
+  end
+
+  defp uploaded(user, source) do
+    {:ok, photo} =
+      Photos.create(user, %{
+        "key" => "moon",
+        "size_bytes" => File.stat!(source).size,
+        "title" => "Decoder fixture",
+        "licence" => "CC BY 4.0",
+        "captured_at" => "2026-10-08T00:00:00Z",
+        "rights_confirmed" => true
+      })
+
+    :ok = Storage.Local.put(photo.source_key, source, false)
+    {:ok, photo} = Photos.complete(user, photo.id)
+    photo
+  end
+
+  # A stopped orphan stays a zombie until PID 1 collects it. A zombie does not run.
+  defp stopped?(pid, tries \\ 20) do
+    case System.cmd("ps", ["-o", "stat=", "-p", pid]) do
+      {stat, 0} ->
+        if String.starts_with?(String.trim(stat), "Z") do
+          true
+        else
+          if tries > 0 do
+            Process.sleep(50)
+            stopped?(pid, tries - 1)
+          else
+            false
+          end
+        end
+
+      _ ->
+        true
+    end
   end
 
   defp photo(user, subject, status) do

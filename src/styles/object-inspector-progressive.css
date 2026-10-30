@@ -208,7 +208,6 @@
   border-top: 1px solid rgba(242, 237, 223, 0.09);
   border-bottom: 1px solid rgba(242, 237, 223, 0.12);
   background: rgba(10, 12, 10, 0.96);
-  backdrop-filter: blur(16px);
 }
 
 .object-view-tabs button {
