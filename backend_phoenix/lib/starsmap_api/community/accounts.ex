@@ -175,7 +175,7 @@ defmodule StarsmapApi.Community.Accounts do
     |> Ecto.Changeset.cast(attrs, [:name, :handle])
     |> Ecto.Changeset.validate_required([:name, :handle])
     |> Ecto.Changeset.validate_length(:name, min: 1, max: 80)
-    |> Ecto.Changeset.validate_format(:handle, ~r/^[a-z][a-z0-9-]{2,39}$/)
+    |> Ecto.Changeset.validate_format(:handle, ~r/\A[a-z][a-z0-9-]{2,39}\z/)
     |> Ecto.Changeset.unique_constraint(:handle)
     |> Repo.update()
   end
