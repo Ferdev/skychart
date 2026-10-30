@@ -135,42 +135,8 @@
     min-height: 24px;
   }
 
-  .scale-command .zoom-presets,
   .scale-options {
     display: none;
-  }
-
-  .scale-command .zoom-presets {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(84px, 1fr);
-    gap: 8px;
-    margin-top: 10px;
-    padding: 8px 0 2px;
-    overflow-x: auto;
-    scroll-snap-type: x proximity;
-  }
-
-  .scale-command .zoom-presets::before,
-  .scale-command .zoom-presets button::before {
-    display: none;
-  }
-
-  .scale-command .zoom-presets button {
-    min-height: 48px;
-    padding: 8px 10px;
-    border: 1px solid rgba(242, 237, 223, 0.1);
-    border-radius: 10px;
-    background: rgba(242, 237, 223, 0.045);
-    scroll-snap-align: start;
-  }
-
-  .scale-command .zoom-presets button.active {
-    border-color: rgba(239, 196, 104, 0.52);
-    background: rgba(239, 196, 104, 0.12);
-  }
-
-  .scale-options {
     height: min(250px, 32dvh);
     margin-top: 10px;
     padding-top: 10px;
