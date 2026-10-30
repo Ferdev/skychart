@@ -8,6 +8,8 @@
   background: rgba(15, 19, 17, 0.95);
   border-color: rgba(238, 230, 206, 0.2);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  /* The bar is almost opaque, so a blur over the moving map only costs frame time. */
+  backdrop-filter: none;
   overflow: visible;
 }
 

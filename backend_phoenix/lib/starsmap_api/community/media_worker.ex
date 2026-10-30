@@ -8,6 +8,17 @@ defmodule StarsmapApi.Community.MediaWorker do
   # Any other exit is a worker fault, such as an out-of-memory kill, and is retried.
   @invalid_image_exit 65
 
+  # A hung decode must not keep the single slot of the media queue. A 42 MP photo took
+  # 47 seconds on half a CPU, and each decoder step stops at 40 seconds by itself.
+  @decode_limit_seconds 120
+  @decode_kill_after_seconds 5
+
+  # A backstop: it stops only the job process. It has room for the decoder limit and
+  # for 5 storage calls of 30 seconds each. The decoder limit comes first, so that
+  # process/1 can remove the scratch files.
+  @impl Oban.Worker
+  def timeout(_job), do: :timer.minutes(5)
+
   @impl true
   def perform(%Oban.Job{args: %{"id" => id}} = job) do
     photo = Photos.get(id)
@@ -80,14 +91,24 @@ defmodule StarsmapApi.Community.MediaWorker do
     end
   end
 
+  # A closed port does not stop an OS process, so the limit is on the decoder itself.
+  # `timeout` signals its whole process group, which includes the vips processes.
   defp decode(source, scratch) do
-    case System.cmd("python3", [
+    limit =
+      Application.get_env(:starsmap_api, :community_decode_limit_seconds, @decode_limit_seconds)
+
+    case System.cmd("timeout", [
+           "--kill-after=#{@decode_kill_after_seconds}",
+           to_string(limit),
+           "python3",
            StarsmapApi.Community.backend_script("community_media.py"),
            source,
            Path.join(scratch, "output")
          ]) do
       {json, 0} -> Jason.decode(json)
       {_, @invalid_image_exit} -> {:error, :invalid_image}
+      # `timeout` exits with 124 after its SIGTERM. After a SIGKILL the exit is 137.
+      {_, 124} -> {:error, {:decoder_exit, :timeout}}
       {_, status} -> {:error, {:decoder_exit, status}}
     end
   end
