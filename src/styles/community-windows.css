@@ -854,3 +854,224 @@
     height: 44px;
   }
 }
+
+/* Tonight's planner (src/sky/nightPlannerPanel.ts). */
+.community-dialog--planner {
+  width: min(760px, calc(100vw - 24px));
+}
+
+.planner-form {
+  display: grid;
+  gap: 12px;
+}
+
+.planner-form__group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+}
+
+.planner-form__group legend {
+  padding: 0 6px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.planner-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.planner-form label :is(input, select) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.planner-form__group > .community-help,
+.planner-form__group > .planner-form__actions {
+  grid-column: 1 / -1;
+}
+
+.planner-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.planner-results {
+  margin-top: 14px;
+}
+
+.planner-summary {
+  margin: 0 0 6px;
+  color: var(--panel-ink);
+  font-size: var(--text-md);
+}
+
+.planner-note {
+  margin: 0 0 6px;
+  color: var(--accent-strong);
+  font-size: var(--text-sm);
+}
+
+.planner-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.planner-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  background: var(--panel-surface);
+}
+
+.planner-row__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--panel-ink);
+  font-size: var(--text-md);
+}
+
+.planner-row__head strong {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.planner-row__rank,
+.planner-row__facts {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-sm);
+}
+
+.planner-row__facts {
+  margin: 0;
+}
+
+.planner-bar {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--panel-line);
+}
+
+.planner-bar span {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--spectral-teal);
+}
+
+.planner-row__data {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.planner-row__data dt {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.planner-row__data dd {
+  margin: 0;
+  color: var(--panel-ink);
+}
+
+@media (max-width: 640px) {
+  .planner-row__head .secondary-action {
+    min-height: 44px;
+  }
+}
+
+/* The tour builder (src/community/tourBuilder.ts). */
+.tour-builder__list {
+  display: grid;
+  gap: 8px;
+  padding: 0 18px 18px;
+}
+
+.tour-builder {
+  padding: 14px 18px 18px;
+}
+
+.tour-builder__row,
+.tour-builder__step {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  background: var(--panel-surface);
+}
+
+.tour-builder__row p {
+  margin: 4px 0 0;
+}
+
+.tour-builder__steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tour-builder__step > p {
+  margin: 0;
+}
+
+.tour-builder__review-steps {
+  margin: 8px 0;
+  padding-left: 20px;
+  color: var(--panel-ink);
+  font-size: var(--text-sm);
+}
+
+.community-review-card--tour h3 {
+  margin: 0;
+  color: var(--panel-ink);
+  font-size: var(--text-md);
+}
+
+/* The target list (src/destination/targetListPanel.ts). */
+.target-list-results {
+  margin-top: 14px;
+}
+
+.target-list-table small {
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.target-list-table .text-action {
+  padding: 0;
+  text-align: left;
+}
+
+.target-list-retry {
+  display: flex;
+  gap: 6px;
+}
+
+.target-list-retry input {
+  min-width: 0;
+  flex: 1;
+}

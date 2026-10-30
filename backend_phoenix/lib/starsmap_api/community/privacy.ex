@@ -1,7 +1,7 @@
 defmodule StarsmapApi.Community.Privacy do
   @moduledoc "Private account exports and immediate, audited account removal."
   import Ecto.Query
-  alias StarsmapApi.Community.{Photo, Vote, Token, Action, Ranking}
+  alias StarsmapApi.Community.{Photo, Vote, Token, Action, Ranking, Tours}
   alias StarsmapApi.CommunityRepo, as: Repo
 
   def export(user) do
@@ -22,7 +22,8 @@ defmodule StarsmapApi.Community.Privacy do
             :status
           ])
         ),
-      votes: Repo.all(from v in Vote, where: v.user_id == ^user.id, select: v.photo_id)
+      votes: Repo.all(from v in Vote, where: v.user_id == ^user.id, select: v.photo_id),
+      tours: Tours.export(user)
     }
   end
 
@@ -41,6 +42,7 @@ defmodule StarsmapApi.Community.Privacy do
 
       Repo.delete_all(from v in Vote, where: v.user_id == ^user.id)
       Repo.delete_all(from t in Token, where: t.user_id == ^user.id)
+      Tours.delete_all(user)
 
       Enum.each(photos, fn p ->
         Repo.update!(Ecto.Changeset.change(p, status: "hidden"))
@@ -80,7 +82,12 @@ defmodule StarsmapApi.Community.Privacy do
     request = Map.get(event, :request) || %{}
     url = Map.get(request, :url) || Map.get(request, "url") || ""
 
-    if String.contains?(url, ["/community/", "/api/photos/"]) do
+    if String.contains?(url, [
+         "/community/",
+         "/api/photos/",
+         "/api/observe/plan",
+         "/api/catalog/match"
+       ]) do
       %{event | request: %{}, extra: %{}, user: %{}, breadcrumbs: []}
     else
       event

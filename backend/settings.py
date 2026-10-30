@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data" / "skyfield"
 CACHE_DIR = ROOT / "data" / "cache"
 DEEP_SKY_CATALOG_PATH = ROOT / "data" / "catalogs" / "deep_sky_catalog.json"
+NGC_IC_CATALOG_PATH = ROOT / "data" / "catalogs" / "ngc_ic_deep_sky.json"
 EXOPLANET_CATALOG_PATH = ROOT / "data" / "catalogs" / "exoplanet_systems.json"
 BRIGHT_STAR_CATALOG_PATH = ROOT / "data" / "catalogs" / "bright_stars.json"
 HOST = os.environ.get("ATLAS_API_HOST", "127.0.0.1")

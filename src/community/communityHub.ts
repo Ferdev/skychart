@@ -4,9 +4,10 @@ import { t } from "../i18n";
 import { CommunityApi, errorText, type Coverage, type OwnPhoto, type Photo, type Photographer } from "./api";
 import { dateText, emptyState, h, openDialog, photoCard, segmented, statusBadge, type DialogView } from "./communityUi";
 import { renderReview } from "./communityReview";
+import { renderTourBuilder, type TourBuilderHost } from "./tourBuilder";
 import type { DialogHost, PhotoDialogs } from "./photoDialogs";
 
-export type HubTab = "gallery" | "photographers" | "coverage" | "rules" | "account" | "review";
+export type HubTab = "gallery" | "photographers" | "coverage" | "rules" | "tours" | "account" | "review";
 
 const CATALOGS = ["messier", "ngc", "ic"] as const;
 const CATALOG_NAMES: Record<string, string> = { messier: "Messier", ngc: "NGC", ic: "IC" };
@@ -31,6 +32,7 @@ export class CommunityHub {
     readonly dialogs: PhotoDialogs,
     readonly changed: () => void,
     readonly host: DialogHost,
+    readonly tours: TourBuilderHost,
   ) {}
 
   get isOpen() {
@@ -68,6 +70,7 @@ export class CommunityHub {
       { id: "photographers", label: t("community.tab.photographers") },
       { id: "coverage", label: t("community.tab.coverage") },
       { id: "rules", label: t("community.tab.rules") },
+      { id: "tours", label: t("community.tab.tours") },
       { id: "account", label: t("community.account.photos") },
       ...(this.api.moderator ? [{ id: "review" as const, label: t("community.review"), count: this.api.reviewCount }] : []),
     ];
@@ -112,6 +115,16 @@ export class CommunityHub {
       photographers: () => (this.handle ? this.profile(panel, this.handle, current) : this.photographers(panel, current)),
       coverage: () => this.coverage(panel, current),
       rules: () => this.rules(panel),
+      tours: () =>
+        renderTourBuilder(panel, {
+          api: this.api,
+          dialogs: this.dialogs,
+          host: this.tours,
+          current,
+          message: (text) => (view.message.textContent = text),
+          close: () => this.close(),
+          repaint: () => this.paint(),
+        }),
       account: () => this.account(panel, current),
       review: () =>
         renderReview(panel, {

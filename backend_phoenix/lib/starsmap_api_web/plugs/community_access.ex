@@ -43,9 +43,14 @@ defmodule StarsmapApiWeb.Plugs.CommunityAccess do
           conn =
             put_resp_header(conn, "cache-control", if(user, do: "no-store", else: "no-cache"))
 
-          options = [capacity: 30, refill_per_second: 0.5, scope: {:community, conn.method}]
-          options = if user, do: Keyword.put(options, :identity, user.id), else: options
-          StarsmapApiWeb.Plugs.RateLimit.call(conn, options)
+          limits = [
+            capacity: Keyword.get(options, :capacity, 30),
+            refill_per_second: Keyword.get(options, :refill_per_second, 0.5),
+            scope: Keyword.get(options, :scope, {:community, conn.method})
+          ]
+
+          limits = if user, do: Keyword.put(limits, :identity, user.id), else: limits
+          StarsmapApiWeb.Plugs.RateLimit.call(conn, limits)
       end
     end
   end

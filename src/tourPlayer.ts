@@ -1,7 +1,14 @@
 import { decodeViewState, type ViewState } from "./viewState";
 
 export type TourStep = { viewState: string; title: string; body: string; holdMs?: number };
-export type Tour = { slug: string; title: string; description: string; steps: TourStep[] };
+export type Tour = { slug: string; title: string; description: string; steps: TourStep[]; author?: string };
+/** A tour of a community member: the slug is this prefix and the unlisted token of the tour. */
+export const SHARED_TOUR_PREFIX = "shared-";
+/** Analytics never get the unlisted token of a shared tour. */
+const analyticsName = (slug: string) => (slug.startsWith(SHARED_TOUR_PREFIX) ? "shared" : slug);
+const tourAddress = (slug: string) => slug.startsWith(SHARED_TOUR_PREFIX)
+  ? `/api/community/shared-tours/${encodeURIComponent(slug.slice(SHARED_TOUR_PREFIX.length))}`
+  : `/tours/${encodeURIComponent(slug)}.json`;
 export type TourPlayerAdapter = {
   navigate(state: ViewState, options: { animate: boolean; slug: string; step: number; restoring: boolean; signal: AbortSignal }): Promise<void>;
   prewarm(state: ViewState): void;
@@ -10,6 +17,8 @@ export type TourPlayerAdapter = {
   translate(key: string, params?: Record<string, string | number>): string;
   /** The user closed the tour. */
   closed(): void;
+  /** Opens the report form of a shared tour. */
+  report?(slug: string): void;
 };
 
 /** The card that shows one step of a guided tour and moves the atlas to the view of that step. */
@@ -30,6 +39,7 @@ export class TourPlayer {
       if (action === "next") void this.go(this.index + 1);
       if (action === "previous") void this.go(this.index - 1);
       if (action === "close") this.close();
+      if (action === "report" && this.tour) this.adapter.report?.(this.tour.slug);
       const dot = target.closest<HTMLButtonElement>("[data-tour-step]");
       if (dot) void this.go(Number(dot.dataset.tourStep));
     });
@@ -54,18 +64,35 @@ export class TourPlayer {
     this.plate.hidden = false;
     this.plate.innerHTML = `<p role="status">${escapeHtml(t("tour.loading"))}</p>`;
     try {
-      const response = await fetch(`/tours/${encodeURIComponent(slug)}.json`, { signal: transition.signal });
+      const response = await fetch(tourAddress(slug), { signal: transition.signal });
       if (!response.ok) throw new Error("Tour unavailable");
       const tour = await response.json() as Tour;
       if (transition.signal.aborted) return;
-      if (tour.slug !== slug || !Array.isArray(tour.steps) || !tour.steps.length || tour.steps.some((item) => !decodeViewState(item.viewState))) throw new Error("Tour data is invalid");
-      this.tour = tour;
-      this.adapter.track("tour_started", { tour: slug });
-      await this.go(Math.min(Math.max(step, 0), tour.steps.length - 1), true);
-      if (!this.transition?.signal.aborted) this.plate.querySelector<HTMLButtonElement>("[data-tour-action='next']")?.focus();
+      if (tour.slug !== slug) throw new Error("Tour data is invalid");
+      await this.begin(tour, step);
     } catch {
       if (!transition.signal.aborted) this.error(t("tour.unavailable"));
     }
+  }
+
+  /** Plays a tour from memory: the preview of the tour builder. */
+  async preview(tour: Tour) {
+    const transition = this.beginTransition();
+    this.plate.setAttribute("aria-label", this.adapter.translate("tour.label"));
+    this.plate.hidden = false;
+    try {
+      await this.begin(tour, 0);
+    } catch {
+      if (!transition.signal.aborted) this.error(this.adapter.translate("tour.unavailable"));
+    }
+  }
+
+  private async begin(tour: Tour, step: number) {
+    if (!Array.isArray(tour.steps) || !tour.steps.length || tour.steps.some((item) => !decodeViewState(item.viewState))) throw new Error("Tour data is invalid");
+    this.tour = tour;
+    this.adapter.track("tour_started", { tour: analyticsName(tour.slug) });
+    await this.go(Math.min(Math.max(step, 0), tour.steps.length - 1), true);
+    if (!this.transition?.signal.aborted) this.plate.querySelector<HTMLButtonElement>("[data-tour-action='next']")?.focus();
   }
 
   async restoreStep(step: number) {
@@ -94,7 +121,7 @@ export class TourPlayer {
     const next = this.tour.steps[index + 1];
     if (next) this.adapter.prewarm(decodeViewState(next.viewState)!);
     if (!restoring && step.holdMs && next) this.timer = window.setTimeout(() => void this.go(index + 1), step.holdMs);
-    if (index === this.tour.steps.length - 1) this.adapter.track("tour_completed", { tour: this.tour.slug });
+    if (index === this.tour.steps.length - 1) this.adapter.track("tour_completed", { tour: analyticsName(this.tour.slug) });
   }
 
   private beginTransition() {
@@ -120,10 +147,12 @@ export class TourPlayer {
       <p class="tour-player__progress">${escapeHtml(t("tour.stepOf", { step: this.index + 1, total }))}</p>
       <h2 tabindex="-1">${escapeHtml(step.title)}</h2>
       <p class="tour-player__body">${escapeHtml(step.body)}</p>
+      ${tour.author ? `<p class="tour-player__progress">${escapeHtml(t("tour.sharedBy", { name: tour.author }))}</p>` : ""}
       <div class="tour-player__dots" role="group" aria-label="${escapeHtml(t("tour.progress"))}">${dots}</div>
       <div class="tour-player__actions">
         <button type="button" class="secondary-action" data-tour-action="previous" ${this.index === 0 ? "disabled" : ""}>${escapeHtml(t("tour.previous"))}</button>
         <button type="button" class="primary-action" data-tour-action="next" ${this.index === total - 1 ? "disabled" : ""}>${escapeHtml(t("tour.next"))}</button>
+        ${tour.slug.startsWith(SHARED_TOUR_PREFIX) && this.adapter.report ? `<button type="button" class="text-action" data-tour-action="report">${escapeHtml(t("tour.report"))}</button>` : ""}
       </div>`;
   }
 

@@ -40,7 +40,16 @@ config :starsmap_api,
   trusted_proxy_cidrs: ["127.0.0.0/8", "::1/128"]
 
 # GlitchTip/Sentry-compatible error tracking
-config :phoenix, :filter_parameters, ["password", "email", "code", "token", "csrf"]
+config :phoenix, :filter_parameters, [
+  "password",
+  "email",
+  "code",
+  "token",
+  "csrf",
+  "latitude",
+  "longitude",
+  "rows"
+]
 
 config :sentry,
   before_send: {StarsmapApi.Community.Privacy, :scrub},

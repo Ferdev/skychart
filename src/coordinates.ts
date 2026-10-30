@@ -92,6 +92,13 @@ export function eclipticCartesianToEquatorial(xAu: number, yAu: number, zAu: num
   };
 }
 
+/** The unit direction of a J2000 right ascension and declination, in the heliocentric ecliptic frame of the atlas. */
+export function directionFromEquatorial(raDeg: number, decDeg: number): { x: number; y: number; z: number } {
+  const ra = toRadians(raDeg), dec = toRadians(decDeg), obliquity = toRadians(J2000_MEAN_OBLIQUITY_DEG);
+  const x = Math.cos(dec) * Math.cos(ra), y = Math.cos(dec) * Math.sin(ra), z = Math.sin(dec);
+  return { x, y: y * Math.cos(obliquity) + z * Math.sin(obliquity), z: -y * Math.sin(obliquity) + z * Math.cos(obliquity) };
+}
+
 export function normalizeDegrees(value: number): number {
   return ((value % FULL_CIRCLE_DEG) + FULL_CIRCLE_DEG) % FULL_CIRCLE_DEG;
 }

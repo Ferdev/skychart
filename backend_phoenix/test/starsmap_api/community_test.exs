@@ -39,6 +39,24 @@ defmodule StarsmapApi.CommunityTest do
     {:ok, user: user, subject: subject}
   end
 
+  test "an error report drops the request of a private calculation or list" do
+    alias StarsmapApi.Community.Privacy
+
+    for url <- ["https://skychart.org/api/observe/plan", "https://skychart.org/api/catalog/match"] do
+      event = %{
+        request: %{url: url, data: %{"latitude_deg" => 1.0}},
+        extra: %{a: 1},
+        user: %{},
+        breadcrumbs: []
+      }
+
+      assert Privacy.scrub(event).request == %{}
+    end
+
+    public = %{request: %{url: "https://skychart.org/api/catalog/search"}}
+    assert Privacy.scrub(public) == public
+  end
+
   test "email codes are one-time and wrong attempts persist" do
     assert :ok = Accounts.request_code("reader@example.com")
     assert_receive {:community_code, "reader@example.com", code}

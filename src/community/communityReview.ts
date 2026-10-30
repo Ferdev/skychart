@@ -1,7 +1,7 @@
 import { formatCount } from "../format/quantity";
 import { NEW_TAB_LINK_ATTRIBUTES } from "../format/links";
 import { t } from "../i18n";
-import { CommunityApi, errorText, type ReviewAction, type ReviewPhoto, type ReviewQueue } from "./api";
+import { CommunityApi, errorText, type ReviewAction, type ReviewPhoto, type ReviewQueue, type ReviewTour } from "./api";
 import { dateText, dateTimeText, emptyState, h, licenceText, segmented, statusBadge } from "./communityUi";
 import type { PhotoDialogs } from "./photoDialogs";
 
@@ -15,7 +15,7 @@ export type ReviewContext = {
   changed: () => Promise<void>;
 };
 
-type Section = "review" | "reports" | "published" | "hidden" | "rejected" | "log" | "members";
+type Section = "review" | "reports" | "tours" | "published" | "hidden" | "rejected" | "log" | "members";
 
 const PRESETS = ["notAstro", "wrongObject", "rights", "synthetic", "quality"];
 /** The section stays selected while the community window is open and closed again. */
@@ -39,6 +39,7 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
       [
         { value: "review", label: t("community.mod.waiting"), count: counts.review ?? 0 },
         { value: "reports", label: t("community.mod.reports"), count: counts.reports ?? 0 },
+        { value: "tours", label: t("community.tab.tours"), count: counts.tours ?? 0 },
         { value: "published", label: t("community.status.published"), count: counts.published ?? 0 },
         { value: "hidden", label: t("community.status.hidden"), count: counts.hidden ?? 0 },
         { value: "rejected", label: t("community.status.rejected"), count: counts.rejected ?? 0 },
@@ -155,6 +156,39 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
     bindCards(photos);
   };
 
+  const paintTours = (tours: ReviewTour[]) => {
+    if (!tours.length) {
+      list.innerHTML = emptyState(t("community.tours.emptyReview"));
+      return;
+    }
+    list.innerHTML = tours
+      .map((tour) => {
+        const reports = tour.reports.length
+          ? `<div class="community-note community-note--warning"><strong>${h(t("community.mod.reports"))}</strong><ul>${tour.reports.map((report) => `<li>${h(report.reason)}</li>`).join("")}</ul></div>`
+          : "";
+        const steps = tour.steps.map((step) => `<li><strong>${h(step.title)}</strong> ${h(step.body)}</li>`).join("");
+        const buttons = tour.status === "hidden"
+          ? `<button type="button" class="primary-action" data-tour-action="restore">${h(t("community.mod.restore"))}</button>`
+          : `<button type="button" class="primary-action" data-tour-action="keep">${h(t("community.tours.keep"))}</button><button type="button" class="secondary-action" data-tour-action="hide">${h(t("community.mod.hide"))}</button>`;
+        return `<article class="community-review-card community-review-card--tour" data-tour-id="${h(tour.id)}"><div><h3>${h(tour.title)}</h3><p class="community-muted">${h(tour.author.name)} · @${h(tour.author.handle)} · ${h(dateTimeText(tour.updated_at))}</p>${tour.moderation_reason ? `<p class="community-muted">${h(tour.moderation_reason)}</p>` : ""}${reports}<ol class="tour-builder__review-steps">${steps}</ol><div class="community-actions community-actions--wrap">${buttons}</div></div></article>`;
+      })
+      .join("");
+    list.querySelectorAll<HTMLButtonElement>("[data-tour-action]").forEach((button) => {
+      const id = button.closest<HTMLElement>("[data-tour-id]")!.dataset.tourId!;
+      const action = button.dataset.tourAction!;
+      const send = async (reason: string) => {
+        await api.request(`/api/community/tours/${id}/review`, "POST", { action, reason });
+        context.message(t("community.mod.done"));
+        await context.changed();
+        await load(true);
+      };
+      button.onclick = () => {
+        if (action === "hide") context.dialogs.reasonForm(t("community.mod.hide"), t("community.mod.hide"), t("community.mod.reasonFor"), send);
+        else send("").catch((error) => context.message(errorText(error)));
+      };
+    });
+  };
+
   const paintLog = (entries: ReviewAction[]) => {
     if (!entries.length) {
       list.innerHTML = emptyState(t("community.mod.emptyLog"));
@@ -162,7 +196,7 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
     }
     const name = (action: string) =>
       ({ hide: t("community.status.hidden"), reject: t("community.status.rejected") })[action] ??
-      (["approve", "restore", "author_remove", "account_delete", "cancel_votes", "suspend_account"].includes(action) ? t(`community.mod.action.${action}`) : action);
+      (["approve", "restore", "author_remove", "account_delete", "cancel_votes", "suspend_account", "tour_keep", "tour_hide", "tour_restore"].includes(action) ? t(`community.mod.action.${action}`) : action);
     list.innerHTML = `<div class="community-table-wrap"><table class="community-table"><thead><tr><th scope="col">${h(t("community.mod.col.date"))}</th><th scope="col">${h(t("community.mod.col.action"))}</th><th scope="col">${h(t("community.mod.col.moderator"))}</th><th scope="col">${h(t("community.mod.col.photo"))}</th><th scope="col">${h(t("community.field.reason"))}</th></tr></thead><tbody>${entries
       .map(
         (entry) =>
@@ -209,6 +243,9 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
           .map((report) => ({ ...report.photo, reports: report.photo.reports?.length ? report.photo.reports : [{ reason: report.reason, at: report.at }] }))
           .filter((photo, index, all) => all.findIndex((other) => other.id === photo.id) === index);
         paintPhotos(photos, t("community.mod.emptyReports"));
+      } else if (section === "tours") {
+        const data = await api.request<{ tours: ReviewTour[] }>("/api/community/review/tours");
+        if (context.current()) paintTours(data.tours);
       } else if (section === "log") {
         const data = await api.request<{ actions: ReviewAction[] }>("/api/community/review/log");
         if (context.current()) paintLog(data.actions);

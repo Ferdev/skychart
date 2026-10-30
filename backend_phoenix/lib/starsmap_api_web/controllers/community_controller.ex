@@ -1,6 +1,6 @@
 defmodule StarsmapApiWeb.CommunityController do
   use StarsmapApiWeb, :controller
-  alias StarsmapApi.Community.{Accounts, Photos, Ranking, Moderation, Storage}
+  alias StarsmapApi.Community.{Accounts, Photos, Ranking, Moderation, SkyOverlay, Storage, Tours}
 
   def config(conn, _),
     do:
@@ -113,6 +113,16 @@ defmodule StarsmapApiWeb.CommunityController do
     if get_req_header(conn, "if-none-match") == [etag] and not payload.more,
       do: send_resp(conn, 304, ""),
       else: conn |> put_resp_header("etag", etag) |> json(payload)
+  end
+
+  def sky(conn, params) do
+    with {:ok, ra} <- bounded(params["ra"], 0, 360),
+         {:ok, dec} <- bounded(params["dec"], -90, 90),
+         {:ok, radius} <- bounded(params["radius"], 1, 180) do
+      json(conn, %{photos: SkyOverlay.list(ra, dec, radius)})
+    else
+      :error -> error(conn, :bad_request, :invalid_area)
+    end
   end
 
   def gallery(conn, %{"key" => key} = params),
@@ -259,6 +269,41 @@ defmodule StarsmapApiWeb.CommunityController do
         &Map.take(&1, [:id, :status])
       )
 
+  def shared_tour(conn, %{"token" => token}) do
+    case Tours.shared(token) do
+      nil -> error(conn, :not_found, :not_found)
+      tour -> json(conn, tour)
+    end
+  end
+
+  def report_tour(conn, %{"token" => token} = p),
+    do: respond(conn, Tours.report(token, p["reason"]), fn _ -> %{ok: true} end)
+
+  def tours(conn, _), do: json(conn, %{tours: Tours.list(conn.assigns.community_user)})
+
+  def create_tour(conn, params),
+    do: respond(conn, Tours.create(conn.assigns.community_user, params), & &1)
+
+  def update_tour(conn, %{"id" => id} = params),
+    do: respond(conn, Tours.update(conn.assigns.community_user, id, params), & &1)
+
+  def delete_tour(conn, %{"id" => id}),
+    do: respond(conn, Tours.delete(conn.assigns.community_user, id), fn _ -> %{ok: true} end)
+
+  def review_tours(conn, _) do
+    if moderator?(conn),
+      do: json(conn, %{tours: Tours.review_list()}),
+      else: error(conn, :forbidden, :not_allowed)
+  end
+
+  def review_tour(conn, %{"id" => id} = p),
+    do:
+      respond(
+        conn,
+        Tours.review(conn.assigns.community_user, id, p["action"], p["reason"]),
+        &Map.take(&1, [:id, :status])
+      )
+
   def media(conn, %{"id" => id, "size" => size}) when size in ["96", "320", "1600"] do
     photo = Photos.get(id)
 
@@ -366,6 +411,15 @@ defmodule StarsmapApiWeb.CommunityController do
   defp respond(conn, {:error, reason}, _),
     do:
       error(conn, :unprocessable_entity, if(is_atom(reason), do: reason, else: :invalid_request))
+
+  defp bounded(value, minimum, maximum) when is_binary(value) do
+    case Float.parse(value) do
+      {number, ""} when number >= minimum and number <= maximum -> {:ok, number}
+      _ -> :error
+    end
+  end
+
+  defp bounded(_, _, _), do: :error
 
   defp offset(value) do
     case Integer.parse(to_string(value || "0")) do

@@ -1,5 +1,6 @@
 import { createSkyProjector } from "./skyProjection";
 import { community } from "../community/communityController";
+import { targetListLayer } from "../destination/targetListLayer";
 import type { Body, Ephemeris } from "../atlas/contracts";
 import type { atlasDom } from "../atlas/atlasDom";
 import { trackEvent } from "../analytics";
@@ -77,6 +78,7 @@ type SkyViewControllerOptions = {
   /** The footer. Labels stay above its text. */
   footer: HTMLElement;
   resetButton: HTMLButtonElement;
+  plannerButton: HTMLButtonElement;
   workspacePanel: HTMLElement;
   selectedObjectPanel: HTMLElement;
   bodyByKey: () => ReadonlyMap<string, Body>;
@@ -89,10 +91,12 @@ type SkyViewControllerOptions = {
   locale: () => SkyShareLocale;
   /** Closes the object inspector and keeps Sky view open. */
   closeInspector: () => void;
+  /** Opens the panel of the night planner. */
+  openPlanner: () => void;
 };
 
 type SkyViewIntegrationOptions = Pick<SkyViewControllerOptions,
-  "bodyByKey" | "ephemeris" | "translate" | "selectBody" | "stateChanged" | "resolveObserver" | "catalogRelease" | "locale" | "closeInspector">;
+  "bodyByKey" | "ephemeris" | "translate" | "selectBody" | "stateChanged" | "resolveObserver" | "catalogRelease" | "locale" | "closeInspector" | "openPlanner">;
 
 /** Where `Exit` goes when Sky view did not open from the 2D map. It is kept in memory only. */
 export type SkyReturnTarget = {
@@ -102,6 +106,8 @@ export type SkyReturnTarget = {
 };
 
 const DEFAULT_FOV_DEG = 72;
+/** The field of view when the planner opens a target. */
+const TARGET_FOV_DEG = 40;
 /** The top part of the footer is an empty colour fade. Labels can use it. */
 const FOOTER_FADE_PX = 30;
 const SKY_POINT_LIMIT = 12_000;
@@ -138,6 +144,7 @@ export class SkyViewController {
     });
     options.closeButton.addEventListener("click", () => this.exit());
     options.resetButton.addEventListener("click", () => { this.setMoreMenu(false); this.resetOrientation(); });
+    options.plannerButton.addEventListener("click", () => { this.setMoreMenu(false); options.openPlanner(); });
     options.moreButton.addEventListener("click", () => this.setMoreMenu(options.moreButton.getAttribute("aria-expanded") !== "true"));
     options.root.addEventListener("pointerdown", (event) => {
       if (!(event.target as HTMLElement).closest(".sky-view__more")) this.setMoreMenu(false);
@@ -167,6 +174,7 @@ export class SkyViewController {
       if (options.workspacePanel.hidden) this.hideObjectInspector();
     }).observe(options.workspacePanel, { attributes: true, attributeFilter: ["hidden"] });
     options.nativeShareButton.hidden = typeof navigator.share !== "function";
+    community.overlayChanged = () => this.requestRender();
     window.addEventListener("resize", () => this.requestRender());
     window.addEventListener("cosmic-atlas:locale-change", () => this.updateLocale());
   }
@@ -215,6 +223,18 @@ export class SkyViewController {
     this.options.canvas.focus({ preventScroll: true });
     this.options.stateChanged(restoredCamera ? "replace" : "push");
     await this.loadCatalog();
+  }
+
+  /** Opens the sky of `observer` with the camera on `direction`, and selects the object at that place. */
+  async openTarget(observer: Body, direction: Vector3, key: string): Promise<void> {
+    const loaded = this.open(observer, {
+      ...cameraForDirection(direction, TARGET_FOV_DEG),
+      constellations: this.options.constellationsToggle.checked,
+      hiddenObjectTypes: this.hiddenObjectTypes(),
+    });
+    await this.selectObject(key);
+    await loaded;
+    this.options.stateChanged("push");
   }
 
   async restore(state: SkyViewState | undefined): Promise<void> {
@@ -398,6 +418,8 @@ export class SkyViewController {
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.drawnLabels = this.renderScene(context, width, height, this.camera, true, this.screenLabelArea(width, height));
     community.drawFootprints(context, createSkyProjector(this.camera, width, height), observer.key);
+    community.renderSkyOverlay(context, this.options.root, this.camera, width, height, observer.key);
+    if (observer.key === "earth") targetListLayer.drawSky(context, createSkyProjector(this.camera, width, height));
     community.render("sky", this.options.root, this.renderedHits.map(h => ({key: h.point.key, x: h.x, y: h.y})), community.showMarkers);
     this.updateSelectionConnector();
   }
@@ -896,16 +918,23 @@ export class SkyViewController {
 
   private async selectAt(point: { x: number; y: number }): Promise<void> {
     const hit = nearestHit(this.renderedHits, point);
-    if (!hit) return;
+    if (!hit) {
+      community.openFootprintAt(point);
+      return;
+    }
     this.options.status.textContent = this.options.translate("sky.selecting", { name: hit.point.name });
-    await this.options.selectBody(hit.point.key);
+    await this.selectObject(hit.point.key);
+    this.options.status.textContent = this.options.translate("sky.ready", { count: formatCount(this.catalogPoints.length) });
+  }
+
+  private async selectObject(key: string): Promise<void> {
+    await this.options.selectBody(key);
     if (!this.active) return;
-    if (!this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === hit.point.key) {
-      this.selectedPointKey = hit.point.key;
+    if (!this.options.selectedObjectPanel.hidden && this.options.selectedObjectPanel.dataset.selectedKey === key) {
+      this.selectedPointKey = key;
       this.options.root.dataset.objectInspector = "true";
       this.updateSelectionConnector();
     }
-    this.options.status.textContent = this.options.translate("sky.ready", { count: formatCount(this.catalogPoints.length) });
   }
 
   private hideObjectInspector(): void {
@@ -970,6 +999,7 @@ export function createSkyViewController(dom: typeof atlasDom, options: SkyViewIn
     header: dom.skyHeader,
     footer: dom.skyFooter,
     resetButton: dom.skyReset,
+    plannerButton: dom.skyPlanner,
     workspacePanel: dom.workspacePanel,
     selectedObjectPanel: dom.selectedObjectPanel,
   });

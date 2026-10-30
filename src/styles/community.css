@@ -404,3 +404,59 @@
 .community-plane-credit[hidden] {
   display: none !important;
 }
+
+/* The Sky overlay. The layer has no z-index, so that an image blends with the sky canvas below it. */
+.community-sky-overlay {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.community-sky-photo img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  transform-origin: 0 0;
+  mix-blend-mode: screen;
+}
+
+/* A keyboard stop for a footprint. It shows when it has focus, and the pointer goes through to the canvas. */
+.community-sky-photo__focus {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 260px;
+  padding: 4px 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--panel-ink);
+  background: rgba(8, 10, 9, 0.86);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.community-sky-photo__focus:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--focus-ring);
+}
+
+.community-sky-opacity {
+  display: grid;
+  gap: 4px;
+  margin: 4px 5px 8px;
+  color: var(--panel-ink-muted);
+  font-size: var(--text-xs);
+}
+
+.community-sky-opacity input[type="range"] {
+  width: 100%;
+  display: block;
+  accent-color: var(--accent-strong);
+}
