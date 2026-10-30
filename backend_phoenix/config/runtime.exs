@@ -148,7 +148,8 @@ if config_env() != :test do
             (community_uri.port || 5432) == (catalog_uri.port || 5432)),
        do: raise("Community data requires a separate database")
 
-    repo_options = [url: database, pool_size: 3]
+    pool_size = String.to_integer(community_env.("COMMUNITY_POOL_SIZE") || "3")
+    repo_options = [url: database, pool_size: pool_size]
 
     repo_options =
       if socket = community_env.("COMMUNITY_PGSOCKET_DIR"),
