@@ -36,9 +36,10 @@ defmodule StarsmapApi.CommunityRuntimeConfigTest do
   )
 
   setup do
-    names = Map.keys(@settings)
+    names = ["COMMUNITY_POOL_SIZE" | Map.keys(@settings)]
     previous = Map.new(names, &{&1, System.get_env(&1)})
     System.put_env(@settings)
+    System.delete_env("COMMUNITY_POOL_SIZE")
 
     on_exit(fn ->
       Enum.each(previous, fn
@@ -75,9 +76,19 @@ defmodule StarsmapApi.CommunityRuntimeConfigTest do
     end
   end
 
+  test "the community pool size is 3 when COMMUNITY_POOL_SIZE is not set" do
+    assert read()[:starsmap_api][StarsmapApi.CommunityRepo][:pool_size] == 3
+  end
+
+  test "COMMUNITY_POOL_SIZE sets the community pool size" do
+    System.put_env("COMMUNITY_POOL_SIZE", "5")
+
+    assert read()[:starsmap_api][StarsmapApi.CommunityRepo][:pool_size] == 5
+  end
+
   test "a blank optional setting is treated as not set" do
     for name <-
-          ~w(COMMUNITY_S3_ENDPOINT COMMUNITY_S3_REGION COMMUNITY_ORIGIN) ++
+          ~w(COMMUNITY_S3_ENDPOINT COMMUNITY_S3_REGION COMMUNITY_ORIGIN COMMUNITY_POOL_SIZE) ++
             ~w(COMMUNITY_BACKUP_URI COMMUNITY_PGSOCKET_DIR COMMUNITY_MEDIA_ROOT),
         do: System.put_env(name, " ")
 
@@ -88,6 +99,7 @@ defmodule StarsmapApi.CommunityRuntimeConfigTest do
     assert config[:starsmap_api][:community_origin] == "https://atlas.example.com"
     assert config[:starsmap_api][:community_media_root] == "/tmp/cosmic-atlas-community"
     refute Keyword.has_key?(config[:starsmap_api][StarsmapApi.CommunityRepo], :socket_dir)
+    assert config[:starsmap_api][StarsmapApi.CommunityRepo][:pool_size] == 3
 
     refute {"0 2 * * *", StarsmapApi.Community.BackupWorker} in cron(config)
   end

@@ -96,6 +96,7 @@ Set the corresponding `STAGING_` or `PRODUCTION_` GitHub variables/secrets below
 | --- | --- | --- |
 | `COMMUNITY_ENABLED` | variable | Feature switch |
 | `COMMUNITY_DATABASE_URL` | secret | Separate writable database |
+| `COMMUNITY_POOL_SIZE` | variable | Optional. Connections to the community database for each web and worker container. The default is 3. The sum for all containers must stay below `max_connections` of the database |
 | `COMMUNITY_SECRET` | secret | At least 32 random bytes; different per environment |
 | `COMMUNITY_ORIGIN` | variable | Exact HTTPS origin, with no path or trailing slash |
 | `COMMUNITY_S3_BUCKET` | secret | Dedicated media bucket |
@@ -153,6 +154,12 @@ one CPU and a 1152 MiB memory limit, one `media` job and one small `publish` job
 a time. libvips and solve processes are limited to 768 MiB each and run in the
 serial media queue. Scratch files are removed on success and failure. Solver
 index files are not included in the image.
+
+The media decoder has a limit of 120 seconds. At the limit the operating system
+stops the decoder and its `vips` processes, and the next job in the queue can
+start. The job retries, to a maximum of 3 attempts. After the third attempt the
+job is `discarded` and the photo has the status `failed`. The complete job has an
+Oban limit of 5 minutes, which also includes the storage transfers.
 
 ## Upload policy and moderation
 

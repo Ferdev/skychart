@@ -219,6 +219,78 @@ defmodule StarsmapApi.CommunityTest do
     File.rm(source)
   end
 
+  describe "with a decoder that hangs" do
+    setup %{user: user} do
+      root = Application.fetch_env!(:starsmap_api, :community_backend_root)
+      fixture = Path.join(System.tmp_dir!(), "hung-decoder-#{Ecto.UUID.generate()}")
+      pids = Path.join(fixture, "pids")
+      File.mkdir_p!(fixture)
+
+      File.write!(Path.join(fixture, "community_media.py"), """
+      import os, subprocess, sys, time
+      source, output = sys.argv[1:]
+      if open(source, 'rb').read(4) == b'HANG':
+          child = subprocess.Popen(['sleep', '60'])
+          with open(#{inspect(pids)}, 'w') as file:
+              file.write(f'{os.getpid()} {child.pid}')
+          time.sleep(60)
+      os.makedirs(output)
+      for name in ('master.png', '96.webp', '320.webp', '1600.webp'):
+          open(os.path.join(output, name), 'w').close()
+      print('{"sha256": "next"}')
+      """)
+
+      Application.put_env(:starsmap_api, :community_backend_root, fixture)
+      Application.put_env(:starsmap_api, :community_decode_limit_seconds, 2)
+
+      on_exit(fn ->
+        Application.put_env(:starsmap_api, :community_backend_root, root)
+        Application.delete_env(:starsmap_api, :community_decode_limit_seconds)
+        File.rm_rf(fixture)
+      end)
+
+      {:ok, hung: processing_photo(user, "HANG"), pids: pids}
+    end
+
+    test "the job ends at the limit, the decoder stops and the next photo starts", %{
+      user: user,
+      hung: hung,
+      pids: pids
+    } do
+      next = processing_photo(user, "NEXT")
+      started = System.monotonic_time(:second)
+
+      assert %{failure: 1, success: 1} =
+               Oban.drain_queue(StarsmapApi.CommunityJobs, queue: :media)
+
+      assert System.monotonic_time(:second) - started < 10
+
+      assert Photos.get(hung.id).status == "processing"
+      assert Photos.get(next.id).status == "review"
+
+      assert [%Oban.Job{errors: [%{"error" => error}]}] =
+               Repo.all(
+                 from j in Oban.Job,
+                   where:
+                     j.worker == "StarsmapApi.Community.MediaWorker" and j.state == "retryable"
+               )
+
+      assert error =~ "{:decoder_exit, :timeout}"
+      assert Path.wildcard(Path.join(Storage.root(), "scratch/#{hung.id}-*")) == []
+
+      for pid <- pids |> File.read!() |> String.split(), do: assert(stopped?(pid))
+    end
+
+    test "a timeout on the last attempt fails the photo", %{hung: hung} do
+      assert {:error, {:decoder_exit, :timeout}} = media_attempt(hung, 3)
+      assert Photos.get(hung.id).status == "failed"
+    end
+  end
+
+  test "the Oban timeout of the media job comes after the decoder limit" do
+    assert StarsmapApi.Community.MediaWorker.timeout(%Oban.Job{}) > :timer.seconds(125)
+  end
+
   test "a corrupt upload fails the photo and cancels the job", %{user: user} do
     photo = processing_photo(user, <<0x89, "PNG\r\n", 0x1A, "\nnot a real image">>)
 
@@ -833,6 +905,26 @@ defmodule StarsmapApi.CommunityTest do
       Application.put_env(:starsmap_api, :community_backend_root, previous)
       File.rm_rf(root)
     end)
+  end
+
+  # A stopped orphan stays a zombie until PID 1 collects it. A zombie does not run.
+  defp stopped?(pid, tries \\ 20) do
+    case System.cmd("ps", ["-o", "stat=", "-p", pid]) do
+      {stat, 0} ->
+        if String.starts_with?(String.trim(stat), "Z") do
+          true
+        else
+          if tries > 0 do
+            Process.sleep(50)
+            stopped?(pid, tries - 1)
+          else
+            false
+          end
+        end
+
+      _ ->
+        true
+    end
   end
 
   defp photo(user, subject, status) do
