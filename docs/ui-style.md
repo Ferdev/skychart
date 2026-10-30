@@ -12,6 +12,7 @@ The custom properties are in `src/styles/foundations.css`.
 | `--text-xs` (12 px), `--text-sm`, `--text-md`, `--text-lg` | Text sizes. 12 px is the minimum for text that the user reads. |
 | `--panel-background` | Background of a dark panel. |
 | `--panel-surface`, `--panel-surface-strong` | A card or a row on a panel, and its hover state. |
+| `--panel-hover-layer` | The hover state of a control with a dark fill of its own, as a `background-image`. |
 | `--panel-line`, `--panel-line-strong` | Borders on a panel. |
 | `--panel-ink`, `--panel-ink-muted` | Text and secondary text on a panel. |
 | `--radius-sm`, `--radius-md`, `--radius-lg` | Corner radius. |
@@ -35,7 +36,9 @@ There are three button classes:
 | `.text-action` | Quiet | Actions in a row of tools, and actions of low weight. |
 
 - Hover and the active state are different. Hover is a light surface. Gold is for the active state only.
-- A button with an on state has `aria-pressed`. Do not show a state by colour only.
+- A control with a dark fill of its own (the header, the time bar, the 3D view) uses `--panel-hover-layer` on hover. The fill stays, so the text stays readable above a bright view, a native `select` list stays dark, and an active control keeps its colour. Do not set `background` or `border-color` on hover for these controls.
+- Focus is the shared ring, and it is not gold. Do not set `outline: none` on a control. A row in a list that clips its content uses a negative `outline-offset`.
+- A button with an on state has `aria-pressed`. Do not show a state by colour only: the active zoom preset also has an underline.
 - A touch target is 44 x 44 px minimum on a phone.
 
 ## Links

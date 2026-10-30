@@ -53,8 +53,7 @@
 }
 
 .locale-control select:hover {
-  border-color: rgba(239, 196, 104, 0.5);
-  background: rgba(36, 40, 32, 0.92);
+  background-image: var(--panel-hover-layer);
 }
 
 /* On a compact window the language menu is a row in Settings (localeControlPlacement.ts). */
@@ -110,9 +109,14 @@
   cursor: text;
 }
 
-.header-search:hover,
+.header-search:hover {
+  background-image: var(--panel-hover-layer);
+}
+
+/* The field has no outline of its own: the ring goes around the search icon and the field. */
 .header-search:focus-within {
-  border-color: rgba(239, 196, 104, 0.6);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .header-search svg {
@@ -402,7 +406,6 @@
 .primary-action,
 .text-action,
 .icon-button,
-.quick-focus button,
 .body-picker-filters button,
 .zoom-presets button,
 .segmented button,
@@ -442,28 +445,6 @@
   background: #fffaf0;
 }
 
-.quick-focus {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.quick-focus button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 5px 8px;
-  color: var(--ink);
-  background: rgba(21, 23, 20, 0.06);
-  font-size: 0.8rem;
-  font-weight: 760;
-}
-
-.quick-focus button:hover {
-  background: rgba(21, 23, 20, 0.11);
-}
-
 .body-orb,
 .large-orb {
   flex: 0 0 auto;
@@ -495,9 +476,6 @@
 
 .workspace-titlebar span {
   min-width: 0;
-  color: rgba(21, 23, 20, 0.68);
-  font-size: 0.82rem;
-  font-weight: 840;
 }
 
 .tab-panels {
@@ -542,7 +520,7 @@
 .panel-head small {
   display: block;
   margin-top: 3px;
-  color: rgba(21, 23, 20, 0.54);
+  color: var(--panel-ink-muted);
   font-size: 0.76rem;
 }
 
@@ -575,15 +553,12 @@
 }
 
 .section-heading span {
-  color: rgba(21, 23, 20, 0.62);
-  font-size: 0.76rem;
   font-weight: 840;
   text-transform: uppercase;
 }
 
 .body-picker-filters,
-.zoom-presets,
-.universe-shells {
+.zoom-presets {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -591,8 +566,7 @@
 }
 
 .body-picker-filters button,
-.zoom-presets button,
-.universe-shells button {
+.zoom-presets button {
   padding: 7px 9px;
   color: rgba(21, 23, 20, 0.72);
   background: rgba(21, 23, 20, 0.07);

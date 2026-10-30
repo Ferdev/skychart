@@ -117,9 +117,8 @@
 
 .text-action:hover,
 .icon-button:hover {
-  border-color: rgba(239, 196, 104, 0.38);
-  color: var(--accent-strong);
-  background: rgba(239, 196, 104, 0.08);
+  border-color: var(--panel-line-strong);
+  background: var(--panel-surface-strong);
 }
 
 .primary-action {

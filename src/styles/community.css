@@ -51,8 +51,7 @@
 }
 
 .community-bar button:hover {
-  border-color: rgba(239, 196, 104, 0.5);
-  background: rgba(36, 40, 32, 0.92);
+  background-image: var(--panel-hover-layer);
 }
 
 .community-bar .community-menu-toggle,
@@ -165,7 +164,7 @@
 }
 
 .community-card:hover {
-  border-color: rgba(239, 196, 104, 0.5);
+  border-color: var(--panel-line-strong);
   background: var(--panel-surface-strong);
 }
 
@@ -320,7 +319,7 @@
 }
 
 .community-marker:hover {
-  border-color: rgba(239, 196, 104, 0.5);
+  background-image: var(--panel-hover-layer);
 }
 
 .community-marker img {
