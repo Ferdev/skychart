@@ -18,7 +18,8 @@ functions of `docs/ui-style.md`. Its text is in `src/i18n/communityTranslations.
 
 - **Header row** (`.community-bar` in the header card): `Gallery`, `Photographers`,
   `Coverage`, `Rules`, `Review` (moderators only, with the count of waiting work),
-  and the account. Below 900 px one button opens the row as a menu.
+  and the account. On windows narrower than 900 px or no taller than 560 px, one
+  button opens the row as a menu.
 - **Community window** (`src/community/communityHub.ts`): one window with a tab
   for each part.
   - `Gallery`: all published photos, ordered by appreciations, by trend, or newest first.
@@ -103,7 +104,7 @@ Set the corresponding `STAGING_` or `PRODUCTION_` GitHub variables/secrets below
 | `COMMUNITY_MEDIA_URL` | variable | Separate HTTPS media/CDN origin |
 | `COMMUNITY_MAIL_URL`, `COMMUNITY_MAIL_TOKEN` | variable, secret | HTTPS mail endpoint and Bearer token |
 | `COMMUNITY_MAIL_FROM` | variable | Sender address, for example `Cosmic Atlas <login@example.org>` |
-| `COMMUNITY_ADMIN_EMAILS` | secret | Optional. Email addresses that get the `admin` role at sign-in, with a comma between them. These addresses also get the administrator notices |
+| `COMMUNITY_ADMIN_EMAILS` | secret | Optional. Email addresses that get the `admin` role at sign-in, with a comma between them. It is the only source of that role: an account whose address is not in the list loses the role at its next request. These addresses also get the administrator notices |
 | `COMMUNITY_BACKUP_URI`, `COMMUNITY_BACKUP_ENDPOINT` | variables | Off-host backup prefix and S3 endpoint |
 | `COMMUNITY_BACKUP_SECRET` | secret | Independent backup encryption password |
 | `COMMUNITY_BACKUP_ACCESS_KEY_ID`, `COMMUNITY_BACKUP_SECRET_ACCESS_KEY` | secrets | Separate backup credentials |
@@ -186,19 +187,24 @@ to give the role.
    GitHub) to the email addresses of the administrators, with a comma between
    them. Deploy. Each of these accounts gets the role `admin` at its next sign-in,
    after the code from the email is verified. The value is a secret, because the
-   deployment log shows clear variables.
-2. Or give the role by hand after the owner has verified their account:
+   deployment log shows clear variables. To remove the role, remove the address and
+   deploy. The account changes to the role `member` at its next request, also in a
+   session that is open. If the address comes back, the account gets the role at its
+   next sign-in.
+2. Or give the role `moderator` by hand after the owner has verified their account.
+   A moderator has the same review tools as an administrator, but a moderator can
+   be suspended:
 
 ```bash
 docker exec <web container> env -u PHX_SERVER /app/bin/starsmap_api eval \
-  'IO.inspect(StarsmapApi.Release.community_role("owner-handle", "admin"))'
+  'IO.inspect(StarsmapApi.Release.community_role("owner-handle", "moderator"))'
 ```
 
 Plain `eval` tries to start a second web server on the port that is already in
 use (`env -u PHX_SERVER` prevents that), and `rpc` cannot connect to the running
 node in this container setup. This is an operator release command, not a public
-API. Use it with the role `member` to remove the role: the secret gives the role
-and does not remove it.
+API. Use it with the role `member` to remove the role of a moderator. The command
+refuses the role `admin` for an address that is not in `COMMUNITY_ADMIN_EMAILS`.
 
 ### Review tools
 
@@ -251,8 +257,9 @@ this change does not add images from photographers without permission.
 
 ## Rankings
 
-Ranking version 1 uses one positive vote per user/photo. Self-votes and votes from
-accounts younger than 24 hours fail. Vote number k from a voter to a photographer
+Ranking version 1 uses one positive vote per user/photo. Self-votes fail. Votes
+fail for 24 hours after the first verified sign-in of the account, and these votes
+have no weight in the scores. Vote number k from a voter to a photographer
 has weight 1/k, ordered by timestamp and UUID. Object covers use total weight,
 then publication time and UUID. Trending uses a 72-hour half-life and at least
 three voters. Photographer listings use the weighted h-index, then cover count,

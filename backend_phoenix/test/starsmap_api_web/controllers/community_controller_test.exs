@@ -266,7 +266,7 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
     assert conn |> get("/api/photos/#{waiting.id}") |> json_response(404)
     assert signed.() |> get("/api/community/media/#{waiting.id}/320") |> json_response(404)
 
-    Repo.update!(Ecto.Changeset.change(member, role: "admin"))
+    Repo.update!(Ecto.Changeset.change(member, role: "moderator"))
 
     assert %{"review_count" => 1} =
              signed.() |> get("/api/community/session") |> json_response(200)
@@ -309,6 +309,32 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
     # The moderator has an account and no photo: the page has zero in each number.
     assert %{"photographer" => %{"photos" => 0, "h_index" => 0}, "photos" => []} =
              conn |> get("/api/community/photographers/#{member.handle}") |> json_response(200)
+  end
+
+  test "an open session loses review access when the address leaves the list", %{conn: conn} do
+    Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
+    on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
+
+    :ok = Accounts.request_code("owner@example.com")
+    assert_receive {:community_code, "owner@example.com", code}
+    {:ok, token, _} = Accounts.verify("owner@example.com", code)
+    signed = fn -> build_conn() |> put_req_cookie("cosmic-community", token) end
+
+    assert %{"user" => %{"role" => "admin"}} =
+             signed.() |> get("/api/community/session") |> json_response(200)
+
+    assert signed.() |> get("/api/community/review") |> json_response(200)
+
+    Application.put_env(:starsmap_api, :community_admin_emails, [])
+
+    assert %{"error" => "not_allowed"} =
+             signed.() |> get("/api/community/review") |> json_response(403)
+
+    assert %{"user" => %{"role" => "member"}} =
+             signed.() |> get("/api/community/session") |> json_response(200)
+
+    assert Repo.get_by!(User, email: "owner@example.com").role == "member"
+    assert conn |> get("/api/community/review") |> json_response(401)
   end
 
   test "policy pages have sections and links to each other", %{conn: conn} do
