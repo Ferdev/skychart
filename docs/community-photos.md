@@ -18,7 +18,8 @@ functions of `docs/ui-style.md`. Its text is in `src/i18n/communityTranslations.
 
 - **Header row** (`.community-bar` in the header card): `Gallery`, `Photographers`,
   `Coverage`, `Rules`, `Review` (moderators only, with the count of waiting work),
-  and the account. Below 900 px one button opens the row as a menu.
+  and the account. On windows narrower than 900 px or no taller than 560 px, one
+  button opens the row as a menu.
 - **Community window** (`src/community/communityHub.ts`): one window with a tab
   for each part.
   - `Gallery`: all published photos, ordered by appreciations, by trend, or newest first.
