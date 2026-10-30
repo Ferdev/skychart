@@ -24,6 +24,74 @@ test.describe("compact and understandable atlas controls", () => {
     issues.assertClean();
   });
 
+  test("shows the active zoom preset in gold and a hover as a light surface", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    const galaxy = page.locator('[data-zoom-preset="galaxy"]');
+    const nearby = page.locator('[data-zoom-preset="nearby"]');
+    await galaxy.click();
+    await expect(galaxy).toHaveAttribute("aria-pressed", "true");
+    await expect(nearby).toHaveAttribute("aria-pressed", "false");
+
+    await page.mouse.move(0, 0);
+    await expect(galaxy).toHaveCSS("color", "rgb(239, 196, 104)");
+    await expect(galaxy).toHaveCSS("border-top-color", "rgb(239, 196, 104)");
+    await expect(galaxy).toHaveCSS("box-shadow", "rgb(239, 196, 104) 0px -2px 0px 0px inset");
+
+    await nearby.hover();
+    await expect(nearby).toHaveCSS("background-color", "rgba(242, 237, 223, 0.1)");
+    await expect(nearby).toHaveCSS("color", "rgb(243, 238, 223)");
+    await expect(nearby).toHaveCSS("box-shadow", "none");
+
+    await galaxy.hover();
+    await expect(galaxy).toHaveCSS("color", "rgb(239, 196, 104)");
+    issues.assertClean();
+  });
+
+  test("keeps gold for the active state of the header and the 3D controls", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    const language = page.locator(".locale-control select");
+    await language.hover();
+    await expect(language).toHaveCSS("border-top-color", "rgba(242, 237, 223, 0.22)");
+    await expect(language).toHaveCSS("background-color", "rgba(12, 16, 13, 0.82)");
+    await expect(language).not.toHaveCSS("background-image", "none");
+
+    const play = page.locator(".atlas-bar .time-bar__play");
+    await play.click();
+    await play.hover();
+    await expect(play).toHaveCSS("border-top-color", "rgb(239, 196, 104)");
+    await play.click();
+    const now = page.locator(".atlas-bar .time-bar__now");
+    await now.hover();
+    await expect(now).toHaveCSS("background-color", "rgb(239, 196, 104)");
+
+    await page.locator("#universe-3d-toggle").click();
+    const find = page.locator("#universe-find");
+    await expect(find).toBeVisible();
+    await find.hover();
+    await expect(find).toHaveCSS("color", "rgb(238, 242, 234)");
+    await expect(find).toHaveCSS("border-top-color", "rgba(130, 203, 179, 0.28)");
+    await expect(find).not.toHaveCSS("background-image", "none");
+
+    await page.mouse.move(0, 0);
+    for (const control of [find, page.locator("#universe-gravity"), page.locator("#universe-minimap-toggle")]) {
+      await page.keyboard.press("Shift");
+      await control.focus();
+      await expect(control).toHaveCSS("outline", "rgb(130, 203, 179) solid 2px");
+      await expect(control).toHaveCSS("color", /238, 242, 234/);
+    }
+    issues.assertClean();
+  });
+
+  test("shows the guided sets in panel text on the dark panel", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    await page.locator("#header-search").click();
+    const set = page.locator("#guided-tours button").first();
+    await expect(set).toBeVisible();
+    await expect(set).toHaveCSS("color", "rgb(243, 238, 223)");
+    await expect(set.locator("span")).toHaveCSS("color", "rgba(243, 238, 223, 0.68)");
+    issues.assertClean();
+  });
+
   test("marks the active scale section without moving the scale panel", async ({ page }) => {
     const issues = collectBrowserIssues(page);
     const scalePanel = page.locator(".scale-rail");

@@ -189,8 +189,8 @@
   display: grid;
   gap: 2px;
   padding: 11px;
-  border: 1px solid rgba(21, 23, 20, 0.1);
-  color: var(--ink);
+  border: 1px solid var(--panel-line);
+  color: var(--panel-ink);
   background: rgba(130, 203, 179, 0.14);
   text-align: left;
 }
@@ -201,7 +201,7 @@
 }
 
 .tour-grid button.active {
-  border-color: rgba(21, 23, 20, 0.26);
+  border-color: var(--panel-line-strong);
   box-shadow: inset 3px 0 0 var(--teal);
 }
 
@@ -211,6 +211,6 @@
 }
 
 .tour-grid span {
-  color: rgba(21, 23, 20, 0.58);
+  color: var(--panel-ink-muted);
   font-size: 0.76rem;
 }
