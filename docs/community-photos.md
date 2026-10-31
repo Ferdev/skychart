@@ -36,6 +36,9 @@ functions of `docs/ui-style.md`. Its text is in `src/i18n/communityTranslations.
   details, and the actions. From a list, the arrow keys go to the previous and the
   next photo. `Open object` selects the object in the atlas with no page load.
 - **Object inspector**: the `Community photos` section follows the `Media` section.
+- **Sky overlay**: aligned photos and footprints in Sky view from Earth, under the
+  photos layer of the `L=` parameter. The data comes from `GET /api/photos/sky`
+  (see "Sky overlay").
 - **Addresses**: `/photos/<id>` opens the viewer on top of the atlas, and
   `/u/<handle>` opens the page of the photographer in the community window.
 
@@ -317,7 +320,12 @@ the canvas, so catalog points stay visible through it. The `Photo opacity` contr
 is in the Sky view filters and in the map overlays. A click on a footprint, or Enter
 on its keyboard stop, opens the photo viewer. An object at that place has priority.
 
-The query area changes in steps of 10 degrees, so a small movement makes no request.
+The center of the query area moves in steps of 10 degrees and its radius in steps of
+30 degrees, so a small movement makes no request. After a failed request, the client
+sends no overlay request for any area for 30 seconds (`OVERLAY_RETRY_MS`). The next
+repaint of Sky view after this interval asks again. A request that the client cancels
+does not start the interval. A failure does not stop the navigation of the atlas.
+
 A new index version clears the area cache, so a takedown leaves the overlay at the
 next refresh. The minimum field of view of Sky view is 20 degrees, so a photo that
 is narrower than about 1 degree stays a footprint.

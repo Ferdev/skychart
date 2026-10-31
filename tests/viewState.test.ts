@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   buildSkyCardPath,
   buildSkyPermalink,
+  decodeHistoryViewState,
   decodeSkyPermalink,
   decodeViewState,
   encodeViewState,
@@ -76,6 +77,13 @@ assert.deepEqual(decodeSkyPermalink("/sky/proxima-centauri", permalink.split("?"
   epochUtc: "2042-04-05T06:07:08.000Z",
 });
 assert.deepEqual(skyPermalinkToViewState(decodeSkyPermalink("/sky/proxima-centauri", permalink.split("?")[1]!)!).sky, normalizedSky);
+// A share link has no map center or zoom, and Back can return to it.
+const shareSearch = "?v=1&t=2042-04-05T00:00:00.000Z&sc=186,0,72&sl=0&sf=asteroid";
+assert.equal(decodeViewState(shareSearch), null);
+assert.deepEqual(decodeHistoryViewState("/sky/earth", shareSearch)?.sky, { observerKey: "earth", yawDeg: 186, pitchDeg: 0, fovDeg: 72, constellations: false, hiddenObjectTypes: ["asteroid"] });
+assert.equal(decodeHistoryViewState("/", shareSearch), null);
+// A full view state keeps its map position on a Sky address.
+assert.equal(decodeHistoryViewState("/sky/earth", "?v=1&c=3,4&z=9&t=2042-04-05T00:00:00.000Z&L=&sky=earth&sc=186,0,72")?.zoom, 9);
 assert.equal(decodeSkyPermalink("/sky/earth", "v=1&t=now&sc=0,0,72"), null);
 assert.equal(decodeSkyPermalink("/sky/earth", "v=1&t=2042-04-05T00:00:00Z&sc=0,0,10"), null);
 assert.equal(decodeSkyPermalink("/sky/earth", "v=1&v=1&t=2042-04-05T00:00:00Z&sc=0,0,72"), null);

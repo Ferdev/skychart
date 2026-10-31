@@ -1,5 +1,5 @@
 import { bindControlInfoTips, bindScaleDisclosures, bindMapSettings } from "../controlPanelInteractions";
-import { decodeViewState, type DisplayLayer } from "../viewState";
+import { decodeHistoryViewState, decodeViewState, type DisplayLayer } from "../viewState";
 import type { MapInteractionController } from "../navigation/mapInteractionController";
 import type { SizeMode, ZoomPreset } from "./contracts";
 import type { atlasDom } from "./atlasDom";
@@ -70,7 +70,7 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
       options.restoreTourStep(tourStep);
       return;
     }
-    const view = decodeViewState(window.location.search);
+    const view = decodeHistoryViewState(window.location.pathname, window.location.search);
     if (view) options.restoreViewState(view);
   });
   dom.copyLinkButton.addEventListener("click", () => options.shareCurrentView(false));

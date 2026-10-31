@@ -107,6 +107,9 @@ test.describe("header search and Search panel", () => {
   });
 
   test("the panel has one scroll area, and the results are directly below the field", async ({ page }) => {
+    // The server reads live feeds, so the number of events changes from day to day.
+    const events = ["A", "B", "C", "D"].map((name, index) => ({ title: `Event ${name}`, summary: `Fixture ${name}.`, starts_at: `2026-07-2${index}T12:00:00Z`, catalog_key: null, url: `https://example.org/event-${name}` }));
+    await page.route("**/api/now", (route) => route.fulfill({ json: { refreshed_at: "2026-07-15T12:00:00Z", stale: false, events } }));
     await page.setViewportSize({ width: 1440, height: 900 });
     await openAtlas(page);
     await openSearchWorkspace(page);
@@ -115,9 +118,10 @@ test.describe("header search and Search panel", () => {
     await expect(page.locator("#search-results")).toBeHidden();
     await expect(page.locator("#explore-domains")).toBeVisible();
     await expect(page.locator("#guided-tour-list [data-tour-slug]")).toHaveCount(2);
-    // The feed is live, so the number of rows changes. Only three rows show before `Show all`.
+    // The feed fixture has four rows. Only three rows show before `Show all`.
     await expect(page.locator("#now-status")).not.toHaveText("Loading current events…");
-    expect(await page.locator("#now-events > li:not([hidden])").count()).toBeLessThanOrEqual(3);
+    await expect(page.locator("#now-events > li")).toHaveCount(4);
+    await expect(page.locator("#now-events > li:not([hidden])")).toHaveCount(3);
 
     await page.locator("#body-search").fill("Mars");
     await expect(page.locator('#body-picker [data-body-key="mars"]').first()).toBeVisible();
