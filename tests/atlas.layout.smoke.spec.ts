@@ -115,7 +115,9 @@ test.describe("header search and Search panel", () => {
     await expect(page.locator("#search-results")).toBeHidden();
     await expect(page.locator("#explore-domains")).toBeVisible();
     await expect(page.locator("#guided-tour-list [data-tour-slug]")).toHaveCount(2);
-    await expect(page.locator("#now-events > li")).not.toHaveCount(4);
+    // The feed is live, so the number of rows changes. Only three rows show before `Show all`.
+    await expect(page.locator("#now-status")).not.toHaveText("Loading current events…");
+    expect(await page.locator("#now-events > li:not([hidden])").count()).toBeLessThanOrEqual(3);
 
     await page.locator("#body-search").fill("Mars");
     await expect(page.locator('#body-picker [data-body-key="mars"]').first()).toBeVisible();
