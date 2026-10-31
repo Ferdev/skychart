@@ -266,6 +266,17 @@ export function decodeSkyPermalink(pathname: string, input: URLSearchParams | st
   });
 }
 
+/**
+ * The view state of a history entry. A share link of Sky view has no map center or zoom,
+ * so it is not a full view state. It stays in the history until the first address update.
+ */
+export function decodeHistoryViewState(pathname: string, search: string): ViewState | null {
+  const view = decodeViewState(search);
+  if (view) return view;
+  const permalink = decodeSkyPermalink(pathname, search);
+  return permalink ? skyPermalinkToViewState(permalink) : null;
+}
+
 export function skyPermalinkToViewState(state: SkyPermalinkState): ViewState {
   return {
     center: { x: 0, y: 0 },
