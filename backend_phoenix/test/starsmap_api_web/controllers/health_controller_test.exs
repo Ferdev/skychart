@@ -22,13 +22,21 @@ defmodule StarsmapApiWeb.HealthControllerTest do
   test "health remains live after a public API bucket is exhausted" do
     client_ip = {198, 51, 100, 40}
 
-    first = %{build_conn() | remote_ip: client_ip} |> get("/api/catalog/nearest")
+    first = nearest(client_ip)
     assert json_response(first, 400)["error"] == "missing_param"
 
-    limited = %{build_conn() | remote_ip: client_ip} |> get("/api/catalog/nearest")
+    # The limiter counts in fixed windows of one second here. When a window ends between
+    # two requests, the second request opens a new bucket and the next one fills it.
+    limited = 1..4 |> Stream.map(fn _ -> nearest(client_ip) end) |> Enum.find(&(&1.status == 429))
+
+    assert limited, "expected the bucket of #{inspect(client_ip)} to be exhausted"
     assert response(limited, 429) == "Too many requests"
 
     health = %{build_conn() | remote_ip: client_ip} |> get("/api/health")
     assert %{"ok" => true, "service" => "starsmap_api"} = json_response(health, 200)
+  end
+
+  defp nearest(client_ip) do
+    %{build_conn() | remote_ip: client_ip} |> get("/api/catalog/nearest")
   end
 end
