@@ -141,11 +141,7 @@ export class CommunityController {
         context.stroke();
         context.font = canvasFont(12);
         context.fillStyle = FOOTPRINT_COLOR;
-        context.fillText(
-          t(wcs.status === "solved" ? "community.footprint.solved" : "community.footprint.author"),
-          corners[0]!.x + 4,
-          corners[0]!.y - 4,
-        );
+        context.fillText(t("community.footprint.author"), corners[0]!.x + 4, corners[0]!.y - 4);
       }
     context.restore();
   }
