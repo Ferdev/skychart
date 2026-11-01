@@ -6,7 +6,7 @@ defmodule StarsmapApiWeb.PythonProxyController do
   @default_request_timeout 90_000
   @minimum_request_timeout 5_000
   @maximum_request_timeout 180_000
-  @night_plan_fields ~w(latitude_deg longitude_deg date min_altitude_deg max_magnitude min_size_arcmin max_size_arcmin types limit)
+  @night_plan_fields ~w(latitude_deg longitude_deg date min_altitude_deg max_magnitude min_size_arcmin max_size_arcmin types limit include_transits)
 
   def spacecraft(conn, _params), do: proxy(conn, "/api/spacecraft")
   def ephemeris(conn, _params), do: proxy(conn, "/api/ephemeris")
@@ -77,7 +77,10 @@ defmodule StarsmapApiWeb.PythonProxyController do
   end
 
   defp validate_uri(%URI{scheme: "http", host: host}) when is_binary(host), do: :ok
-  defp validate_uri(uri), do: {:error, {:unsupported_proxy_target, URI.to_string(uri)}}
+
+  # The query can hold the observer's site, and this error goes to the log.
+  defp validate_uri(uri),
+    do: {:error, {:unsupported_proxy_target, URI.to_string(%{uri | query: nil})}}
 
   defp request_bytes(uri, request_id, body) do
     path =

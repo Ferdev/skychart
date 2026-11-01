@@ -542,7 +542,7 @@ async function openPlannerTarget(target: PlanTarget) {
   const earth = bodyByKey.get("earth");
   if (earth) await skyView?.openTarget(earth, targetDirection(target), target.key);
 }
-const nightPlanner = new NightPlannerPanel({ openTarget: openPlannerTarget });
+const nightPlanner = new NightPlannerPanel({ openTarget: openPlannerTarget, recordTransit: () => (community.enabled ? (transit, night) => community.recordTransit.open(transit, night) : null) });
 const targetListPanel = new TargetListPanel({ selectObject: (key) => { void selectBodyByKey(key, { center: true, zoom: "local" }); } });
 atlasDom.targetListOpen.addEventListener("click", () => targetListPanel.open());
 skyView = createSkyViewController(atlasDom, {

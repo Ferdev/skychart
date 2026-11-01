@@ -103,3 +103,19 @@ one target; a **community photo** is a credited author image, not a catalog
 measurement; a **cover photo** is the current ranked image for that subject.
 Community publishing is disabled by default. Its data uses a separate writable
 repo, and photos never change measured coordinates, size, or source provenance.
+
+### Transit timing
+
+The fitted middle time of one transit from a person's frames, with its uncertainty and
+its difference from the archive prediction. It is a community result. It does not change an
+archive orbit and it does not confirm a planet.
+
+### Depth flight
+
+A guided camera path along the axis of a solved photo, with matched sources at their
+catalog distances and all other light on one plane at the distance of the main subject.
+
+### Finding
+
+A result of the sky sweep of one photo: a known body, a known transient, or a candidate. A
+candidate is an unconfirmed source. It is never a discovery in the atlas.

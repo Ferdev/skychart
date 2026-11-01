@@ -20,6 +20,7 @@ from skyfield.nutationlib import iau2000b_radians
 from backend.errors import QueryInputError
 from backend.scientific_calculation import isoformat_utc, skyfield_context
 from backend.settings import DEEP_SKY_CATALOG_PATH, NGC_IC_CATALOG_PATH
+from backend.transit_timing import candidates_for_site, predicted_transits
 
 # The deepest twilight first. The altitudes are the Sun center; "sunset" includes the
 # standard 34 arcmin of refraction and the 16 arcmin of the solar radius.
@@ -223,6 +224,9 @@ def night_plan_payload(body: Any) -> dict[str, Any]:
         "targets": [],
         "accuracy_note": ACCURACY_NOTE,
     }
+    include_transits = body.get("include_transits") is True
+    if include_transits:
+        payload["transits"] = {"total": 0, "transits": []}
     if window is None:
         return payload
 
@@ -239,14 +243,16 @@ def night_plan_payload(body: Any) -> dict[str, Any]:
         "illuminated_fraction": float(almanac.fraction_illuminated(ephemeris, "moon", times[count // 2])),
         "windows": _windows(start, step_minutes, moon_altitudes, 0.0),
     }
+    # The third row of the site rotation is the local zenith in the GCRS frame of the catalog directions.
+    zenith = site.rotation_at(times)[2]
+    if include_transits:
+        payload["transits"] = predicted_transits(candidates_for_site(latitude, min_altitude), times, start, step_minutes, zenith, moon_directions, min_altitude, ephemeris)
     if not rows:
         return payload
 
     right_ascension = np.radians([row["ra_deg"] for row in rows])
     declination = np.radians([row["dec_deg"] for row in rows])
     directions = np.stack([np.cos(declination) * np.cos(right_ascension), np.cos(declination) * np.sin(right_ascension), np.sin(declination)], axis=1)
-    # The third row of the site rotation is the local zenith in the GCRS frame of the catalog directions.
-    zenith = site.rotation_at(times)[2]
     altitudes = np.degrees(np.arcsin(np.clip(directions @ zenith, -1.0, 1.0)))
     minutes = _minutes_above(altitudes - min_altitude, step_minutes)
     visible = np.flatnonzero(minutes > 0)

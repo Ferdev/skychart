@@ -1,8 +1,19 @@
-import { DISPLAY_LAYERS, encodeViewState, type BodyFilter, type DisplayLayer, type SkyViewState, type UniverseViewState, type ViewState } from "../viewState";
+import { DISPLAY_LAYERS, encodeViewState, type BodyFilter, type DisplayLayer, type SkyViewState, type UniverseViewState, type ViewState } from "../viewState.ts";
 import type { Camera, SelectBodyOptions, ZoomPreset } from "../atlas/contracts";
 import type { CatalogPointManifestRepository } from "../catalog/catalogPointManifest";
 import type { CatalogPointStream } from "../catalog/catalogPointStream";
-import { clamp } from "../geometry";
+import { clamp } from "../geometry.ts";
+
+/** Parameters of the page, not of the view. Each address that the atlas writes keeps them. */
+const PAGE_PARAMETERS = ["perf", "dynamicPointFallback", "lang"];
+
+function keepPageParameters(params: URLSearchParams): void {
+  const existing = new URLSearchParams(window.location.search);
+  for (const name of PAGE_PARAMETERS) {
+    const value = existing.get(name);
+    if (value !== null) params.set(name, value);
+  }
+}
 
 export interface AtlasViewStateAccess {
   camera: Camera;
@@ -65,6 +76,8 @@ export class AtlasViewStateController {
    * The user can skip a step during its camera move, so the next step must do this load.
    */
   private tourTimePending = false;
+  /** The user closed the tour. History can go back to an address of that tour, and no tour uses that address now. */
+  private tourClosed = false;
 
   get restoring(): boolean {
     return this.historyRestoreInProgress;
@@ -129,11 +142,7 @@ export class AtlasViewStateController {
   currentUrl(): string {
     const state = this.current();
     const params = new URLSearchParams(encodeViewState(state));
-    const existing = new URLSearchParams(window.location.search);
-    for (const name of ["perf", "dynamicPointFallback", "lang"]) {
-      const value = existing.get(name);
-      if (value !== null) params.set(name, value);
-    }
+    keepPageParameters(params);
     const pathname = !state.sky && /^\/sky\/[^/]+\/?$/.test(window.location.pathname) ? "/" : window.location.pathname;
     return `${pathname}?${params.toString()}${window.location.hash}`;
   }
@@ -154,7 +163,8 @@ export class AtlasViewStateController {
   }
 
   push(): void {
-    if (this.historyRestoreInProgress || !this.options.hasEphemeris()) return;
+    // A tour keeps its address, so that a reload opens the same step.
+    if (this.historyRestoreInProgress || !this.options.hasEphemeris() || this.isTourUrl()) return;
     if (this.replaceTimer !== null) window.clearTimeout(this.replaceTimer);
     this.replaceTimer = null;
     history.pushState(null, "", this.currentUrl());
@@ -162,7 +172,9 @@ export class AtlasViewStateController {
 
   async restoreSelection(view: ViewState): Promise<void> {
     const selected = view.compare?.[0] ?? view.objectKey;
+    // A view with no object must not show the object of the view before it.
     if (selected) await this.options.selectBodyByKey(selected);
+    else this.options.dismissSelection();
     if (view.compare?.[1]) await this.options.setCompareTargetByKey(view.compare[1]);
     if (view.universe) {
       await this.options.restoreSky(undefined);
@@ -181,15 +193,21 @@ export class AtlasViewStateController {
     this.pendingSelectionState = view;
     this.options.updateAllUi();
     this.options.requestRender(true);
-    if (oldTime !== view.time) await this.options.loadAtlas(view.time === "now" ? undefined : view.time);
-    else {
-      this.pendingSelectionState = null;
-      await this.restoreSelection(view);
+    try {
+      if (oldTime !== view.time) await this.options.loadAtlas(view.time === "now" ? undefined : view.time);
+      else {
+        this.pendingSelectionState = null;
+        await this.restoreSelection(view);
+      }
+    } finally {
+      // A load that failed did not take the selection, and a later load must not apply this old view.
+      if (this.pendingSelectionState === view) this.pendingSelectionState = null;
+      this.historyRestoreInProgress = false;
     }
-    this.historyRestoreInProgress = false;
   }
 
   async navigateTour(view: ViewState, navigation: TourNavigationOptions): Promise<void> {
+    this.tourClosed = false;
     if (navigation.restoring) this.historyRestoreInProgress = true;
     const start = { ...this.options.state.camera };
     if (this.options.state.viewTime !== view.time) this.tourTimePending = true;
@@ -212,15 +230,12 @@ export class AtlasViewStateController {
     // A step of a member's tour can have a fixed time.
     if (this.tourTimePending) await this.loadPendingTourTime();
     if (navigation.signal.aborted) return this.finishTourRestore(navigation);
-    // A step with no object must not show the object of the step before it.
-    if (!view.objectKey && !view.compare) this.options.dismissSelection();
     await this.restoreSelection(view);
     if (navigation.signal.aborted) return this.finishTourRestore(navigation);
     // A step can change the object type filter and the layers.
     this.options.updateAllUi();
     const params = new URLSearchParams(encodeViewState({ ...view, tour: navigation.slug, step: navigation.step }));
-    const perf = new URLSearchParams(window.location.search).get("perf");
-    if (perf !== null) params.set("perf", perf);
+    keepPageParameters(params);
     const url = `${window.location.pathname}?${params.toString()}`;
     if (navigation.restoring) history.replaceState(null, "", url);
     else history.pushState(null, "", url);
@@ -245,8 +260,8 @@ export class AtlasViewStateController {
     // A step that the close stopped must not keep address updates off.
     this.historyRestoreInProgress = false;
     if (this.tourTimePending) void this.loadPendingTourTime();
-    if (!this.isTourUrl() || !this.options.hasEphemeris()) return;
-    history.replaceState(null, "", this.currentUrl());
+    if (this.isTourUrl() && this.options.hasEphemeris()) history.replaceState(null, "", this.currentUrl());
+    this.tourClosed = true;
   }
 
   private async loadPendingTourTime(): Promise<void> {
@@ -265,6 +280,6 @@ export class AtlasViewStateController {
   }
 
   private isTourUrl(): boolean {
-    return new URLSearchParams(window.location.search).has("tour");
+    return !this.tourClosed && new URLSearchParams(window.location.search).has("tour");
   }
 }

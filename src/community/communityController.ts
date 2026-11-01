@@ -1,4 +1,4 @@
-import { footprintDirections } from "./photoFootprint";
+import { footprintDirections, footprintWcs } from "./photoFootprint";
 import { canvasFont } from "../format/fonts";
 import { formatCount } from "../format/quantity";
 import { t } from "../i18n";
@@ -8,15 +8,20 @@ import type { TourBuilderHost } from "./tourBuilder";
 import { dateText, emptyState, h, licenceText, photoCard } from "./communityUi";
 import { PhotoIndex } from "./photoIndex";
 import { PhotoDialogs, type DialogHost } from "./photoDialogs";
+import { mountObjectFindings } from "./photoFindings";
 import { planeCorners, planeTransform } from "./photoPlane";
 import { overlayArea, overlayPlacements, quadContains, type OverlayArea, type OverlayPlacement } from "./photoOverlay";
 import type { SkyCamera } from "../sky/skyProjection";
+import { TransitFlow } from "../transit/transitFlow";
+import { canHaveTimings, mountTransitTimings } from "../transit/transitTimings";
 type Marker = { key: string; x: number; y: number };
 /** Size of a map card and the free space around it, for the overlap test. */
 const MARKER_WIDTH = 168;
 const MARKER_HEIGHT = 52;
 /** The teal of the interface (`--spectral-teal`), for the footprint lines on the Sky canvas. */
 const FOOTPRINT_COLOR = "#82cbb3";
+/** The lowest alpha of the footprint lines and labels, so that they stay readable at a low photo opacity. */
+const MIN_FOOTPRINT_ALPHA = 0.35;
 const OVERLAY_RETRY_MS = 30_000;
 export class CommunityController {
   readonly api = new CommunityApi();
@@ -34,6 +39,8 @@ export class CommunityController {
     void this.refresh();
     this.hub.refresh();
   });
+  /** The `Record transit` steps of the night planner. */
+  readonly recordTransit = new TransitFlow(this.api, (after) => this.dialogs.login(after));
   /** The tour builder works with the atlas through these two functions, which `main.ts` sets. */
   readonly tours: TourBuilderHost = { captureView: null, preview: null };
   readonly hub: CommunityHub = new CommunityHub(this.api, this.dialogs, () => void this.refresh(), this.host, this.tours);
@@ -121,32 +128,28 @@ export class CommunityController {
     context.save();
     context.strokeStyle = FOOTPRINT_COLOR;
     context.lineWidth = 1;
-    context.globalAlpha = this.opacity;
-    const seen = new Set<string>();
-    for (const frame of this.lastFrames.values())
-      for (const point of frame.points) {
-        const cover = this.index.get(point.key);
-        const wcs = cover?.cover?.wcs;
-        // A solver solution is on the Sky overlay, with the viewer behind it.
-        if (!wcs || wcs.status === "solved" || seen.has(cover!.subject_id) || seen.size >= 24) continue;
-        seen.add(cover!.subject_id);
-        const corners = footprintDirections(wcs).map(project);
-        if (corners.length !== 4 || corners.some((p) => !p)) continue;
-        context.beginPath();
-        corners.forEach((p, i) => {
-          if (i === 0) context.moveTo(p!.x, p!.y);
-          else context.lineTo(p!.x, p!.y);
-        });
-        context.closePath();
-        context.stroke();
-        context.font = canvasFont(12);
-        context.fillStyle = FOOTPRINT_COLOR;
-        context.fillText(t("community.footprint.author"), corners[0]!.x + 4, corners[0]!.y - 4);
-      }
+    context.globalAlpha = Math.max(MIN_FOOTPRINT_ALPHA, this.opacity);
+    for (const wcs of footprintWcs(this.lastFrames.values(), (key) => this.index.get(key))) {
+      const corners = footprintDirections(wcs).map(project);
+      if (corners.length !== 4 || corners.some((p) => !p)) continue;
+      context.beginPath();
+      corners.forEach((p, i) => {
+        if (i === 0) context.moveTo(p!.x, p!.y);
+        else context.lineTo(p!.x, p!.y);
+      });
+      context.closePath();
+      context.stroke();
+      context.font = canvasFont(12);
+      context.fillStyle = FOOTPRINT_COLOR;
+      context.fillText(t("community.footprint.author"), corners[0]!.x + 4, corners[0]!.y - 4);
+    }
     context.restore();
   }
   /** Sky view repaints when this is set: a new overlay response, a new opacity, or a new state of the layer. */
   overlayChanged: (() => void) | null = null;
+  /** The status line of the Sky view, which is a live region. The Sky view sets it. */
+  overlayStatus: HTMLElement | null = null;
+  private overlayFailure: { text: string; before: string } | null = null;
   private overlayLayer: HTMLElement | null = null;
   private readonly overlayImages = new Map<string, HTMLElement>();
   private readonly overlayCache = new Map<string, OverlayPhoto[]>();
@@ -154,6 +157,8 @@ export class CommunityController {
   private overlayRequest: AbortController | null = null;
   private overlayVersion = -1;
   private overlayRetryAt = 0;
+  /** The photos on the sky. They stay there until the response of the next area arrives. */
+  private overlayPhotos: OverlayPhoto[] = [];
   private overlayPlaced: OverlayPlacement[] = [];
 
   /** The photos layer of the Sky view filters. `main.ts` sets it, because the layer is part of the view state. */
@@ -188,15 +193,15 @@ export class CommunityController {
   renderSkyOverlay(context: CanvasRenderingContext2D, root: HTMLElement, camera: SkyCamera, width: number, height: number, observerKey: string) {
     const shown = this.enabled && this.showMarkers && observerKey === "earth";
     if (shown) this.requestOverlay(overlayArea(camera, width, height));
-    const photos = shown ? this.overlayCache.get(this.overlayKey) ?? [] : [];
-    this.overlayPlaced = overlayPlacements(photos, camera, width, height);
+    this.overlayPhotos = shown ? this.overlayCache.get(this.overlayKey) ?? this.overlayPhotos : [];
+    this.overlayPlaced = overlayPlacements(this.overlayPhotos, camera, width, height);
     this.paintOverlayImages(root);
     if (!this.overlayPlaced.length) return;
     context.save();
     context.strokeStyle = FOOTPRINT_COLOR;
     context.fillStyle = FOOTPRINT_COLOR;
     context.lineWidth = 1;
-    context.globalAlpha = Math.max(0.35, this.opacity);
+    context.globalAlpha = Math.max(MIN_FOOTPRINT_ALPHA, this.opacity);
     context.font = canvasFont(12);
     for (const place of this.overlayPlaced) {
       context.beginPath();
@@ -214,8 +219,24 @@ export class CommunityController {
     if (place) this.openOverlayPhoto(place.photo.id);
   }
 
+  /** The focus stays on the control that the person used, so a failure shows only in the status line. */
   private openOverlayPhoto(id: string) {
-    void this.api.request<Photo>(`/api/photos/${encodeURIComponent(id)}`).then((photo) => this.dialogs.photo(photo)).catch(() => undefined);
+    this.clearOverlayFailure();
+    void this.api.request<Photo>(`/api/photos/${encodeURIComponent(id)}`).then((photo) => this.dialogs.photo(photo)).catch((error) => this.showOverlayFailure(errorText(error)));
+  }
+
+  private showOverlayFailure(text: string) {
+    this.clearOverlayFailure();
+    if (!this.overlayStatus) return;
+    this.overlayFailure = { text, before: this.overlayStatus.textContent ?? "" };
+    this.overlayStatus.textContent = text;
+  }
+
+  /** The status line goes back to its earlier text. A newer status of the Sky view stays. */
+  private clearOverlayFailure() {
+    const failure = this.overlayFailure;
+    this.overlayFailure = null;
+    if (failure && this.overlayStatus?.textContent === failure.text) this.overlayStatus.textContent = failure.before;
   }
 
   /** The area changes in steps, so a small movement of the view makes no request. */
@@ -527,6 +548,8 @@ export class CommunityController {
         this.paintGallery();
         void this.loadGallery(key);
       } else this.paintGallery();
+      if (canHaveTimings(key)) void mountTransitTimings(this.api, this.galleryNode, key, () => this.galleryKey !== key).catch(() => undefined);
+      else if (!key.startsWith("gaia-")) void mountObjectFindings(this.api, this.galleryNode, key, () => this.galleryKey !== key, (id) => this.openOverlayPhoto(id)).catch(() => undefined);
     }
   }
   private async loadGallery(key: string, append = false) {
