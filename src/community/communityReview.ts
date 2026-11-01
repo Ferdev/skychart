@@ -271,7 +271,7 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
     }
     const name = (action: string) =>
       ({ hide: t("community.status.hidden"), reject: t("community.status.rejected") })[action] ??
-      (["approve", "restore", "author_remove", "account_delete", "cancel_votes", "suspend_account", "tour_keep", "tour_hide", "tour_restore", "transit_approve", "transit_reject", "transit_hide", "finding_approve", "finding_reject"].includes(action) ? t(`community.mod.action.${action}`) : action);
+      (["approve", "restore", "author_remove", "account_delete", "cancel_votes", "suspend_account", "unsuspend_account", "tour_keep", "tour_hide", "tour_restore", "transit_approve", "transit_reject", "transit_hide", "finding_approve", "finding_reject"].includes(action) ? t(`community.mod.action.${action}`) : action);
     list.innerHTML = `<div class="community-table-wrap"><table class="community-table"><thead><tr><th scope="col">${h(t("community.mod.col.date"))}</th><th scope="col">${h(t("community.mod.col.action"))}</th><th scope="col">${h(t("community.mod.col.moderator"))}</th><th scope="col">${h(t("community.mod.col.photo"))}</th><th scope="col">${h(t("community.field.reason"))}</th></tr></thead><tbody>${entries
       .map(
         (entry) =>

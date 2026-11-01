@@ -249,6 +249,21 @@ test("photo opacity lives in the settings overlays group", async ({ page }) => {
   await expect(opacity).not.toContainText("Photo opacity");
 });
 
+test("the decision log names a suspension and a reinstatement", async ({ page }) => {
+  const state = await communityFixture(page, { role: "moderator" });
+  state.signed = true;
+  await openAtlas(page);
+  await page.locator("[data-community-review]").click();
+  const hub = page.getByRole("dialog", { name: "Community photos" });
+  await hub.getByRole("button", { name: "Decision log" }).click();
+  const rows = hub.locator(".community-table tbody tr");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText("Account reinstated");
+  await expect(rows.nth(0)).toContainText("vera: Appeal accepted");
+  await expect(rows.nth(1)).toContainText("Account suspended");
+  await expect(rows.nth(1)).toContainText("vera: Repeated abuse");
+});
+
 test("moderators can hide a public photo with a reason", async ({ page }) => {
   const state = await communityFixture(page, { role: "moderator" });
   state.signed = true;
@@ -293,6 +308,43 @@ for (const [name, role, signed] of [
     await expect(viewer.getByRole("button", { name: "Hide" })).toHaveCount(0);
   });
 }
+
+test("a refused report tells the limits of the text in each language", async ({ page }) => {
+  await communityFixture(page);
+  let reasons = 0;
+  await page.route("**/api/photos/*/report", (route) => {
+    reasons += 1;
+    return route.fulfill({ status: 422, json: { error: "invalid_report" } });
+  });
+  await openAtlas(page);
+  await selectCatalogObject(page, "Sun", "sun");
+  for (const [locale, text] of [
+    ["en", "A report must have 3 to 2,000 characters."],
+    ["es", "La denuncia debe tener entre 3 y 2000 caracteres."],
+    ["fr", "Le signalement doit contenir de 3 à 2\u00a0000 caractères."],
+    ["de", "Die Meldung muss 3 bis 2000 Zeichen lang sein."],
+    ["pt-BR", "A denúncia deve ter de 3 a 2.000 caracteres."],
+    ["it", "La segnalazione deve avere da 3 a 2000 caratteri."],
+    ["zh-Hans", "举报内容须为 3 到 2,000 个字符。"],
+    ["ja", "報告は 3～2,000 文字で入力してください。"],
+    ["ko", "신고 내용은 3~2,000자로 입력하세요."],
+  ] as const) {
+    await page.locator("#locale-select").selectOption(locale);
+    await page.locator(".community-gallery [data-photo]").first().click();
+    const viewer = page.getByRole("dialog", { name: "Sun portrait" });
+    await viewer.locator("[data-report]").click();
+    const form = page.locator("dialog:has(textarea[name=reason])");
+    // The browser refuses two characters with its own message, but one emoji is two units for the form.
+    await form.locator("textarea").fill("🔭a");
+    await form.getByRole("button").last().click();
+    await expect(form, locale).toContainText(text);
+    await page.keyboard.press("Escape");
+    await expect(form).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(viewer).toBeHidden();
+  }
+  expect(reasons).toBe(9);
+});
 
 test("community row stays reachable on a tablet-width screen", async ({ page }) => {
   const state = await communityFixture(page, { role: "admin" });
