@@ -5,6 +5,7 @@ defmodule StarsmapApi.Community.Moderation do
   alias StarsmapApi.CommunityRepo, as: Repo
 
   @listed ["review", "published", "hidden", "rejected"]
+  @account_actions ["cancel_votes", "suspend_account"]
 
   def queue, do: list("review", 0, 50)
 
@@ -128,11 +129,16 @@ defmodule StarsmapApi.Community.Moderation do
         on: p.id == a.photo_id,
         left_join: t in Tour,
         on: t.id == a.tour_id,
+        left_join: target in User,
+        on:
+          a.action in ^@account_actions and
+            fragment("left(?, 36) = ?::text", a.reason, target.id),
         order_by: [desc: a.inserted_at],
         limit: ^limit,
         select: %{
           action: a.action,
-          reason: a.reason,
+          # The record keeps the target's ID. A moderator reads the current handle.
+          reason: coalesce(fragment("? || substr(?, 37)", target.handle, a.reason), a.reason),
           at: a.inserted_at,
           moderator: u.name,
           photo_id: p.id,
@@ -261,7 +267,7 @@ defmodule StarsmapApi.Community.Moderation do
         Repo.insert!(%Action{
           user_id: actor.id,
           action: "cancel_votes",
-          reason: "#{handle}: #{reason}"
+          reason: account_reason(user, reason)
         })
 
         authors |> Enum.uniq() |> Enum.each(&Ranking.refresh_author/1)
@@ -285,7 +291,7 @@ defmodule StarsmapApi.Community.Moderation do
         Repo.insert!(%Action{
           user_id: actor.id,
           action: "suspend_account",
-          reason: "#{handle}: #{reason}"
+          reason: account_reason(user, reason)
         })
 
         subjects = Repo.all(from p in Photo, distinct: p.subject_id, select: p.subject_id)
@@ -305,6 +311,32 @@ defmodule StarsmapApi.Community.Moderation do
   end
 
   def suspend(_, _, _, _), do: {:error, :not_allowed}
+
+  @doc "Replaces the handle at the start of the older account audit reasons with the user ID."
+  def forget_handle(user) do
+    prefix = "#{user.handle}: "
+
+    Repo.update_all(
+      from(a in Action,
+        where: a.action in ^@account_actions and fragment("starts_with(?, ?)", a.reason, ^prefix),
+        update: [
+          set: [
+            reason:
+              fragment(
+                "? || substr(?, ?)",
+                ^account_reason(user, ""),
+                a.reason,
+                ^(String.length(prefix) + 1)
+              ),
+            updated_at: ^StarsmapApi.Community.now()
+          ]
+        ]
+      ),
+      []
+    )
+  end
+
+  defp account_reason(user, reason), do: "#{user.id}: #{reason}"
 
   # The role comes first: a person without the role gets no information about the reason.
   defp check_reason(%{role: role}, reason) when role in ["moderator", "admin"] do
