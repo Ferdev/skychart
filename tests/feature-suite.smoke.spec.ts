@@ -112,6 +112,37 @@ test("the Subscribe control gives a copyable address and a webcal link for the c
   expect(await calendar.text()).toContain("BEGIN:VCALENDAR");
 });
 
+test("the Sky overlay keeps its photos while the next area loads", async ({ page }) => {
+  test.setTimeout(120_000);
+  const photo = overlayPhoto("11111111-1111-4111-8111-111111111111", 83.8, -5.4, 0.008);
+  await overlayFixture(page, [photo]);
+  await openEarthSky(page);
+  const photos = page.locator(".community-sky-photo");
+  await expect(photos).toHaveCount(1, { timeout: 20_000 });
+
+  let release = () => {};
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/photos/sky?**", async (route) => {
+    await held;
+    await route.fulfill({ json: { photos: [photo] } });
+  });
+  const nextArea = page.waitForRequest("**/api/photos/sky?**");
+  const box = (await page.locator("#sky-view canvas").first().boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 450, box.y + box.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await nextArea;
+
+  // Repaint frames arrive while the response waits. The photo stays through all of them.
+  for (let frame = 0; frame < 5; frame += 1) {
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    await expect(photos).toHaveCount(1);
+  }
+  release();
+  await expect(photos).toHaveCount(1);
+});
+
 test("the Sky overlay aligns a photo, opens the viewer, and follows the L parameter", async ({ page }) => {
   test.setTimeout(120_000);
   await overlayFixture(page, [overlayPhoto("11111111-1111-4111-8111-111111111111", 83.8, -5.4, 0.008), overlayPhoto("22222222-2222-4222-8222-222222222222", 200, -40, 0.001)]);

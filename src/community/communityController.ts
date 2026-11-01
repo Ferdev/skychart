@@ -154,6 +154,8 @@ export class CommunityController {
   private overlayRequest: AbortController | null = null;
   private overlayVersion = -1;
   private overlayRetryAt = 0;
+  /** The photos on the sky. They stay there until the response of the next area arrives. */
+  private overlayPhotos: OverlayPhoto[] = [];
   private overlayPlaced: OverlayPlacement[] = [];
 
   /** The photos layer of the Sky view filters. `main.ts` sets it, because the layer is part of the view state. */
@@ -188,8 +190,8 @@ export class CommunityController {
   renderSkyOverlay(context: CanvasRenderingContext2D, root: HTMLElement, camera: SkyCamera, width: number, height: number, observerKey: string) {
     const shown = this.enabled && this.showMarkers && observerKey === "earth";
     if (shown) this.requestOverlay(overlayArea(camera, width, height));
-    const photos = shown ? this.overlayCache.get(this.overlayKey) ?? [] : [];
-    this.overlayPlaced = overlayPlacements(photos, camera, width, height);
+    this.overlayPhotos = shown ? this.overlayCache.get(this.overlayKey) ?? this.overlayPhotos : [];
+    this.overlayPlaced = overlayPlacements(this.overlayPhotos, camera, width, height);
     this.paintOverlayImages(root);
     if (!this.overlayPlaced.length) return;
     context.save();
