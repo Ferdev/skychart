@@ -18,13 +18,15 @@ defmodule StarsmapApi.Catalog.TargetMatch do
   @search_limit 5
   @concurrency 4
   @time_budget_ms 20_000
+  @task_timeout_ms @time_budget_ms + 5_000
   @r :math.pi() / 180
 
   def max_rows, do: @max_rows
 
   @doc """
   Matches the rows. The result has one entry for each row, in the order of the request.
-  `max_rows` lets a transport set a smaller bound.
+  `max_rows` lets a transport set a smaller bound. `task_timeout_ms` sets how long the match
+  waits for a lookup.
   """
   def run(rows, options \\ []) do
     limit = Keyword.get(options, :max_rows, @max_rows)
@@ -43,7 +45,7 @@ defmodule StarsmapApi.Catalog.TargetMatch do
         matched =
           rows
           |> Enum.map(&normalize/1)
-          |> resolve(radius, deadline)
+          |> resolve(radius, deadline, Keyword.get(options, :task_timeout_ms, @task_timeout_ms))
           |> mark_duplicates()
 
         {:ok,
@@ -80,7 +82,7 @@ defmodule StarsmapApi.Catalog.TargetMatch do
 
   # Identical inputs are one lookup. Designations share one indexed query, and only the other
   # names use the search, which is the expensive step.
-  defp resolve(rows, radius, deadline) do
+  defp resolve(rows, radius, deadline, task_timeout) do
     unique = Enum.uniq_by(rows, &lookup_id/1)
     keyed = by_key(unique)
 
@@ -89,7 +91,7 @@ defmodule StarsmapApi.Catalog.TargetMatch do
       |> Task.async_stream(
         fn row -> {lookup_id(row), lookup(row, keyed, radius, deadline)} end,
         max_concurrency: @concurrency,
-        timeout: @time_budget_ms + 5_000,
+        timeout: task_timeout,
         on_timeout: :kill_task
       )
       |> Enum.flat_map(fn
@@ -98,10 +100,11 @@ defmodule StarsmapApi.Catalog.TargetMatch do
       end)
       |> Map.new()
 
+    # A row has no result only when the timeout stopped its lookup.
     rows
     |> Enum.with_index()
     |> Enum.map(fn {row, index} ->
-      Map.get(results, lookup_id(row), unmatched())
+      Map.get(results, lookup_id(row), out_of_time())
       |> Map.merge(%{row: index, input: row.input, kind: row.kind})
     end)
   end
@@ -188,6 +191,8 @@ defmodule StarsmapApi.Catalog.TargetMatch do
     degrees = radius / 60
     ra_margin = min(degrees / max(:math.cos(min(abs(dec) + degrees, 89.9) * @r), 0.002), 180.0)
 
+    # A dense box has too many rows to read. The query orders them by the haversine term of
+    # `separation_arcsec/4`, which grows with the angle, so one row of each range is enough.
     candidates =
       ra_ranges(ra, ra_margin)
       |> Enum.flat_map(fn {low, high} ->
@@ -196,7 +201,20 @@ defmodule StarsmapApi.Catalog.TargetMatch do
             where:
               o.dec_deg >= ^(dec - degrees) and o.dec_deg <= ^(dec + degrees) and
                 o.ra_deg >= ^low and o.ra_deg <= ^high,
-            limit: 2_000
+            order_by: [
+              asc:
+                fragment(
+                  "power(sin(radians(? - ?) / 2), 2) + cos(radians(?)) * cos(radians(?)) * power(sin(radians(? - ?) / 2), 2)",
+                  o.dec_deg,
+                  ^dec,
+                  ^dec,
+                  o.dec_deg,
+                  o.ra_deg,
+                  ^ra
+                ),
+              asc: o.key
+            ],
+            limit: 1
         )
       end)
 

@@ -48,6 +48,35 @@ defmodule StarsmapApi.Catalog.TargetMatchTest do
     payload.rows
   end
 
+  defp star(key, ra, dec) do
+    %{
+      key: key,
+      name: key,
+      object_type: "star",
+      catalog_group: "bright_stars",
+      source_type: "bright_star_catalog",
+      position_model: "fixed_catalog_vector",
+      search_text: key,
+      aliases: [],
+      ra_deg: ra,
+      dec_deg: dec,
+      x_au: 1.0,
+      y_au: 2.0,
+      z_au: 3.0
+    }
+  end
+
+  # More rows than a query can read, and the closest row is last by insert order and by right ascension.
+  defp seed_dense_field(first_ra, closest_ra, dec) do
+    fillers = for index <- 1..2_100, do: star("filler-#{index}", first_ra + index * 1.0e-4, dec)
+
+    fillers
+    |> Enum.chunk_every(500)
+    |> Enum.each(&SnapshotStore.upsert_source_objects/1)
+
+    SnapshotStore.upsert_source_objects([star("closest", closest_ra, dec)])
+  end
+
   test "designations, aliases, and keys resolve to one object" do
     for name <- ["M 42", "m42", "Messier 42", "M042", "Orion Nebula"] do
       assert [%{status: "matched", object: %{key: "m42"}}] = match([%{"name" => name}])
@@ -142,6 +171,51 @@ defmodule StarsmapApi.Catalog.TargetMatchTest do
 
     assert [%{status: "matched"}] =
              match([%{"ra_deg" => 84.2, "dec_deg" => -5.39}], radius_arcmin: 30)
+  end
+
+  test "a dense field gives the nearest object" do
+    seed_dense_field(120.0, 120.5, 20.0)
+
+    assert [%{status: "matched", object: %{key: "closest"}, separation_arcsec: separation}] =
+             match([%{"ra_deg" => 120.5001, "dec_deg" => 20.0}], radius_arcmin: 60)
+
+    assert_in_delta separation, 0.0001 * :math.cos(20 * :math.pi() / 180) * 3600, 0.001
+  end
+
+  test "a dense field across right ascension zero gives the nearest object" do
+    seed_dense_field(359.5, 359.9999, 30.0)
+
+    assert [%{status: "matched", object: %{key: "closest"}}] =
+             match([%{"ra_deg" => 0.0002, "dec_deg" => 30.0}], radius_arcmin: 60)
+  end
+
+  test "a dense field above right ascension zero gives the nearest object" do
+    seed_dense_field(0.1, 0.5, 40.0)
+
+    assert [%{status: "matched", object: %{key: "closest"}}] =
+             match([%{"ra_deg" => 0.5001, "dec_deg" => 40.0}], radius_arcmin: 60)
+  end
+
+  test "two objects at one position give the first key" do
+    SnapshotStore.upsert_source_objects([star("same-b", 150.0, 10.0)])
+    SnapshotStore.upsert_source_objects([star("same-a", 150.0, 10.0)])
+
+    assert [%{object: %{key: "same-a"}}] = match([%{"ra_deg" => 150.001, "dec_deg" => 10.0}])
+  end
+
+  test "a lookup that the timeout stopped has the time budget reason" do
+    assert [%{status: "unmatched", reason: "time_budget"}] =
+             match([%{"ra_deg" => 83.82, "dec_deg" => -5.39}], task_timeout_ms: 0)
+  end
+
+  test "an object that is not in the catalog has no reason" do
+    assert [row] = match([%{"name" => "Andromdea"}])
+    assert row.status == "unmatched"
+    refute Map.has_key?(row, :reason)
+
+    assert [position] = match([%{"ra_deg" => 200.0, "dec_deg" => 10.0}])
+    assert position.status == "unmatched"
+    refute Map.has_key?(position, :reason)
   end
 
   test "the row limit refuses an oversized request" do
