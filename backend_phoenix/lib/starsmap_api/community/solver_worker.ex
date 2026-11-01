@@ -53,6 +53,8 @@ defmodule StarsmapApi.Community.SolverWorker do
               StarsmapApi.Community.Annotations.rebuild(changed)
 
               if current.status == "published", do: Ranking.refresh(current.subject_id)
+              StarsmapApi.Community.Depth.enqueue(changed)
+              StarsmapApi.Community.Findings.enqueue(changed)
             end
           end)
 

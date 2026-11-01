@@ -3,6 +3,8 @@ import { NEW_TAB_LINK_ATTRIBUTES } from "../format/links";
 import { t } from "../i18n";
 import { CommunityApi, errorText, type Photo } from "./api";
 import { dateText, h, licenceText, openDialog, type DialogView } from "./communityUi";
+import { DepthFlight } from "./depthFlight";
+import { mountFindings } from "./photoFindings";
 
 /** Actions of the photo windows that other parts of the community area do. */
 export type DialogHost = {
@@ -14,6 +16,11 @@ export type DialogHost = {
 
 const LICENCES = ["All rights reserved", "CC BY 4.0", "CC BY-SA 4.0", "CC0"];
 const WCS_FIELDS = ["ra_deg", "dec_deg", "pixel_scale_arcsec", "rotation_deg", "width", "height"];
+
+/** The site of a photo goes to the server rounded to one degree, and only when both fields have a value. */
+function coarseSite(latitude: string, longitude: string): { site_lat?: number; site_lon?: number } {
+  return latitude.trim() && longitude.trim() ? { site_lat: Math.round(Number(latitude)), site_lon: Math.round(Number(longitude)) } : {};
+}
 
 export class PhotoDialogs {
   host: DialogHost = { openObject: () => undefined, openPhotographer: () => undefined };
@@ -112,18 +119,16 @@ export class PhotoDialogs {
     view.body.innerHTML = `<div class="community-viewer__layout"><figure class="community-viewer__stage"><div class="community-photo-stage"><img class="community-full-photo" src="${h(photo.image_url)}" alt="${h(photo.title)}"></div></figure><aside class="community-viewer__side" aria-label="${h(t("community.viewer.details"))}"><p class="community-viewer__author"><button type="button" class="community-link" data-author>${h(photo.author.name)}</button> <span>@${h(photo.author.handle)}</span></p><div class="community-actions"><button type="button" class="secondary-action" data-vote></button></div>${photo.caption ? `<p class="community-viewer__caption">${h(photo.caption)}</p>` : ""}<dl class="community-facts">${facts
       .filter(([, value]) => value)
       .map(([label, value]) => `<dt>${h(label)}</dt><dd>${h(value)}</dd>`)
-      .join("")}</dl>${photo.composite ? `<p class="community-note">${h(t("community.field.composite"))}</p>` : ""}${coordinates ? `<p class="community-credit">${h(coordinates)}</p>` : ""}<div class="community-actions community-actions--wrap"><button type="button" class="text-action" data-open-object>${h(t("community.openObject"))}</button><button type="button" class="text-action" data-copy>${h(t("community.copyLink"))}</button>${photo.wcs ? `<button type="button" class="text-action" data-compare>${h(t("community.compare"))}</button>` : ""}<button type="button" class="text-action" data-report>${h(t("community.report"))}</button>${this.api.moderator ? `<button type="button" class="text-action" data-hide>${h(t("community.mod.hide"))}</button>` : ""}</div></aside></div>`;
+      .join("")}</dl>${photo.composite ? `<p class="community-note">${h(t("community.field.composite"))}</p>` : ""}${coordinates ? `<p class="community-credit">${h(coordinates)}</p>` : ""}<div class="community-actions community-actions--wrap"><button type="button" class="text-action" data-open-object>${h(t("community.openObject"))}</button><button type="button" class="text-action" data-copy>${h(t("community.copyLink"))}</button>${photo.wcs ? `<button type="button" class="text-action" data-compare>${h(t("community.compare"))}</button>` : ""}${photo.depth_ready ? `<button type="button" class="text-action" data-depth>${h(t("depth.enter"))}</button>` : ""}<button type="button" class="text-action" data-report>${h(t("community.report"))}</button>${this.api.moderator ? `<button type="button" class="text-action" data-hide>${h(t("community.mod.hide"))}</button>` : ""}</div><section class="community-section" data-findings></section></aside></div>`;
     const stage = view.body.querySelector<HTMLElement>(".community-photo-stage")!;
     // The labels of the objects in the photo use fractions of the image, so the stage gets the width of the image.
-    if (photo.in_frame?.length) {
-      const image = stage.querySelector<HTMLImageElement>("img")!;
-      const resize = new ResizeObserver(() => {
-        if (!image.isConnected) return resize.disconnect();
-        stage.style.width = `${image.getBoundingClientRect().width}px`;
-      });
-      resize.observe(image);
-      view.dialog.addEventListener("close", () => resize.disconnect(), { once: true });
-    }
+    const image = stage.querySelector<HTMLImageElement>("img")!;
+    const resize = new ResizeObserver(() => {
+      if (!image.isConnected) return resize.disconnect();
+      stage.style.width = `${image.getBoundingClientRect().width}px`;
+    });
+    resize.observe(image);
+    view.dialog.addEventListener("close", () => resize.disconnect(), { once: true });
     for (const tag of photo.in_frame ?? []) {
       const label = document.createElement("button");
       label.type = "button";
@@ -149,6 +154,9 @@ export class PhotoDialogs {
     };
     const compare = view.body.querySelector<HTMLButtonElement>("[data-compare]");
     if (compare) compare.onclick = () => this.compareSurvey(photo);
+    const depth = view.body.querySelector<HTMLButtonElement>("[data-depth]");
+    if (depth) depth.onclick = () => void new DepthFlight(this.api, (key) => this.host.openObject(key)).open(photo);
+    void mountFindings(this.api, view.body.querySelector<HTMLElement>("[data-findings]")!, stage, photo, (text) => (view.message.textContent = text));
 
     let voted = false;
     const voteButton = view.body.querySelector<HTMLButtonElement>("[data-vote]")!;
@@ -240,7 +248,7 @@ export class PhotoDialogs {
     const view = openDialog(`${t("community.publish")} · ${name}`);
     const field = (label: string, control: string, wide = false) =>
       `<label class="community-field${wide ? " community-field--wide" : ""}"><span>${h(label)}</span>${control}</label>`;
-    view.body.innerHTML = `<form class="community-form"><div class="community-form__grid">${field(t("community.field.image"), `<input name="file" type="file" accept="image/jpeg,image/png,image/tiff" aria-describedby="community-upload-formats" required>`, true)}<p class="community-field__help" id="community-upload-formats">${h(t("community.upload.formats"))}</p>${field(t("community.field.title"), `<input name="title" maxlength="160" required>`)}${field(t("community.field.capturedAt"), `<input name="captured_at" type="datetime-local" required>`)}${field(t("community.field.caption"), `<textarea name="caption" maxlength="4000"></textarea>`, true)}${field(t("community.field.equipment"), `<input name="equipment" maxlength="500">`)}${field(t("community.field.processing"), `<input name="processing" maxlength="1000">`)}</div><fieldset class="community-fieldset"><legend>${h(t("community.upload.rightsHeading"))}</legend>${field(t("community.field.licence"), `<select name="licence">${LICENCES.map((licence) => `<option value="${h(licence)}">${h(licenceText(licence))}</option>`).join("")}</select>`)}<label class="community-check"><input type="checkbox" name="composite"><span>${h(t("community.field.composite"))}</span></label><label class="community-check"><input type="checkbox" name="rights" required><span>${h(t("community.field.rights"))}</span></label></fieldset><p class="community-note">${h(t("community.upload.notice"))}</p><div class="community-actions"><button class="primary-action">${h(t("community.publish"))}</button><span class="community-form__links"><a href="/community/rules" ${NEW_TAB_LINK_ATTRIBUTES}>${h(t("community.rules.title"))}</a><a href="/community/terms" ${NEW_TAB_LINK_ATTRIBUTES}>${h(t("community.terms"))}</a><a href="/community/privacy" ${NEW_TAB_LINK_ATTRIBUTES}>${h(t("community.privacy"))}</a></span></div></form>`;
+    view.body.innerHTML = `<form class="community-form"><div class="community-form__grid">${field(t("community.field.image"), `<input name="file" type="file" accept="image/jpeg,image/png,image/tiff" aria-describedby="community-upload-formats" required>`, true)}<p class="community-field__help" id="community-upload-formats">${h(t("community.upload.formats"))}</p>${field(t("community.field.title"), `<input name="title" maxlength="160" required>`)}${field(t("community.field.capturedAt"), `<input name="captured_at" type="datetime-local" required>`)}${field(t("community.field.caption"), `<textarea name="caption" maxlength="4000"></textarea>`, true)}${field(t("community.field.equipment"), `<input name="equipment" maxlength="500">`)}${field(t("community.field.processing"), `<input name="processing" maxlength="1000">`)}</div><fieldset class="community-fieldset"><legend>${h(t("community.upload.rightsHeading"))}</legend>${field(t("community.field.licence"), `<select name="licence">${LICENCES.map((licence) => `<option value="${h(licence)}">${h(licenceText(licence))}</option>`).join("")}</select>`)}<label class="community-check"><input type="checkbox" name="composite"><span>${h(t("community.field.composite"))}</span></label><label class="community-check"><input type="checkbox" name="depth_allowed"><span>${h(t("depth.allow"))}</span></label><p class="community-field__help">${h(t("depth.allowHelp"))}</p><label class="community-check"><input type="checkbox" name="rights" required><span>${h(t("community.field.rights"))}</span></label></fieldset><fieldset class="community-fieldset"><legend>${h(t("finding.site"))}</legend><div class="community-form__grid">${field(t("launch.latitude"), `<input name="site_lat" type="number" min="-90" max="90" step="any" inputmode="decimal">`)}${field(t("launch.longitude"), `<input name="site_lon" type="number" min="-180" max="180" step="any" inputmode="decimal">`)}</div><p class="community-field__help">${h(t("finding.siteHelp"))}</p></fieldset><p class="community-note">${h(t("community.upload.notice"))}</p><div class="community-actions"><button class="primary-action">${h(t("community.publish"))}</button><span class="community-form__links"><a href="/community/rules" ${NEW_TAB_LINK_ATTRIBUTES}>${h(t("community.rules.title"))}</a><a href="/community/terms" ${NEW_TAB_LINK_ATTRIBUTES}>${h(t("community.terms"))}</a><a href="/community/privacy" ${NEW_TAB_LINK_ATTRIBUTES}>${h(t("community.privacy"))}</a></span></div></form>`;
     const form = view.body.querySelector("form")!;
     form.onsubmit = async (event) => {
       event.preventDefault();
@@ -267,6 +275,8 @@ export class PhotoDialogs {
           equipment: data.get("equipment"),
           processing: data.get("processing"),
           composite: data.has("composite"),
+          depth_allowed: data.has("depth_allowed"),
+          ...coarseSite(String(data.get("site_lat")), String(data.get("site_lon"))),
           rights_confirmed: true,
           synthetic: false,
         });

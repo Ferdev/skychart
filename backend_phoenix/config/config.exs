@@ -40,6 +40,9 @@ config :starsmap_api,
   trusted_proxy_cidrs: ["127.0.0.0/8", "::1/128"]
 
 # GlitchTip/Sentry-compatible error tracking
+# Phoenix has no filter function: each name here also matches inside a longer name.
+# "lat" also hides a parameter such as "constellation". Sentry does not read this list:
+# `StarsmapApi.Community.Privacy.scrub/1` removes the request from an error report.
 config :phoenix, :filter_parameters, [
   "password",
   "email",
@@ -48,7 +51,10 @@ config :phoenix, :filter_parameters, [
   "csrf",
   "latitude",
   "longitude",
-  "rows"
+  "lat",
+  "lon",
+  "rows",
+  "targets"
 ]
 
 config :sentry,

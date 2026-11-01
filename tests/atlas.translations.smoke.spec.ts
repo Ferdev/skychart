@@ -35,7 +35,17 @@ test.describe("Spanish interface", () => {
       "Sky from object", "Cruise forward", "Gravity route", "Speed", "Trip map", "Brightness from here", "Catalog positions", "More",
     ]);
     // The switch of the target card and the trip map row of the More menu have Spanish names.
-    await expect(page.locator("#universe-target-toggle")).toHaveAttribute("aria-label", "Mostrar todas las acciones");
+    const targetToggle = page.locator("#universe-target-toggle");
+    await expect(targetToggle).toHaveAttribute("aria-label", "Mostrar todas las acciones del objeto seleccionado");
+    // The window is wide, so the target card shows all actions and its switch is not on the screen.
+    await targetToggle.dispatchEvent("click");
+    await expect(targetToggle).toHaveAttribute("aria-label", "Mostrar menos acciones del objeto seleccionado");
+    await targetToggle.dispatchEvent("click");
+    const minimapToggle = page.locator("#universe-minimap-toggle");
+    await expect(minimapToggle).toHaveAccessibleName("Ocultar el mapa del viaje");
+    await minimapToggle.click();
+    await expect(minimapToggle).toHaveAccessibleName("Mostrar el mapa del viaje");
+    await minimapToggle.click();
     await expect(page.locator("#universe-minimap-menu-toggle")).toHaveText(/el mapa del viaje$/);
     await page.locator("#universe-close").click();
     await expect(page.locator("#universe-view")).toBeHidden();

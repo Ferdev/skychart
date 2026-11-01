@@ -18,6 +18,7 @@ from backend.catalog_sources import (
 )
 from backend.errors import QueryInputError
 from backend.night_planner import MAX_BODY_BYTES, night_plan_payload
+from backend.transit_timing import MAX_BODY_BYTES as TRANSIT_FIT_MAX_BODY_BYTES, transit_fit_payload
 from backend.payload_cache import cache_key_payload, cached_payload
 from backend.request_query import (
     parse_bool_param,
@@ -41,6 +42,11 @@ from backend.scientific_calculation import (
     trails_payload,
 )
 
+# The query of an observation holds the observer's site. The match stops before the
+# protocol version, so a malformed request line with a space also loses its query.
+OBSERVE_QUERY = re.compile(r"(/api/observe[^?\s]*)\?.*?(?= HTTP/\d|$)")
+
+
 class Handler(BaseHTTPRequestHandler):
     def request_id(self) -> str:
         value = self.headers.get("X-Request-ID", "unknown")
@@ -62,19 +68,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         # The site is in the body, so no log line or cache key holds it.
-        if urlparse(self.path).path != "/api/observe/plan":
+        path = urlparse(self.path).path
+        if path == "/api/observe/plan":
+            calculation, limit, label = night_plan_payload, MAX_BODY_BYTES, "night plan calculation"
+        elif path == "/api/observe/transit-fit":
+            calculation, limit, label = transit_fit_payload, TRANSIT_FIT_MAX_BODY_BYTES, "transit fit"
+        else:
             self.respond({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= MAX_BODY_BYTES:
+            if not 0 < length <= limit:
                 raise QueryInputError("the request body has an invalid size")
-            self.respond(night_plan_payload(json.loads(self.rfile.read(length))))
+            self.respond(calculation(json.loads(self.rfile.read(length))))
         except (QueryInputError, ValueError) as exc:
             self.respond({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
         except Exception:
-            self.log_internal_error("night plan calculation")
-            self.respond({"error": "night plan calculation failed", "request_id": self.request_id()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            self.log_internal_error(label)
+            self.respond({"error": f"{label} failed", "request_id": self.request_id()}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -216,10 +227,9 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 groups = parse_catalog_groups(query)
-                objects = catalog_objects_for_groups(groups)
                 include_objects = parse_bool_param(query, "include_objects", True)
                 key = cache_key_payload("catalog", groups=groups, include_objects=include_objects)
-                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, objects, include_objects=include_objects)))
+                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, catalog_objects_for_groups(groups), include_objects=include_objects)))
             except QueryInputError as exc:
                 payload = {"error": str(exc)}
                 if exc.details is not None:
@@ -274,7 +284,8 @@ class Handler(BaseHTTPRequestHandler):
         self.respond({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 
     def log_message(self, format: str, *args: Any) -> None:
-        print(f"{self.address_string()} - {format % args}")
+        message = OBSERVE_QUERY.sub(r"\1", format % args)
+        print(f"{self.address_string()} - {message}")
 
     def respond(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> bool:
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

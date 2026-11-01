@@ -12,6 +12,30 @@ export type Wcs = {
   cd?: number[];
   crpix?: number[];
 };
+/** The limit of photographed objects with a footprint on one Sky redraw. */
+const FOOTPRINT_LIMIT = 24;
+/**
+ * The WCS of each photographed object to outline, one for each subject, in the order of the
+ * points. The scan stops at the limit, so that a redraw looks up no later points.
+ */
+export function footprintWcs(
+  frames: Iterable<{ points: readonly { key: string }[] }>,
+  lookup: (key: string) => { subject_id: string; cover?: { wcs?: Wcs | null } | null } | undefined,
+): Wcs[] {
+  const seen = new Set<string>();
+  const result: Wcs[] = [];
+  for (const frame of frames)
+    for (const point of frame.points) {
+      const cover = lookup(point.key);
+      const wcs = cover?.cover?.wcs;
+      // A solver solution is on the Sky overlay, with the viewer behind it.
+      if (!wcs || wcs.status === "solved" || seen.has(cover!.subject_id)) continue;
+      seen.add(cover!.subject_id);
+      result.push(wcs);
+      if (seen.size >= FOOTPRINT_LIMIT) return result;
+    }
+  return result;
+}
 /** TAN sky directions. Supplied WCS is explicitly labelled and never changes object coordinates. */
 export function footprintDirections(
   wcs: Wcs,

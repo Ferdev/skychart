@@ -444,7 +444,8 @@
 
 .community-sky-photo__focus:focus-visible {
   opacity: 1;
-  outline: 2px solid var(--focus-ring);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .community-sky-opacity {

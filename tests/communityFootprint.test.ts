@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { footprintDirections } from "../src/community/photoFootprint.ts";
+import { footprintDirections, footprintWcs } from "../src/community/photoFootprint.ts";
 import { planeTransform } from "../src/community/photoPlane.ts";
 const wcs = {
   ra_deg: 359.9,
@@ -25,6 +25,38 @@ test("small TAN footprints stay finite at RA wrap and near the pole", () => {
 test("unsupported astrometry never draws a footprint", () => {
   assert.deepEqual(footprintDirections({ ...wcs, frame: "unknown" }), []);
   assert.deepEqual(footprintDirections({ ...wcs, projection: "SIP" }), []);
+});
+test("the footprint scan stops at the limit and looks up no later points", () => {
+  const points = Array.from({ length: 100 }, (_, index) => ({ key: `k${index}` }));
+  const frames = [{ points: points.slice(0, 20) }, { points: points.slice(20) }];
+  const lookups: string[] = [];
+  const result = footprintWcs(frames, (key) => {
+    lookups.push(key);
+    return { subject_id: `subject-${key}`, cover: { wcs: { ...wcs, width: Number(key.slice(1)) + 1 } } };
+  });
+  assert.deepEqual(lookups, points.slice(0, 24).map((point) => point.key));
+  assert.deepEqual(result.map((item) => item.width), Array.from({ length: 24 }, (_, index) => index + 1));
+});
+test("the footprint limit counts one entry for each subject, without solved or missing covers", () => {
+  const covers = new Map<string, { subject_id: string; cover?: { wcs?: typeof wcs | null } | null }>([
+    ["none", { subject_id: "none", cover: null }],
+    ["solved", { subject_id: "solved", cover: { wcs: { ...wcs, status: "solved" } } }],
+  ]);
+  const keys = ["unknown", "none", "solved"];
+  for (let index = 0; index < 30; index += 1) {
+    for (const key of [`a${index}`, `b${index}`]) {
+      covers.set(key, { subject_id: `subject-${index}`, cover: { wcs } });
+      keys.push(key);
+    }
+  }
+  const lookups: string[] = [];
+  const result = footprintWcs([{ points: keys.map((key) => ({ key })) }], (key) => {
+    lookups.push(key);
+    return covers.get(key);
+  });
+  assert.equal(result.length, 24);
+  assert.equal(lookups.at(-1), "a23");
+  assert.equal(footprintWcs([{ points: [{ key: "a0" }, { key: "b0" }] }], (key) => covers.get(key)).length, 1);
 });
 test("photo plane homography maps all four image corners with perspective", () => {
   const points = [{ x: 10, y: 15 }, { x: 170, y: 30 }, { x: 150, y: 180 }, { x: 30, y: 150 }];

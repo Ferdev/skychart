@@ -33,6 +33,30 @@ export type PlanTarget = {
   best_altitude_deg: number;
   moon_separation_deg: number;
 };
+/** One predicted transit of the planner's short list of deep transits of bright hosts. */
+export type PlannedTransit = {
+  key: string;
+  host_key: string;
+  name: string;
+  host_name: string;
+  status: "confirmed" | "candidate";
+  ra_deg: number;
+  dec_deg: number;
+  magnitude: number;
+  magnitude_band: string;
+  depth_ppt: number;
+  duration_hours: number;
+  epoch: number;
+  coverage: "full" | "no_baseline" | "partial";
+  ingress_utc: string;
+  mid_utc: string;
+  egress_utc: string;
+  uncertainty_minutes: number;
+  altitude_ingress_deg: number;
+  altitude_mid_deg: number;
+  altitude_egress_deg: number;
+  moon_separation_deg: number;
+};
 export type NightPlan = {
   date: string;
   min_altitude_deg: number;
@@ -41,6 +65,7 @@ export type NightPlan = {
   moon: { illuminated_fraction: number; windows: PlanWindow[] } | null;
   total: number;
   targets: PlanTarget[];
+  transits?: { total: number; transits: PlannedTransit[] };
   accuracy_note: string;
 };
 
@@ -87,6 +112,7 @@ export function planRequest(site: PlannerSite, date: string, filters: PlannerFil
     longitude_deg: site.longitude,
     date,
     min_altitude_deg: filters.minAltitude,
+    include_transits: true,
     ...(filters.type ? { types: [filters.type] } : {}),
     ...(filters.maxMagnitude === null ? {} : { max_magnitude: filters.maxMagnitude }),
     ...(filters.minSize === null ? {} : { min_size_arcmin: filters.minSize }),

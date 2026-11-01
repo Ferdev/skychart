@@ -1,5 +1,6 @@
 import { COMMUNITY_TRANSLATIONS } from "./communityTranslations";
 import { DATA_LABEL_TRANSLATIONS } from "./dataLabelTranslations";
+import { DEPTH_TRANSLATIONS } from "./depthTranslations";
 import { FIELD_TRANSLATIONS } from "./fieldTranslations";
 import { NOW_CALENDAR_TRANSLATIONS } from "./nowCalendarTranslations";
 import { OBJECT_TRANSLATIONS } from "./objectTranslations";
@@ -8,6 +9,7 @@ import { SEARCH_TRANSLATIONS } from "./searchTranslations";
 import { SETTINGS_TRANSLATIONS } from "./settingsTranslations";
 import { SHELL_TRANSLATIONS } from "./shellTranslations";
 import { SKY_TRANSLATIONS } from "./skyTranslations";
+import { TRANSIT_TRANSLATIONS } from "./transitTranslations";
 import { TYPE_TRANSLATIONS } from "./typeTranslations";
 import { TARGET_LIST_TRANSLATIONS } from "./targetListTranslations";
 import { UNIVERSE3D_TRANSLATIONS } from "./universe3dTranslations";
@@ -27,6 +29,8 @@ const AREAS: readonly Record<string, Record<string, string>>[] = [
   DATA_LABEL_TRANSLATIONS,
   COMMUNITY_TRANSLATIONS,
   PLANNER_TRANSLATIONS,
+  TRANSIT_TRANSLATIONS,
+  DEPTH_TRANSLATIONS,
   TARGET_LIST_TRANSLATIONS,
   NOW_CALENDAR_TRANSLATIONS,
 ];

@@ -1,10 +1,25 @@
 defmodule StarsmapApi.Community.Moderation do
   @moduledoc "Audited publication, takedown, and anonymous reports."
   import Ecto.Query
-  alias StarsmapApi.Community.{Photo, Photos, Action, Report, Ranking, Storage, Tour, Tours, User}
+
+  alias StarsmapApi.Community.{
+    Photo,
+    Photos,
+    Action,
+    Report,
+    Ranking,
+    Storage,
+    Tour,
+    Tours,
+    Transits,
+    Findings,
+    User
+  }
+
   alias StarsmapApi.CommunityRepo, as: Repo
 
   @listed ["review", "published", "hidden", "rejected"]
+  @account_actions ["cancel_votes", "suspend_account"]
 
   def queue, do: list("review", 0, 50)
 
@@ -44,12 +59,16 @@ defmodule StarsmapApi.Community.Moderation do
       Repo.aggregate(from(r in Report, where: is_nil(r.resolved_at)), :count)
     )
     |> Map.put("tours", max(Tours.open_report_count(), Tours.held_count()))
+    |> Map.put("transits", Transits.pending_count())
+    |> Map.put("findings", Findings.pending_count())
   end
 
-  @doc "Work that waits for a moderator: photos in review and open reports."
+  @doc "Work that waits for a moderator: photos, transit timings and candidates, and open reports."
   def pending_count do
     counts = counts()
-    counts["review"] + counts["reports"] + counts["tours"]
+
+    counts["review"] + counts["reports"] + counts["tours"] + counts["transits"] +
+      counts["findings"]
   end
 
   @doc "Private view of a photo for moderators: the public payload and the review signals."
@@ -128,11 +147,16 @@ defmodule StarsmapApi.Community.Moderation do
         on: p.id == a.photo_id,
         left_join: t in Tour,
         on: t.id == a.tour_id,
+        left_join: target in User,
+        on:
+          a.action in ^@account_actions and
+            fragment("left(?, 36) = ?::text", a.reason, target.id),
         order_by: [desc: a.inserted_at],
         limit: ^limit,
         select: %{
           action: a.action,
-          reason: a.reason,
+          # The record keeps the target's ID. A moderator reads the current handle.
+          reason: coalesce(fragment("? || substr(?, 37)", target.handle, a.reason), a.reason),
           at: a.inserted_at,
           moderator: u.name,
           photo_id: p.id,
@@ -147,11 +171,8 @@ defmodule StarsmapApi.Community.Moderation do
       when action in ["approve", "restore"] and reason in [nil, ""],
       do: review(user, id, action, if(action == "approve", do: "Approved", else: "Restored"))
 
-  def review(user, id, action, reason)
-      when action in ["approve", "hide", "reject", "restore"] and is_binary(reason) do
-    if user.role not in ["moderator", "admin"] or byte_size(reason) not in 3..2000 do
-      {:error, :not_allowed}
-    else
+  def review(user, id, action, reason) when action in ["approve", "hide", "reject", "restore"] do
+    with :ok <- check_reason(user, reason) do
       StarsmapApi.Community.transaction(fn ->
         photo = Photos.get(id) || Repo.rollback(:not_found)
         if photo.status in ["uploading", "processing", "failed"], do: Repo.rollback(:not_ready)
@@ -197,6 +218,7 @@ defmodule StarsmapApi.Community.Moderation do
             StarsmapApi.Community.PublishWorker.new(%{id: photo.id})
           )
 
+        StarsmapApi.Community.Depth.enqueue(photo)
         photo
       end)
     end
@@ -236,18 +258,22 @@ defmodule StarsmapApi.Community.Moderation do
   def report(_, _), do: {:error, :invalid_report}
 
   def reports do
-    Repo.all(
-      from r in Report, where: is_nil(r.resolved_at), order_by: [asc: r.inserted_at], limit: 50
-    )
-    |> Enum.map(fn r ->
-      %{id: r.id, reason: r.reason, at: r.inserted_at, photo: detail(Photos.get(r.photo_id))}
+    reports =
+      Repo.all(
+        from r in Report, where: is_nil(r.resolved_at), order_by: [asc: r.inserted_at], limit: 50
+      )
+
+    ids = reports |> Enum.map(& &1.photo_id) |> Enum.uniq()
+    # A detail has all open reports of its photo, so reports of one photo share one detail.
+    details = Repo.all(from p in Photo, where: p.id in ^ids) |> Map.new(&{&1.id, detail(&1)})
+
+    Enum.map(reports, fn r ->
+      %{id: r.id, reason: r.reason, at: r.inserted_at, photo: Map.fetch!(details, r.photo_id)}
     end)
   end
 
-  def cancel_votes(actor, handle, reason) when is_binary(reason) do
-    if actor.role not in ["admin", "moderator"] or byte_size(reason) not in 3..2000 do
-      {:error, :not_allowed}
-    else
+  def cancel_votes(actor, handle, reason) do
+    with :ok <- check_reason(actor, reason) do
       StarsmapApi.Community.transaction(fn ->
         user =
           Repo.get_by(StarsmapApi.Community.User, handle: handle) || Repo.rollback(:not_found)
@@ -266,7 +292,7 @@ defmodule StarsmapApi.Community.Moderation do
         Repo.insert!(%Action{
           user_id: actor.id,
           action: "cancel_votes",
-          reason: "#{handle}: #{reason}"
+          reason: account_reason(user, reason)
         })
 
         authors |> Enum.uniq() |> Enum.each(&Ranking.refresh_author/1)
@@ -275,13 +301,8 @@ defmodule StarsmapApi.Community.Moderation do
     end
   end
 
-  def cancel_votes(_, _, _), do: {:error, :not_allowed}
-
-  def suspend(actor, handle, reason, suspended)
-      when is_boolean(suspended) and is_binary(reason) do
-    if actor.role not in ["admin", "moderator"] or byte_size(reason) not in 3..2000 do
-      {:error, :not_allowed}
-    else
+  def suspend(actor, handle, reason, suspended) when is_boolean(suspended) do
+    with :ok <- check_reason(actor, reason) do
       StarsmapApi.Community.transaction(fn ->
         user =
           Repo.get_by(StarsmapApi.Community.User, handle: handle) || Repo.rollback(:not_found)
@@ -295,11 +316,21 @@ defmodule StarsmapApi.Community.Moderation do
         Repo.insert!(%Action{
           user_id: actor.id,
           action: "suspend_account",
-          reason: "#{handle}: #{reason}"
+          reason: account_reason(user, reason)
         })
 
-        subjects = Repo.all(from p in Photo, distinct: p.subject_id, select: p.subject_id)
-        Enum.each(subjects, &Ranking.refresh/1)
+        # The scores change only for the photos of this account and the photos with its votes,
+        # because the vote weights of a voter are counted for each author.
+        own = from p in Photo, where: p.user_id == ^user.id, select: p.subject_id
+
+        voted =
+          from p in Photo,
+            join: v in StarsmapApi.Community.Vote,
+            on: v.photo_id == p.id,
+            where: v.user_id == ^user.id,
+            select: p.subject_id
+
+        Repo.all(union(own, ^voted)) |> Enum.each(&Ranking.refresh/1)
 
         for photo <- Repo.all(from p in Photo, where: p.user_id == ^user.id) do
           {:ok, _} =
@@ -315,6 +346,41 @@ defmodule StarsmapApi.Community.Moderation do
   end
 
   def suspend(_, _, _, _), do: {:error, :not_allowed}
+
+  @doc "Replaces the handle at the start of the older account audit reasons with the user ID."
+  def forget_handle(user) do
+    prefix = "#{user.handle}: "
+
+    Repo.update_all(
+      from(a in Action,
+        where: a.action in ^@account_actions and fragment("starts_with(?, ?)", a.reason, ^prefix),
+        update: [
+          set: [
+            reason:
+              fragment(
+                "? || substr(?, ?)",
+                ^account_reason(user, ""),
+                a.reason,
+                ^(String.length(prefix) + 1)
+              ),
+            updated_at: ^StarsmapApi.Community.now()
+          ]
+        ]
+      ),
+      []
+    )
+  end
+
+  defp account_reason(user, reason), do: "#{user.id}: #{reason}"
+
+  # The role comes first: a person without the role gets no information about the reason.
+  defp check_reason(%{role: role}, reason) when role in ["moderator", "admin"] do
+    if is_binary(reason) and byte_size(reason) in 3..2000,
+      do: :ok,
+      else: {:error, :invalid_reason}
+  end
+
+  defp check_reason(_, _), do: {:error, :not_allowed}
 
   def publish_files(photo) do
     scratch =

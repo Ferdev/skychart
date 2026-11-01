@@ -329,6 +329,52 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
              conn |> get("/api/community/photographers/#{member.handle}") |> json_response(200)
   end
 
+  test "a moderation reason out of range gets its own error, not a permission error", %{
+    conn: conn
+  } do
+    {:ok, subject} = Subjects.ensure("moon")
+    :ok = Accounts.request_code("reason@example.com")
+    assert_receive {:community_code, "reason@example.com", code}
+    {:ok, token, member} = Accounts.verify("reason@example.com", code)
+
+    waiting =
+      Repo.insert!(%Photo{
+        user_id: member.id,
+        subject_id: subject.id,
+        declared_key: "moon",
+        title: "Waiting photo",
+        caption: "",
+        licence: "CC BY 4.0",
+        captured_at: StarsmapApi.Community.now(),
+        status: "review",
+        source_key: "uploads/reason",
+        size_bytes: 3
+      })
+
+    moderate = fn path, params ->
+      conn
+      |> put_req_cookie("cosmic-community", token)
+      |> write()
+      |> put_req_header("x-community-csrf", Accounts.csrf(token))
+      |> post("/api/community" <> path, params)
+      |> json_response(422)
+    end
+
+    assert %{"error" => "not_allowed"} =
+             moderate.("/photos/#{waiting.id}/review", %{action: "hide", reason: "Valid reason"})
+
+    Repo.update!(Ecto.Changeset.change(member, role: "moderator"))
+
+    for {path, params} <- [
+          {"/photos/#{waiting.id}/review", %{action: "hide"}},
+          {"/users/#{member.handle}/suspension", %{suspended: true}},
+          {"/users/#{member.handle}/cancel-votes", %{}}
+        ],
+        reason <- [%{reason: "ab"}, %{}] do
+      assert %{"error" => "invalid_reason"} = moderate.(path, Map.merge(params, reason))
+    end
+  end
+
   test "an open session loses review access when the address leaves the list", %{conn: conn} do
     Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
     on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
@@ -731,5 +777,37 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       response = get(conn, "/?tour=shared-0123456789abcdef0123456789abcdef")
       assert get_resp_header(response, "x-robots-tag") == ["noindex"]
     end
+  end
+
+  test "public transit timings have no session and writes need one", %{conn: conn} do
+    assert %{"timings" => [], "planets" => []} =
+             conn |> get("/api/objects/exosys-wasp-12/transits") |> json_response(200)
+
+    assert conn
+           |> put_req_header("origin", "http://www.example.com")
+           |> put_req_header("content-type", "application/json")
+           |> post("/api/community/transits", %{})
+           |> json_response(401)
+  end
+
+  test "comparison stars need a valid small area", %{conn: conn} do
+    assert %{"error" => "invalid_area"} =
+             conn
+             |> get("/api/transits/comparison-stars?ra=97&dec=29&radius=40")
+             |> json_response(400)
+
+    assert %{"stars" => []} =
+             conn
+             |> get("/api/transits/comparison-stars?ra=97.6&dec=29.6&radius=0.5")
+             |> json_response(200)
+  end
+
+  test "depth layers and their files have the gate of a published photo", %{conn: conn} do
+    id = Ecto.UUID.generate()
+
+    assert %{"error" => "not_found"} =
+             conn |> get("/api/photos/#{id}/depth") |> json_response(404)
+
+    assert conn |> get("/api/community/media/#{id}/depth-base") |> response(404)
   end
 end

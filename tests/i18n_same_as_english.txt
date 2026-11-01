@@ -91,3 +91,11 @@ community.mod.col.moderator de
 community.mod.col.photo fr
 community.nav.menu de
 community.privacy it
+transit.tab.transits fr
+transit.minutes es
+transit.minutes fr
+transit.minutes pt-BR
+transit.minutes it
+transit.altitudes pt-BR
+depth.pause fr
+depth.credit *
