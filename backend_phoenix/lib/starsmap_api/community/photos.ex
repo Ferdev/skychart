@@ -33,6 +33,7 @@ defmodule StarsmapApi.Community.Photos do
             size_bytes: size,
             status: "uploading"
           }
+          |> Map.merge(StarsmapApi.Community.Findings.coarse_site(attrs))
           |> Ecto.Changeset.cast(attrs, [
             :title,
             :caption,
@@ -40,7 +41,8 @@ defmodule StarsmapApi.Community.Photos do
             :captured_at,
             :equipment,
             :processing,
-            :composite
+            :composite,
+            :depth_allowed
           ])
           |> Ecto.Changeset.validate_required([:title, :licence, :captured_at])
           |> Ecto.Changeset.validate_length(:title, min: 1, max: 160)
@@ -179,7 +181,15 @@ defmodule StarsmapApi.Community.Photos do
 
         subject = Repo.get(StarsmapApi.Community.Subject, p.subject_id)
 
-        Map.take(p, [:id, :title, :status, :inserted_at, :declared_key, :published_at])
+        Map.take(p, [
+          :id,
+          :title,
+          :status,
+          :inserted_at,
+          :declared_key,
+          :published_at,
+          :depth_allowed
+        ])
         |> Map.merge(%{
           object_name: subject && subject.name,
           # The owner can read the private derivative while the photo is not public.

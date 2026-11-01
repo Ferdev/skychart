@@ -96,7 +96,7 @@ See [Catalog Tile Format](tile-format.md) for the SMP3 and SMPK1 contracts.
 - `GET /api/trails`
 - `GET /api/observe`
 - `GET /api/now`
-- `POST /api/observe/plan`
+- `POST /api/observe/plan`, with `include_transits: true` for the predicted transits
 - `POST /api/catalog/match`
 - `GET /feed.xml`
 - `GET /calendar.ics`

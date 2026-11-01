@@ -8,9 +8,12 @@ import type { TourBuilderHost } from "./tourBuilder";
 import { dateText, emptyState, h, licenceText, photoCard } from "./communityUi";
 import { PhotoIndex } from "./photoIndex";
 import { PhotoDialogs, type DialogHost } from "./photoDialogs";
+import { mountObjectFindings } from "./photoFindings";
 import { planeCorners, planeTransform } from "./photoPlane";
 import { overlayArea, overlayPlacements, quadContains, type OverlayArea, type OverlayPlacement } from "./photoOverlay";
 import type { SkyCamera } from "../sky/skyProjection";
+import { TransitFlow } from "../transit/transitFlow";
+import { canHaveTimings, mountTransitTimings } from "../transit/transitTimings";
 type Marker = { key: string; x: number; y: number };
 /** Size of a map card and the free space around it, for the overlap test. */
 const MARKER_WIDTH = 168;
@@ -34,6 +37,8 @@ export class CommunityController {
     void this.refresh();
     this.hub.refresh();
   });
+  /** The `Record transit` steps of the night planner. */
+  readonly recordTransit = new TransitFlow(this.api, (after) => this.dialogs.login(after));
   /** The tour builder works with the atlas through these two functions, which `main.ts` sets. */
   readonly tours: TourBuilderHost = { captureView: null, preview: null };
   readonly hub: CommunityHub = new CommunityHub(this.api, this.dialogs, () => void this.refresh(), this.host, this.tours);
@@ -527,6 +532,8 @@ export class CommunityController {
         this.paintGallery();
         void this.loadGallery(key);
       } else this.paintGallery();
+      if (canHaveTimings(key)) void mountTransitTimings(this.api, this.galleryNode, key, () => this.galleryKey !== key).catch(() => undefined);
+      else if (!key.startsWith("gaia-")) void mountObjectFindings(this.api, this.galleryNode, key, () => this.galleryKey !== key, (id) => this.openOverlayPhoto(id)).catch(() => undefined);
     }
   }
   private async loadGallery(key: string, append = false) {

@@ -228,6 +228,8 @@ The `Review` tab has these sections. Each number is the count of that section.
 | Waiting | Photos that wait for a decision, oldest first | `Approve`, `Reject` |
 | Reports | Published photos with an open report | `Keep photo`, `Hide` |
 | Tours | Shared tours with an open report, and hidden tours | `Keep tour`, `Hide`, `Restore` |
+| Transits | Transit timings that wait, then approved timings | `Approve`, `Reject`, `Hide` |
+| Candidates | Candidates with a second frame | `Approve`, `Reject` |
 | Published | Published photos, newest decision first | `Hide` |
 | Hidden, Rejected | Photos that are not public | `Restore` |
 | Decision log | The last 50 audit records | none |
@@ -329,6 +331,94 @@ does not start the interval. A failure does not stop the navigation of the atlas
 A new index version clears the area cache, so a takedown leaves the overlay at the
 next refresh. The minimum field of view of Sky view is 20 degrees, so a photo that
 is narrower than about 1 degree stays a footprint.
+
+## Transit timings
+
+The `Transits` list of the night planner shows the predicted transits of
+`data/catalogs/transit_targets.json` for one site and one night. Confirmed planets are
+first. Run `python3 scripts/build_transit_targets.py` to build the file again.
+
+`Record transit` has these steps:
+
+1. The person selects the FITS frames and enters the telescope and the camera. The
+   atlas accepts a 2D frame, or a cube with up to three planes, of 8, 16, or 32 bits or
+   floating point. It reads no compressed FITS. A frame needs a UTC time and an exposure.
+2. A Web Worker (`src/transit/transitWorker.ts`) reads the first frame and finds its
+   stars. The sky solution comes from the header. If the header has none, one small gray
+   copy of the frame goes to the plate solver (`POST /api/community/transits/frames`), in
+   the serial media queue. The worker deletes this copy after the solve. Without the
+   solver, or a solution in the header, the flow stops with a message.
+3. `GET /api/transits/comparison-stars` gives the Gaia stars of the field from the
+   catalog tables, down to G 14. The atlas selects up to six stars near the
+   target in brightness and color, with no close neighbour. The person checks the field.
+4. The worker measures each frame with one aperture. A star moves from its last
+   place, so slow drift and field rotation are followed. A frame with a lost or a
+   saturated star is dropped, and the count is shown.
+5. `POST /api/community/transits/fit` shows the light curve and the fit, and stores nothing.
+6. `POST /api/community/transits` runs the fit again on the server, so that a
+   result always comes from the measurements. It stores the observation with the state
+   `review`. Each account can send 10 timings in 24 hours, and one timing for each transit.
+
+Only the measurements leave the browser, with one exception: the gray copy of step 2.
+A moderator sees the light curve, the baseline scatter, the scatter of a comparison
+star, the dropped frames, and the fit values. Approval needs no text. `Reject` and
+`Hide` need a reason. The approved timings are in the `Transit timings` section of
+the object inspector (`GET /api/objects/:key/transits`), with the name of the observer, and
+are marked as a community result. The observer reads the state in `My photos`. Account
+export includes the timings, and account removal deletes them.
+
+## Depth flight
+
+A photographer must allow this use, in the publish form or in `My photos`. The default
+is off, also for older photos. A withdrawal deletes the layers at once. A photo must be
+published, have a solution of the plate solver, and be at most 5 degrees wide.
+
+After approval, `DepthWorker` runs `backend/community_depth.py` on the approved 1600 px
+derivative, never on the private master. It detects sources, removes the median offset of
+the solution, and keeps mutual nearest pairs within 3 pixels of a Gaia, Messier,
+OpenNGC, or SIMBAD record with a distance. DESI is not used, because its tiles have no
+distance. It needs at least three pairs with two different distances. `photo_depth_layers`
+holds each source, and the media storage holds `depth-base.webp` and `depth-sprites.webp`.
+A sprite has only the light above the filled sky, and the viewer adds the light of the
+layers, so the base image and the sprites give the derivative again at the start.
+
+`Enter this photo` in the photo viewer opens the flight on a canvas of its own, with a
+position slider, a free look (drag or arrow keys), and the nearest and the farthest
+source. It does not use the WebGL universe view: a selected sprite opens the object in
+the atlas, not a target card of the 3D view. `Save clip` records one guided flight with
+`MediaRecorder`, and the credit is in each frame. The depth files pass through
+Phoenix with the gate of a published photo, so that a canvas can record them. The events
+`depth_flight` and `depth_clip` go to the analytics.
+
+## Sky sweep
+
+The publish form has an optional coarse site. The browser and the server round it to one
+degree. It is in no public payload. A sweep needs that site, a capture time, and a solution
+of the plate solver. A photo without a site has no sweep. A person cannot add a site after
+the upload in this version.
+
+After a solve, `SweepWorker` runs in the serial media queue. It reads the JPL
+Small-Body Identification API for asteroids and comets (with the capture time and the
+coarse site), the DR11 catalog through the NOIRLab Astro Data Lab, and the ALeRCE ZTF
+object list. It then runs `backend/community_sweep.py` on the private master. The stats of
+the last sweep are in `photos.assets.sweep`, and `stop` gives the reason for no candidates.
+
+`photo_findings` has the kinds `known_body`, `known_transient`, and `candidate`:
+
+| State | Meaning |
+| --- | --- |
+| `proposed` | A known object that only the author and the moderators can see |
+| `waiting_second` | A candidate that needs a frame from another time |
+| `review` | A second photo, at least one hour apart, has a candidate within 4 arcseconds |
+| `reviewed` | A moderator approved it. The prepared report text exists |
+| `approved` | The author shows it. Only this state is public |
+| `dismissed`, `rejected` | The author or a moderator removed it |
+
+The photo viewer shows `Found in this photo` with a circle on each finding, and a blink of
+the photo and the DR11 cutout for a candidate. The object inspector and the page of a
+photographer list the public findings. The atlas sends no report: a person reads the text and
+sends it by hand. Account export includes the findings, and account removal deletes them
+and the site.
 
 ## Shared tours
 

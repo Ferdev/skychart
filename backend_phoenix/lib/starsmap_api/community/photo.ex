@@ -14,7 +14,10 @@ defmodule StarsmapApi.Community.Photo do
     field :user_id, Ecto.UUID
     field :subject_id, Ecto.UUID
     field :size_bytes, :integer
+    field :site_lat, :float
+    field :site_lon, :float
     field :composite, :boolean, default: false
+    field :depth_allowed, :boolean, default: false
     field :assets, :map, default: %{}
     field :wcs, :map
     field :captured_at, :utc_datetime_usec

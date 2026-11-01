@@ -23,6 +23,8 @@ export type Photo = {
   votes: number;
   thumbnail_url: string;
   image_url: string;
+  /** Only the response for one photo has this field. */
+  depth_ready?: boolean;
 };
 export type Cover = {
   subject_id: string;
@@ -56,6 +58,7 @@ export type OwnPhoto = {
   votes?: number;
   inserted_at?: string;
   moderation_reason?: string | null;
+  depth_allowed?: boolean;
 };
 export type Photographer = {
   handle: string;
@@ -109,6 +112,64 @@ export type ReviewAction = {
   photo_title?: string | null;
 };
 
+/** One result of the sweep of a photo. `state`, `report`, and the photo fields depend on the list. */
+export type Finding = {
+  id: string;
+  kind: "known_body" | "known_transient" | "candidate";
+  designation?: string | null;
+  ra_deg: number;
+  dec_deg: number;
+  x?: number | null;
+  y?: number | null;
+  magnitude?: number | null;
+  recovered?: boolean;
+  near_key?: string | null;
+  near_name?: string | null;
+  state?: string;
+  report?: string | null;
+  photo_id?: string;
+  photo_title?: string;
+  captured_at?: string;
+  author?: { handle: string; name: string };
+};
+/** A candidate in the review tools, with the two frames. */
+export type ReviewFinding = Finding & {
+  image_url: string;
+  wcs: import("./photoFootprint").Wcs;
+  second_frame?: { id: string; title: string; captured_at: string; image_url: string; wcs: import("./photoFootprint").Wcs; x?: number | null; y?: number | null } | null;
+};
+
+/** A transit timing of the signed-in observer. */
+export type OwnTransit = {
+  id: string;
+  object_name: string;
+  mid_time_utc: string;
+  uncertainty_minutes: number;
+  review_state: string;
+  moderation_reason?: string | null;
+};
+/** A transit timing in the review tools. */
+export type ReviewTransit = {
+  id: string;
+  object_name: string;
+  target_status: string;
+  night: string;
+  mid_time_utc: string;
+  uncertainty_minutes: number;
+  o_minus_c_minutes: number;
+  predicted_uncertainty_minutes: number;
+  depth_ppt: number;
+  duration_minutes: number;
+  frame_count: number;
+  instrument: string;
+  method_version: string;
+  observer: { handle: string; name: string };
+  review_state: string;
+  submitted_at: string;
+  checks: Record<string, number | string | null>;
+  measurements?: { points: [number, number, number][]; model?: import("../transit/lightCurve").CurveModel } | null;
+};
+
 /** A tour of the signed-in person. */
 export type OwnTour = {
   id: string;
@@ -140,6 +201,11 @@ const ERROR_KEYS = new Set([
   "invalid_wcs",
   "invalid_tour",
   "tour_quota",
+  "transit_rejected",
+  "transit_quota",
+  "transit_duplicate",
+  "invalid_transit",
+  "transit_fit_unavailable",
 ]);
 
 export class CommunityApi {

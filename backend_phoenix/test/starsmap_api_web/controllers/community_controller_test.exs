@@ -732,4 +732,36 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       assert get_resp_header(response, "x-robots-tag") == ["noindex"]
     end
   end
+
+  test "public transit timings have no session and writes need one", %{conn: conn} do
+    assert %{"timings" => [], "planets" => []} =
+             conn |> get("/api/objects/exosys-wasp-12/transits") |> json_response(200)
+
+    assert conn
+           |> put_req_header("origin", "http://www.example.com")
+           |> put_req_header("content-type", "application/json")
+           |> post("/api/community/transits", %{})
+           |> json_response(401)
+  end
+
+  test "comparison stars need a valid small area", %{conn: conn} do
+    assert %{"error" => "invalid_area"} =
+             conn
+             |> get("/api/transits/comparison-stars?ra=97&dec=29&radius=40")
+             |> json_response(400)
+
+    assert %{"stars" => []} =
+             conn
+             |> get("/api/transits/comparison-stars?ra=97.6&dec=29.6&radius=0.5")
+             |> json_response(200)
+  end
+
+  test "depth layers and their files have the gate of a published photo", %{conn: conn} do
+    id = Ecto.UUID.generate()
+
+    assert %{"error" => "not_found"} =
+             conn |> get("/api/photos/#{id}/depth") |> json_response(404)
+
+    assert conn |> get("/api/community/media/#{id}/depth-base") |> response(404)
+  end
 end
