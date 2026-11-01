@@ -18,6 +18,17 @@ defmodule StarsmapApi.Community do
     Path.join(Application.get_env(:starsmap_api, :community_backend_root, "/app/backend"), name)
   end
 
+  @doc "The interpreter with numpy: the project environment next to the backend, when it exists."
+  def python do
+    path =
+      Path.expand(
+        "../.venv/bin/python",
+        Application.get_env(:starsmap_api, :community_backend_root, "/app/backend")
+      )
+
+    if File.exists?(path), do: path, else: "python3"
+  end
+
   def uuid(value) do
     case Ecto.UUID.cast(value) do
       {:ok, id} -> id

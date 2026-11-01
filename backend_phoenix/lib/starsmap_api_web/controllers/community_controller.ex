@@ -1,6 +1,19 @@
 defmodule StarsmapApiWeb.CommunityController do
   use StarsmapApiWeb, :controller
-  alias StarsmapApi.Community.{Accounts, Photos, Ranking, Moderation, SkyOverlay, Storage, Tours}
+
+  alias StarsmapApi.Community.{
+    Accounts,
+    Depth,
+    FieldCatalog,
+    Findings,
+    Photos,
+    Ranking,
+    Moderation,
+    SkyOverlay,
+    Storage,
+    Tours,
+    Transits
+  }
 
   def config(conn, _),
     do:
@@ -132,9 +145,51 @@ defmodule StarsmapApiWeb.CommunityController do
     photo = Photos.get(id)
 
     if Photos.visible?(photo),
-      do: json(conn, Photos.public(photo)),
+      do: json(conn, photo |> Photos.public() |> Map.put(:depth_ready, Depth.ready?(photo))),
       else: error(conn, :not_found, :not_found)
   end
+
+  def photo_findings(conn, %{"id" => id}) do
+    case Findings.visible_to(conn.assigns.community_user, id) do
+      {:ok, findings} -> json(conn, %{findings: findings})
+      _ -> error(conn, :not_found, :not_found)
+    end
+  end
+
+  def object_findings(conn, %{"key" => key}),
+    do: json(conn, %{findings: Findings.for_object(key)})
+
+  def finding_public(conn, %{"id" => id} = params),
+    do: respond(conn, Findings.set_public(conn.assigns.community_user, id, params["show"]), & &1)
+
+  def review_findings(conn, _) do
+    if moderator?(conn),
+      do: json(conn, %{findings: Findings.review_list()}),
+      else: error(conn, :forbidden, :not_allowed)
+  end
+
+  def review_finding(conn, %{"id" => id} = p),
+    do:
+      respond(
+        conn,
+        Findings.review(conn.assigns.community_user, id, p["action"], p["reason"]),
+        &Map.take(&1, [:id, :state, :report])
+      )
+
+  def depth(conn, %{"id" => id}) do
+    case Depth.public(id) do
+      {:ok, layers} -> json(conn, layers)
+      _ -> error(conn, :not_found, :not_found)
+    end
+  end
+
+  def depth_permission(conn, %{"id" => id} = params),
+    do:
+      respond(
+        conn,
+        Depth.set_allowed(conn.assigns.community_user, id, params["allowed"]),
+        & &1
+      )
 
   def intent(conn, params) do
     case Photos.create(conn.assigns.community_user, params) do
@@ -193,7 +248,8 @@ defmodule StarsmapApiWeb.CommunityController do
 
         json(conn, %{
           photographer: Map.put(stats, :joined_at, user.inserted_at),
-          photos: user.id |> Photos.by_author() |> Enum.take(48) |> Enum.map(&Photos.public/1)
+          photos: user.id |> Photos.by_author() |> Enum.take(48) |> Enum.map(&Photos.public/1),
+          findings: Findings.for_author(user.id)
         })
     end
   end
@@ -304,6 +360,70 @@ defmodule StarsmapApiWeb.CommunityController do
         &Map.take(&1, [:id, :status])
       )
 
+  def transits(conn, %{"key" => key}), do: json(conn, Transits.public_list(key))
+
+  # The Gaia stars for one field. The radius has a low limit, because a frame of a
+  # small telescope is small and this request reads a large table.
+  def comparison_stars(conn, params) do
+    with {:ok, ra} <- bounded(params["ra"], 0, 360),
+         {:ok, dec} <- bounded(params["dec"], -90, 90),
+         {:ok, radius} <- bounded(params["radius"], 0.05, 2) do
+      stars =
+        FieldCatalog.cone(ra, dec, radius, max_magnitude: 15.0, limit: 400)
+        |> Enum.map(fn star ->
+          %{
+            key: star.key,
+            ra: star.ra,
+            dec: star.dec,
+            magnitude: star.magnitude,
+            bp_rp: is_map(star.facts) && star.facts["bp_rp"]
+          }
+        end)
+
+      json(conn, %{stars: stars})
+    else
+      :error -> error(conn, :bad_request, :invalid_area)
+    end
+  end
+
+  def my_transits(conn, _),
+    do: json(conn, %{transits: Transits.mine(conn.assigns.community_user)})
+
+  def fit_transit(conn, params), do: respond(conn, Transits.preview(params), & &1)
+
+  def submit_transit(conn, params),
+    do:
+      respond(
+        conn,
+        Transits.submit(conn.assigns.community_user, params),
+        &Map.take(&1, [:id, :review_state])
+      )
+
+  def queue_frame(conn, params),
+    do:
+      respond(
+        conn,
+        Transits.queue_frame(conn.assigns.community_user, params),
+        &Map.take(&1, [:id, :status])
+      )
+
+  def frame_status(conn, %{"id" => id}),
+    do: respond(conn, Transits.frame_status(conn.assigns.community_user, id), & &1)
+
+  def review_transits(conn, params) do
+    if moderator?(conn),
+      do: json(conn, %{transits: Transits.review_list(params["state"])}),
+      else: error(conn, :forbidden, :not_allowed)
+  end
+
+  def review_transit(conn, %{"id" => id} = p),
+    do:
+      respond(
+        conn,
+        Transits.review(conn.assigns.community_user, id, p["action"], p["reason"]),
+        &Map.take(&1, [:id, :review_state])
+      )
+
   def media(conn, %{"id" => id, "size" => size}) when size in ["96", "320", "1600"] do
     photo = Photos.get(id)
 
@@ -345,6 +465,40 @@ defmodule StarsmapApiWeb.CommunityController do
             {:ok, %{body: bytes}} -> send_resp(conn, 200, bytes)
             _ -> error(conn, :not_found, :not_found)
           end
+        end
+      end
+    else
+      error(conn, :not_found, :not_found)
+    end
+  end
+
+  # Depth layers pass through this server, so that a canvas with them can record a clip.
+  def media(conn, %{"id" => id, "size" => size}) when size in ["depth-base", "depth-sprites"] do
+    photo = Photos.get(id)
+
+    if Photos.visible?(photo) && photo.depth_allowed do
+      key = "masters/#{photo.id}/#{size}.webp"
+
+      conn =
+        conn
+        |> put_resp_header("cache-control", "no-store")
+        |> put_resp_content_type("image/webp")
+        |> put_resp_header("x-content-type-options", "nosniff")
+
+      if Storage.adapter() == Storage.Local do
+        path = Storage.local_path(key)
+
+        if File.regular?(path),
+          do: send_file(conn, 200, path),
+          else: error(conn, :not_found, :not_found)
+      else
+        case ExAws.S3.get_object(
+               Application.fetch_env!(:starsmap_api, :community_s3_bucket),
+               key
+             )
+             |> ExAws.request() do
+          {:ok, %{body: bytes}} -> send_resp(conn, 200, bytes)
+          _ -> error(conn, :not_found, :not_found)
         end
       end
     else

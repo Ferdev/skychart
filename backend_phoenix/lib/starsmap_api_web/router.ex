@@ -178,6 +178,10 @@ defmodule StarsmapApiWeb.Router do
     get "/photos/index", CommunityController, :index
     get "/photos/sky", CommunityController, :sky
     get "/objects/:key/photos", CommunityController, :gallery
+    get "/objects/:key/transits", CommunityController, :transits
+    get "/transits/comparison-stars", CommunityController, :comparison_stars
+    get "/photos/:id/depth", CommunityController, :depth
+    get "/objects/:key/findings", CommunityController, :object_findings
     get "/photos/:id", CommunityController, :show
     get "/community/rankings", CommunityController, :rankings
     get "/community/photographers", CommunityController, :photographers
@@ -206,6 +210,10 @@ defmodule StarsmapApiWeb.Router do
     post "/photos/:id/solve", CommunityController, :solve
     post "/photos/:id/wcs", CommunityController, :wcs
     post "/photos/:id/complete", CommunityController, :complete
+    post "/photos/:id/depth-permission", CommunityController, :depth_permission
+    post "/findings/:id/public", CommunityController, :finding_public
+    get "/review/findings", CommunityController, :review_findings
+    post "/findings/:id/review", CommunityController, :review_finding
     post "/photos/:id/vote", CommunityController, :vote
     get "/photos/:id/vote", CommunityController, :vote_state
     delete "/photos/:id/vote", CommunityController, :vote
@@ -215,6 +223,13 @@ defmodule StarsmapApiWeb.Router do
     get "/review/log", CommunityController, :review_log
     post "/photos/:id/review", CommunityController, :review
     get "/review/tours", CommunityController, :review_tours
+    get "/review/transits", CommunityController, :review_transits
+    post "/transits/:id/review", CommunityController, :review_transit
+    get "/transits", CommunityController, :my_transits
+    post "/transits/fit", CommunityController, :fit_transit
+    post "/transits", CommunityController, :submit_transit
+    post "/transits/frames", CommunityController, :queue_frame
+    get "/transits/frames/:id", CommunityController, :frame_status
     post "/tours/:id/review", CommunityController, :review_tour
     get "/tours", CommunityController, :tours
     post "/tours", CommunityController, :create_tour
@@ -227,6 +242,7 @@ defmodule StarsmapApiWeb.Router do
   scope "/api/community", StarsmapApiWeb do
     pipe_through :community_media
     get "/session", CommunityController, :session
+    get "/photos/:id/findings", CommunityController, :photo_findings
     get "/media/:id/:size", CommunityController, :media
   end
 

@@ -1,9 +1,10 @@
 import { formatCount, formatFixed } from "../format/quantity";
 import { NEW_TAB_LINK_ATTRIBUTES } from "../format/links";
 import { t } from "../i18n";
-import { CommunityApi, errorText, type Coverage, type OwnPhoto, type Photo, type Photographer } from "./api";
-import { dateText, emptyState, h, openDialog, photoCard, segmented, statusBadge, type DialogView } from "./communityUi";
+import { CommunityApi, errorText, type Coverage, type Finding, type OwnPhoto, type OwnTransit, type Photo, type Photographer } from "./api";
+import { dateText, dateTimeText, emptyState, h, openDialog, photoCard, segmented, statusBadge, type DialogView } from "./communityUi";
 import { renderReview } from "./communityReview";
+import { findingList } from "./photoFindings";
 import { renderTourBuilder, type TourBuilderHost } from "./tourBuilder";
 import type { DialogHost, PhotoDialogs } from "./photoDialogs";
 
@@ -230,7 +231,7 @@ export class CommunityHub {
     panel.innerHTML = `<button type="button" class="text-action community-back" data-back>‹ ${h(t("community.profile.back"))}</button><div class="community-profile" aria-busy="true"></div>`;
     panel.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => this.open("photographers");
     const root = panel.querySelector<HTMLElement>(".community-profile")!;
-    let data: { photographer: Photographer; photos: Photo[] };
+    let data: { photographer: Photographer; photos: Photo[]; findings?: Finding[] };
     try {
       data = await this.api.request(`/api/community/photographers/${encodeURIComponent(handle)}`);
     } catch {
@@ -246,8 +247,12 @@ export class CommunityHub {
       data.photos.length
         ? `<div class="community-photo-grid">${data.photos.map((photo) => photoCard(photo, { object: true })).join("")}</div>`
         : emptyState(t("community.profile.empty"))
-    }`;
+    }${data.findings?.length ? `<section class="community-section"><h3>${h(t("finding.title"))}</h3>${findingList(data.findings)}</section>` : ""}`;
     this.bindPhotos(root, data.photos);
+    root.querySelectorAll<HTMLButtonElement>("[data-finding-photo]").forEach((button) => {
+      const photo = data.photos.find((item) => item.id === button.dataset.findingPhoto);
+      if (photo) button.onclick = () => void this.dialogs.photo(photo);
+    });
   }
 
   private async coverage(panel: HTMLElement, current: () => boolean) {
@@ -328,7 +333,7 @@ export class CommunityHub {
     const message = (text: string) => {
       if (this.view) this.view.message.textContent = text;
     };
-    panel.innerHTML = `<section class="community-section"><h3>${h(t("community.account.photos"))}</h3><div data-photos aria-busy="true"></div></section><section class="community-section"><h3>${h(t("community.account.profile"))}</h3><form class="community-form" data-profile><div class="community-form__grid"><label class="community-field"><span>${h(t("community.field.name"))}</span><input name="name" value="${h(user.name)}" maxlength="80" required></label><label class="community-field"><span>${h(t("community.field.handle"))}</span><input name="handle" value="${h(user.handle)}" pattern="[a-z][a-z0-9-]{2,39}" aria-describedby="community-handle-help" required></label><p class="community-field__help" id="community-handle-help">${h(t("community.account.handleHelp"))}</p></div><div class="community-actions"><button class="secondary-action">${h(t("community.account.save"))}</button></div></form></section><section class="community-section"><h3>${h(t("community.account.data"))}</h3><div class="community-actions community-actions--wrap"><button type="button" class="text-action" data-export>${h(t("community.account.export"))}</button><button type="button" class="text-action" data-logout>${h(t("community.signOut"))}</button><button type="button" class="text-action community-danger" data-delete>${h(t("community.account.remove"))}</button></div></section>`;
+    panel.innerHTML = `<section class="community-section"><h3>${h(t("community.account.photos"))}</h3><div data-photos aria-busy="true"></div></section><section class="community-section" data-transits hidden><h3>${h(t("transit.timings.title"))}</h3><ul class="community-findings"></ul></section><section class="community-section"><h3>${h(t("community.account.profile"))}</h3><form class="community-form" data-profile><div class="community-form__grid"><label class="community-field"><span>${h(t("community.field.name"))}</span><input name="name" value="${h(user.name)}" maxlength="80" required></label><label class="community-field"><span>${h(t("community.field.handle"))}</span><input name="handle" value="${h(user.handle)}" pattern="[a-z][a-z0-9-]{2,39}" aria-describedby="community-handle-help" required></label><p class="community-field__help" id="community-handle-help">${h(t("community.account.handleHelp"))}</p></div><div class="community-actions"><button class="secondary-action">${h(t("community.account.save"))}</button></div></form></section><section class="community-section"><h3>${h(t("community.account.data"))}</h3><div class="community-actions community-actions--wrap"><button type="button" class="text-action" data-export>${h(t("community.account.export"))}</button><button type="button" class="text-action" data-logout>${h(t("community.signOut"))}</button><button type="button" class="text-action community-danger" data-delete>${h(t("community.account.remove"))}</button></div></section>`;
     const form = panel.querySelector<HTMLFormElement>("[data-profile]")!;
     form.onsubmit = async (event) => {
       event.preventDefault();
@@ -384,6 +389,17 @@ export class CommunityHub {
 
     const data = await this.api.request<{ photos: OwnPhoto[] }>("/api/community/me");
     if (!current()) return;
+    void this.api
+      .request<{ transits: OwnTransit[] }>("/api/community/transits")
+      .then(({ transits }) => {
+        const section = panel.querySelector<HTMLElement>("[data-transits]");
+        if (!current() || !section || !transits.length) return;
+        section.hidden = false;
+        section.querySelector("ul")!.innerHTML = transits
+          .map((item) => `<li><strong>${h(item.object_name)}</strong><span class="community-muted">${h(dateTimeText(item.mid_time_utc))} · ± ${h(t("transit.minutes", { value: formatFixed(item.uncertainty_minutes, 2) }))}</span>${statusBadge(item.review_state === "approved" ? "published" : item.review_state)}${item.moderation_reason ? `<p class="community-note">${h(t("community.account.note", { reason: item.moderation_reason }))}</p>` : ""}</li>`)
+          .join("");
+      })
+      .catch(() => undefined);
     const list = panel.querySelector<HTMLElement>("[data-photos]")!;
     list.removeAttribute("aria-busy");
     if (!data.photos.length) {
@@ -393,7 +409,7 @@ export class CommunityHub {
     list.innerHTML = `<ul class="community-own-list">${data.photos
       .map((photo) => {
         const ready = !["uploading", "processing", "failed"].includes(photo.status);
-        return `<li class="community-own" data-id="${h(photo.id)}">${photo.thumbnail_url ? `<img loading="lazy" decoding="async" src="${h(photo.thumbnail_url)}" alt="">` : `<span class="community-own__blank" aria-hidden="true"></span>`}<div class="community-own__text"><strong>${h(photo.title)}</strong><span class="community-muted">${h([photo.object_name, dateText(photo.inserted_at)].filter(Boolean).join(" · "))}</span>${statusBadge(photo.status)}${photo.moderation_reason && ["rejected", "hidden"].includes(photo.status) ? `<p class="community-note">${h(t("community.account.note", { reason: photo.moderation_reason }))}</p>` : ""}</div><div class="community-actions community-actions--wrap">${ready ? `<button type="button" class="text-action" data-wcs>${h(t("community.wcs.title"))}</button><button type="button" class="text-action" data-solve>${h(t("community.wcs.solve"))}</button>` : ""}<button type="button" class="text-action community-danger" data-remove>${h(t("community.remove"))}</button></div></li>`;
+        return `<li class="community-own" data-id="${h(photo.id)}">${photo.thumbnail_url ? `<img loading="lazy" decoding="async" src="${h(photo.thumbnail_url)}" alt="">` : `<span class="community-own__blank" aria-hidden="true"></span>`}<div class="community-own__text"><strong>${h(photo.title)}</strong><span class="community-muted">${h([photo.object_name, dateText(photo.inserted_at)].filter(Boolean).join(" · "))}</span>${statusBadge(photo.status)}${photo.moderation_reason && ["rejected", "hidden"].includes(photo.status) ? `<p class="community-note">${h(t("community.account.note", { reason: photo.moderation_reason }))}</p>` : ""}</div><div class="community-actions community-actions--wrap">${ready ? `<button type="button" class="text-action" data-wcs>${h(t("community.wcs.title"))}</button><button type="button" class="text-action" data-solve>${h(t("community.wcs.solve"))}</button><button type="button" class="text-action" data-depth-permission="${photo.depth_allowed ? "false" : "true"}">${h(t(photo.depth_allowed ? "depth.withdraw" : "depth.allow"))}</button>` : ""}<button type="button" class="text-action community-danger" data-remove>${h(t("community.remove"))}</button></div></li>`;
       })
       .join("")}</ul>`;
     list.querySelectorAll<HTMLElement>(".community-own").forEach((row) => {
@@ -404,6 +420,19 @@ export class CommunityHub {
           try {
             await this.api.request(`/api/community/photos/${id}/solve`, "POST", {});
             message(t("community.wcs.queued"));
+          } catch (error) {
+            message(errorText(error));
+          }
+        };
+      const permission = row.querySelector<HTMLButtonElement>("[data-depth-permission]");
+      if (permission)
+        permission.onclick = async () => {
+          const allowed = permission.dataset.depthPermission === "true";
+          try {
+            await this.api.request(`/api/community/photos/${id}/depth-permission`, "POST", { allowed });
+            permission.dataset.depthPermission = String(!allowed);
+            permission.textContent = t(allowed ? "depth.withdraw" : "depth.allow");
+            message(t("community.account.saved"));
           } catch (error) {
             message(errorText(error));
           }
