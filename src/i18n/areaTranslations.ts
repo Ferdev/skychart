@@ -1,5 +1,7 @@
 import { COMMUNITY_TRANSLATIONS } from "./communityTranslations";
 import { DATA_LABEL_TRANSLATIONS } from "./dataLabelTranslations";
+import { ANSWER_FLIGHT_TRANSLATIONS } from "./answerFlightTranslations";
+import { DEEP_FIELD_TRANSLATIONS } from "./deepFieldTranslations";
 import { DEPTH_TRANSLATIONS } from "./depthTranslations";
 import { FIELD_TRANSLATIONS } from "./fieldTranslations";
 import { NOW_CALENDAR_TRANSLATIONS } from "./nowCalendarTranslations";
@@ -31,6 +33,8 @@ const AREAS: readonly Record<string, Record<string, string>>[] = [
   PLANNER_TRANSLATIONS,
   TRANSIT_TRANSLATIONS,
   DEPTH_TRANSLATIONS,
+  DEEP_FIELD_TRANSLATIONS,
+  ANSWER_FLIGHT_TRANSLATIONS,
   TARGET_LIST_TRANSLATIONS,
   NOW_CALENDAR_TRANSLATIONS,
 ];

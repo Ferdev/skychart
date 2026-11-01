@@ -1,7 +1,9 @@
 defmodule StarsmapApi.Community.Privacy do
   @moduledoc "Private account exports and immediate, audited account removal."
   import Ecto.Query
+
   alias StarsmapApi.Community.{
+    DeepFields,
     Findings,
     Photo,
     Vote,
@@ -39,7 +41,8 @@ defmodule StarsmapApi.Community.Privacy do
       votes: Repo.all(from v in Vote, where: v.user_id == ^user.id, select: v.photo_id),
       tours: Tours.export(user),
       transit_timings: Transits.export(user),
-      findings: Findings.export(user)
+      findings: Findings.export(user),
+      deep_field_frames: DeepFields.export(user)
     }
   end
 
@@ -61,6 +64,7 @@ defmodule StarsmapApi.Community.Privacy do
       Tours.delete_all(user)
       Transits.delete_all(user)
       Findings.delete_all(user)
+      DeepFields.delete_all(user)
 
       Enum.each(photos, fn p ->
         Repo.update!(
@@ -116,6 +120,7 @@ defmodule StarsmapApi.Community.Privacy do
     if String.contains?(url, [
          "/community/",
          "/api/photos/",
+         "/api/flights",
          "/api/observe",
          "/api/catalog/match"
        ]) do

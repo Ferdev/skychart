@@ -3,6 +3,7 @@ defmodule StarsmapApiWeb.CommunityController do
 
   alias StarsmapApi.Community.{
     Accounts,
+    DeepFields,
     Depth,
     FieldCatalog,
     Findings,
@@ -19,6 +20,7 @@ defmodule StarsmapApiWeb.CommunityController do
     do:
       json(conn, %{
         enabled: StarsmapApi.Community.enabled?(),
+        flights: StarsmapApi.Flights.enabled?(),
         max_bytes: 60_000_000,
         max_pixels: 120_000_000,
         formats: ["image/jpeg", "image/png", "image/tiff"]
@@ -52,7 +54,12 @@ defmodule StarsmapApiWeb.CommunityController do
       do:
         json(
           conn,
-          Map.put(identity(conn), :photos, Photos.mine(conn.assigns.community_user))
+          conn
+          |> identity()
+          |> Map.merge(%{
+            photos: Photos.mine(conn.assigns.community_user),
+            deep_field_future: not is_nil(conn.assigns.community_user.deep_field_consent_at)
+          })
         ),
       else: json(conn, %{user: nil, csrf: "", photos: [], review_count: 0})
   end
@@ -139,13 +146,26 @@ defmodule StarsmapApiWeb.CommunityController do
   end
 
   def gallery(conn, %{"key" => key} = params),
-    do: json(conn, %{photos: Photos.gallery(key, params["cursor"])})
+    do:
+      json(conn, %{
+        photos: Photos.gallery(key, params["cursor"]),
+        deep_field: DeepFields.for_key(key)
+      })
 
   def show(conn, %{"id" => id}) do
     photo = Photos.get(id)
 
     if Photos.visible?(photo),
-      do: json(conn, photo |> Photos.public() |> Map.put(:depth_ready, Depth.ready?(photo))),
+      do:
+        json(
+          conn,
+          photo
+          |> Photos.public()
+          |> Map.merge(%{
+            depth_ready: Depth.ready?(photo),
+            deep_field_open: DeepFields.open_for(photo)
+          })
+        ),
       else: error(conn, :not_found, :not_found)
   end
 

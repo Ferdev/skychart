@@ -1,14 +1,27 @@
+import { chipKey, factText, speechText, type FlightSource, type NarrationSentence } from "./community/flightNarration";
 import { decodeViewState, type ViewState } from "./viewState";
 
-export type TourStep = { viewState: string; title: string; body: string; holdMs?: number };
-export type Tour = { slug: string; title: string; description: string; steps: TourStep[]; author?: string };
+export type TourStep = {
+  viewState: string;
+  title: string;
+  body: string;
+  holdMs?: number;
+  /** An answer flight: the narration with a chip for each number and each object. */
+  sentences?: NarrationSentence[];
+  sources?: FlightSource[] | null;
+};
+export type Tour = { slug: string; title: string; description: string; steps: TourStep[]; author?: string; narrated?: boolean; flight?: string };
 /** A tour of a community member: the slug is this prefix and the unlisted token of the tour. */
 export const SHARED_TOUR_PREFIX = "shared-";
-/** Analytics never get the unlisted token of a shared tour. */
-const analyticsName = (slug: string) => (slug.startsWith(SHARED_TOUR_PREFIX) ? "shared" : slug);
-const tourAddress = (slug: string) => slug.startsWith(SHARED_TOUR_PREFIX)
-  ? `/api/community/shared-tours/${encodeURIComponent(slug.slice(SHARED_TOUR_PREFIX.length))}`
-  : `/tours/${encodeURIComponent(slug)}.json`;
+/** An answer flight: the slug is this prefix and the stable name of the flight. */
+export const ANSWER_FLIGHT_PREFIX = "answer-";
+/** Analytics never get the unlisted token of a shared tour, or the question behind a flight. */
+const analyticsName = (slug: string) => (slug.startsWith(SHARED_TOUR_PREFIX) ? "shared" : slug.startsWith(ANSWER_FLIGHT_PREFIX) ? "answer" : slug);
+const tourAddress = (slug: string) => {
+  if (slug.startsWith(SHARED_TOUR_PREFIX)) return `/api/community/shared-tours/${encodeURIComponent(slug.slice(SHARED_TOUR_PREFIX.length))}`;
+  if (slug.startsWith(ANSWER_FLIGHT_PREFIX)) return `/api/flights/${encodeURIComponent(slug.slice(ANSWER_FLIGHT_PREFIX.length))}`;
+  return `/tours/${encodeURIComponent(slug)}.json`;
+};
 export type TourPlayerAdapter = {
   navigate(state: ViewState, options: { animate: boolean; slug: string; step: number; restoring: boolean; signal: AbortSignal }): Promise<void>;
   prewarm(state: ViewState): void;
@@ -19,6 +32,10 @@ export type TourPlayerAdapter = {
   closed(): void;
   /** Opens the report form of a shared tour. */
   report?(slug: string): void;
+  /** The language of the reader, for numbers and browser speech. */
+  locale(): string;
+  /** A chip opens its source record in the inspector. */
+  openObject?(key: string): void;
 };
 
 /** The card that shows one step of a guided tour and moves the atlas to the view of that step. */
@@ -28,6 +45,8 @@ export class TourPlayer {
   private timer: number | null = null;
   private transition: AbortController | null = null;
   private plate = document.createElement("section");
+  private speaking = false;
+  private arrival: Promise<unknown> = Promise.resolve();
 
   constructor(private adapter: TourPlayerAdapter) {
     Object.assign(this.plate, { id: "tour-player", className: "tour-player", hidden: true });
@@ -40,6 +59,10 @@ export class TourPlayer {
       if (action === "previous") void this.go(this.index - 1);
       if (action === "close") this.close();
       if (action === "report" && this.tour) this.adapter.report?.(this.tour.slug);
+      if (action === "speak") this.toggleSpeech();
+      const chip = target.closest<HTMLButtonElement>("[data-tour-object]");
+      // The view of the step replaces the selection, so a click during the flight waits for its end.
+      if (chip) void this.arrival.then(() => this.adapter.openObject?.(chip.dataset.tourObject!));
       const dot = target.closest<HTMLButtonElement>("[data-tour-step]");
       if (dot) void this.go(Number(dot.dataset.tourStep));
     });
@@ -110,18 +133,78 @@ export class TourPlayer {
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
     this.index = index;
+    this.stopVoice();
     const step = this.tour.steps[index]!;
     const state = decodeViewState(step.viewState)!;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     this.plate.dataset.motion = reduced ? "cut" : "flight";
     if (restoring) this.render();
-    await this.adapter.navigate(state, { animate: !reduced, slug: this.tour.slug, step: index, restoring, signal: transition.signal });
+    const flight = this.adapter.navigate(state, { animate: !reduced, slug: this.tour.slug, step: index, restoring, signal: transition.signal });
+    this.arrival = flight.catch(() => undefined);
+    await flight;
     if (transition.signal.aborted) return;
     if (!restoring) this.render();
     const next = this.tour.steps[index + 1];
     if (next) this.adapter.prewarm(decodeViewState(next.viewState)!);
     if (!restoring && step.holdMs && next) this.timer = window.setTimeout(() => void this.go(index + 1), step.holdMs);
     if (index === this.tour.steps.length - 1) this.adapter.track("tour_completed", { tour: analyticsName(this.tour.slug) });
+    if (this.speaking) this.speak();
+  }
+
+  private unit = (unit: string) => this.adapter.translate(`ask.unit.${unit}`);
+
+  private get canSpeak() {
+    return Boolean(this.tour?.narrated) && "speechSynthesis" in window;
+  }
+
+  /** Browser speech reads the step in the language of the reader. The button keeps it on for the next step. */
+  private toggleSpeech() {
+    this.speaking = !this.speaking;
+    if (this.speaking) this.speak();
+    else this.stopVoice();
+    this.render();
+  }
+
+  private speak() {
+    const step = this.tour?.steps[this.index];
+    if (!step?.sentences || !this.canSpeak) return;
+    const locale = this.adapter.locale();
+    const speech = new SpeechSynthesisUtterance(speechText(step.title, step.sentences, locale, this.unit));
+    speech.lang = locale;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(speech);
+  }
+
+  private stopVoice() {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  }
+
+  /** The narration: each number and each object is a button that opens its record. */
+  private narration(sentences: NarrationSentence[]): string {
+    const locale = this.adapter.locale();
+    const t = this.adapter.translate;
+    return sentences
+      .map(
+        (sentence) =>
+          `<p class="tour-player__body">${sentence
+            .map((segment) => {
+              if (segment.kind === "text") return escapeHtml(segment.text);
+              const text = segment.kind === "fact" ? factText(segment, locale, this.unit) : segment.text;
+              const key = chipKey(segment);
+              if (!key) return `<span class="tour-player__chip">${escapeHtml(text)}</span>`;
+              const asOf = segment.kind === "fact" && segment.as_of ? ` ${t("ask.asOf", { date: segment.as_of.slice(0, 10) })}` : "";
+              return `<button type="button" class="tour-player__chip" data-tour-object="${escapeHtml(key)}" title="${escapeHtml(`${t("ask.openRecord")}${asOf}`)}">${escapeHtml(text)}</button>`;
+            })
+            .join("")}</p>`,
+      )
+      .join("");
+  }
+
+  private sources(sources: FlightSource[]): string {
+    const t = this.adapter.translate;
+    return `<div class="tour-player__sources"><h3>${escapeHtml(t("ask.sources"))}</h3><ul>${sources
+      .map((source) => `<li><button type="button" class="text-action" data-tour-object="${escapeHtml(source.key)}">${escapeHtml(source.name)}</button>${source.catalog ? ` <span>${escapeHtml(source.catalog)}</span>` : ""}</li>`)
+      .join("")}</ul></div>`;
   }
 
   private beginTransition() {
@@ -146,12 +229,15 @@ export class TourPlayer {
       </div>
       <p class="tour-player__progress">${escapeHtml(t("tour.stepOf", { step: this.index + 1, total }))}</p>
       <h2 tabindex="-1">${escapeHtml(step.title)}</h2>
-      <p class="tour-player__body">${escapeHtml(step.body)}</p>
+      ${step.sentences?.length ? this.narration(step.sentences) : `<p class="tour-player__body">${escapeHtml(step.body)}</p>`}
+      ${step.sources?.length ? this.sources(step.sources) : ""}
       ${tour.author ? `<p class="tour-player__progress">${escapeHtml(t("tour.sharedBy", { name: tour.author }))}</p>` : ""}
       <div class="tour-player__dots" role="group" aria-label="${escapeHtml(t("tour.progress"))}">${dots}</div>
       <div class="tour-player__actions">
         <button type="button" class="secondary-action" data-tour-action="previous" ${this.index === 0 ? "disabled" : ""}>${escapeHtml(t("tour.previous"))}</button>
         <button type="button" class="primary-action" data-tour-action="next" ${this.index === total - 1 ? "disabled" : ""}>${escapeHtml(t("tour.next"))}</button>
+        ${this.canSpeak ? `<button type="button" class="secondary-action" data-tour-action="speak" aria-pressed="${this.speaking}">${escapeHtml(t(this.speaking ? "ask.stop" : "ask.listen"))}</button>` : ""}
+        ${tour.flight ? `<a class="text-action" href="/flights/${escapeHtml(tour.flight)}">${escapeHtml(t("ask.page"))}</a>` : ""}
         ${tour.slug.startsWith(SHARED_TOUR_PREFIX) && this.adapter.report ? `<button type="button" class="text-action" data-tour-action="report">${escapeHtml(t("tour.report"))}</button>` : ""}
       </div>`;
   }
@@ -168,6 +254,8 @@ export class TourPlayer {
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
     this.tour = null;
+    this.speaking = false;
+    this.stopVoice();
     this.plate.hidden = true;
     if (wasActive) this.adapter.closed();
   }

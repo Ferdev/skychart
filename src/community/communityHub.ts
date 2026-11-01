@@ -4,11 +4,19 @@ import { t } from "../i18n";
 import { CommunityApi, errorText, type Coverage, type Finding, type OwnPhoto, type OwnTransit, type Photo, type Photographer } from "./api";
 import { dateText, dateTimeText, emptyState, h, openDialog, photoCard, segmented, statusBadge, type DialogView } from "./communityUi";
 import { renderReview } from "./communityReview";
+import { addFrameDialog, frameStateText } from "./deepField";
 import { findingList } from "./photoFindings";
 import { renderTourBuilder, type TourBuilderHost } from "./tourBuilder";
 import type { DialogHost, PhotoDialogs } from "./photoDialogs";
 
 export type HubTab = "gallery" | "photographers" | "coverage" | "rules" | "tours" | "account" | "review";
+
+/** The action of a photo of the owner in `My photos`. */
+function frameButton(photo: OwnPhoto): string {
+  const active = photo.deep_frame && !photo.deep_frame.withdrawn_at;
+  if (active) return `<button type="button" class="text-action" data-frame-remove>${h(t("deep.remove"))}</button>`;
+  return photo.deep_field_open ? `<button type="button" class="text-action" data-frame-add="${h(photo.deep_field_open.title)}">${h(t("deep.add"))}</button>` : "";
+}
 
 const CATALOGS = ["messier", "ngc", "ic"] as const;
 const CATALOG_NAMES: Record<string, string> = { messier: "Messier", ngc: "NGC", ic: "IC" };
@@ -387,7 +395,7 @@ export class CommunityHub {
       };
     };
 
-    const data = await this.api.request<{ photos: OwnPhoto[] }>("/api/community/me");
+    const data = await this.api.request<{ photos: OwnPhoto[]; deep_field_future?: boolean }>("/api/community/me");
     if (!current()) return;
     void this.api
       .request<{ transits: OwnTransit[] }>("/api/community/transits")
@@ -406,14 +414,45 @@ export class CommunityHub {
       list.innerHTML = emptyState(t("community.account.noPhotos"));
       return;
     }
-    list.innerHTML = `<ul class="community-own-list">${data.photos
+    const future = Boolean(data.deep_field_future);
+    list.innerHTML = `<div class="community-actions"><button type="button" class="text-action" data-deep-future="${future ? "false" : "true"}">${h(t(future ? "deep.futureOff" : "deep.future"))}</button></div><ul class="community-own-list">${data.photos
       .map((photo) => {
         const ready = !["uploading", "processing", "failed"].includes(photo.status);
-        return `<li class="community-own" data-id="${h(photo.id)}">${photo.thumbnail_url ? `<img loading="lazy" decoding="async" src="${h(photo.thumbnail_url)}" alt="">` : `<span class="community-own__blank" aria-hidden="true"></span>`}<div class="community-own__text"><strong>${h(photo.title)}</strong><span class="community-muted">${h([photo.object_name, dateText(photo.inserted_at)].filter(Boolean).join(" · "))}</span>${statusBadge(photo.status)}${photo.moderation_reason && ["rejected", "hidden"].includes(photo.status) ? `<p class="community-note">${h(t("community.account.note", { reason: photo.moderation_reason }))}</p>` : ""}</div><div class="community-actions community-actions--wrap">${ready ? `<button type="button" class="text-action" data-wcs>${h(t("community.wcs.title"))}</button><button type="button" class="text-action" data-solve>${h(t("community.wcs.solve"))}</button><button type="button" class="text-action" data-depth-permission="${photo.depth_allowed ? "false" : "true"}">${h(t(photo.depth_allowed ? "depth.withdraw" : "depth.allow"))}</button>` : ""}<button type="button" class="text-action community-danger" data-remove>${h(t("community.remove"))}</button></div></li>`;
+        return `<li class="community-own" data-id="${h(photo.id)}">${photo.thumbnail_url ? `<img loading="lazy" decoding="async" src="${h(photo.thumbnail_url)}" alt="">` : `<span class="community-own__blank" aria-hidden="true"></span>`}<div class="community-own__text"><strong>${h(photo.title)}</strong><span class="community-muted">${h([photo.object_name, dateText(photo.inserted_at)].filter(Boolean).join(" · "))}</span>${statusBadge(photo.status)}${photo.deep_frame ? `<span class="community-muted">${h(`${t("deep.title")}: ${frameStateText(photo.deep_frame)}`)}</span>` : ""}${photo.moderation_reason && ["rejected", "hidden"].includes(photo.status) ? `<p class="community-note">${h(t("community.account.note", { reason: photo.moderation_reason }))}</p>` : ""}</div><div class="community-actions community-actions--wrap">${ready ? `<button type="button" class="text-action" data-wcs>${h(t("community.wcs.title"))}</button><button type="button" class="text-action" data-solve>${h(t("community.wcs.solve"))}</button><button type="button" class="text-action" data-depth-permission="${photo.depth_allowed ? "false" : "true"}">${h(t(photo.depth_allowed ? "depth.withdraw" : "depth.allow"))}</button>` : ""}${frameButton(photo)}<button type="button" class="text-action community-danger" data-remove>${h(t("community.remove"))}</button></div></li>`;
       })
       .join("")}</ul>`;
+    const futureButton = list.querySelector<HTMLButtonElement>("[data-deep-future]")!;
+    futureButton.onclick = async () => {
+      const enabled = futureButton.dataset.deepFuture === "true";
+      try {
+        await this.api.request("/api/community/deep-field-consent", "POST", { future: enabled });
+        futureButton.dataset.deepFuture = String(!enabled);
+        futureButton.textContent = t(enabled ? "deep.futureOff" : "deep.future");
+        message(t("community.account.saved"));
+      } catch (error) {
+        message(errorText(error));
+      }
+    };
     list.querySelectorAll<HTMLElement>(".community-own").forEach((row) => {
       const id = row.dataset.id!;
+      const add = row.querySelector<HTMLButtonElement>("[data-frame-add]");
+      if (add)
+        add.onclick = () =>
+          addFrameDialog(this.api, id, add.dataset.frameAdd!, () => {
+            message(t("deep.added"));
+            this.refresh();
+          });
+      const withdraw = row.querySelector<HTMLButtonElement>("[data-frame-remove]");
+      if (withdraw)
+        withdraw.onclick = async () => {
+          try {
+            await this.api.request(`/api/community/photos/${id}/deep-frame`, "DELETE", {});
+            message(t("deep.removed"));
+            this.refresh();
+          } catch (error) {
+            message(errorText(error));
+          }
+        };
       const solve = row.querySelector<HTMLButtonElement>("[data-solve]");
       if (solve)
         solve.onclick = async () => {

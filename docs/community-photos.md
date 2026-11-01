@@ -110,6 +110,7 @@ Set the corresponding `STAGING_` or `PRODUCTION_` GitHub variables/secrets below
 | `COMMUNITY_MAIL_URL`, `COMMUNITY_MAIL_TOKEN` | variable, secret | HTTPS mail endpoint and Bearer token |
 | `COMMUNITY_MAIL_FROM` | variable | Sender address, for example `Cosmic Atlas <login@example.org>` |
 | `COMMUNITY_ADMIN_EMAILS` | secret | Optional. Email addresses that get the `admin` role at sign-in, with a comma between them. It is the only source of that role: an account whose address is not in the list loses the role at its next request. These addresses also get the administrator notices |
+| `ANSWER_FLIGHTS_API_KEY`, `ANSWER_FLIGHTS_MODEL`, `ANSWER_FLIGHTS_DAILY_USD` | secret, variables | See `docs/answer-flights.md`. With no key, the feature is off |
 | `COMMUNITY_BACKUP_URI`, `COMMUNITY_BACKUP_ENDPOINT` | variables | Off-host backup prefix and S3 endpoint |
 | `COMMUNITY_BACKUP_SECRET` | secret | Independent backup encryption password |
 | `COMMUNITY_BACKUP_ACCESS_KEY_ID`, `COMMUNITY_BACKUP_SECRET_ACCESS_KEY` | secrets | Separate backup credentials |
@@ -230,6 +231,7 @@ The `Review` tab has these sections. Each number is the count of that section.
 | Tours | Shared tours with an open report, and hidden tours | `Keep tour`, `Hide`, `Restore` |
 | Transits | Transit timings that wait, then approved timings | `Approve`, `Reject`, `Hide` |
 | Candidates | Candidates with a second frame | `Approve`, `Reject` |
+| Deep fields | The open field, its builds, and the next targets | `Open field`, `Rebuild now`, `Close field` |
 | Published | Published photos, newest decision first | `Hide` |
 | Hidden, Rejected | Photos that are not public | `Restore` |
 | Decision log | The last 50 audit records | none |
@@ -422,6 +424,83 @@ the photo and the DR11 cutout for a candidate. The object inspector and the page
 photographer list the public findings. The atlas sends no report: a person reads the text and
 sends it by hand. Account export includes the findings, and account removal deletes them
 and the site.
+
+## Deep fields
+
+A deep field is one shared image of one object. It grows deeper with each frame and credits
+each contributor. The first version has one open target. It has no all-sky mosaic, no
+science-grade photometry, no AI denoising or sharpening, and no automatic target choice.
+
+### Steps
+
+1. In `Review`, the `Deep fields` section lists the fixed objects with the most solved
+   photos. A moving body cannot be a target, because it has no place on a fixed grid. A
+   moderator selects `Open field`. The database permits one open field
+   (`deep_fields_one_open`). The center and the width of the grid come from the median of
+   the solutions, and the width is at most 5 degrees.
+2. An owner selects `Add my frame` in the photo viewer or in `My photos`, and confirms the
+   text. The same dialog can add all future photos. That consent is
+   `users.deep_field_consent_at`, and `My photos` can stop it. A photo enters only when it is
+   approved, solved with a TAN solution with a CD matrix, and of that subject.
+3. `DeepFieldNightly` runs at 04:00 UTC. It starts a rebuild only when the frames differ from
+   the last attempt. A moderator can also select `Rebuild now`.
+4. `My photos` shows the weight of the frame, or the reason for a frame that was not used.
+
+### The build
+
+`DeepFieldWorker` runs in the serial media queue, so it never runs next to another image
+job. It takes the 40 oldest consents and runs `backend/community_deep_field.py` on the
+approved 1600 px derivatives, never on the private masters.
+
+For each frame, the script detects stars and pairs them with Gaia. It needs at least six
+stars that are not saturated and are round. An affine fit from the solution to the stars
+gives the alignment, and a median error above 2 pixels rejects the frame. The peaks of the
+stars give a tone curve (a power law) and the blocks of the sky give the background, so one
+unit of pixel value means the peak of a star of magnitude 0 in each frame. The frame goes to a
+tangent-plane grid of 1600 x 1200 pixels with bilinear sampling.
+
+A frame has the weight `(sharpest width / its width)^2 / noise^2`, and the weights add up to
+one. Two passes over the frames on disk give a mean and a variance, then a mean with a clip
+at 3 sigma. A pixel with fewer than three frames has no clip. The depth map shows the frames
+for each pixel. The stack and the best single frame use one stretch, so the slider of the
+page is honest.
+
+The limiting magnitude is the magnitude of a star with a peak of five times the noise of the
+sky. The measure for the stack and for the best frame use the same pixels. `gain_mag` is the
+difference. This is an estimate for a picture, not photometry.
+
+A frame that fails keeps its reason (`too_few_stars`, `trailed_stars`, `poor_alignment`,
+`no_tone_fit`, `outside_field`, `no_noise_measure`). A build with fewer than two usable frames
+stops, and the current image stays, unless that image holds a frame that left.
+
+A build of 40 frames at 1600 x 1200 pixels took 123 seconds, with a peak of 398 MiB and 1.2 GB
+of scratch disk, in the task container (2026-11-01). The limits are 768 MiB and 600 seconds.
+Keep this scratch space free on the worker.
+
+### Withdrawal and removal
+
+A withdrawal takes the frame out at the next rebuild. A photo that stops being public (hide,
+reject, removal by the author, account removal) leaves the credit wall at once, because the
+wall reads current visibility, and it queues a rebuild of each field that lists it, also a
+closed field. If too few frames stay, the image is retired. An old image leaves the store when
+a new build replaces it. A previously downloaded copy cannot be recalled. The consent text
+needs legal review before activation, because a stack is a derivative of the photos of many
+people, whatever the licence of each photo.
+
+### Interface
+
+`/deep-field/<slug>` opens the window on top of the atlas, with a page for a crawler. The
+window has the image with a zoom (buttons, wheel, drag, and the keys `+`, `-`, and the arrow
+keys), a slider from the best frame to the stack, a depth map, and a credit wall. The object
+inspector has a deep field row in `Community photos`. The Sky overlay shows the current
+stack as one photo, and it opens the window. The images pass through Phoenix
+(`GET /api/deep-fields/:slug/media/:version/:name`), and only the current version answers.
+Account export includes the frames.
+
+## Answer flights
+
+See `docs/answer-flights.md`. The flights use `CommunityRepo` and `COMMUNITY_ENABLED`, but they
+use no account.
 
 ## Shared tours
 

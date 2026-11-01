@@ -8,6 +8,7 @@ defmodule StarsmapApi.Community.Moderation do
     Action,
     Report,
     Ranking,
+    DeepFields,
     Storage,
     Tour,
     Tours,
@@ -219,6 +220,11 @@ defmodule StarsmapApi.Community.Moderation do
           )
 
         StarsmapApi.Community.Depth.enqueue(photo)
+
+        if status == "published",
+          do: DeepFields.photo_ready(photo),
+          else: DeepFields.photo_removed(photo.id)
+
         photo
       end)
     end
@@ -230,6 +236,7 @@ defmodule StarsmapApi.Community.Moderation do
     StarsmapApi.Community.transaction(fn ->
       photo = Photos.owned(user, id) || Repo.rollback(:not_found)
       Repo.update!(Ecto.Changeset.change(photo, status: "hidden"))
+      DeepFields.photo_removed(id)
 
       Repo.insert!(%Action{
         photo_id: id,

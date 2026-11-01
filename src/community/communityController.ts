@@ -3,6 +3,9 @@ import { canvasFont } from "../format/fonts";
 import { formatCount } from "../format/quantity";
 import { t } from "../i18n";
 import { CommunityApi, errorText, type OverlayPhoto, type Photo, type Cover } from "./api";
+import { AnswerFlights } from "./answerFlights";
+import { DeepFieldWindow, deepFieldRow } from "./deepField";
+import type { DeepFieldRow } from "./deepFieldModel";
 import { CommunityHub, type HubTab } from "./communityHub";
 import type { TourBuilderHost } from "./tourBuilder";
 import { dateText, emptyState, h, licenceText, photoCard } from "./communityUi";
@@ -35,6 +38,10 @@ export class CommunityController {
     openObject: (key) => this.openObject(key),
     openPhotographer: (handle) => this.hub.open("photographers", { handle }),
   };
+  /** `main.ts` sets `startTour`, because the tour player is outside this module. */
+  readonly flights: { startTour: ((slug: string) => void) | null } = { startTour: null };
+  private readonly askForm = new AnswerFlights(this.api, (slug) => this.flights.startTour?.(slug));
+  readonly deepFields = new DeepFieldWindow(this.api, (key) => this.openObject(key), this.host.openPhotographer);
   readonly dialogs = new PhotoDialogs(this.api, () => {
     void this.refresh();
     this.hub.refresh();
@@ -222,6 +229,11 @@ export class CommunityController {
   /** The focus stays on the control that the person used, so a failure shows only in the status line. */
   private openOverlayPhoto(id: string) {
     this.clearOverlayFailure();
+    const deepField = this.overlayPhotos.find((photo) => photo.id === id)?.deep_field;
+    if (deepField) {
+      void this.deepFields.open(deepField);
+      return;
+    }
     void this.api.request<Photo>(`/api/photos/${encodeURIComponent(id)}`).then((photo) => this.dialogs.photo(photo)).catch((error) => this.showOverlayFailure(errorText(error)));
   }
 
@@ -280,7 +292,7 @@ export class CommunityController {
       let element = this.overlayImages.get(place.photo.id);
       if (!element) {
         element = document.createElement("div");
-        element.innerHTML = `<button type="button" class="community-sky-photo__focus">${h(`${place.photo.title} · ${place.photo.author}`)}</button>`;
+        element.innerHTML = `<button type="button" class="community-sky-photo__focus">${h(place.photo.deep_field ? t("deep.pageTitle", { title: place.photo.title }) : `${place.photo.title} · ${place.photo.author}`)}</button>`;
         element.querySelector("button")!.onclick = () => this.openOverlayPhoto(place.photo.id);
         this.overlayLayer.append(element);
         this.overlayImages.set(place.photo.id, element);
@@ -317,6 +329,7 @@ export class CommunityController {
   private photos: Photo[] = [];
   private galleryMore = false;
   private galleryError = "";
+  private galleryField: DeepFieldRow | null = null;
   private galleryRequest: AbortController | null = null;
   private galleryNode: HTMLElement | null = null;
   private generation = 0;
@@ -426,10 +439,11 @@ export class CommunityController {
   }
   private async start() {
     try {
-      const config = await this.api.request<{ enabled: boolean }>(
+      const config = await this.api.request<{ enabled: boolean; flights?: boolean }>(
         "/api/community/config",
       );
       this.enabled = config.enabled;
+      if (config.flights) this.askForm.mount();
       if (!this.enabled) return;
       document
         .querySelectorAll<HTMLElement>(".community-toggle")
@@ -477,6 +491,8 @@ export class CommunityController {
   private openAddress() {
     const photo = /^\/photos\/([0-9a-f-]{36})\/?$/i.exec(window.location.pathname);
     const person = /^\/u\/([a-z][a-z0-9-]{2,39})\/?$/.exec(window.location.pathname);
+    const deepField = /^\/deep-field\/([a-z0-9-]{1,80})\/?$/.exec(window.location.pathname);
+    if (deepField) void this.deepFields.open(deepField[1]!);
     if (photo)
       void this.api
         .request<Photo>(`/api/photos/${photo[1]}`)
@@ -558,7 +574,7 @@ export class CommunityController {
     this.galleryRequest = request;
     const generation = ++this.generation;
     try {
-      const result = await this.api.request<{ photos: Photo[] }>(
+      const result = await this.api.request<{ photos: Photo[]; deep_field?: DeepFieldRow | null }>(
         `/api/objects/${encodeURIComponent(key)}/photos${append ? `?cursor=${encodeURIComponent(this.photos[this.photos.length - 1].id)}` : ""}`,
         "GET",
         undefined,
@@ -576,6 +592,7 @@ export class CommunityController {
       this.galleryMore =
         result.photos.length === 24 && this.photos.length < 240;
       this.galleryError = "";
+      this.galleryField = result.deep_field ?? null;
       this.paintGallery();
     } catch (error) {
       if (!request.signal.aborted && this.galleryNode) {
@@ -588,12 +605,16 @@ export class CommunityController {
     const node = this.galleryNode;
     if (!node) return;
     node.innerHTML = `<div class="community-gallery__head"><h3>${h(t("community.title"))}${this.photos.length ? ` <span class="community-count">${h(formatCount(this.photos.length))}</span>` : ""}</h3><button type="button" class="secondary-action" data-upload>${h(t("community.publish"))}</button></div>${
+      this.galleryField ? deepFieldRow(this.galleryField) : ""
+    }${
       this.photos.length
         ? `<div class="community-photo-grid">${this.photos.map((photo) => photoCard(photo)).join("")}</div>`
         : emptyState(t("community.gallery.empty"))
     }${this.galleryError ? `<p class="community-message" role="status">${h(this.galleryError)}</p>` : ""}`;
     node.querySelector<HTMLButtonElement>("[data-upload]")!.onclick = () =>
       this.dialogs.upload(node.dataset.key!, node.dataset.name!);
+    const field = node.querySelector<HTMLButtonElement>("[data-deep-field]");
+    if (field) field.onclick = () => void this.deepFields.open(field.dataset.deepField!);
     const photos = this.photos;
     node.querySelectorAll<HTMLButtonElement>("[data-photo]").forEach(
       (button) =>
