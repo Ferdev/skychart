@@ -435,7 +435,7 @@ defmodule StarsmapApi.CommunityTest do
              Moderation.reports()
 
     # A rejection without a reason fails, because the photographer reads the reason.
-    assert {:error, :not_allowed} = Moderation.review(moderator, waiting.id, "reject", "")
+    assert {:error, :invalid_reason} = Moderation.review(moderator, waiting.id, "reject", "")
     assert {:ok, _} = Moderation.review(moderator, waiting.id, "reject", "Wrong object")
     assert [%{id: rejected}] = Moderation.list("rejected")
     assert rejected == waiting.id
@@ -948,6 +948,65 @@ defmodule StarsmapApi.CommunityTest do
       )
 
     assert detail_queries == 2
+  end
+
+  describe "a moderation reason" do
+    setup %{user: user, subject: subject} do
+      moderator =
+        Repo.insert!(%User{
+          email: "reason-mod@example.com",
+          handle: "reason-mod",
+          name: "Moderator",
+          role: "moderator"
+        })
+
+      %{moderator: moderator, photo: photo(user, subject, "review")}
+    end
+
+    test "out of range is invalid for a moderator and an admin", %{
+      user: user,
+      moderator: moderator,
+      photo: photo
+    } do
+      admin = Repo.update!(Ecto.Changeset.change(moderator, role: "admin"))
+
+      for actor <- [moderator, admin], reason <- ["ab", String.duplicate("a", 2001), nil] do
+        assert {:error, :invalid_reason} = Moderation.review(actor, photo.id, "hide", reason)
+        assert {:error, :invalid_reason} = Moderation.cancel_votes(actor, user.handle, reason)
+        assert {:error, :invalid_reason} = Moderation.suspend(actor, user.handle, reason, true)
+      end
+
+      assert Photos.get(photo.id).status == "review"
+      refute Repo.get!(User, user.id).suspended
+      assert Moderation.log() == []
+    end
+
+    test "a member gets not_allowed for a valid and for an invalid reason", %{
+      user: user,
+      photo: photo
+    } do
+      for reason <- ["Valid reason", "ab", nil] do
+        assert {:error, :not_allowed} = Moderation.review(user, photo.id, "hide", reason)
+        assert {:error, :not_allowed} = Moderation.cancel_votes(user, user.handle, reason)
+        assert {:error, :not_allowed} = Moderation.suspend(user, user.handle, reason, true)
+      end
+    end
+
+    test "the limits of the range are valid", %{user: user, moderator: moderator, photo: photo} do
+      assert {:ok, _} = Moderation.review(moderator, photo.id, "hide", "abc")
+
+      assert {:ok, _} =
+               Moderation.cancel_votes(moderator, user.handle, String.duplicate("a", 2000))
+
+      assert {:ok, _} = Moderation.suspend(moderator, user.handle, "abc", true)
+    end
+
+    test "approval without a reason still gets the default text", %{
+      moderator: moderator,
+      photo: photo
+    } do
+      assert {:ok, _} = Moderation.review(moderator, photo.id, "approve", "")
+    end
   end
 
   test "account deletion revokes login, hides photos and queues byte removal", %{

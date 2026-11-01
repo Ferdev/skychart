@@ -147,11 +147,8 @@ defmodule StarsmapApi.Community.Moderation do
       when action in ["approve", "restore"] and reason in [nil, ""],
       do: review(user, id, action, if(action == "approve", do: "Approved", else: "Restored"))
 
-  def review(user, id, action, reason)
-      when action in ["approve", "hide", "reject", "restore"] and is_binary(reason) do
-    if user.role not in ["moderator", "admin"] or byte_size(reason) not in 3..2000 do
-      {:error, :not_allowed}
-    else
+  def review(user, id, action, reason) when action in ["approve", "hide", "reject", "restore"] do
+    with :ok <- check_reason(user, reason) do
       StarsmapApi.Community.transaction(fn ->
         photo = Photos.get(id) || Repo.rollback(:not_found)
         if photo.status in ["uploading", "processing", "failed"], do: Repo.rollback(:not_ready)
@@ -250,10 +247,8 @@ defmodule StarsmapApi.Community.Moderation do
     end)
   end
 
-  def cancel_votes(actor, handle, reason) when is_binary(reason) do
-    if actor.role not in ["admin", "moderator"] or byte_size(reason) not in 3..2000 do
-      {:error, :not_allowed}
-    else
+  def cancel_votes(actor, handle, reason) do
+    with :ok <- check_reason(actor, reason) do
       StarsmapApi.Community.transaction(fn ->
         user =
           Repo.get_by(StarsmapApi.Community.User, handle: handle) || Repo.rollback(:not_found)
@@ -281,13 +276,8 @@ defmodule StarsmapApi.Community.Moderation do
     end
   end
 
-  def cancel_votes(_, _, _), do: {:error, :not_allowed}
-
-  def suspend(actor, handle, reason, suspended)
-      when is_boolean(suspended) and is_binary(reason) do
-    if actor.role not in ["admin", "moderator"] or byte_size(reason) not in 3..2000 do
-      {:error, :not_allowed}
-    else
+  def suspend(actor, handle, reason, suspended) when is_boolean(suspended) do
+    with :ok <- check_reason(actor, reason) do
       StarsmapApi.Community.transaction(fn ->
         user =
           Repo.get_by(StarsmapApi.Community.User, handle: handle) || Repo.rollback(:not_found)
@@ -331,6 +321,15 @@ defmodule StarsmapApi.Community.Moderation do
   end
 
   def suspend(_, _, _, _), do: {:error, :not_allowed}
+
+  # The role comes first: a person without the role gets no information about the reason.
+  defp check_reason(%{role: role}, reason) when role in ["moderator", "admin"] do
+    if is_binary(reason) and byte_size(reason) in 3..2000,
+      do: :ok,
+      else: {:error, :invalid_reason}
+  end
+
+  defp check_reason(_, _), do: {:error, :not_allowed}
 
   def publish_files(photo) do
     scratch =
