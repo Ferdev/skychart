@@ -14,6 +14,12 @@ export type Wcs = {
 };
 /** The limit of photographed objects with a footprint on one Sky redraw. */
 const FOOTPRINT_LIMIT = 24;
+/** The lowest alpha of the footprint lines and labels, so that they stay readable at a low photo opacity. */
+const MIN_FOOTPRINT_ALPHA = 0.35;
+/** The alpha of all Sky footprints, author-supplied and solved, for a photo opacity. */
+export function footprintAlpha(opacity: number): number {
+  return Math.max(MIN_FOOTPRINT_ALPHA, opacity);
+}
 /**
  * The WCS of each photographed object to outline, one for each subject, in the order of the
  * points. The scan stops at the limit, so that a redraw looks up no later points.

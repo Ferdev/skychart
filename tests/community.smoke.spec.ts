@@ -176,6 +176,7 @@ test("author-placed and solved footprints keep the same alpha floor at a low pho
 
   expect(await drawsAt("0")).toEqual({ author: 0.35, solved: 0.35, outlines: [0.35] });
   expect(await drawsAt("0.2")).toEqual({ author: 0.35, solved: 0.35, outlines: [0.35] });
+  expect(await drawsAt("0.65")).toEqual({ author: 0.65, solved: 0.65, outlines: [0.65] });
   expect(await drawsAt("0.8")).toEqual({ author: 0.8, solved: 0.8, outlines: [0.8] });
 });
 

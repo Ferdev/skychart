@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { footprintDirections, footprintWcs } from "../src/community/photoFootprint.ts";
+import { footprintAlpha, footprintDirections, footprintWcs } from "../src/community/photoFootprint.ts";
 import { planeTransform } from "../src/community/photoPlane.ts";
 const wcs = {
   ra_deg: 359.9,
@@ -21,6 +21,13 @@ test("small TAN footprints stay finite at RA wrap and near the pole", () => {
     assert.ok([p.x, p.y, p.z].every(Number.isFinite));
     assert.ok(Math.abs(Math.hypot(p.x, p.y, p.z) - 1) < 0.001);
   }
+});
+test("footprints keep a readable alpha at a low photo opacity and follow it above the floor", () => {
+  assert.equal(footprintAlpha(0), 0.35);
+  assert.equal(footprintAlpha(0.2), 0.35);
+  assert.equal(footprintAlpha(0.35), 0.35);
+  assert.equal(footprintAlpha(0.65), 0.65);
+  assert.equal(footprintAlpha(1), 1);
 });
 test("unsupported astrometry never draws a footprint", () => {
   assert.deepEqual(footprintDirections({ ...wcs, frame: "unknown" }), []);
