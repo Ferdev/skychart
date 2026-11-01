@@ -8,6 +8,15 @@ const FIXTURE_A = {
   astrometry: { apparent_magnitude: 1, distance_ly: 0.000158 }, position: { x_au: -10, y_au: 0, z_au: 0 },
 };
 
+/** The sky response for the observer of this request: one catalog star at x = -10 AU. */
+function catalogSky(url: URL, name = "Fixture A") {
+  const observer = { x: Number(url.searchParams.get("observer_x_au")), y: Number(url.searchParams.get("observer_y_au")), z: Number(url.searchParams.get("observer_z_au")) };
+  const delta = { x: -10 - observer.x, y: -observer.y, z: -observer.z };
+  const distance = Math.hypot(delta.x, delta.y, delta.z) || 1;
+  return { returned: 1, nearby_returned: 1, points: [{ key: "fixture-a", name, object_type: "star", color: "#f8cb65", apparent_magnitude: 1,
+    distance_au: distance, direction: { x: delta.x / distance, y: delta.y / distance, z: delta.z / distance } }] };
+}
+
 /** The Sun and Earth from the ephemeris, and one catalog star at x = -10 AU. */
 async function installFixtures(context: BrowserContext) {
   await context.route("**/api/**", (route) => {
@@ -18,13 +27,7 @@ async function installFixtures(context: BrowserContext) {
     if (url.pathname === "/api/catalog/viewport") payload = { objects: [], total: 0 };
     if (url.pathname === "/api/catalog/search") payload = { objects: url.searchParams.get("q")?.toLowerCase().includes("fixture") ? [FIXTURE_A] : [], total: 1, has_more: false };
     if (url.pathname === "/api/objects/fixture-a") payload = { object: FIXTURE_A };
-    if (url.pathname === "/api/catalog/sky") {
-      const observer = { x: Number(url.searchParams.get("observer_x_au")), y: Number(url.searchParams.get("observer_y_au")), z: Number(url.searchParams.get("observer_z_au")) };
-      const delta = { x: -10 - observer.x, y: -observer.y, z: -observer.z };
-      const distance = Math.hypot(delta.x, delta.y, delta.z) || 1;
-      payload = { returned: 1, nearby_returned: 1, points: [{ key: "fixture-a", name: "Fixture A", object_type: "star", color: "#f8cb65", apparent_magnitude: 1,
-        distance_au: distance, direction: { x: delta.x / distance, y: delta.y / distance, z: delta.z / distance } }] };
-    }
+    if (url.pathname === "/api/catalog/sky") payload = catalogSky(url);
     if (url.pathname === "/api/spacecraft") payload = { bodies: [] };
     if (url.pathname === "/api/now") payload = { events: [] };
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(payload) });
@@ -105,13 +108,23 @@ test.describe("3D view controls", () => {
     await chooseFixtureA(page);
     await page.locator("#universe-fly").click();
     await expect(page.locator("#universe-autopilot")).toHaveAttribute("aria-pressed", "true");
-    // The first press stops the flight and starts a reload. The second press comes before the reload ends.
+    // The test holds the reload. The new name is the sign that the app has read the response.
+    let releaseReload = () => {};
+    const released = new Promise<void>((resolve) => { releaseReload = resolve; });
+    await page.route("**/api/catalog/sky**", async (route) => {
+      await released;
+      await route.fulfill({ json: catalogSky(new URL(route.request().url()), "Fixture A, reloaded") });
+    });
+    const requested = page.waitForRequest("**/api/catalog/sky**");
     const reload = page.waitForResponse("**/api/catalog/sky**");
+    // The first press stops the flight and starts a reload. The second press comes before the reload ends.
     await page.locator("#universe-map").press("Escape");
     await page.locator("#universe-map").press("Escape");
     await expect(page.locator("#universe-status")).toHaveText("Press Esc again to exit 3D");
+    await requested;
+    releaseReload();
     await reload;
-    await page.waitForTimeout(200);
+    await expect(page.locator("#universe-target-name")).toHaveText("Fixture A, reloaded");
     await expect(page.locator("#universe-status")).toHaveText("Press Esc again to exit 3D");
     await expect(page.locator("#universe-view")).toBeVisible();
     await page.locator("#universe-map").press("Escape");

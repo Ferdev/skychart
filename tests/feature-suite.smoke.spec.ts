@@ -5,6 +5,10 @@ const SITE = { latitude: "-33.8568", longitude: "151.2153" };
 
 /** The sky from Earth, with the camera on the Orion Nebula at 40 degrees. */
 const EARTH_SKY = "/?v=1&c=0,0&z=24&t=2026-01-15T22:00:00.000Z&L=grid.1~photos.1&sky=earth&sc=82.0,-28.7,40.0";
+/** The photo queries of three steps near this camera. */
+const NORTH_AREA = "ra=80&dec=0&radius=60";
+const EAST_AREA = "ra=90&dec=0&radius=60";
+const SOUTHEAST_AREA = "ra=90&dec=-10&radius=60";
 
 async function openEarthSky(page: Page) {
   await openAtlas(page, EARTH_SKY);
@@ -29,12 +33,36 @@ async function overlayFixture(page: Page, photos: unknown[]) {
   await page.route("**/api/community/session", (route) => route.fulfill({ json: { user: null, csrf: "", review_count: 0 } }));
   await page.route("**/api/photos/index?**", (route) => route.fulfill({ json: { version: 1, more: false, items: [] } }));
   await page.route("**/overlay-image.png", (route) => route.fulfill({ contentType: "image/png", body: image }));
-  const state = { requests: 0 };
+  const state = { areas: [] as string[], failing: false };
   await page.route("**/api/photos/sky?**", (route) => {
-    state.requests += 1;
-    return route.fulfill({ json: { photos } });
+    state.areas.push(new URL(route.request().url()).search.slice(1));
+    return route.fulfill(state.failing ? { status: 500, json: {} } : { json: { photos } });
   });
   return state;
+}
+
+/** Drags the Sky view. At 40 degrees, one pixel is 0.04 degrees. A drag down moves the view north, and a drag left moves it east. */
+async function dragSky(page: Page, x: number, y: number) {
+  const camera = new URL(page.url()).searchParams.get("sc");
+  await page.mouse.move(720, 600);
+  await page.mouse.down();
+  await page.mouse.move(720 + x, 600 + y, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(() => new URL(page.url()).searchParams.get("sc")).not.toBe(camera);
+}
+
+/**
+ * Opens the Sky view, and gives the number of photo requests up to now. The first index response clears the overlay
+ * cache, so the app can ask for the first step two times. Requests stay in order, so the request of the drag comes
+ * after all the requests of the start.
+ */
+async function openSkyAndCountRequests(page: Page, overlay: Awaited<ReturnType<typeof overlayFixture>>) {
+  const index = page.waitForResponse("**/api/photos/index?**");
+  await openEarthSky(page);
+  await (await index).finished();
+  await dragSky(page, 0, 40);
+  await expect.poll(() => overlay.areas.at(-1)).toBe(NORTH_AREA);
+  return overlay.areas.length;
 }
 
 test("the planner keeps the site private, ranks targets, and opens a target in Sky view", async ({ page }) => {
@@ -225,6 +253,39 @@ test("a failed photo open from the Sky overlay shows in the status line and the 
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog", { name: `Photo ${id}` })).toBeVisible();
   await expect(status).toHaveText(ready!);
+});
+
+test("the Sky overlay asks for photos again only when the view goes into a new step", async ({ page }) => {
+  const overlay = await overlayFixture(page, []);
+  const requests = await openSkyAndCountRequests(page, overlay);
+
+  await dragSky(page, 0, 20);
+  expect(overlay.areas).toHaveLength(requests);
+
+  // Requests stay in order, so a late request from the small drag comes before the request of this step.
+  await dragSky(page, -80, 0);
+  await expect.poll(() => overlay.areas.slice(requests)).toEqual([EAST_AREA]);
+});
+
+test("a failed Sky overlay request makes no new request for 30 seconds", async ({ page }) => {
+  await page.clock.install();
+  const overlay = await overlayFixture(page, []);
+  const requests = await openSkyAndCountRequests(page, overlay);
+
+  overlay.failing = true;
+  await dragSky(page, -80, 0);
+  await expect.poll(() => overlay.areas.slice(requests)).toEqual([EAST_AREA]);
+
+  // In the wait, new frames make no request in the same step or in a new step.
+  await dragSky(page, 0, 20);
+  await page.clock.fastForward(20_000);
+  await dragSky(page, 0, -120);
+  expect(overlay.areas).toHaveLength(requests + 1);
+
+  overlay.failing = false;
+  await page.clock.fastForward(11_000);
+  await dragSky(page, 0, -10);
+  await expect.poll(() => overlay.areas.slice(requests)).toEqual([EAST_AREA, SOUTHEAST_AREA]);
 });
 
 test("a target list resolves names and positions, corrects a row, plots a layer, and exports a CSV", async ({ page }) => {
