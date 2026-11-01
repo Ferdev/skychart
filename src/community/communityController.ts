@@ -147,6 +147,9 @@ export class CommunityController {
   }
   /** Sky view repaints when this is set: a new overlay response, a new opacity, or a new state of the layer. */
   overlayChanged: (() => void) | null = null;
+  /** The status line of the Sky view, which is a live region. The Sky view sets it. */
+  overlayStatus: HTMLElement | null = null;
+  private overlayFailure: { text: string; before: string } | null = null;
   private overlayLayer: HTMLElement | null = null;
   private readonly overlayImages = new Map<string, HTMLElement>();
   private readonly overlayCache = new Map<string, OverlayPhoto[]>();
@@ -214,8 +217,24 @@ export class CommunityController {
     if (place) this.openOverlayPhoto(place.photo.id);
   }
 
+  /** The focus stays on the control that the person used, so a failure shows only in the status line. */
   private openOverlayPhoto(id: string) {
-    void this.api.request<Photo>(`/api/photos/${encodeURIComponent(id)}`).then((photo) => this.dialogs.photo(photo)).catch(() => undefined);
+    this.clearOverlayFailure();
+    void this.api.request<Photo>(`/api/photos/${encodeURIComponent(id)}`).then((photo) => this.dialogs.photo(photo)).catch((error) => this.showOverlayFailure(errorText(error)));
+  }
+
+  private showOverlayFailure(text: string) {
+    this.clearOverlayFailure();
+    if (!this.overlayStatus) return;
+    this.overlayFailure = { text, before: this.overlayStatus.textContent ?? "" };
+    this.overlayStatus.textContent = text;
+  }
+
+  /** The status line goes back to its earlier text. A newer status of the Sky view stays. */
+  private clearOverlayFailure() {
+    const failure = this.overlayFailure;
+    this.overlayFailure = null;
+    if (failure && this.overlayStatus?.textContent === failure.text) this.overlayStatus.textContent = failure.before;
   }
 
   /** The area changes in steps, so a small movement of the view makes no request. */
