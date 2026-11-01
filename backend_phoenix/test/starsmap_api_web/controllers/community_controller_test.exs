@@ -329,6 +329,52 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
              conn |> get("/api/community/photographers/#{member.handle}") |> json_response(200)
   end
 
+  test "a moderation reason out of range gets its own error, not a permission error", %{
+    conn: conn
+  } do
+    {:ok, subject} = Subjects.ensure("moon")
+    :ok = Accounts.request_code("reason@example.com")
+    assert_receive {:community_code, "reason@example.com", code}
+    {:ok, token, member} = Accounts.verify("reason@example.com", code)
+
+    waiting =
+      Repo.insert!(%Photo{
+        user_id: member.id,
+        subject_id: subject.id,
+        declared_key: "moon",
+        title: "Waiting photo",
+        caption: "",
+        licence: "CC BY 4.0",
+        captured_at: StarsmapApi.Community.now(),
+        status: "review",
+        source_key: "uploads/reason",
+        size_bytes: 3
+      })
+
+    moderate = fn path, params ->
+      conn
+      |> put_req_cookie("cosmic-community", token)
+      |> write()
+      |> put_req_header("x-community-csrf", Accounts.csrf(token))
+      |> post("/api/community" <> path, params)
+      |> json_response(422)
+    end
+
+    assert %{"error" => "not_allowed"} =
+             moderate.("/photos/#{waiting.id}/review", %{action: "hide", reason: "Valid reason"})
+
+    Repo.update!(Ecto.Changeset.change(member, role: "moderator"))
+
+    for {path, params} <- [
+          {"/photos/#{waiting.id}/review", %{action: "hide"}},
+          {"/users/#{member.handle}/suspension", %{suspended: true}},
+          {"/users/#{member.handle}/cancel-votes", %{}}
+        ],
+        reason <- [%{reason: "ab"}, %{}] do
+      assert %{"error" => "invalid_reason"} = moderate.(path, Map.merge(params, reason))
+    end
+  end
+
   test "an open session loses review access when the address leaves the list", %{conn: conn} do
     Application.put_env(:starsmap_api, :community_admin_emails, ["owner@example.com"])
     on_exit(fn -> Application.delete_env(:starsmap_api, :community_admin_emails) end)
