@@ -2,7 +2,9 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
+import backend.http_transport
 from backend.http_transport import Handler
 from backend.payload_cache import cached_payload
 
@@ -20,6 +22,53 @@ class BackendRuntimeHardeningTest(unittest.TestCase):
         handler.send_header = lambda _key, _value: None
         handler.end_headers = lambda: None
         self.assertFalse(handler.respond({"ok": True}))
+
+    def test_catalog_objects_are_built_only_on_a_cache_miss(self):
+        def get(path):
+            handler = object.__new__(Handler)
+            handler.path = path
+            responses = []
+            handler.respond = lambda payload, status=200: responses.append((status, payload))
+            handler.do_GET()
+            return responses[0]
+
+        objects = [{"key": "sun", "catalog_group": "core"}]
+        with tempfile.TemporaryDirectory() as directory, mock.patch(
+            "backend.payload_cache.CACHE_DIR", Path(directory)
+        ), mock.patch.object(
+            backend.http_transport, "catalog_objects_for_groups", return_value=objects
+        ) as build_objects, mock.patch.object(
+            backend.http_transport,
+            "catalog_summary_payload",
+            side_effect=lambda groups, items, include_objects: {"groups": groups, "object_count": len(items)},
+        ):
+            first_status, first = get("/api/catalog?groups=core&include_objects=false")
+            second_status, second = get("/api/catalog?groups=core&include_objects=false")
+            self.assertEqual(build_objects.call_count, 1)
+            get("/api/catalog?groups=core&include_objects=true")
+            self.assertEqual(build_objects.call_count, 2)
+
+        self.assertEqual((first_status, second_status), (200, 200))
+        self.assertFalse(first["cache"]["hit"])
+        self.assertTrue(second["cache"]["hit"])
+        self.assertEqual({**first, "cache": None}, {**second, "cache": None})
+        self.assertEqual(first["object_count"], 1)
+
+    def test_catalog_object_failure_uses_the_error_response(self):
+        handler = object.__new__(Handler)
+        handler.path = "/api/catalog?groups=core"
+        handler.headers = {}
+        responses = []
+        handler.respond = lambda payload, status=200: responses.append((status, payload))
+        with tempfile.TemporaryDirectory() as directory, mock.patch(
+            "backend.payload_cache.CACHE_DIR", Path(directory)
+        ), mock.patch.object(
+            backend.http_transport, "catalog_objects_for_groups", side_effect=RuntimeError("catalog failed")
+        ), mock.patch.object(Handler, "log_internal_error") as log_error:
+            handler.do_GET()
+        log_error.assert_called_once_with("catalog response")
+        self.assertEqual(responses[0][0], 500)
+        self.assertEqual(responses[0][1]["error"], "catalog response failed")
 
     def test_cache_build_is_single_flight_under_concurrency(self):
         with tempfile.TemporaryDirectory() as directory:

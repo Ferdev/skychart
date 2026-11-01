@@ -196,17 +196,27 @@ defmodule StarsmapApi.Catalog.TargetMatch do
             where:
               o.dec_deg >= ^(dec - degrees) and o.dec_deg <= ^(dec + degrees) and
                 o.ra_deg >= ^low and o.ra_deg <= ^high,
-            limit: 2_000
+            limit: 2_000,
+            select: map(o, [:id, :key, :ra_deg, :dec_deg])
         )
       end)
 
     candidates
     |> Enum.map(&{&1, separation_arcsec(ra, dec, &1.ra_deg, &1.dec_deg)})
-    |> Enum.filter(fn {_object, separation} -> separation <= radius * 60 end)
-    |> Enum.min_by(fn {object, separation} -> {separation, object.key} end, fn -> nil end)
+    |> Enum.filter(fn {_candidate, separation} -> separation <= radius * 60 end)
+    |> Enum.min_by(fn {candidate, separation} -> {separation, candidate.key} end, fn -> nil end)
     |> case do
       nil -> unmatched()
-      {object, separation} -> Map.put(matched(object), :separation_arcsec, separation)
+      {candidate, separation} -> nearest_payload(candidate, separation)
+    end
+  end
+
+  # A candidate has only the columns of the ranking, because a full record is large. The lookup
+  # uses the id: a key is unique in one source table, and the view has several tables.
+  defp nearest_payload(candidate, separation) do
+    case Repo.get(CatalogSourceObject, candidate.id) do
+      nil -> unmatched()
+      object -> Map.put(matched(object), :separation_arcsec, separation)
     end
   end
 

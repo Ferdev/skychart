@@ -216,10 +216,9 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 groups = parse_catalog_groups(query)
-                objects = catalog_objects_for_groups(groups)
                 include_objects = parse_bool_param(query, "include_objects", True)
                 key = cache_key_payload("catalog", groups=groups, include_objects=include_objects)
-                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, objects, include_objects=include_objects)))
+                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, catalog_objects_for_groups(groups), include_objects=include_objects)))
             except QueryInputError as exc:
                 payload = {"error": str(exc)}
                 if exc.details is not None:

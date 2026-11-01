@@ -1,4 +1,4 @@
-import { footprintDirections } from "./photoFootprint";
+import { footprintDirections, footprintWcs } from "./photoFootprint";
 import { canvasFont } from "../format/fonts";
 import { formatCount } from "../format/quantity";
 import { t } from "../i18n";
@@ -122,27 +122,20 @@ export class CommunityController {
     context.strokeStyle = FOOTPRINT_COLOR;
     context.lineWidth = 1;
     context.globalAlpha = this.opacity;
-    const seen = new Set<string>();
-    for (const frame of this.lastFrames.values())
-      for (const point of frame.points) {
-        const cover = this.index.get(point.key);
-        const wcs = cover?.cover?.wcs;
-        // A solver solution is on the Sky overlay, with the viewer behind it.
-        if (!wcs || wcs.status === "solved" || seen.has(cover!.subject_id) || seen.size >= 24) continue;
-        seen.add(cover!.subject_id);
-        const corners = footprintDirections(wcs).map(project);
-        if (corners.length !== 4 || corners.some((p) => !p)) continue;
-        context.beginPath();
-        corners.forEach((p, i) => {
-          if (i === 0) context.moveTo(p!.x, p!.y);
-          else context.lineTo(p!.x, p!.y);
-        });
-        context.closePath();
-        context.stroke();
-        context.font = canvasFont(12);
-        context.fillStyle = FOOTPRINT_COLOR;
-        context.fillText(t("community.footprint.author"), corners[0]!.x + 4, corners[0]!.y - 4);
-      }
+    for (const wcs of footprintWcs(this.lastFrames.values(), (key) => this.index.get(key))) {
+      const corners = footprintDirections(wcs).map(project);
+      if (corners.length !== 4 || corners.some((p) => !p)) continue;
+      context.beginPath();
+      corners.forEach((p, i) => {
+        if (i === 0) context.moveTo(p!.x, p!.y);
+        else context.lineTo(p!.x, p!.y);
+      });
+      context.closePath();
+      context.stroke();
+      context.font = canvasFont(12);
+      context.fillStyle = FOOTPRINT_COLOR;
+      context.fillText(t("community.footprint.author"), corners[0]!.x + 4, corners[0]!.y - 4);
+    }
     context.restore();
   }
   /** Sky view repaints when this is set: a new overlay response, a new opacity, or a new state of the layer. */

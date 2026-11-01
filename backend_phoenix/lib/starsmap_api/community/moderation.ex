@@ -236,11 +236,17 @@ defmodule StarsmapApi.Community.Moderation do
   def report(_, _), do: {:error, :invalid_report}
 
   def reports do
-    Repo.all(
-      from r in Report, where: is_nil(r.resolved_at), order_by: [asc: r.inserted_at], limit: 50
-    )
-    |> Enum.map(fn r ->
-      %{id: r.id, reason: r.reason, at: r.inserted_at, photo: detail(Photos.get(r.photo_id))}
+    reports =
+      Repo.all(
+        from r in Report, where: is_nil(r.resolved_at), order_by: [asc: r.inserted_at], limit: 50
+      )
+
+    ids = reports |> Enum.map(& &1.photo_id) |> Enum.uniq()
+    # A detail has all open reports of its photo, so reports of one photo share one detail.
+    details = Repo.all(from p in Photo, where: p.id in ^ids) |> Map.new(&{&1.id, detail(&1)})
+
+    Enum.map(reports, fn r ->
+      %{id: r.id, reason: r.reason, at: r.inserted_at, photo: Map.fetch!(details, r.photo_id)}
     end)
   end
 
@@ -298,8 +304,18 @@ defmodule StarsmapApi.Community.Moderation do
           reason: "#{handle}: #{reason}"
         })
 
-        subjects = Repo.all(from p in Photo, distinct: p.subject_id, select: p.subject_id)
-        Enum.each(subjects, &Ranking.refresh/1)
+        # The scores change only for the photos of this account and the photos with its votes,
+        # because the vote weights of a voter are counted for each author.
+        own = from p in Photo, where: p.user_id == ^user.id, select: p.subject_id
+
+        voted =
+          from p in Photo,
+            join: v in StarsmapApi.Community.Vote,
+            on: v.photo_id == p.id,
+            where: v.user_id == ^user.id,
+            select: p.subject_id
+
+        Repo.all(union(own, ^voted)) |> Enum.each(&Ranking.refresh/1)
 
         for photo <- Repo.all(from p in Photo, where: p.user_id == ^user.id) do
           {:ok, _} =
