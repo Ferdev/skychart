@@ -175,6 +175,7 @@ export class SkyViewController {
     }).observe(options.workspacePanel, { attributes: true, attributeFilter: ["hidden"] });
     options.nativeShareButton.hidden = typeof navigator.share !== "function";
     community.overlayChanged = () => this.requestRender();
+    community.overlayStatus = this.options.status;
     window.addEventListener("resize", () => this.requestRender());
     window.addEventListener("cosmic-atlas:locale-change", () => this.updateLocale());
   }

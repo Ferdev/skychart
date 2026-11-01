@@ -48,6 +48,61 @@ defmodule StarsmapApi.Catalog.TargetMatchTest do
     payload.rows
   end
 
+  defp star(key, ra, dec) do
+    %{
+      key: key,
+      name: key,
+      object_type: "star",
+      catalog_group: "bright_stars",
+      source_type: "bright_star_catalog",
+      position_model: "fixed_catalog_vector",
+      search_text: key,
+      aliases: [],
+      ra_deg: ra,
+      dec_deg: dec,
+      x_au: 1.0,
+      y_au: 2.0,
+      z_au: 3.0
+    }
+  end
+
+  # More rows than a query can read, and the closest row is last by insert order and by right ascension.
+  defp seed_dense_field(first_ra, closest_ra, dec) do
+    fillers = for index <- 1..2_100, do: star("filler-#{index}", first_ra + index * 1.0e-4, dec)
+
+    fillers
+    |> Enum.chunk_every(500)
+    |> Enum.each(&SnapshotStore.upsert_source_objects/1)
+
+    SnapshotStore.upsert_source_objects([star("closest", closest_ra, dec)])
+  end
+
+  # The SQL text of each query on the catalog view while `action` runs.
+  defp catalog_queries(action) do
+    handler = "target-match-queries-#{System.unique_integer([:positive])}"
+    :telemetry.attach(handler, [:starsmap_api, :repo, :query], &__MODULE__.query_event/4, self())
+
+    try do
+      {action.(), received_queries([])}
+    after
+      :telemetry.detach(handler)
+    end
+  end
+
+  def query_event(_event, _measurements, metadata, pid),
+    do: send(pid, {:catalog_query, metadata.query})
+
+  defp received_queries(queries) do
+    receive do
+      {:catalog_query, query} ->
+        if String.contains?(query, ~s(FROM "catalog_source_objects")),
+          do: received_queries([query | queries]),
+          else: received_queries(queries)
+    after
+      0 -> Enum.reverse(queries)
+    end
+  end
+
   test "designations, aliases, and keys resolve to one object" do
     for name <- ["M 42", "m42", "Messier 42", "M042", "Orion Nebula"] do
       assert [%{status: "matched", object: %{key: "m42"}}] = match([%{"name" => name}])
@@ -123,6 +178,56 @@ defmodule StarsmapApi.Catalog.TargetMatchTest do
     assert_in_delta row.separation_arcsec, expected, 0.01
   end
 
+  test "a position ranks coordinates and reads the full record of the nearest object only" do
+    {[row], queries} =
+      catalog_queries(fn ->
+        match([%{"ra_deg" => 83.8325, "dec_deg" => -5.4}], radius_arcmin: 60)
+      end)
+
+    assert row.object.key == "m42"
+
+    {full, ranking} = Enum.split_with(queries, &String.contains?(&1, "source_payload"))
+    assert length(full) == 1
+    assert ranking != []
+    assert Enum.all?(ranking, &String.contains?(&1, ~s("ra_deg")))
+  end
+
+  test "a position gives the same object payload as its key" do
+    assert [by_position] = match([%{"ra_deg" => 83.8325, "dec_deg" => -5.4}])
+    assert [by_key] = match([%{"key" => "m42"}])
+    assert by_position.object == by_key.object
+    assert is_float(by_position.separation_arcsec)
+  end
+
+  test "a position takes the nearest row when two source tables have one key" do
+    near = %{
+      key: "shared-key",
+      name: "Near row",
+      object_type: "star",
+      catalog_group: "bright_stars",
+      source_type: "bright_star_catalog",
+      position_model: "fixed_catalog_vector",
+      search_text: "near row",
+      aliases: [],
+      ra_deg: 150.0,
+      dec_deg: 20.0
+    }
+
+    far = %{
+      near
+      | name: "Far row",
+        search_text: "far row",
+        catalog_group: "exoplanet_systems",
+        source_type: "exoplanet_archive_system",
+        ra_deg: 150.2
+    }
+
+    SnapshotStore.upsert_source_objects([near, far])
+
+    assert [%{status: "matched", object: %{name: "Near row"}}] =
+             match([%{"ra_deg" => 150.01, "dec_deg" => 20.0}], radius_arcmin: 60)
+  end
+
   test "the Andromeda galaxy is at the right separation from its published center" do
     # NGC 224 from the fixture, and the same position 30 arcseconds north.
     assert [row] = match([%{"ra_deg" => 10.684, "dec_deg" => 41.269 + 30 / 3600}])
@@ -142,6 +247,51 @@ defmodule StarsmapApi.Catalog.TargetMatchTest do
 
     assert [%{status: "matched"}] =
              match([%{"ra_deg" => 84.2, "dec_deg" => -5.39}], radius_arcmin: 30)
+  end
+
+  test "a dense field gives the nearest object" do
+    seed_dense_field(120.0, 120.5, 20.0)
+
+    assert [%{status: "matched", object: %{key: "closest"}, separation_arcsec: separation}] =
+             match([%{"ra_deg" => 120.5001, "dec_deg" => 20.0}], radius_arcmin: 60)
+
+    assert_in_delta separation, 0.0001 * :math.cos(20 * :math.pi() / 180) * 3600, 0.001
+  end
+
+  test "a dense field across right ascension zero gives the nearest object" do
+    seed_dense_field(359.5, 359.9999, 30.0)
+
+    assert [%{status: "matched", object: %{key: "closest"}}] =
+             match([%{"ra_deg" => 0.0002, "dec_deg" => 30.0}], radius_arcmin: 60)
+  end
+
+  test "a dense field above right ascension zero gives the nearest object" do
+    seed_dense_field(0.1, 0.5, 40.0)
+
+    assert [%{status: "matched", object: %{key: "closest"}}] =
+             match([%{"ra_deg" => 0.5001, "dec_deg" => 40.0}], radius_arcmin: 60)
+  end
+
+  test "two objects at one position give the first key" do
+    SnapshotStore.upsert_source_objects([star("same-b", 150.0, 10.0)])
+    SnapshotStore.upsert_source_objects([star("same-a", 150.0, 10.0)])
+
+    assert [%{object: %{key: "same-a"}}] = match([%{"ra_deg" => 150.001, "dec_deg" => 10.0}])
+  end
+
+  test "a lookup that the timeout stopped has the time budget reason" do
+    assert [%{status: "unmatched", reason: "time_budget"}] =
+             match([%{"ra_deg" => 83.82, "dec_deg" => -5.39}], task_timeout_ms: 0)
+  end
+
+  test "an object that is not in the catalog has no reason" do
+    assert [row] = match([%{"name" => "Andromdea"}])
+    assert row.status == "unmatched"
+    refute Map.has_key?(row, :reason)
+
+    assert [position] = match([%{"ra_deg" => 200.0, "dec_deg" => 10.0}])
+    assert position.status == "unmatched"
+    refute Map.has_key?(position, :reason)
   end
 
   test "the row limit refuses an oversized request" do

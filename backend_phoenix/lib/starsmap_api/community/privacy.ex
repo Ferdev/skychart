@@ -1,7 +1,7 @@
 defmodule StarsmapApi.Community.Privacy do
   @moduledoc "Private account exports and immediate, audited account removal."
   import Ecto.Query
-  alias StarsmapApi.Community.{Photo, Vote, Token, Action, Ranking, Tours}
+  alias StarsmapApi.Community.{Photo, Vote, Token, Action, Moderation, Ranking, Tours}
   alias StarsmapApi.CommunityRepo, as: Repo
 
   def export(user) do
@@ -61,6 +61,8 @@ defmodule StarsmapApi.Community.Privacy do
           )
       end)
 
+      Moderation.forget_handle(user)
+
       Repo.update!(
         Ecto.Changeset.change(user,
           suspended: true,
@@ -85,7 +87,7 @@ defmodule StarsmapApi.Community.Privacy do
     if String.contains?(url, [
          "/community/",
          "/api/photos/",
-         "/api/observe/plan",
+         "/api/observe",
          "/api/catalog/match"
        ]) do
       %{event | request: %{}, extra: %{}, user: %{}, breadcrumbs: []}

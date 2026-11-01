@@ -1,5 +1,6 @@
 defmodule StarsmapApiWeb.McpControllerTest do
   use StarsmapApiWeb.ConnCase, async: false
+  import ExUnit.CaptureLog
 
   alias StarsmapApi.AgentSkyFixtures
   alias StarsmapApi.Mcp.Tools
@@ -481,6 +482,27 @@ defmodule StarsmapApiWeb.McpControllerTest do
 
       assert oversized["isError"] == true
       assert oversized["structuredContent"]["error"]["code"] == "too_many_targets"
+    end
+
+    test "match_sky_objects writes no target to the parameter log", %{conn: conn} do
+      level = Logger.level()
+      Logger.configure(level: :debug)
+      on_exit(fn -> Logger.configure(level: level) end)
+
+      log =
+        capture_log(fn ->
+          result =
+            call_tool(conn, "match_sky_objects", %{
+              "targets" => [%{"name" => "Private list item"}]
+            })
+
+          assert result["isError"] == false
+        end)
+
+      # The body stays out of the parameters. Ecto's debug query log is a separate matter.
+      assert log =~ "POST /mcp"
+      assert log =~ "Parameters: %{}"
+      refute log =~ ~s("targets")
     end
 
     test "list_sky_events and list_guided_tours", %{conn: conn} do
