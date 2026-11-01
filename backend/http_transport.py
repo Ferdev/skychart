@@ -41,6 +41,11 @@ from backend.scientific_calculation import (
     trails_payload,
 )
 
+# The query of an observation holds the observer's site. The match stops before the
+# protocol version, so a malformed request line with a space also loses its query.
+OBSERVE_QUERY = re.compile(r"(/api/observe[^?\s]*)\?.*?(?= HTTP/\d|$)")
+
+
 class Handler(BaseHTTPRequestHandler):
     def request_id(self) -> str:
         value = self.headers.get("X-Request-ID", "unknown")
@@ -274,7 +279,8 @@ class Handler(BaseHTTPRequestHandler):
         self.respond({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 
     def log_message(self, format: str, *args: Any) -> None:
-        print(f"{self.address_string()} - {format % args}")
+        message = OBSERVE_QUERY.sub(r"\1", format % args)
+        print(f"{self.address_string()} - {message}")
 
     def respond(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> bool:
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

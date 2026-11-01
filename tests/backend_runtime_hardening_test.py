@@ -1,3 +1,5 @@
+import contextlib
+import io
 import tempfile
 import threading
 import unittest
@@ -20,6 +22,36 @@ class BackendRuntimeHardeningTest(unittest.TestCase):
         handler.send_header = lambda _key, _value: None
         handler.end_headers = lambda: None
         self.assertFalse(handler.respond({"ok": True}))
+
+    def request_log(self, method, *args):
+        handler = object.__new__(Handler)
+        handler.requestline = args[0] if args else ""
+        handler.client_address = ("127.0.0.1", 1)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            getattr(handler, method)(*args[1:])
+        return output.getvalue()
+
+    def test_request_log_omits_the_observer_site(self):
+        line = "GET /api/observe?key=mars&lat=12.3456&lon=-65.4321 HTTP/1.1"
+        output = self.request_log("log_request", line, 200)
+        self.assertIn('"GET /api/observe HTTP/1.1" 200', output)
+        self.assertNotIn("12.3456", output)
+        self.assertNotIn("65.4321", output)
+
+    def test_error_log_omits_the_observer_site(self):
+        handler = object.__new__(Handler)
+        handler.client_address = ("127.0.0.1", 1)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            handler.log_error("code %d, message %s", 400, "Bad request syntax ('GET /api/observe?lat=12.3456 &lon=-65.4321 HTTP/1.1')")
+        self.assertIn("/api/observe HTTP/1.1", output.getvalue())
+        self.assertNotIn("12.3456", output.getvalue())
+        self.assertNotIn("65.4321", output.getvalue())
+
+    def test_request_log_keeps_the_query_of_other_routes(self):
+        output = self.request_log("log_request", "GET /api/trails?key=mars HTTP/1.1", 200)
+        self.assertIn("/api/trails?key=mars", output)
 
     def test_cache_build_is_single_flight_under_concurrency(self):
         with tempfile.TemporaryDirectory() as directory:

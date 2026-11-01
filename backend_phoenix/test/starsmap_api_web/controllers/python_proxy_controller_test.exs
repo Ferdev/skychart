@@ -1,5 +1,6 @@
 defmodule StarsmapApiWeb.PythonProxyControllerTest do
   use StarsmapApiWeb.ConnCase, async: false
+  import ExUnit.CaptureLog
   alias StarsmapApiWeb.PythonProxyController
 
   setup do
@@ -27,6 +28,54 @@ defmodule StarsmapApiWeb.PythonProxyControllerTest do
     assert payload["error"] == "python_backend_unavailable"
     assert is_binary(payload["request_id"])
     refute inspect(payload) =~ "127.0.0.1"
+  end
+
+  describe "the logs of an observation request" do
+    setup do
+      level = Logger.level()
+      Logger.configure(level: :debug)
+      on_exit(fn -> Logger.configure(level: level) end)
+    end
+
+    test "do not show the observer's site", %{conn: conn} do
+      System.put_env("PYTHON_BACKEND_URL", "http://127.0.0.1:1")
+
+      log =
+        capture_log(fn ->
+          conn |> get("/api/observe?key=mars&lat=12.3456&lon=-65.4321") |> json_response(502)
+        end)
+
+      assert log =~ ~s("key" => "mars")
+      assert log =~ ~s("lat" => "[FILTERED]")
+      assert log =~ ~s("lon" => "[FILTERED]")
+      refute log =~ "12.3456"
+      refute log =~ "65.4321"
+    end
+
+    test "do not show the site when the proxy target is not valid", %{conn: conn} do
+      System.put_env("PYTHON_BACKEND_URL", "https://python.invalid")
+
+      log =
+        capture_log(fn ->
+          conn |> get("/api/observe?key=mars&lat=12.3456&lon=-65.4321") |> json_response(502)
+        end)
+
+      assert log =~ "unsupported_proxy_target"
+      refute log =~ "12.3456"
+      refute log =~ "65.4321"
+    end
+
+    test "do not show a target list", %{conn: conn} do
+      log =
+        capture_log(fn ->
+          conn
+          |> put_req_header("content-type", "application/json")
+          |> post("/api/catalog/match", Jason.encode!(%{targets: [%{name: "Private list item"}]}))
+        end)
+
+      assert log =~ ~s("targets" => "[FILTERED]")
+      refute log =~ "Private list item"
+    end
   end
 
   test "replaces an upstream 5xx body and forwards the correlation ID", %{conn: conn} do

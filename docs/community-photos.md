@@ -242,6 +242,9 @@ not proof of ownership.
 
 `Approve` and `Restore` need no text. `Reject` and `Hide` need a reason, and the
 photographer reads that reason in `My photos`. Each action has an audit record.
+The record of `Suspend`, `Restore` and `Cancel votes` keeps the user ID of the
+target, and the decision log shows the current handle. Account removal replaces a
+handle at the start of an older record with the user ID.
 `Keep photo` closes the open reports of a photo and keeps it public. A moderator
 can also hide a public photo from the photo viewer. The header button shows the
 count of waiting photos and open reports; the server sends it with the session of

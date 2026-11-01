@@ -4,6 +4,7 @@ defmodule StarsmapApi.CommunityTest do
 
   alias StarsmapApi.Community.{
     Accounts,
+    Action,
     User,
     Photo,
     Photos,
@@ -42,7 +43,11 @@ defmodule StarsmapApi.CommunityTest do
   test "an error report drops the request of a private calculation or list" do
     alias StarsmapApi.Community.Privacy
 
-    for url <- ["https://skychart.org/api/observe/plan", "https://skychart.org/api/catalog/match"] do
+    for url <- [
+          "https://skychart.org/api/observe?key=mars&lat=1.5&lon=2.5",
+          "https://skychart.org/api/observe/plan",
+          "https://skychart.org/api/catalog/match"
+        ] do
       event = %{
         request: %{url: url, data: %{"latitude_deg" => 1.0}},
         extra: %{a: 1},
@@ -935,6 +940,84 @@ defmodule StarsmapApi.CommunityTest do
                where: j.worker == "StarsmapApi.Community.PurgeWorker"
              )
            )
+  end
+
+  describe "the audit record of an account action" do
+    setup do
+      moderator =
+        Repo.insert!(%User{
+          email: "audit-mod@example.com",
+          handle: "audit-mod",
+          name: "Moderator",
+          role: "moderator"
+        })
+
+      %{moderator: moderator}
+    end
+
+    defp audit_reasons, do: Repo.all(from a in Action, order_by: a.inserted_at, select: a.reason)
+
+    defp legacy_action(actor, action, reason) do
+      Repo.insert!(%Action{user_id: actor.id, action: action, reason: reason})
+    end
+
+    test "stores the ID of the target and shows its current handle", %{
+      user: user,
+      moderator: moderator
+    } do
+      assert {:ok, _} = Moderation.cancel_votes(moderator, user.handle, "Vote ring")
+      assert {:ok, _} = Moderation.suspend(moderator, user.handle, "Repeated abuse", true)
+
+      assert audit_reasons() == ["#{user.id}: Vote ring", "#{user.id}: Repeated abuse"]
+
+      assert Moderation.log() |> Enum.map(& &1.reason) |> Enum.sort() ==
+               ["author: Repeated abuse", "author: Vote ring"]
+
+      Repo.update!(Ecto.Changeset.change(user, handle: "renamed"))
+
+      assert Moderation.log() |> Enum.map(& &1.reason) |> Enum.sort() ==
+               ["renamed: Repeated abuse", "renamed: Vote ring"]
+    end
+
+    test "keeps no former handle after the account is erased", %{
+      user: user,
+      moderator: moderator
+    } do
+      assert {:ok, _} = Moderation.suspend(moderator, user.handle, "Repeated abuse", true)
+      legacy_action(moderator, "suspend_account", "author: Older abuse")
+      legacy_action(moderator, "cancel_votes", "author: Older vote ring")
+
+      assert {:ok, :ok} = StarsmapApi.Community.Privacy.erase(user)
+
+      refute Enum.any?(audit_reasons(), &String.contains?(&1, "author"))
+
+      assert Enum.sort(audit_reasons()) ==
+               Enum.sort([
+                 "#{user.id}: Repeated abuse",
+                 "#{user.id}: Older abuse",
+                 "#{user.id}: Older vote ring"
+               ])
+
+      assert Moderation.log() |> Enum.map(& &1.reason) |> Enum.sort() ==
+               Enum.sort([
+                 "deleted-#{user.id}: Repeated abuse",
+                 "deleted-#{user.id}: Older abuse",
+                 "deleted-#{user.id}: Older vote ring"
+               ])
+    end
+
+    test "erasure changes only the rows of that handle", %{user: user, moderator: moderator} do
+      kept = [
+        legacy_action(moderator, "suspend_account", "author-two: Other account"),
+        legacy_action(moderator, "suspend_account", "coauthor: Other account"),
+        legacy_action(moderator, "hide", "author: Free text of a photo decision"),
+        legacy_action(moderator, "suspend_account", "Not the prefix: author: text")
+      ]
+
+      assert {:ok, :ok} = StarsmapApi.Community.Privacy.erase(user)
+
+      assert Enum.sort(audit_reasons()) == kept |> Enum.map(& &1.reason) |> Enum.sort()
+    end
   end
 
   test "TAN image annotations preserve reference pixels and parity" do

@@ -77,7 +77,10 @@ defmodule StarsmapApiWeb.PythonProxyController do
   end
 
   defp validate_uri(%URI{scheme: "http", host: host}) when is_binary(host), do: :ok
-  defp validate_uri(uri), do: {:error, {:unsupported_proxy_target, URI.to_string(uri)}}
+
+  # The query can hold the observer's site, and this error goes to the log.
+  defp validate_uri(uri),
+    do: {:error, {:unsupported_proxy_target, URI.to_string(%{uri | query: nil})}}
 
   defp request_bytes(uri, request_id, body) do
     path =
