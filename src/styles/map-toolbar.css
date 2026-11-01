@@ -144,9 +144,9 @@
 .toolbar-quick-layers label:has(:checked),
 .toolbar-settings-button[aria-expanded="true"],
 .share-trigger[aria-expanded="true"] {
-  color: #f6d58b;
-  border-color: rgba(239, 196, 104, 0.28);
-  background: rgba(239, 196, 104, 0.1);
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent-strong) 28%, transparent);
+  background: color-mix(in srgb, var(--accent-strong) 10%, transparent);
 }
 
 .atlas-toolbar .zoom-presets {
@@ -191,7 +191,7 @@
 .atlas-toolbar .zoom-presets button.active {
   border-color: var(--accent-strong);
   color: var(--accent-strong);
-  background: rgba(239, 196, 104, 0.14);
+  background: color-mix(in srgb, var(--accent-strong) 14%, transparent);
   box-shadow: inset 0 -2px 0 var(--accent-strong);
 }
 
@@ -285,7 +285,7 @@
   .toolbar-bottom { gap: 5px; padding-top: 4px; }
   .toolbar-quick-layers label { min-height: 44px; padding: 0 8px; }
   .atlas-toolbar .zoom-presets button { min-height: 44px; padding: 0 8px; }
-  .atlas-toolbar .zoom-presets button.active { border-color: rgba(239, 196, 104, 0.52); }
+  .atlas-toolbar .zoom-presets button.active { border-color: color-mix(in srgb, var(--accent-strong) 52%, transparent); }
   .atlas-toolbar .zoom-presets button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .map-settings { width: min(420px, calc(100vw - 20px)); border-radius: 16px; padding: 12px; }
   .map-settings .scale-collapse__toggle { min-height: 44px; }

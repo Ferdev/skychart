@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, skipIfAtlasUnavailable } from "./atlas-test-utils";
+import { collectBrowserIssues, openAtlas, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
 
 test.describe("compact and understandable atlas controls", () => {
   test.beforeEach(async ({ page, request }) => {
@@ -44,6 +44,31 @@ test.describe("compact and understandable atlas controls", () => {
 
     await galaxy.hover();
     await expect(galaxy).toHaveCSS("color", "rgb(239, 196, 104)");
+    issues.assertClean();
+  });
+
+  test("uses the same gold for the selected toolbar controls and the inspector", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    const gold = "rgb(239, 196, 104)";
+    await expect(page.locator(".toolbar-quick-layers label:has(:checked)").first()).toHaveCSS("color", gold);
+
+    const settings = page.locator("#map-settings-toggle");
+    await settings.click();
+    await expect(settings).toHaveAttribute("aria-expanded", "true");
+    await expect(settings).toHaveCSS("color", gold);
+    await page.keyboard.press("Escape");
+
+    const share = page.locator("#share-menu-button");
+    await share.click();
+    await expect(share).toHaveAttribute("aria-expanded", "true");
+    await expect(share).toHaveCSS("color", gold);
+    await page.locator("#close-share-popover").click();
+
+    await selectCatalogObject(page, "Mars", "mars");
+    const tab = page.locator('.object-view-tabs button[aria-selected="true"]');
+    await expect(tab).toHaveCSS("color", gold);
+    expect(await tab.evaluate((element) => getComputedStyle(element, "::after").backgroundColor)).toBe(gold);
+    await expect(page.locator(".compare-selected-action")).toHaveCSS("color", gold);
     issues.assertClean();
   });
 
