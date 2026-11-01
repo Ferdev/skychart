@@ -20,6 +20,8 @@ const MARKER_WIDTH = 168;
 const MARKER_HEIGHT = 52;
 /** The teal of the interface (`--spectral-teal`), for the footprint lines on the Sky canvas. */
 const FOOTPRINT_COLOR = "#82cbb3";
+/** The lowest alpha of the footprint lines and labels, so that they stay readable at a low photo opacity. */
+const MIN_FOOTPRINT_ALPHA = 0.35;
 const OVERLAY_RETRY_MS = 30_000;
 export class CommunityController {
   readonly api = new CommunityApi();
@@ -126,7 +128,7 @@ export class CommunityController {
     context.save();
     context.strokeStyle = FOOTPRINT_COLOR;
     context.lineWidth = 1;
-    context.globalAlpha = this.opacity;
+    context.globalAlpha = Math.max(MIN_FOOTPRINT_ALPHA, this.opacity);
     for (const wcs of footprintWcs(this.lastFrames.values(), (key) => this.index.get(key))) {
       const corners = footprintDirections(wcs).map(project);
       if (corners.length !== 4 || corners.some((p) => !p)) continue;
@@ -199,7 +201,7 @@ export class CommunityController {
     context.strokeStyle = FOOTPRINT_COLOR;
     context.fillStyle = FOOTPRINT_COLOR;
     context.lineWidth = 1;
-    context.globalAlpha = Math.max(0.35, this.opacity);
+    context.globalAlpha = Math.max(MIN_FOOTPRINT_ALPHA, this.opacity);
     context.font = canvasFont(12);
     for (const place of this.overlayPlaced) {
       context.beginPath();
