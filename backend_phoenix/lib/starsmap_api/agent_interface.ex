@@ -223,6 +223,9 @@ defmodule StarsmapApi.AgentInterface do
         parameter
       )
 
+  defp position?(%{position: %{x_au: x, y_au: y}}), do: finite_number?(x) && finite_number?(y)
+  defp position?(_), do: false
+
   defp center(params, object) do
     x = params["center_x_au"]
     y = params["center_y_au"]
@@ -236,7 +239,8 @@ defmodule StarsmapApi.AgentInterface do
           {:ok, %{x: x_value, y: y_value}}
         end
 
-      object && finite_number?(object.position.x_au) && finite_number?(object.position.y_au) ->
+      # A body of the Solar System moves, so its record has no static position.
+      object && position?(object) ->
         {:ok, %{x: object.position.x_au, y: object.position.y_au}}
 
       object ->

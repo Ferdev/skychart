@@ -1,6 +1,6 @@
 defmodule StarsmapApiWeb.CommunityPageController do
   use StarsmapApiWeb, :controller
-  alias StarsmapApi.Community.{Photos, User}
+  alias StarsmapApi.Community.{DeepFields, Photos, User}
   alias StarsmapApi.CommunityRepo, as: Repo
 
   def photo(conn, %{"id" => id}) do
@@ -46,6 +46,44 @@ defmodule StarsmapApiWeb.CommunityPageController do
           "This photo is not public or does not exist."
         )
       )
+    end
+  end
+
+  def deep_field(conn, %{"slug" => slug}) do
+    case DeepFields.public(slug) do
+      {:ok, field} ->
+        names = Enum.map_join(field.contributors, ", ", & &1.name)
+
+        image =
+          if field.build,
+            do:
+              "<figure><img src=\"#{h(field.build.stack_url)}\" alt=\"#{h(field.title)}\"><figcaption>#{field.build.frames} frames · #{h(names)}</figcaption></figure>",
+            else: ""
+
+        # The application opens the page of this field. This article is the text for a crawler
+        # and for a browser with no JavaScript.
+        body =
+          "<article class=\"object-page\"><nav aria-label=\"Breadcrumb\"><a href=\"/\">Cosmic Atlas</a> / <span>Deep fields</span></nav>" <>
+            "<h1>#{h(field.title)}: deep field</h1>#{image}<p>A shared image of one object, stacked from the photos of the community.</p>" <>
+            "<a href=\"/o/#{URI.encode(field.key, &URI.char_unreserved?/1)}\">Explore #{h(field.title)}</a></article>"
+
+        html(
+          conn,
+          StarsmapApiWeb.ServerShell.render!(
+            title: "#{field.title} deep field — Cosmic Atlas",
+            body: body
+          )
+        )
+
+      _ ->
+        conn
+        |> put_status(:not_found)
+        |> html(
+          StarsmapApiWeb.StaticPage.not_found(
+            "Deep field not found",
+            "This deep field does not exist."
+          )
+        )
     end
   end
 

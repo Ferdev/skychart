@@ -46,6 +46,17 @@ def test_detection_gives_centers_and_refuses_the_edge():
     assert all(item["elongation"] < 1.4 for item in found)
 
 
+def test_an_opaque_image_keeps_its_values_and_three_bands(tmp_path):
+    pixels = np.full((64, 64, 3), 30, dtype=np.uint8)
+    pixels[10:20, 10:20] = (140, 90, 40)
+    image = tmp_path / "opaque.webp"
+    write_webp(pixels, image, "[lossless]")
+    decoded = read_rgb(image, tmp_path)
+    assert decoded.shape == (64, 64, 3)
+    assert tuple(decoded[15, 15]) == (140, 90, 40)
+    assert tuple(decoded[40, 40]) == (30, 30, 30)
+
+
 def test_pairs_are_strict_and_a_solution_offset_is_removed():
     stars = [(100, 120), (400, 300), (700, 500), (250, 450), (600, 100)]
     sources = [{"x": x + 7.0, "y": y - 5.0, "flux": 10.0} for x, y in stars] + [{"x": 50.0, "y": 50.0, "flux": 5.0}]

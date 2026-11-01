@@ -8,6 +8,7 @@ defmodule StarsmapApi.Community.User do
     field :role, :string, default: "member"
     field :suspended, :boolean, default: false
     field :first_sign_in_at, :utc_datetime_usec
+    field :deep_field_consent_at, :utc_datetime_usec
     timestamps(type: :utc_datetime_usec)
   end
 end

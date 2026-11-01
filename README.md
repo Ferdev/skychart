@@ -29,6 +29,8 @@ Cosmic Atlas is a scientific celestial atlas with a precise 2D map and a free-fl
 - Transit timings. The `Transits` list of the night planner predicts deep transits of bright hosts for a site and a night. `Record transit` reads FITS frames in the browser and sends only the measurements. A moderator approves each timing. See [Transit timings](docs/community-photos.md#transit-timings).
 - A depth flight (`Enter this photo`) through a published solved photo, when its photographer allows it. See [Depth flight](docs/community-photos.md#depth-flight).
 - A sky sweep of a solved photo that lists known asteroids, comets, and transients in the frame, and keeps candidates for review. See [Sky sweep](docs/community-photos.md#sky-sweep).
+- Collective deep fields: owners add approved solved photos of one target to a shared stacked image with a depth map, a credit wall, and a measured limiting magnitude. See [Deep fields](docs/community-photos.md#deep-fields).
+- Answer flights: a sky question gives a narrated flight in which each number comes from a stored catalog record. It is off with no model key. See [Answer flights](docs/answer-flights.md).
 - A calendar subscription (`/calendar.ics`, with an optional `types` filter) for the events of `Happening now`.
 - A target list import in the Search panel: paste or upload names or RA and Dec positions, match them against the catalog, correct ambiguous rows, plot the matches in a temporary layer, and export a CSV with the source of each match.
 - Guided object sets for Solar neighborhood, bright stars, nearby stars, small bodies, Messier highlights, galaxies, active galaxies, nebulae, and universe-scale exploration.

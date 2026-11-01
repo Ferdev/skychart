@@ -5,7 +5,7 @@ defmodule StarsmapApi.Community.SkyOverlay do
   stars, so it does not go on the sky as an aligned image.
   """
   import Ecto.Query
-  alias StarsmapApi.Community.{Photos, Storage}
+  alias StarsmapApi.Community.{DeepFields, Photos, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
 
   @limit 200
@@ -40,7 +40,20 @@ defmodule StarsmapApi.Community.SkyOverlay do
     end)
     |> Enum.take(@limit)
     |> Enum.map(&item/1)
+    |> then(&(deep_fields(ra, dec, radius) ++ &1))
   end
+
+  # A stack is one photo on the sky, and it comes first, so that a dense area does not push it out.
+  defp deep_fields(ra, dec, radius) do
+    DeepFields.overlay_fields()
+    |> Enum.flat_map(fn field ->
+      item = DeepFields.overlay_item(field)
+
+      if item && overlaps?(wcs_strings(item.wcs), ra, dec, radius), do: [item], else: []
+    end)
+  end
+
+  defp wcs_strings(wcs), do: Map.new(wcs, fn {key, value} -> {to_string(key), value} end)
 
   defp aligned?(
          %{"projection" => "TAN", "frame" => "ICRS", "epoch" => "J2000", "status" => "solved"} = w

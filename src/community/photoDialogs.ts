@@ -3,6 +3,7 @@ import { NEW_TAB_LINK_ATTRIBUTES } from "../format/links";
 import { t } from "../i18n";
 import { CommunityApi, errorText, type Photo } from "./api";
 import { dateText, h, licenceText, openDialog, type DialogView } from "./communityUi";
+import { mountFrameAction } from "./deepField";
 import { DepthFlight } from "./depthFlight";
 import { mountFindings } from "./photoFindings";
 
@@ -156,6 +157,8 @@ export class PhotoDialogs {
     if (compare) compare.onclick = () => this.compareSurvey(photo);
     const depth = view.body.querySelector<HTMLButtonElement>("[data-depth]");
     if (depth) depth.onclick = () => void new DepthFlight(this.api, (key) => this.host.openObject(key)).open(photo);
+    if (photo.deep_field_open && this.api.user?.handle === photo.author.handle)
+      void mountFrameAction(this.api, view.body.querySelector<HTMLElement>(".community-actions")!, photo.id, (text) => (view.message.textContent = text)).catch(() => undefined);
     void mountFindings(this.api, view.body.querySelector<HTMLElement>("[data-findings]")!, stage, photo, (text) => (view.message.textContent = text));
 
     let voted = false;

@@ -108,6 +108,8 @@ See [Catalog Tile Format](tile-format.md) for the SMP3 and SMPK1 contracts.
 - `GET /api/agent/v1/catalogs`
 - `GET /api/agent/v1/view-link`
 - `GET /openapi.json` (the public contract of `/api/agent/v1`)
+- `GET /api/photos/sky` (the [Sky overlay](community-photos.md#sky-overlay) of the
+  community photos, behind `COMMUNITY_ENABLED`)
 - `GET /feed.xml`
 - `GET /calendar.ics`
 - `POST /mcp` (the public [MCP server](mcp-server.md))
@@ -141,3 +143,11 @@ in a separate writable database. It does not write through the catalog union vie
 or staging's read-only catalog role. Oban runs bounded image/solver jobs in the
 community worker. S3 holds private sources and masters and approved derivatives.
 See [community photos](community-photos.md) for configuration and recovery.
+
+## Deep fields and answer flights
+
+`DeepFieldWorker` stacks photos in the serial `media` queue of the worker container (see
+[Deep fields](community-photos.md#deep-fields)). The `flights` queue runs in the web container,
+because the position tools of an answer flight need the Python service of that container (see
+[Answer flights](answer-flights.md)). A web container has no Oban plugins, so it does not take
+the leadership that the cron plugin of the worker needs.

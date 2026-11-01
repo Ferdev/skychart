@@ -54,6 +54,11 @@ defmodule StarsmapApi.Release do
     StarsmapApi.Community.Operations.role(handle, role)
   end
 
+  def hide_answer_flight(slug) do
+    {:ok, _} = Application.ensure_all_started(@app)
+    StarsmapApi.Flights.hide(slug)
+  end
+
   def import_community(path, moderator_handle) do
     {:ok, _} = Application.ensure_all_started(@app)
     StarsmapApi.Community.Operations.import_manifest(path, moderator_handle)

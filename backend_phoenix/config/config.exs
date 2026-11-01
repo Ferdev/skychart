@@ -54,7 +54,8 @@ config :phoenix, :filter_parameters, [
   "lat",
   "lon",
   "rows",
-  "targets"
+  "targets",
+  "question"
 ]
 
 config :sentry,

@@ -2,7 +2,7 @@ defmodule StarsmapApi.Analytics do
   alias StarsmapApi.Analytics.Event
   alias StarsmapApi.Repo
 
-  @event_names ~w(page_view search object compare share embed_loaded image_export tour_started tour_completed methodology citation_copied filter data_export cross_tool depth_flight depth_clip)
+  @event_names ~w(page_view search object compare share embed_loaded image_export tour_started tour_completed methodology citation_copied filter data_export cross_tool depth_flight depth_clip deep_field answer_flight)
   @property_keys ~w(query_length object_type source filter format tour tool method resolution_tier)
   @referrer_surfaces [
     {"chatgpt", ["chatgpt.com", "chat.openai.com"]},
