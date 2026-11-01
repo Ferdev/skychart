@@ -133,6 +133,24 @@ body[data-universe-view] .tour-player {
   }
 
   /*
+   * The button stays 24 x 24 px. Its target is 32 x 44 px, so that eleven dots stay on one row at a
+   * 390 px width. The gaps give the targets their room, and the targets of two dots do not overlap.
+   */
+  .tour-player__dots {
+    gap: 20px 8px;
+  }
+
+  .tour-player__dots button {
+    position: relative;
+  }
+
+  .tour-player__dots button::after {
+    position: absolute;
+    inset: -11px -5px;
+    content: "";
+  }
+
+  /*
    * A step that selects an object opens the inspector sheet. The card is then a bar at the bottom of the
    * window with a fixed height, and the sheet is above it (object-inspector-progressive.css). The toolbar
    * is not in view while the sheet is open.

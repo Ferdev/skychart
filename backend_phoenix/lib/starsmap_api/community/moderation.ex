@@ -247,15 +247,13 @@ defmodule StarsmapApi.Community.Moderation do
     end)
   end
 
-  def report(id, reason) when is_binary(reason) and byte_size(reason) in 3..2000 do
-    if Photos.visible?(Photos.get(id)) do
-      Repo.insert(%Report{photo_id: id, reason: reason})
-    else
-      {:error, :not_found}
+  def report(id, reason) do
+    cond do
+      not StarsmapApi.Community.valid_reason?(reason) -> {:error, :invalid_report}
+      Photos.visible?(Photos.get(id)) -> Repo.insert(%Report{photo_id: id, reason: reason})
+      true -> {:error, :not_found}
     end
   end
-
-  def report(_, _), do: {:error, :invalid_report}
 
   def reports do
     reports =
@@ -375,7 +373,7 @@ defmodule StarsmapApi.Community.Moderation do
 
   # The role comes first: a person without the role gets no information about the reason.
   defp check_reason(%{role: role}, reason) when role in ["moderator", "admin"] do
-    if is_binary(reason) and byte_size(reason) in 3..2000,
+    if StarsmapApi.Community.valid_reason?(reason),
       do: :ok,
       else: {:error, :invalid_reason}
   end

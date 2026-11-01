@@ -73,10 +73,12 @@
   background: var(--panel-surface);
 }
 
+/* Gold is the current filter, and the underline shows it without colour. */
 .scope-section .body-picker-filters button.active {
   border-color: var(--accent-strong);
   color: var(--accent-strong);
   background: rgba(239, 196, 104, 0.14);
+  box-shadow: inset 0 -2px 0 var(--accent-strong);
 }
 
 .search-scroll {
@@ -216,6 +218,13 @@
   .scope-section .body-picker-filters button,
   .body-picker-filters__more {
     min-height: 44px;
+  }
+
+  /* The text and the marker do not change. The padding makes a 44 px target. */
+  .now-subscribe summary {
+    min-width: 44px;
+    min-height: 44px;
+    padding-block: 12px;
   }
 
   .results-section {

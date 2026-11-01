@@ -75,21 +75,19 @@ defmodule StarsmapApi.Community.Tours do
     end
   end
 
-  def report(token, reason) when is_binary(reason) and byte_size(reason) in 3..2000 do
-    case open_tour(token) do
-      {tour, _author} ->
-        StarsmapApi.Community.transaction(fn ->
-          Repo.insert!(%TourReport{tour_id: tour.id, reason: reason})
-          if is_nil(tour.reviewed_at), do: hold(tour)
-          :ok
-        end)
-
-      nil ->
-        {:error, :not_found}
+  def report(token, reason) do
+    with true <- StarsmapApi.Community.valid_reason?(reason),
+         {tour, _author} <- open_tour(token) do
+      StarsmapApi.Community.transaction(fn ->
+        Repo.insert!(%TourReport{tour_id: tour.id, reason: reason})
+        if is_nil(tour.reviewed_at), do: hold(tour)
+        :ok
+      end)
+    else
+      false -> {:error, :invalid_report}
+      nil -> {:error, :not_found}
     end
   end
-
-  def report(_, _), do: {:error, :invalid_report}
 
   @doc "The tours that wait for a moderator and the tours that a moderator hid."
   def review_list do
