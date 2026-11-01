@@ -1014,6 +1014,215 @@ defmodule StarsmapApi.CommunityTest do
     end
   end
 
+  describe "a moderator and their own photo" do
+    setup %{user: user, subject: subject} do
+      moderator =
+        Repo.insert!(%User{
+          email: "own-photo-mod@example.com",
+          handle: "own-photo-mod",
+          name: "Moderator",
+          role: "moderator"
+        })
+
+      %{moderator: moderator, other_photo: photo(user, subject, "review")}
+    end
+
+    test "cannot approve or restore it, and nothing changes", %{
+      moderator: moderator,
+      subject: subject
+    } do
+      for {status, action} <- [
+            {"review", "approve"},
+            {"published", "approve"},
+            {"hidden", "restore"},
+            {"rejected", "restore"}
+          ],
+          reason <- ["", "Looks correct"] do
+        own = photo(moderator, subject, status)
+
+        assert {:error, :not_allowed} = Moderation.review(moderator, own.id, action, reason)
+        assert Photos.get(own.id).status == status
+      end
+
+      assert Moderation.log() == []
+    end
+
+    test "cannot close a report of it with Keep photo", %{moderator: moderator, subject: subject} do
+      own = photo(moderator, subject, "published")
+      {:ok, report} = Moderation.report(own.id, "Wrong credit")
+
+      assert {:error, :not_allowed} = Moderation.review(moderator, own.id, "approve", "")
+      assert is_nil(Repo.reload!(report).resolved_at)
+    end
+
+    test "can still hide or reject it", %{moderator: moderator, subject: subject} do
+      assert {:ok, %{status: "hidden"}} =
+               Moderation.review(
+                 moderator,
+                 photo(moderator, subject, "published").id,
+                 "hide",
+                 "Wrong object"
+               )
+
+      assert {:ok, %{status: "rejected"}} =
+               Moderation.review(
+                 moderator,
+                 photo(moderator, subject, "review").id,
+                 "reject",
+                 "Wrong object"
+               )
+    end
+
+    test "can still approve and restore the photo of another author", %{
+      moderator: moderator,
+      other_photo: other_photo
+    } do
+      assert {:ok, %{status: "published"}} =
+               Moderation.review(moderator, other_photo.id, "approve", "")
+
+      assert {:ok, %{status: "hidden"}} =
+               Moderation.review(moderator, other_photo.id, "hide", "Attribution review")
+
+      assert {:ok, %{status: "published"}} =
+               Moderation.review(moderator, other_photo.id, "restore", "")
+    end
+
+    test "a second moderator can approve it", %{moderator: moderator, subject: subject} do
+      own = photo(moderator, subject, "review")
+
+      second =
+        Repo.insert!(%User{
+          email: "second-mod@example.com",
+          handle: "second-mod",
+          name: "Second",
+          role: "moderator"
+        })
+
+      assert {:ok, %{status: "published"}} = Moderation.review(second, own.id, "approve", "")
+    end
+
+    test "an admin can approve and restore their own photo", %{
+      moderator: moderator,
+      subject: subject
+    } do
+      admin = Repo.update!(Ecto.Changeset.change(moderator, role: "admin"))
+      own = photo(admin, subject, "review")
+
+      assert {:ok, %{status: "published"}} = Moderation.review(admin, own.id, "approve", "")
+      assert {:ok, %{status: "hidden"}} = Moderation.review(admin, own.id, "hide", "Wrong object")
+      assert {:ok, %{status: "published"}} = Moderation.review(admin, own.id, "restore", "")
+    end
+  end
+
+  describe "the cancellation of votes" do
+    setup %{user: user, subject: subject} do
+      moderator =
+        Repo.insert!(%User{
+          email: "votes-mod@example.com",
+          handle: "votes-mod",
+          name: "Moderator",
+          role: "moderator"
+        })
+
+      admin =
+        Repo.insert!(%User{
+          email: "votes-admin@example.com",
+          handle: "votes-admin",
+          name: "Admin",
+          role: "admin"
+        })
+
+      %{moderator: moderator, admin: admin, published: photo(user, subject, "published")}
+    end
+
+    defp vote_count(voter),
+      do: Repo.aggregate(from(v in Vote, where: v.user_id == ^voter.id), :count)
+
+    test "does not reach an admin, and the votes remain", %{
+      moderator: moderator,
+      admin: admin,
+      published: published
+    } do
+      Repo.insert!(%Vote{user_id: admin.id, photo_id: published.id})
+
+      assert {:error, :not_allowed} =
+               Moderation.cancel_votes(moderator, admin.handle, "Vote ring")
+
+      assert vote_count(admin) == 1
+      assert Moderation.log() == []
+    end
+
+    test "does not reach the actor, and the votes remain", %{
+      moderator: moderator,
+      admin: admin,
+      published: published
+    } do
+      for actor <- [moderator, admin] do
+        Repo.insert!(%Vote{user_id: actor.id, photo_id: published.id})
+
+        assert {:error, :not_allowed} = Moderation.cancel_votes(actor, actor.handle, "Vote ring")
+        assert vote_count(actor) == 1
+      end
+
+      assert Moderation.log() == []
+    end
+
+    test "still removes the votes of a member and of another moderator", %{
+      moderator: moderator,
+      published: published,
+      user: user
+    } do
+      second =
+        Repo.insert!(%User{
+          email: "votes-second@example.com",
+          handle: "votes-second",
+          name: "Second",
+          role: "moderator"
+        })
+
+      member =
+        Repo.insert!(%User{email: "votes-member@example.com", handle: "voter", name: "Voter"})
+
+      for target <- [second, member] do
+        Repo.insert!(%Vote{user_id: target.id, photo_id: published.id})
+
+        assert {:ok, :ok} = Moderation.cancel_votes(moderator, target.handle, "Vote ring")
+        assert vote_count(target) == 0
+      end
+
+      assert {:ok, :ok} = Moderation.cancel_votes(moderator, user.handle, "No votes")
+    end
+
+    test "gives not_found for an unknown handle", %{moderator: moderator} do
+      assert {:error, :not_found} = Moderation.cancel_votes(moderator, "nobody", "Vote ring")
+    end
+  end
+
+  test "suspension keeps its rule for an admin and for the actor", %{user: user} do
+    moderator =
+      Repo.insert!(%User{
+        email: "suspend-rule-mod@example.com",
+        handle: "suspend-rule-mod",
+        name: "Moderator",
+        role: "moderator"
+      })
+
+    admin =
+      Repo.insert!(%User{
+        email: "suspend-rule-admin@example.com",
+        handle: "suspend-rule-admin",
+        name: "Admin",
+        role: "admin"
+      })
+
+    assert {:error, :not_allowed} = Moderation.suspend(moderator, admin.handle, "Abuse", true)
+    assert {:error, :not_allowed} = Moderation.suspend(moderator, moderator.handle, "Abuse", true)
+    assert {:error, :not_found} = Moderation.suspend(moderator, "nobody", "Abuse", true)
+    assert {:ok, :ok} = Moderation.suspend(admin, user.handle, "Abuse", true)
+    refute Repo.get!(User, admin.id).suspended
+    refute Repo.get!(User, moderator.id).suspended
+  end
+
   test "account deletion revokes login, hides photos and queues byte removal", %{
     user: user,
     subject: subject
