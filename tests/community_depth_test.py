@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -100,6 +101,6 @@ def test_the_script_reports_a_bad_request(tmp_path: Path):
     script = Path(__file__).resolve().parents[1] / "backend" / "community_depth.py"
     request = tmp_path / "request.json"
     request.write_text(json.dumps({"records": []}), encoding="utf-8")
-    run = subprocess.run([str(Path(__file__).resolve().parents[1] / ".venv/bin/python"), str(script), "missing.webp", str(request), str(tmp_path / "out")], capture_output=True, text=True)
+    run = subprocess.run([sys.executable, str(script), "missing.webp", str(request), str(tmp_path / "out")], capture_output=True, text=True)
     assert run.returncode == 1
     assert "error" in json.loads(run.stdout)
