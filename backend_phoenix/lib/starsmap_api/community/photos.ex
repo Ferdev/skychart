@@ -165,39 +165,44 @@ defmodule StarsmapApi.Community.Photos do
   end
 
   @doc "The photographer's own photos, with the private status and the last moderator text."
-  def mine(user),
-    do:
+  def mine(user) do
+    photos =
       Repo.all(
         from p in Photo, where: p.user_id == ^user.id, order_by: [desc: p.inserted_at], limit: 50
       )
-      |> Enum.map(fn p ->
-        action =
-          Repo.one(
-            from a in StarsmapApi.Community.Action,
-              where: a.photo_id == ^p.id,
-              order_by: [desc: a.inserted_at],
-              limit: 1
-          )
 
-        subject = Repo.get(StarsmapApi.Community.Subject, p.subject_id)
+    states = StarsmapApi.Community.DeepFields.own_states(user, photos)
+    Enum.map(photos, &(&1 |> own() |> Map.merge(states[&1.id])))
+  end
 
-        Map.take(p, [
-          :id,
-          :title,
-          :status,
-          :inserted_at,
-          :declared_key,
-          :published_at,
-          :depth_allowed
-        ])
-        |> Map.merge(%{
-          object_name: subject && subject.name,
-          # The owner can read the private derivative while the photo is not public.
-          thumbnail_url: if(p.sha256, do: Storage.media_url(p.id, "320"), else: nil),
-          votes: if(p.status == "published", do: Ranking.vote_count(p.id), else: 0),
-          moderation_reason: if(action, do: action.reason, else: nil)
-        })
-      end)
+  defp own(p) do
+    action =
+      Repo.one(
+        from a in StarsmapApi.Community.Action,
+          where: a.photo_id == ^p.id,
+          order_by: [desc: a.inserted_at],
+          limit: 1
+      )
+
+    subject = Repo.get(StarsmapApi.Community.Subject, p.subject_id)
+
+    Map.take(p, [
+      :id,
+      :title,
+      :status,
+      :inserted_at,
+      :declared_key,
+      :published_at,
+      :depth_allowed
+    ])
+    |> Map.merge(%{
+      object_name: subject && subject.name,
+      # The owner can read the private derivative while the photo is not public.
+      thumbnail_url: if(p.sha256, do: Storage.media_url(p.id, "320"), else: nil),
+      votes: if(p.status == "published", do: Ranking.vote_count(p.id), else: 0),
+      moderation_reason: if(action, do: action.reason, else: nil)
+    })
+  end
 
   @doc "Published photos, newest first."
   def recent(offset \\ 0, limit \\ 24) when is_integer(offset) and offset >= 0 do

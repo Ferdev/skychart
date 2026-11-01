@@ -99,3 +99,12 @@ transit.minutes it
 transit.altitudes pt-BR
 depth.pause fr
 depth.credit *
+ask.unit.km es
+ask.unit.km fr
+ask.unit.km de
+ask.unit.km pt-BR
+ask.unit.km it
+ask.unit.pc fr
+ask.unit.pc pt-BR
+ask.sources fr
+ask.unit.min fr

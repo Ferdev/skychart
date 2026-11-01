@@ -1,6 +1,6 @@
 export const ANALYTICS_EVENTS = [
   "page_view", "search", "object", "compare", "share", "embed_loaded", "image_export",
-  "tour_started", "tour_completed", "methodology", "citation_copied", "filter", "data_export", "cross_tool", "depth_flight", "depth_clip"
+  "tour_started", "tour_completed", "methodology", "citation_copied", "filter", "data_export", "cross_tool", "depth_flight", "depth_clip", "deep_field", "answer_flight"
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
 export type AnalyticsProperties = Record<string, string | number>;

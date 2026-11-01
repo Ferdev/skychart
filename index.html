@@ -513,6 +513,16 @@
             </section>
             <div class="search-scroll" id="search-scroll">
               <div class="search-discovery" id="search-discovery">
+            <section class="workspace-section ask-section" id="ask-section" aria-labelledby="ask-heading" hidden>
+              <div class="section-heading"><span id="ask-heading" data-i18n="ask.title">Ask</span></div>
+              <form class="ask-form" autocomplete="off">
+                <label class="sr-only" for="ask-question" data-i18n="ask.label">Ask a question about the sky</label>
+                <input id="ask-question" name="question" type="text" minlength="8" maxlength="200" required data-i18n-attrs="placeholder:ask.placeholder" placeholder="How far away is the Andromeda Galaxy?">
+                <button type="submit" class="secondary-action" data-i18n="ask.submit">Ask</button>
+              </form>
+              <p class="ask-help" data-i18n="ask.help">A short flight answers your question. Each number comes from a catalog record.</p>
+              <div class="ask-state" aria-busy="false"><p role="status" data-ask-status></p></div>
+            </section>
             <section class="workspace-section now-panel" aria-labelledby="now-heading"><div class="section-heading"><span id="now-heading" data-i18n="launch.happeningNow">Happening now</span><a href="/feed.xml" data-i18n="launch.atomFeed">Atom feed</a></div><details id="now-subscribe" class="now-subscribe"></details><p id="now-status" role="status" data-i18n="launch.eventsLoading">Loading current events…</p><ol id="now-events" class="now-events"></ol><button id="now-show-all" class="text-action" type="button" aria-controls="now-events" aria-expanded="false" hidden>Show all</button></section>
             <section class="workspace-section explore-section" aria-label="Explore domains" data-i18n-attrs="aria-label:explore.label">
               <div class="section-heading">

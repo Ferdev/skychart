@@ -212,3 +212,57 @@ body[data-universe-view] .tour-player {
     display: none;
   }
 }
+
+.tour-player__actions {
+  flex-wrap: wrap;
+}
+
+.tour-player__actions a {
+  white-space: nowrap;
+}
+
+/* An answer flight: a chip for each number and each object, and the sources of the last step. */
+.tour-player__chip {
+  display: inline;
+  padding: 0 4px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--panel-ink);
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+button.tour-player__chip {
+  cursor: pointer;
+}
+
+button.tour-player__chip:hover {
+  border-color: var(--accent-strong);
+}
+
+button.tour-player__chip:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.tour-player__sources {
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--panel-ink-muted);
+}
+
+.tour-player__sources h3 {
+  margin: 0 0 4px;
+  font-size: var(--text-xs);
+  color: var(--panel-ink);
+}
+
+.tour-player__sources ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

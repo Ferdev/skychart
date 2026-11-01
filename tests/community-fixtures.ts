@@ -37,7 +37,7 @@ export const reviewPhoto = {
   last_action: null,
 };
 export const photographer = { handle: "observer", name: "Observer", h_index: 2, photos: 12, objects: 9, votes: 31, covers: 4, first_photos: 2 };
-export async function communityFixture(page: Page, options: { role?: string } = {}) {
+export async function communityFixture(page: Page, options: { role?: string; flights?: boolean } = {}) {
   const state = {
     role: options.role ?? "member",
     queue: [reviewPhoto] as (typeof reviewPhoto)[],
@@ -58,7 +58,7 @@ export async function communityFixture(page: Page, options: { role?: string } = 
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = {};
-    if (path === "/api/community/config") data = { enabled: true };
+    if (path === "/api/community/config") data = { enabled: true, flights: options.flights ?? false };
     else if (path === "/api/community/session" || path === "/api/community/me")
       data = {
         user: state.signed

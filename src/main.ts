@@ -424,7 +424,7 @@ const exoplanetSystems = new ExoplanetSystemNavigator({
   root: bodyInfo, mapper: catalogObjectMapper, body: (key) => bodyByKey.get(key), bodies: () => ephemeris?.bodies ?? [], mergeBodies, viewport: usableViewportRect, maximumZoom: MAX_ZOOM,
   animateCameraTo: (target) => { activeZoomPreset = null; updateZoomPresetButtons(); animateCameraTo(target, LOCAL_ZOOM_DURATION_MS, scheduleViewStateReplace); },
 });
-const tourPlayer = new TourPlayer({ navigate: (state, options) => viewStateController.navigateTour(state, options), prewarm: (state) => viewStateController.prewarmTour(state), track: (event, properties) => trackEvent(event, properties), translate: t, closed: () => viewStateController.endTour(), report: (slug) => community.reportTour(slug, () => tourPlayer.close()) });
+const tourPlayer = new TourPlayer({ navigate: (state, options) => viewStateController.navigateTour(state, options), prewarm: (state) => viewStateController.prewarmTour(state), track: (event, properties) => trackEvent(event, properties), translate: t, closed: () => viewStateController.endTour(), report: (slug) => community.reportTour(slug, () => tourPlayer.close()), locale, openObject: (key) => void community.selectObject?.(key) });
 const objectInspection: ObjectInspectionView = new ObjectInspectionView({
   bodyInfo,
   hydrationStates: objectDetailHydrationStates,
@@ -594,6 +594,7 @@ community.selectObject = (key) => selectBodyByKey(key, { center: true, zoom: "lo
 // A step of a member's tour has the same state as a shared view, with no tour of its own.
 community.tours.captureView = () => encodeViewState({ ...viewStateController.current(), tour: undefined, step: undefined });
 community.tours.preview = (tour) => { setActiveTab(null); void tourPlayer.preview(tour); };
+community.flights.startTour = (slug) => { setActiveTab(null); void tourPlayer.start(slug); };
 // The photos layer of Sky view is the same `L=` layer as the switch of the map toolbar.
 community.skyLayerChanged = (shown) => {
   atlasState.displayLayers = { ...atlasState.displayLayers, photos: shown };

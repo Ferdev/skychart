@@ -1,4 +1,5 @@
 import { t } from "../i18n";
+import type { DeepFieldSummary, DeepFrame } from "./deepFieldModel";
 
 export type Photo = {
   id: string;
@@ -25,6 +26,8 @@ export type Photo = {
   image_url: string;
   /** Only the response for one photo has this field. */
   depth_ready?: boolean;
+  /** The open deep field that this photo can join. Only the response for one photo has this field. */
+  deep_field_open?: DeepFieldSummary | null;
 };
 export type Cover = {
   subject_id: string;
@@ -45,6 +48,8 @@ export type OverlayPhoto = {
   wcs: import("./photoFootprint").Wcs;
   thumbnail_url: string;
   image_url: string;
+  /** The slug of a deep field: this item is its current stack. */
+  deep_field?: string;
 };
 export type User = { id: string; handle: string; name: string; role: string };
 /** A photo of the signed-in photographer, with its private status. */
@@ -59,6 +64,8 @@ export type OwnPhoto = {
   inserted_at?: string;
   moderation_reason?: string | null;
   depth_allowed?: boolean;
+  deep_field_open?: DeepFieldSummary | null;
+  deep_frame?: DeepFrame | null;
 };
 export type Photographer = {
   handle: string;
@@ -208,6 +215,14 @@ const ERROR_KEYS = new Set([
   "transit_duplicate",
   "invalid_transit",
   "transit_fit_unavailable",
+  "field_open",
+  "no_solved_photos",
+  "moving_target",
+  "no_open_field",
+  "not_eligible",
+  "question_rejected",
+  "flights_daily_limit",
+  "flights_unavailable",
 ]);
 
 export class CommunityApi {

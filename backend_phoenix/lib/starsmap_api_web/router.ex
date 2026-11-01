@@ -153,6 +153,36 @@ defmodule StarsmapApiWeb.Router do
       scope: :shared_tour
   end
 
+  # A question can start a paid model call, so a client has a small budget of questions.
+  pipeline :flight_question do
+    plug :accepts, ["json"]
+
+    plug StarsmapApiWeb.Plugs.CommunityAccess,
+      capacity: 6,
+      refill_per_second: 0.02,
+      scope: :flight_question
+  end
+
+  # The player reads the state of a flight every two seconds, and a class replays one flight.
+  pipeline :flight_read do
+    plug :accepts, ["json"]
+
+    plug StarsmapApiWeb.Plugs.CommunityAccess,
+      capacity: 240,
+      refill_per_second: 4.0,
+      scope: :flight_read
+  end
+
+  scope "/api", StarsmapApiWeb do
+    pipe_through :flight_question
+    post "/flights", FlightController, :create
+  end
+
+  scope "/api", StarsmapApiWeb do
+    pipe_through :flight_read
+    get "/flights/:slug", FlightController, :show
+  end
+
   pipeline :community_html do
     plug StarsmapApiWeb.Plugs.CommunityAccess
     plug StarsmapApiWeb.Plugs.FramePolicy
@@ -163,6 +193,8 @@ defmodule StarsmapApiWeb.Router do
     get "/community/:page", CommunityPolicyController, :show
     get "/photos/:id", CommunityPageController, :photo
     get "/u/:handle", CommunityPageController, :profile
+    get "/deep-field/:slug", CommunityPageController, :deep_field
+    get "/flights/:slug", FlightController, :page
   end
 
   pipeline :community_session do
@@ -183,6 +215,8 @@ defmodule StarsmapApiWeb.Router do
     get "/photos/:id/depth", CommunityController, :depth
     get "/objects/:key/findings", CommunityController, :object_findings
     get "/photos/:id", CommunityController, :show
+    get "/deep-fields/:slug", DeepFieldController, :show
+    get "/deep-fields/:slug/media/:version/:name", DeepFieldController, :media
     get "/community/rankings", CommunityController, :rankings
     get "/community/photographers", CommunityController, :photographers
     get "/community/photographers/:handle", CommunityController, :photographer
@@ -211,6 +245,14 @@ defmodule StarsmapApiWeb.Router do
     post "/photos/:id/wcs", CommunityController, :wcs
     post "/photos/:id/complete", CommunityController, :complete
     post "/photos/:id/depth-permission", CommunityController, :depth_permission
+    get "/photos/:id/deep-frame", DeepFieldController, :frame
+    post "/photos/:id/deep-frame", DeepFieldController, :add_frame
+    delete "/photos/:id/deep-frame", DeepFieldController, :withdraw
+    post "/deep-field-consent", DeepFieldController, :consent
+    get "/review/deep-fields", DeepFieldController, :review
+    post "/deep-fields", DeepFieldController, :open
+    post "/deep-fields/:slug/close", DeepFieldController, :close
+    post "/deep-fields/:slug/rebuild", DeepFieldController, :rebuild
     post "/findings/:id/public", CommunityController, :finding_public
     get "/review/findings", CommunityController, :review_findings
     post "/findings/:id/review", CommunityController, :review_finding

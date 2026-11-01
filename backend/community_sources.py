@@ -22,7 +22,9 @@ def read_rgb(image: Path, scratch: Path, size: int | None = None) -> np.ndarray:
         subprocess.run(["vips", "thumbnail", source, str(small), str(size), "--height", str(size), "--size", "down"], check=True, capture_output=True, timeout=60)
         source = str(small)
     flat = scratch / "flat.png"
-    subprocess.run(["vips", "flatten", source, str(flat)], check=True, capture_output=True, timeout=60)
+    # `flatten` takes the last band as alpha, also in an opaque image. So it runs only when an alpha exists.
+    source_bands = int(subprocess.run(["vipsheader", "-f", "bands", source], check=True, capture_output=True, timeout=10).stdout)
+    subprocess.run(["vips", "flatten" if source_bands in (2, 4) else "copy", source, str(flat)], check=True, capture_output=True, timeout=60)
     width = int(subprocess.run(["vipsheader", "-f", "width", str(flat)], check=True, capture_output=True, timeout=10).stdout)
     height = int(subprocess.run(["vipsheader", "-f", "height", str(flat)], check=True, capture_output=True, timeout=10).stdout)
     bands = int(subprocess.run(["vipsheader", "-f", "bands", str(flat)], check=True, capture_output=True, timeout=10).stdout)
