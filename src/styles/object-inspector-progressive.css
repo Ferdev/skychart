@@ -243,12 +243,12 @@
 }
 
 .object-view-tabs button[aria-selected="true"] {
-  color: #f1c568;
+  color: var(--accent-strong);
 }
 
 .object-view-tabs button[aria-selected="true"]::after {
-  background: #f1c568;
-  box-shadow: 0 0 10px rgba(241, 197, 104, 0.18);
+  background: var(--accent-strong);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-strong) 18%, transparent);
 }
 
 .object-view-tabs button:focus-visible,
@@ -315,7 +315,7 @@
   gap: 10px;
   border: 1px solid rgba(242, 237, 223, 0.16);
   border-radius: 4px;
-  color: #f1c568;
+  color: var(--accent-strong);
   background: rgba(242, 237, 223, 0.035);
 }
 
@@ -325,8 +325,8 @@
 }
 
 .compare-selected-action[aria-expanded="true"] {
-  border-color: rgba(241, 197, 104, 0.6);
-  background: rgba(241, 197, 104, 0.14);
+  border-color: color-mix(in srgb, var(--accent-strong) 60%, transparent);
+  background: color-mix(in srgb, var(--accent-strong) 14%, transparent);
 }
 
 .compare-selected-action > span {
