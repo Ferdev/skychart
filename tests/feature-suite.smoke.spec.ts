@@ -152,6 +152,50 @@ test("the Sky overlay aligns a photo, opens the viewer, and follows the L parame
   await expect(page.locator("#sky-photos-toggle")).not.toBeChecked();
 });
 
+test("a failed photo open from the Sky overlay shows in the status line and the focus stays on the footprint", async ({ page }) => {
+  test.setTimeout(120_000);
+  const id = "11111111-1111-4111-8111-111111111111";
+  const failure = "Request failed. Please try again.";
+  let available = false;
+  await overlayFixture(page, [overlayPhoto(id, 83.8, -5.4, 0.008)]);
+  await page.route(`**/api/photos/${id}`, (route) => available
+    ? route.fulfill({ json: { ...overlayPhoto(id, 83.8, -5.4, 0.008), declared_key: "m42", caption: "", equipment: "", processing: "", composite: false, author: { handle: "observer", name: "Observer" }, votes: 1 } })
+    : route.fulfill({ status: 404, json: { error: "not_found" } }));
+  await openEarthSky(page);
+  const status = page.getByRole("status").and(page.locator("#sky-view-status"));
+  await expect(status).toContainText("loaded", { timeout: 30_000 });
+  const ready = await status.textContent();
+  const footprint = page.locator(".community-sky-photo__focus").first();
+  await expect(footprint).toHaveCount(1, { timeout: 20_000 });
+
+  // The last input is the keyboard, so that the footprint matches `:focus-visible`.
+  await page.keyboard.press("Shift");
+  await footprint.focus();
+  await expect(footprint).toHaveCSS("outline", "rgb(130, 203, 179) solid 2px");
+  await expect(footprint).toHaveCSS("outline-offset", "2px");
+
+  await page.keyboard.press("Enter");
+  await expect(status).toHaveText(failure);
+  await expect(footprint).toBeFocused();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+
+  // The same failure again changes the live region, so that it is announced again.
+  await status.evaluate((node) => {
+    const texts: (string | null)[] = [];
+    (window as unknown as { statusTexts: typeof texts }).statusTexts = texts;
+    new MutationObserver(() => texts.push(node.textContent)).observe(node, { childList: true, characterData: true, subtree: true });
+  });
+  await page.keyboard.press("Enter");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { statusTexts: string[] }).statusTexts)).toEqual([ready, failure]);
+  await expect(footprint).toBeFocused();
+
+  // A photo that opens removes the failure text.
+  available = true;
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: `Photo ${id}` })).toBeVisible();
+  await expect(status).toHaveText(ready!);
+});
+
 test("a target list resolves names and positions, corrects a row, plots a layer, and exports a CSV", async ({ page }) => {
   test.setTimeout(120_000);
   await openAtlas(page);
