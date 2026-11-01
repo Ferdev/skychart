@@ -32,6 +32,7 @@ Phoenix owns narrow semantic workflows:
 - nearest-object and viewport hydration;
 - anonymous product analytics;
 - current sky-event storage and feeds;
+- the read-only agent REST API and its OpenAPI document;
 - server-rendered public pages and metadata.
 
 `catalog_objects` is the common searchable projection. It stores stable keys,
@@ -98,9 +99,17 @@ See [Catalog Tile Format](tile-format.md) for the SMP3 and SMPK1 contracts.
 - `GET /api/now`
 - `POST /api/observe/plan`
 - `POST /api/catalog/match`
+- `GET /api/agent/v1/objects/search`
+- `GET /api/agent/v1/objects/:key`
+- `GET /api/agent/v1/catalogs`
+- `GET /api/agent/v1/view-link`
+- `GET /openapi.json` (the public contract of `/api/agent/v1`)
 - `GET /feed.xml`
 - `GET /calendar.ics`
 - `POST /mcp` (the public [MCP server](mcp-server.md))
+
+The first four [MCP tools](mcp-server.md#tools) are the operations of
+`/api/agent/v1`. A change to the agent API must also change those tools.
 
 Development-only dynamic point endpoints remain available as a fallback when
 no static manifest is configured. Maintained staging and production builds use
