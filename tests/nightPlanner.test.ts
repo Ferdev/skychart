@@ -40,7 +40,7 @@ test("the default night is the evening that is in progress", () => {
 
 test("the request sends only the filters that the user set", () => {
   const body = planRequest({ latitude: 1, longitude: 2 }, "2026-10-30", { type: "", minAltitude: 30, maxMagnitude: null, minSize: 0, maxSize: null });
-  assert.deepEqual(body, { latitude_deg: 1, longitude_deg: 2, date: "2026-10-30", min_altitude_deg: 30, min_size_arcmin: 0 });
+  assert.deepEqual(body, { latitude_deg: 1, longitude_deg: 2, date: "2026-10-30", min_altitude_deg: 30, include_transits: true, min_size_arcmin: 0 });
   assert.deepEqual(planRequest({ latitude: 1, longitude: 2 }, "2026-10-30", { type: "galaxy", minAltitude: 10, maxMagnitude: 9, minSize: null, maxSize: 5 }).types, ["galaxy"]);
 });
 
