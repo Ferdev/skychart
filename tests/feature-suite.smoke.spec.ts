@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openAtlas, openSearchWorkspace } from "./atlas-test-utils";
+import { directionFromEquatorial } from "../src/coordinates";
+import { createSkyProjector } from "../src/sky/skyProjection";
 
 const SITE = { latitude: "-33.8568", longitude: "151.2153" };
 
@@ -16,6 +18,25 @@ async function openEarthSky(page: Page) {
   await expect(page.locator("#sky-view")).toBeVisible();
 }
 
+type SentBody = { method: string; url: string; body: string };
+
+/**
+ * Records the body of each request of the page. `request.postData()` gives null for a Blob, and the analytics
+ * of the app sends a Blob, so the bodies come from the browser protocol. Call the result to read them.
+ */
+async function recordRequestBodies(page: Page) {
+  const sent: Promise<SentBody>[] = [];
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.enable");
+  cdp.on("Network.requestWillBeSent", ({ requestId, request: { method, url, hasPostData } }) => {
+    if (hasPostData) sent.push(cdp.send("Network.getRequestPostData", { requestId }).then(({ postData }) => ({ method, url, body: postData })));
+  });
+  return () => Promise.all(sent);
+}
+
+/** About 0.08 degrees in `EARTH_SKY`. With perspective, the center of the bounding box is 0.3 px from the sky position. */
+const IMAGE_CENTER_TOLERANCE_PX = 2;
+
 const image = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAD0lEQVR4nGNgYGD4//8/AAYBAv4CsjmuAAAAAElFTkSuQmCC", "base64");
 
 function overlayPhoto(id: string, ra: number, dec: number, scaleDeg: number) {
@@ -27,6 +48,14 @@ function overlayPhoto(id: string, ra: number, dec: number, scaleDeg: number) {
       cd: [-scaleDeg, 0, 0, scaleDeg], crpix: [800.5, 534], projection: "TAN", frame: "ICRS", epoch: "J2000", status: "solved",
     },
   };
+}
+
+/** The place on the window of a sky position, with the camera of the address and the projection of the Sky canvas. */
+async function skyWindowPoint(page: Page, raDeg: number, decDeg: number) {
+  const canvas = (await page.locator("#sky-view canvas").first().boundingBox())!;
+  const [yawDeg, pitchDeg, fovDeg] = new URL(page.url()).searchParams.get("sc")!.split(",").map(Number) as [number, number, number];
+  const point = createSkyProjector({ yawDeg, pitchDeg, fovDeg }, canvas.width, canvas.height)(directionFromEquatorial(raDeg, decDeg))!;
+  return { x: canvas.x + point.x, y: canvas.y + point.y };
 }
 
 async function overlayFixture(page: Page, photos: unknown[]) {
@@ -68,12 +97,11 @@ async function openSkyAndCountRequests(page: Page, overlay: Awaited<ReturnType<t
 
 test("the planner keeps the site private, ranks targets, and opens a target in Sky view", async ({ page }) => {
   test.setTimeout(120_000);
-  const events: string[] = [];
+  // The app sends no analytics from a webdriver browser. This test must see them.
+  await page.addInitScript(() => Object.defineProperty(navigator, "webdriver", { get: () => false }));
+  const sentBodies = await recordRequestBodies(page);
   const addresses: string[] = [];
-  page.on("request", (request) => {
-    addresses.push(request.url());
-    if (request.url().includes("/api/events")) events.push(request.postData() ?? "");
-  });
+  page.on("request", (request) => addresses.push(request.url()));
   await openEarthSky(page);
   await page.locator("#sky-planner-button").click();
   const panel = page.getByRole("dialog", { name: "Tonight's planner" });
@@ -98,7 +126,16 @@ test("the planner keeps the site private, ranks targets, and opens a target in S
   expect(new URL(page.url()).searchParams.get("sky")).toBe("earth");
 
   await page.waitForTimeout(500);
-  for (const text of [...events, ...addresses, page.url()]) {
+  const sent = await sentBodies();
+  const isPlannerCall = ({ method, url }: SentBody) => method === "POST" && new URL(url).pathname === "/api/observe/plan";
+  const plannerBodies = sent.filter(isPlannerCall).map(({ body }) => body);
+  const otherBodies = sent.filter((request) => !isPlannerCall(request)).map(({ body }) => body);
+  // The planner call is the one request that has the site. The analytics Blob shows that all bodies are read.
+  expect(plannerBodies).toHaveLength(1);
+  expect(plannerBodies[0]).toContain(SITE.latitude);
+  expect(plannerBodies[0]).toContain(SITE.longitude);
+  expect(otherBodies.join("\n")).toContain("page_view");
+  for (const text of [...otherBodies, ...addresses, page.url()]) {
     expect(text).not.toContain("33.85");
     expect(text).not.toContain("151.21");
   }
@@ -281,10 +318,18 @@ test("the Sky overlay aligns a photo, opens the viewer, and follows the L parame
     ...overlayPhoto("11111111-1111-4111-8111-111111111111", 83.8, -5.4, 0.008), declared_key: "m42", caption: "", equipment: "", processing: "", composite: false, author: { handle: "observer", name: "Observer" }, votes: 1,
   } }));
   await openEarthSky(page);
-  const image = page.locator(".community-sky-photo img").first();
-  await expect(image).toHaveCount(1, { timeout: 20_000 });
+  // The second photo is behind the camera, so it has no image and no footprint.
+  const images = page.locator(".community-sky-photo img");
+  await expect(images).toHaveCount(1, { timeout: 20_000 });
+  await expect(page.locator(".community-sky-photo")).toHaveCount(1);
+  const image = images.first();
   await expect(image).toHaveCSS("mix-blend-mode", "screen");
   expect(await image.evaluate((node: HTMLElement) => node.style.transform)).toContain("matrix3d");
+  const expected = await skyWindowPoint(page, 83.8, -5.4);
+  await expect.poll(async () => {
+    const { x, y, width, height } = (await image.boundingBox())!;
+    return Math.hypot(x + width / 2 - expected.x, y + height / 2 - expected.y);
+  }, { message: "pixels from the center of the image to its sky position" }).toBeLessThan(IMAGE_CENTER_TOLERANCE_PX);
   expect(new URL(page.url()).searchParams.get("L")).toContain("photos.1");
 
   await page.locator("#sky-layer-controls summary").click();
