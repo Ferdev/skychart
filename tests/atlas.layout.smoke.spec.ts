@@ -41,7 +41,8 @@ async function expectNoOverlap(page: Page, state: string) {
   }
 }
 
-for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+// The last window is a phone in landscape. A window no taller than 560 px has its own layout.
+for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
   test.describe(`layout at ${viewport.width}px`, () => {
     test.use({ viewport, isMobile: viewport.width < 900, hasTouch: viewport.width < 900 });
 
