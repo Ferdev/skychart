@@ -23,6 +23,9 @@ function footprints(count: number) {
   });
 }
 
+/** The yaw and the pitch of the `sc` address parameter. They are numbers because the app writes `-33.0` as `-33`. */
+const skyHeading = (page: Page) => new URL(page.url()).searchParams.get("sc")!.split(",").slice(0, 2).map(Number);
+
 /** Counts the strokes on the Sky canvas. A frame with no strokes shows no new Sky frame. */
 async function countSkyStrokes(page: Page) {
   await page.addInitScript((footprintColor) => {
@@ -44,6 +47,7 @@ async function countSkyStrokes(page: Page) {
  * moves: one move before each animation frame gives one new Sky frame for each sampled frame.
  */
 async function moveAndSample(page: Page) {
+  const headingBefore = skyHeading(page);
   await page.mouse.move(800, 500);
   await page.mouse.down();
   const sample = await page.evaluate(async (pointerId) => {
@@ -72,6 +76,8 @@ async function moveAndSample(page: Page) {
   const { intervals, skyFrames, footprints: placed } = sample;
   // The budget is valid only when each sampled frame is a frame of the movement.
   expect(skyFrames).toBe(intervals.length);
+  // The address changes after the drag ends. With no change, the intervals are of a view that did not move.
+  await expect.poll(() => skyHeading(page), { message: "the drag moves the Sky camera" }).not.toEqual(headingBefore);
   return { median: intervals[Math.floor(intervals.length / 2)]!, p95: intervals[Math.floor(intervals.length * 0.95)]!, placed };
 }
 
@@ -91,7 +97,8 @@ test("200 footprints in view stay near the frame rate of the same Sky view with 
 
   photos = footprints(200);
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
-  await page.reload();
+  // The first drag changed the address, so a reload would start at another camera.
+  await page.goto(EARTH_SKY);
   await expect(page.locator("#load-state")).toHaveText("ready", { timeout: 45_000 });
   await expect(page.locator("#sky-view-status")).toContainText("loaded", { timeout: 30_000 });
   await expect.poll(() => page.locator(".community-sky-photo").count(), { timeout: 20_000 }).toBeGreaterThan(0);
