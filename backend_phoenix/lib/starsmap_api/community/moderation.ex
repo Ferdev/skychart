@@ -185,6 +185,12 @@ defmodule StarsmapApi.Community.Moderation do
              ),
            do: Repo.rollback(:not_allowed)
 
+        # A second person reviews the photo of a moderator. This does not apply to an admin,
+        # because a project can have only one admin.
+        if action in ["approve", "restore"] and user.role == "moderator" and
+             photo.user_id == user.id,
+           do: Repo.rollback(:not_allowed)
+
         status =
           if action in ["approve", "restore"],
             do: "published",
@@ -275,8 +281,7 @@ defmodule StarsmapApi.Community.Moderation do
   def cancel_votes(actor, handle, reason) do
     with :ok <- check_reason(actor, reason) do
       StarsmapApi.Community.transaction(fn ->
-        user =
-          Repo.get_by(StarsmapApi.Community.User, handle: handle) || Repo.rollback(:not_found)
+        user = account_target(actor, handle)
 
         authors =
           Repo.all(
@@ -304,10 +309,7 @@ defmodule StarsmapApi.Community.Moderation do
   def suspend(actor, handle, reason, suspended) when is_boolean(suspended) do
     with :ok <- check_reason(actor, reason) do
       StarsmapApi.Community.transaction(fn ->
-        user =
-          Repo.get_by(StarsmapApi.Community.User, handle: handle) || Repo.rollback(:not_found)
-
-        if user.role == "admin" or user.id == actor.id, do: Repo.rollback(:not_allowed)
+        user = account_target(actor, handle)
         Repo.update!(Ecto.Changeset.change(user, suspended: suspended))
 
         if suspended,
@@ -369,6 +371,13 @@ defmodule StarsmapApi.Community.Moderation do
       ),
       []
     )
+  end
+
+  # An account action never changes an admin or the account of the actor.
+  defp account_target(actor, handle) do
+    user = Repo.get_by(User, handle: handle) || Repo.rollback(:not_found)
+    if user.role == "admin" or user.id == actor.id, do: Repo.rollback(:not_allowed)
+    user
   end
 
   defp account_reason(user, reason), do: "#{user.id}: #{reason}"
