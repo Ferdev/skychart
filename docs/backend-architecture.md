@@ -108,6 +108,8 @@ See [Catalog Tile Format](tile-format.md) for the SMP3 and SMPK1 contracts.
 - `GET /api/agent/v1/catalogs`
 - `GET /api/agent/v1/view-link`
 - `GET /openapi.json` (the public contract of `/api/agent/v1`)
+- `GET /api/photos/sky` (the [Sky overlay](community-photos.md#sky-overlay) of the
+  community photos, behind `COMMUNITY_ENABLED`)
 - `GET /feed.xml`
 - `GET /calendar.ics`
 - `POST /mcp` (the public [MCP server](mcp-server.md))
