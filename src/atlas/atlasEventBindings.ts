@@ -3,6 +3,7 @@ import { decodeHistoryViewState, decodeViewState, type DisplayLayer } from "../v
 import type { MapInteractionController } from "../navigation/mapInteractionController";
 import type { SizeMode, ZoomPreset } from "./contracts";
 import type { atlasDom } from "./atlasDom";
+import { isTextEntry } from "../destination/headerSearch";
 import { bindLocaleControlPlacement } from "./localeControlPlacement";
 import { bindShareButtonPlacement } from "./shareButtonPlacement";
 import { bindObjectSheet } from "../object/objectSheet";
@@ -93,6 +94,8 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
   });
   window.addEventListener("keydown", (event) => {
     if (event.key.toLowerCase() !== "p" || !event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+    // In a text field, Shift+P is a capital letter. A key that stays down must not flip the display repeatedly.
+    if (event.repeat || isTextEntry(event.target)) return;
     state.performanceEnabled = !state.performanceEnabled;
     window.localStorage.setItem("starsmap:perf", state.performanceEnabled ? "1" : "0");
     dom.diagnosticsToggle.checked = state.performanceEnabled;

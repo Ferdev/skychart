@@ -19,7 +19,9 @@ defmodule StarsmapApi.Community.Moderation do
   alias StarsmapApi.CommunityRepo, as: Repo
 
   @listed ["review", "published", "hidden", "rejected"]
-  @account_actions ["cancel_votes", "suspend_account"]
+  @account_actions ["cancel_votes", "suspend_account", "unsuspend_account"]
+  @author_removals ["author_remove", "account_delete"]
+  @photo_decisions ["approve", "hide", "reject", "restore"]
 
   def queue, do: list("review", 0, 50)
 
@@ -75,10 +77,28 @@ defmodule StarsmapApi.Community.Moderation do
   def detail(photo) do
     author = Repo.get!(User, photo.user_id)
 
+    last_decision =
+      from a in Action,
+        where: a.photo_id == parent_as(:photo).id and a.action in @photo_decisions,
+        order_by: [desc: a.inserted_at],
+        limit: 1,
+        select: %{action: a.action}
+
+    removed_by_author =
+      from a in Action,
+        where: a.photo_id == parent_as(:photo).id and a.action in @author_removals,
+        select: 1
+
+    # A photographer's own removal is not a rejection. `remove/2` also hides a rejected photo,
+    # so a removal after a moderator took the photo down does not clear that rejection.
     by_status =
       Repo.all(
         from p in Photo,
+          as: :photo,
+          left_lateral_join: d in subquery(last_decision),
+          on: true,
           where: p.user_id == ^author.id and p.status in @listed,
+          where: d.action in ["hide", "reject"] or not exists(removed_by_author),
           group_by: p.status,
           select: {p.status, count()}
       )
@@ -180,8 +200,7 @@ defmodule StarsmapApi.Community.Moderation do
         if action in ["approve", "restore"] and
              Repo.exists?(
                from a in Action,
-                 where:
-                   a.photo_id == ^photo.id and a.action in ["author_remove", "account_delete"]
+                 where: a.photo_id == ^photo.id and a.action in @author_removals
              ),
            do: Repo.rollback(:not_allowed)
 
@@ -212,11 +231,7 @@ defmodule StarsmapApi.Community.Moderation do
         Repo.insert!(%Action{photo_id: photo.id, user_id: user.id, action: action, reason: reason})
 
         Ranking.refresh_author(photo.user_id)
-
-        Repo.update_all(
-          from(r in Report, where: r.photo_id == ^photo.id and is_nil(r.resolved_at)),
-          set: [resolved_at: StarsmapApi.Community.now()]
-        )
+        resolve_reports(photo.id)
 
         {:ok, _} =
           Oban.insert(
@@ -245,12 +260,20 @@ defmodule StarsmapApi.Community.Moderation do
       })
 
       Ranking.refresh_author(photo.user_id)
+      resolve_reports(photo.id)
 
       {:ok, _} =
         Oban.insert(StarsmapApi.CommunityJobs, StarsmapApi.Community.PublishWorker.new(%{id: id}))
 
       :ok
     end)
+  end
+
+  defp resolve_reports(photo_id) do
+    Repo.update_all(
+      from(r in Report, where: r.photo_id == ^photo_id and is_nil(r.resolved_at)),
+      set: [resolved_at: StarsmapApi.Community.now()]
+    )
   end
 
   def report(id, reason) do
@@ -315,7 +338,7 @@ defmodule StarsmapApi.Community.Moderation do
 
         Repo.insert!(%Action{
           user_id: actor.id,
-          action: "suspend_account",
+          action: if(suspended, do: "suspend_account", else: "unsuspend_account"),
           reason: account_reason(user, reason)
         })
 
@@ -382,7 +405,8 @@ defmodule StarsmapApi.Community.Moderation do
 
   # The role comes first: a person without the role gets no information about the reason.
   defp check_reason(%{role: role}, reason) when role in ["moderator", "admin"] do
-    if StarsmapApi.Community.valid_reason?(reason),
+    # The record keeps the text as it came, so the upper limit applies to all of it.
+    if StarsmapApi.Community.valid_reason?(reason) and String.length(String.trim(reason)) >= 3,
       do: :ok,
       else: {:error, :invalid_reason}
   end

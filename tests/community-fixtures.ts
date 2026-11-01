@@ -106,7 +106,13 @@ export async function communityFixture(page: Page, options: { role?: string } = 
     else if (path === "/api/community/review/photos")
       data = { photos: state.removed ? [] : [{ ...reviewPhoto, ...photo, status: "published" }] };
     else if (path === "/api/community/review/log")
-      data = { actions: [{ action: "approve", reason: "Approved", at: "2026-10-08T10:00:00Z", moderator: "Reader", photo_id: photo.id, photo_title: photo.title }] };
+      data = {
+        actions: [
+          { action: "unsuspend_account", reason: "vera: Appeal accepted", at: "2026-10-09T10:00:00Z", moderator: "Reader", photo_id: null, photo_title: null },
+          { action: "suspend_account", reason: "vera: Repeated abuse", at: "2026-10-08T12:00:00Z", moderator: "Reader", photo_id: null, photo_title: null },
+          { action: "approve", reason: "Approved", at: "2026-10-08T10:00:00Z", moderator: "Reader", photo_id: photo.id, photo_title: photo.title },
+        ],
+      };
     else if (path === "/api/community/photographers") data = { photographers: [photographer] };
     else if (path.startsWith("/api/community/photographers/"))
       data = { photographer: { ...photographer, rank: 1, joined_at: "2026-09-01T00:00:00Z" }, photos: [photo] };

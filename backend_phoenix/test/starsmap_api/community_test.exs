@@ -1053,6 +1053,139 @@ defmodule StarsmapApi.CommunityTest do
     } do
       assert {:ok, _} = Moderation.review(moderator, photo.id, "approve", "")
     end
+
+    test "with fewer than three visible characters is invalid", %{
+      user: user,
+      moderator: moderator,
+      photo: photo
+    } do
+      for reason <- ["   ", "\t\n\r ", "\u00A0\u00A0\u00A0", "  a  ", " ab ", " 理 "] do
+        assert {:error, :invalid_reason} = Moderation.review(moderator, photo.id, "hide", reason)
+
+        assert {:error, :invalid_reason} =
+                 Moderation.review(moderator, photo.id, "reject", reason)
+
+        assert {:error, :invalid_reason} =
+                 Moderation.cancel_votes(moderator, user.handle, reason)
+
+        assert {:error, :invalid_reason} =
+                 Moderation.suspend(moderator, user.handle, reason, true)
+
+        assert {:error, :invalid_reason} =
+                 Moderation.suspend(moderator, user.handle, reason, false)
+      end
+
+      assert Photos.get(photo.id).status == "review"
+      refute Repo.get!(User, user.id).suspended
+      assert Moderation.log() == []
+    end
+
+    test "keeps its spaces, and they count for the upper limit", %{
+      moderator: moderator,
+      photo: photo
+    } do
+      too_long = String.duplicate("a", 2000) <> " "
+      assert {:error, :invalid_reason} = Moderation.review(moderator, photo.id, "hide", too_long)
+
+      assert {:ok, _} = Moderation.review(moderator, photo.id, "hide", " abc ")
+      assert [%{reason: " abc "}] = Moderation.log()
+    end
+  end
+
+  describe "the removal of a photo by its photographer" do
+    setup do
+      moderator =
+        Repo.insert!(%User{
+          email: "removal-mod@example.com",
+          handle: "removal-mod",
+          name: "Moderator",
+          role: "moderator"
+        })
+
+      %{moderator: moderator}
+    end
+
+    defp rejected_count(photo) do
+      Moderation.detail(Photos.get(photo.id)).author.rejected
+    end
+
+    test "closes the open reports of that photo only", %{user: user, subject: subject} do
+      removed = photo(user, subject, "published")
+      kept = photo(user, subject, "published")
+
+      assert {:ok, _} = Moderation.report(removed.id, "Wrong object")
+      assert {:ok, _} = Moderation.report(removed.id, "Wrong credit")
+      assert {:ok, _} = Moderation.report(kept.id, "Stolen picture")
+      assert Moderation.counts()["reports"] == 3
+
+      assert {:ok, :ok} = Moderation.remove(user, removed.id)
+
+      assert Moderation.counts()["reports"] == 1
+      assert [%{reason: "Stolen picture"}] = Moderation.reports()
+
+      assert {:ok, :ok} = Moderation.remove(user, kept.id)
+      assert Moderation.counts()["reports"] == 0
+      assert Moderation.pending_count() == 0
+    end
+
+    test "is not a rejection in the statistics of the author", %{user: user, subject: subject} do
+      removed = photo(user, subject, "published")
+      later = photo(user, subject, "review")
+
+      assert {:ok, :ok} = Moderation.remove(user, removed.id)
+
+      assert rejected_count(later) == 0
+      assert Moderation.detail(Photos.get(later.id)).author.published == 0
+    end
+
+    test "does not clear a rejection or a takedown", %{
+      user: user,
+      subject: subject,
+      moderator: moderator
+    } do
+      rejected = photo(user, subject, "review")
+      hidden = photo(user, subject, "published")
+      later = photo(user, subject, "review")
+
+      assert {:ok, _} = Moderation.review(moderator, rejected.id, "reject", "Wrong object")
+      assert {:ok, _} = Moderation.review(moderator, hidden.id, "hide", "Stolen picture")
+      assert rejected_count(later) == 2
+
+      assert {:ok, :ok} = Moderation.remove(user, rejected.id)
+      assert {:ok, :ok} = Moderation.remove(user, hidden.id)
+
+      assert Photos.get(rejected.id).status == "hidden"
+      assert rejected_count(later) == 2
+    end
+
+    test "after a moderator reversed a takedown is not a rejection", %{
+      user: user,
+      subject: subject,
+      moderator: moderator
+    } do
+      restored = photo(user, subject, "published")
+      later = photo(user, subject, "review")
+
+      assert {:ok, _} = Moderation.review(moderator, restored.id, "hide", "Wrong object")
+      assert {:ok, _} = Moderation.review(moderator, restored.id, "restore", "Our error")
+      assert {:ok, :ok} = Moderation.remove(user, restored.id)
+
+      assert rejected_count(later) == 0
+    end
+
+    test "by account deletion is not a rejection, but an earlier rejection stays", %{
+      user: user,
+      subject: subject,
+      moderator: moderator
+    } do
+      published = photo(user, subject, "published")
+      rejected = photo(user, subject, "review")
+
+      assert {:ok, _} = Moderation.review(moderator, rejected.id, "reject", "Wrong object")
+      assert {:ok, :ok} = StarsmapApi.Community.Privacy.erase(user)
+
+      assert rejected_count(published) == 1
+    end
   end
 
   describe "a moderator and their own photo" do
@@ -1319,6 +1452,34 @@ defmodule StarsmapApi.CommunityTest do
                ["renamed: Repeated abuse", "renamed: Vote ring"]
     end
 
+    test "names a suspension and a reinstatement differently", %{
+      user: user,
+      moderator: moderator
+    } do
+      assert {:ok, _} = Moderation.suspend(moderator, user.handle, "Repeated abuse", true)
+      assert Repo.get!(User, user.id).suspended
+
+      assert {:ok, _} = Moderation.suspend(moderator, user.handle, "Appeal accepted", false)
+      refute Repo.get!(User, user.id).suspended
+
+      entries = fn -> Moderation.log() |> Enum.map(&{&1.action, &1.reason}) |> Enum.sort() end
+
+      assert entries.() == [
+               {"suspend_account", "author: Repeated abuse"},
+               {"unsuspend_account", "author: Appeal accepted"}
+             ]
+
+      assert audit_reasons() == ["#{user.id}: Repeated abuse", "#{user.id}: Appeal accepted"]
+
+      # The log gets the current handle of the target for the new action too.
+      Repo.update!(Ecto.Changeset.change(user, handle: "renamed"))
+
+      assert entries.() == [
+               {"suspend_account", "renamed: Repeated abuse"},
+               {"unsuspend_account", "renamed: Appeal accepted"}
+             ]
+    end
+
     test "keeps no former handle after the account is erased", %{
       user: user,
       moderator: moderator
@@ -1326,6 +1487,7 @@ defmodule StarsmapApi.CommunityTest do
       assert {:ok, _} = Moderation.suspend(moderator, user.handle, "Repeated abuse", true)
       legacy_action(moderator, "suspend_account", "author: Older abuse")
       legacy_action(moderator, "cancel_votes", "author: Older vote ring")
+      legacy_action(moderator, "unsuspend_account", "author: Older appeal")
 
       assert {:ok, :ok} = StarsmapApi.Community.Privacy.erase(user)
 
@@ -1335,14 +1497,16 @@ defmodule StarsmapApi.CommunityTest do
                Enum.sort([
                  "#{user.id}: Repeated abuse",
                  "#{user.id}: Older abuse",
-                 "#{user.id}: Older vote ring"
+                 "#{user.id}: Older vote ring",
+                 "#{user.id}: Older appeal"
                ])
 
       assert Moderation.log() |> Enum.map(& &1.reason) |> Enum.sort() ==
                Enum.sort([
                  "deleted-#{user.id}: Repeated abuse",
                  "deleted-#{user.id}: Older abuse",
-                 "deleted-#{user.id}: Older vote ring"
+                 "deleted-#{user.id}: Older vote ring",
+                 "deleted-#{user.id}: Older appeal"
                ])
     end
 
