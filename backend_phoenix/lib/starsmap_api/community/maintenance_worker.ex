@@ -39,7 +39,8 @@ defmodule StarsmapApi.Community.PurgeWorker do
         Enum.reduce_while(
           [
             photo.source_key
-            | Enum.map(["master.png", "96.webp", "320.webp", "1600.webp"], &"masters/#{id}/#{&1}")
+            | Enum.map(["master.png", "96.webp", "320.webp", "1600.webp"], &"masters/#{id}/#{&1}") ++
+                StarsmapApi.Community.Depth.file_keys(id)
           ],
           :ok,
           fn key, _ ->

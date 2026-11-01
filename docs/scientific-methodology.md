@@ -450,3 +450,61 @@ local obstructions, weather, and light pollution are not modeled. Moon separatio
 is the topocentric separation at the highest altitude of the target in the window.
 Dusk, dawn, moonrise, and separation are checked against JPL Horizons values in
 `tests/night_planner_test.py`.
+
+## Transit timings
+
+`data/catalogs/transit_targets.json` is a short list for small telescopes: a depth
+of at least 5 ppt, a host of magnitude 12.5 or brighter, a period of at most 30 days,
+and a reference time in BJD-TDB. Confirmed planets use the V magnitude of the archive.
+Candidates use the TESS magnitude. The list has the depth and the duration
+because the planet snapshot has neither for a confirmed planet.
+
+A prediction for epoch `n` is `T0 + n P`, and its uncertainty is
+`sqrt(sigma_T0^2 + n^2 sigma_P^2)`. The larger of the two archive errors is used, and the
+two errors are taken as independent. The planner uses the same time grid, site rotation,
+and dark window as the targets of the same night. A frame time is UTC, so the
+fit adds the difference of TDB and UTC and the light travel time from the center of
+the Earth to the barycenter. The site is not used: it changes a time by at most 21 ms.
+Proper motion is not applied.
+
+The fit (`trapezoid-1`) is a trapezoid with a linear baseline. The middle has a
+grid, and the duration has five values near the catalog duration. Depth and baseline
+are linear parameters of each grid point. The share of ingress is fixed from the depth
+for an impact parameter of 0.5. The error of the middle comes from the curvature of
+chi-square, with the errors scaled by the scatter of the fit, and is not smaller than the
+analytic value of Carter et al. (2008). A red noise factor (time-averaging, Winn et al.
+2008) multiplies it. With 40 simulated curves of WASP-12 b, the standard deviation of
+(fit - truth) / error is below 1.3. The fit refuses a curve with no contact, no
+baseline, too few points in transit, a depth below 3 sigma, or an error above 15 minutes.
+
+The summary of a planet is a weighted fit of a change of reference time and period,
+with the archive errors as the prior. It gives the timing uncertainty at the
+newest observed epoch, next to the archive prediction for that orbit. It is a
+community result. It does not change an archive value, and a timing does not confirm
+a candidate.
+
+## Depth flight
+
+A depth flight places each matched source at its catalog distance. A Gaia record has a
+parallax distance. A Messier, OpenNGC, or SIMBAD record has its catalog distance. The camera
+moves along the axis of the photo, so a source at distance `d` has the scale
+`d / (d - z)` for a camera at `z`, and its direction from the axis does not change.
+At `z = 0` each scale is 1, so the first frame is the photo. Unmatched light stays on one
+plane at the distance of the main subject. The view does not model gas or dust.
+
+## Sky sweep
+
+The sweep reads the private master at a long side of at most 4096 pixels. It removes
+hot pixels, trails, sources at the edge, and the glare of saturated stars. A
+magnitude is an estimate against the DR11 r band and has no standard band, because a
+processed photo has no linear response. Stacking can remove a moving object, so a body
+that is not seen in the frame stays in the list with that label. The list of JPL has
+its own position errors.
+
+A source is a candidate only when all of these are true: it is not within the match
+radius of a DR11 source, a Gaia record, a known body, or an ALeRCE ZTF object; it is near a
+cataloged galaxy; at least half of the sources of the frame agree with DR11; and the frame
+has at most 20 candidates. The ALeRCE list holds ZTF alert objects. It is
+not the Transient Name Server, which needs an account. A missing service gives no
+candidate. A candidate is not a discovery. A person must read it, and a person must send
+any report.

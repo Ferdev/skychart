@@ -1,9 +1,11 @@
-import { formatCount } from "../format/quantity";
+import { formatCount, formatFixed } from "../format/quantity";
 import { NEW_TAB_LINK_ATTRIBUTES } from "../format/links";
 import { t } from "../i18n";
-import { CommunityApi, errorText, type ReviewAction, type ReviewPhoto, type ReviewQueue, type ReviewTour } from "./api";
+import { lightCurveSvg } from "../transit/lightCurve";
+import { CommunityApi, errorText, type ReviewAction, type ReviewFinding, type ReviewPhoto, type ReviewQueue, type ReviewTour, type ReviewTransit } from "./api";
 import { dateText, dateTimeText, emptyState, h, licenceText, segmented, statusBadge } from "./communityUi";
 import type { PhotoDialogs } from "./photoDialogs";
+import { bindBlink, blinkMarkup, findingFacts, findingTitle } from "./photoFindings";
 
 export type ReviewContext = {
   api: CommunityApi;
@@ -15,7 +17,7 @@ export type ReviewContext = {
   changed: () => Promise<void>;
 };
 
-type Section = "review" | "reports" | "tours" | "published" | "hidden" | "rejected" | "log" | "members";
+type Section = "review" | "reports" | "tours" | "transits" | "findings" | "published" | "hidden" | "rejected" | "log" | "members";
 
 const PRESETS = ["notAstro", "wrongObject", "rights", "synthetic", "quality"];
 /** The section stays selected while the community window is open and closed again. */
@@ -40,6 +42,8 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
         { value: "review", label: t("community.mod.waiting"), count: counts.review ?? 0 },
         { value: "reports", label: t("community.mod.reports"), count: counts.reports ?? 0 },
         { value: "tours", label: t("community.tab.tours"), count: counts.tours ?? 0 },
+        { value: "transits", label: t("transit.tab.transits"), count: counts.transits ?? 0 },
+        { value: "findings", label: t("finding.mod.section"), count: counts.findings ?? 0 },
         { value: "published", label: t("community.status.published"), count: counts.published ?? 0 },
         { value: "hidden", label: t("community.status.hidden"), count: counts.hidden ?? 0 },
         { value: "rejected", label: t("community.status.rejected"), count: counts.rejected ?? 0 },
@@ -189,6 +193,77 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
     });
   };
 
+  const paintTransits = (transits: ReviewTransit[]) => {
+    if (!transits.length) {
+      list.innerHTML = emptyState(t("transit.mod.empty"));
+      return;
+    }
+    const minutes = (value: number) => t("transit.minutes", { value: formatFixed(value, 2) });
+    const ppt = (value: unknown) => (typeof value === "number" ? t("transit.ppt", { value: formatFixed(value, 1) }) : "");
+    list.innerHTML = transits
+      .map((transit) => {
+        const facts: [string, string][] = [
+          [t("transit.result.mid"), dateTimeText(transit.mid_time_utc)],
+          [t("transit.result.uncertainty"), `± ${minutes(transit.uncertainty_minutes)}`],
+          [t("transit.result.oc"), `${minutes(transit.o_minus_c_minutes)} (± ${minutes(transit.predicted_uncertainty_minutes)})`],
+          [t("transit.result.depth"), ppt(transit.depth_ppt)],
+          [t("transit.result.duration"), minutes(transit.duration_minutes)],
+          [t("transit.result.frames"), formatCount(transit.frame_count)],
+          [t("transit.result.dropped"), formatCount(Number(transit.checks.frames_dropped ?? 0))],
+          [t("transit.result.baseline"), ppt(transit.checks.baseline_rms_ppt)],
+          [t("transit.result.comparison"), ppt(transit.checks.comparison_rms_ppt)],
+          [t("transit.mod.chi"), typeof transit.checks.reduced_chi_square === "number" ? formatFixed(transit.checks.reduced_chi_square, 2) : ""],
+          [t("transit.mod.redNoise"), typeof transit.checks.red_noise_factor === "number" ? formatFixed(transit.checks.red_noise_factor, 2) : ""],
+          [t("transit.instrument"), transit.instrument],
+        ];
+        return `<article class="community-review-card community-review-card--tour" data-transit-id="${h(transit.id)}"><div><header><h3>${h(transit.object_name)}</h3><span class="community-status">${h(t(`transit.status.${transit.target_status}`))}</span></header><p class="community-muted">${h(transit.observer.name)} · @${h(transit.observer.handle)} · ${h(dateTimeText(transit.submitted_at))}</p>${lightCurveSvg(transit.measurements?.points ?? [], transit.measurements?.model, t("transit.curve.caption", { name: transit.object_name }))}<dl class="community-facts">${facts.filter(([, value]) => value).map(([label, value]) => `<dt>${h(label)}</dt><dd>${h(value)}</dd>`).join("")}</dl><div class="community-actions community-actions--wrap">${transit.review_state === "approved" ? `<button type="button" class="secondary-action" data-transit-action="hide">${h(t("community.mod.hide"))}</button>` : `<button type="button" class="primary-action" data-transit-action="approve">${h(t("community.mod.approve"))}</button><button type="button" class="secondary-action" data-transit-action="reject">${h(t("community.mod.reject"))}</button>`}</div></div></article>`;
+      })
+      .join("");
+    list.querySelectorAll<HTMLButtonElement>("[data-transit-action]").forEach((button) => {
+      const id = button.closest<HTMLElement>("[data-transit-id]")!.dataset.transitId!;
+      const action = button.dataset.transitAction!;
+      const send = async (reason: string) => {
+        await api.request(`/api/community/transits/${id}/review`, "POST", { action, reason });
+        context.message(t("community.mod.done"));
+        await context.changed();
+        await load(true);
+      };
+      button.onclick = () => {
+        const label = t(action === "hide" ? "community.mod.hide" : "community.mod.reject");
+        if (action === "approve") send("").catch((error) => context.message(errorText(error)));
+        else context.dialogs.reasonForm(label, label, t("community.mod.reasonFor"), send);
+      };
+    });
+  };
+
+  const paintFindings = (findings: ReviewFinding[]) => {
+    if (!findings.length) {
+      list.innerHTML = emptyState(t("finding.mod.empty"));
+      return;
+    }
+    list.innerHTML = findings
+      .map((finding) => {
+        const second = finding.second_frame;
+        return `<article class="community-review-card community-review-card--tour" data-finding-id="${h(finding.id)}"><div><header><h3>${h(findingTitle(finding))}</h3></header><p class="community-muted">${h(findingFacts(finding))}</p><p class="community-muted">${h(finding.photo_title ?? "")} · ${h(finding.author?.name ?? "")} · ${h(dateTimeText(finding.captured_at))}</p>${blinkMarkup(finding.image_url, finding.wcs, finding)}${second ? `<p class="community-note">${h(t("finding.mod.second", { title: second.title, date: dateTimeText(second.captured_at) }))}</p>${blinkMarkup(second.image_url, second.wcs, { ...finding, x: second.x, y: second.y })}` : ""}<div class="community-actions community-actions--wrap"><button type="button" class="primary-action" data-finding-action="approve">${h(t("community.mod.approve"))}</button><button type="button" class="secondary-action" data-finding-action="reject">${h(t("community.mod.reject"))}</button></div></div></article>`;
+      })
+      .join("");
+    bindBlink(list);
+    list.querySelectorAll<HTMLButtonElement>("[data-finding-action]").forEach((button) => {
+      const id = button.closest<HTMLElement>("[data-finding-id]")!.dataset.findingId!;
+      const action = button.dataset.findingAction!;
+      const send = async (reason: string) => {
+        await api.request(`/api/community/findings/${id}/review`, "POST", { action, reason });
+        context.message(t("community.mod.done"));
+        await context.changed();
+        await load(true);
+      };
+      button.onclick = () => {
+        if (action === "reject") context.dialogs.reasonForm(t("community.mod.reject"), t("community.mod.reject"), t("community.mod.reasonFor"), send);
+        else send("").catch((error) => context.message(errorText(error)));
+      };
+    });
+  };
+
   const paintLog = (entries: ReviewAction[]) => {
     if (!entries.length) {
       list.innerHTML = emptyState(t("community.mod.emptyLog"));
@@ -196,7 +271,7 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
     }
     const name = (action: string) =>
       ({ hide: t("community.status.hidden"), reject: t("community.status.rejected") })[action] ??
-      (["approve", "restore", "author_remove", "account_delete", "cancel_votes", "suspend_account", "tour_keep", "tour_hide", "tour_restore"].includes(action) ? t(`community.mod.action.${action}`) : action);
+      (["approve", "restore", "author_remove", "account_delete", "cancel_votes", "suspend_account", "tour_keep", "tour_hide", "tour_restore", "transit_approve", "transit_reject", "transit_hide", "finding_approve", "finding_reject"].includes(action) ? t(`community.mod.action.${action}`) : action);
     list.innerHTML = `<div class="community-table-wrap"><table class="community-table"><thead><tr><th scope="col">${h(t("community.mod.col.date"))}</th><th scope="col">${h(t("community.mod.col.action"))}</th><th scope="col">${h(t("community.mod.col.moderator"))}</th><th scope="col">${h(t("community.mod.col.photo"))}</th><th scope="col">${h(t("community.field.reason"))}</th></tr></thead><tbody>${entries
       .map(
         (entry) =>
@@ -246,6 +321,13 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
       } else if (section === "tours") {
         const data = await api.request<{ tours: ReviewTour[] }>("/api/community/review/tours");
         if (context.current()) paintTours(data.tours);
+      } else if (section === "transits") {
+        // Timings that wait come first. An approved timing can still be hidden.
+        const [waiting, approved] = await Promise.all(["review", "approved"].map((state) => api.request<{ transits: ReviewTransit[] }>(`/api/community/review/transits?state=${state}`)));
+        if (context.current()) paintTransits([...waiting!.transits, ...approved!.transits]);
+      } else if (section === "findings") {
+        const data = await api.request<{ findings: ReviewFinding[] }>("/api/community/review/findings");
+        if (context.current()) paintFindings(data.findings);
       } else if (section === "log") {
         const data = await api.request<{ actions: ReviewAction[] }>("/api/community/review/log");
         if (context.current()) paintLog(data.actions);

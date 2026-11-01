@@ -1,0 +1,116 @@
+/* The transit record steps and the transit timings of the object inspector. */
+.transit-field canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+}
+
+.transit-curve {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-block: 8px;
+  background: var(--panel-surface);
+  border-radius: var(--radius-sm);
+}
+
+.transit-curve circle {
+  fill: var(--panel-ink-muted);
+}
+
+.transit-curve polyline {
+  stroke: var(--spectral-teal);
+  stroke-width: 2;
+}
+
+.transit-timings__list {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+/* The depth flight. */
+.depth-flight {
+  display: grid;
+  gap: 8px;
+}
+
+.depth-flight__stage canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #000;
+  border-radius: var(--radius-sm);
+  touch-action: none;
+  cursor: grab;
+}
+
+.depth-flight__ruler {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--panel-ink-muted);
+}
+
+/* The findings of a photo. */
+.community-finding-mark {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border: 1.5px solid var(--spectral-teal);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.community-finding-mark[data-kind="candidate"] {
+  border-color: var(--accent-strong);
+}
+
+.community-findings {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.community-findings li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.finding-blink {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.finding-blink svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #000;
+  border-radius: var(--radius-sm);
+}
+
+.finding-blink circle {
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 1.5;
+}
+
+.finding-report {
+  overflow-x: auto;
+  padding: 8px;
+  background: var(--panel-surface);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+}

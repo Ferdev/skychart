@@ -1,5 +1,5 @@
 import { escapeHtml as h } from "../atlasFormatting";
-import { emptyState, openDialog, type DialogView } from "../community/communityUi";
+import { emptyState, openDialog, segmented, type DialogView } from "../community/communityUi";
 import { objectTypeLabel } from "../format/objectTypeLabel";
 import { formatCount, formatDateTime, formatDuration, formatFixed, formatPercent } from "../format/quantity";
 import { t } from "../i18n";
@@ -13,6 +13,7 @@ import {
   validSite,
   writeSite,
   type NightPlan,
+  type PlannedTransit,
   type PlannerFilters,
   type PlannerSite,
   type PlanTarget,
@@ -39,7 +40,13 @@ export class NightPlannerPanel {
   private date = defaultNight(new Date());
   private filters: PlannerFilters = { type: "", minAltitude: 30, maxMagnitude: 12, minSize: null, maxSize: null };
 
-  constructor(private readonly options: { openTarget: (target: PlanTarget) => Promise<void> }) {
+  private list: "targets" | "transits" = "targets";
+
+  constructor(private readonly options: {
+    openTarget: (target: PlanTarget) => Promise<void>;
+    /** Absent when the community is off: the list of transits stays, with no action. */
+    recordTransit?: () => ((transit: PlannedTransit, night: string) => void) | null;
+  }) {
     window.addEventListener("cosmic-atlas:locale-change", () => {
       if (this.view?.dialog.isConnected) this.paint();
     });
@@ -166,12 +173,34 @@ export class NightPlannerPanel {
     }
     const night = plan.window;
     const moon = plan.moon;
+    const transits = plan.transits?.transits ?? [];
+    const lists = segmented(t("transit.sections"), "list", [
+      { value: "targets", label: t("transit.tab.targets"), count: plan.total },
+      { value: "transits", label: t("transit.tab.transits"), count: plan.transits?.total ?? 0 },
+    ], this.list);
+    const targets = plan.targets.length
+      ? `<p class="community-help">${h(t("planner.count", { shown: formatCount(plan.targets.length), total: formatCount(plan.total), altitude: formatFixed(plan.min_altitude_deg, 0) }))}</p><ol class="planner-list">${plan.targets.map((target, index) => this.row(target, index, night)).join("")}</ol>`
+      : emptyState(t("planner.noTargets"));
+    const transitList = `<p class="community-help">${h(t("transit.help"))}</p>${transits.length
+      ? `<ol class="planner-list">${transits.map((transit, index) => this.transitRow(transit, index, night)).join("")}</ol>`
+      : emptyState(t("transit.none"))}`;
     root.innerHTML = `<p class="planner-summary">${h(t("planner.window", { kind: t(`planner.darkness.${plan.darkness}`), span: span(night) }))}${moon ? ` ${h(t("planner.moon", { percent: formatPercent(moon.illuminated_fraction, 0) }))}` : ""}</p>
       ${plan.darkness === "astronomical" ? "" : `<p class="planner-note" role="note">${h(t("planner.noAstronomicalDarkness"))}</p>`}
-      ${plan.targets.length
-        ? `<p class="community-help">${h(t("planner.count", { shown: formatCount(plan.targets.length), total: formatCount(plan.total), altitude: formatFixed(plan.min_altitude_deg, 0) }))}</p><ol class="planner-list">${plan.targets.map((target, index) => this.row(target, index, night)).join("")}</ol>`
-        : emptyState(t("planner.noTargets"))}
+      ${lists}${this.list === "targets" ? targets : transitList}
       <p class="community-help">${h(t("planner.accuracy"))}</p>`;
+    root.querySelectorAll<HTMLButtonElement>("[data-list]").forEach((button) => {
+      button.onclick = () => {
+        this.list = button.dataset.list as "targets" | "transits";
+        this.paintResults();
+      };
+    });
+    root.querySelectorAll<HTMLButtonElement>("[data-record]").forEach((button) => {
+      button.onclick = () => {
+        const transit = transits[Number(button.dataset.record)]!;
+        this.view?.dialog.close();
+        this.options.recordTransit?.()?.(transit, plan.date);
+      };
+    });
     root.querySelectorAll<HTMLButtonElement>("[data-target]").forEach((button) => {
       button.onclick = () => {
         const target = plan.targets[Number(button.dataset.target)]!;
@@ -179,6 +208,27 @@ export class NightPlannerPanel {
         void this.options.openTarget(target);
       };
     });
+  }
+
+  private transitRow(transit: PlannedTransit, index: number, night: PlanWindow) {
+    const window = { start_utc: transit.ingress_utc, end_utc: transit.egress_utc };
+    const bar = barSegments(night, [window]).map((part) => `<span style="left:${Math.max(0, part.left).toFixed(2)}%;width:${Math.min(100 - Math.max(0, part.left), part.width).toFixed(2)}%"></span>`).join("");
+    const facts = [
+      t(`transit.status.${transit.status}`),
+      t(`transit.coverage.${transit.coverage}`),
+      t("transit.depth", { value: t("transit.ppt", { value: formatFixed(transit.depth_ppt, 1) }), hours: formatDuration(transit.duration_hours * 3600), band: transit.magnitude_band, magnitude: formatFixed(transit.magnitude, 1) }),
+    ].join(" · ");
+    const canRecord = this.options.recordTransit?.();
+    return `<li class="planner-row">
+      <div class="planner-row__head"><span class="planner-row__rank">${formatCount(index + 1)}</span><strong>${h(transit.name)}</strong>${canRecord ? `<button type="button" class="secondary-action" data-record="${index}" aria-label="${h(`${t("transit.record")} · ${transit.name}`)}">${h(t("transit.record"))}</button>` : ""}</div>
+      <p class="planner-row__facts">${h(facts)}</p>
+      <div class="planner-bar" aria-hidden="true">${bar}</div>
+      <dl class="planner-row__data">
+        <div><dt>${h(t("transit.tab.transits"))}</dt><dd>${h(t("transit.times", { ingress: clock(transit.ingress_utc), middle: clock(transit.mid_utc), egress: clock(transit.egress_utc) }))}</dd></div>
+        <div><dt>${h(t("transit.altitudes"))}</dt><dd>${h([transit.altitude_ingress_deg, transit.altitude_mid_deg, transit.altitude_egress_deg].map(degrees).join(" → "))}</dd></div>
+        <div><dt>${h(t("transit.prediction"))}</dt><dd>± ${h(t("transit.minutes", { value: formatFixed(transit.uncertainty_minutes, 1) }))}</dd></div>
+        <div><dt>${h(t("planner.moonDistance"))}</dt><dd>${h(degrees(transit.moon_separation_deg))}</dd></div>
+      </dl></li>`;
   }
 
   private row(target: PlanTarget, index: number, night: PlanWindow) {

@@ -81,7 +81,8 @@ defmodule StarsmapApiWeb.CommunityPolicyController do
           [
             "Your email address. The site uses it only to send sign-in codes.",
             "The file that you sent. The site removes it seven days after successful processing.",
-            "The precise location metadata of a photo. The site removes it from each published file."
+            "The precise location metadata of a photo. The site removes it from each published file.",
+            "The coarse site of a photo, if you enter it. The site rounds it to one degree and does not show it. The sky sweep sends it with the capture time to NASA JPL, to list known asteroids and comets."
           ]},
          {"Cookies", :text,
           "One session cookie identifies your account. The community sets no other cookie."},
