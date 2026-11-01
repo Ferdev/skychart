@@ -124,6 +124,61 @@ test('photo markers follow Sky and 3D view objects',async({page})=>{
   await expect(page.locator('#universe-view')).toBeVisible();await expect(page.locator('#universe-view .community-marker-layer button').first()).toBeVisible();
 });
 
+test("author-placed and solved footprints keep the same alpha floor at a low photo opacity", async ({ page }) => {
+  const footprint = { pixel_scale_arcsec: 36, rotation_deg: 0, width: 1600, height: 1067, frame: "ICRS", epoch: "J2000", projection: "TAN" };
+  await page.addInitScript(() => {
+    const draws: { kind: string; text: string; alpha: number; color: string }[] = [];
+    Object.assign(window, { footprintDraws: draws });
+    const prototype = CanvasRenderingContext2D.prototype;
+    const { fillText, stroke } = prototype;
+    prototype.fillText = function (...args) {
+      draws.push({ kind: "label", text: String(args[0]), alpha: this.globalAlpha, color: String(this.fillStyle) });
+      return fillText.apply(this, args);
+    };
+    prototype.stroke = function (...args: []) {
+      draws.push({ kind: "outline", text: "", alpha: this.globalAlpha, color: String(this.strokeStyle) });
+      return stroke.apply(this, args);
+    };
+  });
+  await communityFixture(page);
+  // The Sun of the fixture is at RA 180°, Dec 0° from Earth, so both photos are in the center of the view.
+  await page.route("**/api/photos/index?**", (route) => route.fulfill({
+    json: { version: 1, more: false, items: [{
+      subject_id: "subject", keys: ["sun"], name: "Sun", count: 1,
+      cover: { ...photo, wcs: { ...footprint, ra_deg: 195, dec_deg: 0, status: "author_supplied" } },
+    }] },
+  }));
+  await page.route("**/api/photos/sky?**", (route) => route.fulfill({
+    json: { photos: [{ ...photo, author: "Observer", wcs: { ...footprint, ra_deg: 165, dec_deg: 0, status: "solved", cd: [-0.01, 0, 0, 0.01], crpix: [800.5, 534] } }] },
+  }));
+  await openAtlas(page, "/?v=1&c=0,0&z=24&t=2026-10-08T00:00:00.000Z&L=grid.1~photos.1&sky=earth&sc=180,0,72");
+  await expect(page.locator("#sky-view")).toBeVisible();
+
+  const drawsAt = async (opacity: string) => {
+    await page.locator("#sky-photo-opacity").evaluate((input: HTMLInputElement, value) => {
+      (window as unknown as { footprintDraws: unknown[] }).footprintDraws.length = 0;
+      input.value = value;
+      input.dispatchEvent(new Event("input"));
+    }, opacity);
+    const footprintDraws = () => page.evaluate(() => {
+      const draws = (window as unknown as { footprintDraws: { kind: string; text: string; alpha: number; color: string }[] }).footprintDraws;
+      const author = draws.find((draw) => draw.text === "Author-supplied footprint");
+      const solved = draws.find((draw) => draw.text === "Plate-solved footprint");
+      return {
+        author: author?.alpha ?? null,
+        solved: solved?.alpha ?? null,
+        outlines: [...new Set(draws.filter((draw) => draw.kind === "outline" && draw.color === "#82cbb3").map((draw) => draw.alpha))],
+      };
+    });
+    await expect.poll(async () => { const { author, solved } = await footprintDraws(); return author !== null && solved !== null; }, { timeout: 20_000 }).toBe(true);
+    return footprintDraws();
+  };
+
+  expect(await drawsAt("0")).toEqual({ author: 0.35, solved: 0.35, outlines: [0.35] });
+  expect(await drawsAt("0.2")).toEqual({ author: 0.35, solved: 0.35, outlines: [0.35] });
+  expect(await drawsAt("0.8")).toEqual({ author: 0.8, solved: 0.8, outlines: [0.8] });
+});
+
 test("community row sits inside the atlas panel and clear of its content", async ({ page }) => {
   const state = await communityFixture(page, { role: "admin" });
   state.signed = true;
