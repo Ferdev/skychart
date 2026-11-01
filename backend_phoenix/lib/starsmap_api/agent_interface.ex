@@ -15,6 +15,7 @@ defmodule StarsmapApi.AgentInterface do
   @min_zoom 1.0e-14
   @max_zoom 50_000_000.0
   @max_coordinate_au 3.0e15
+  @max_object_key_bytes 180
 
   def search(params) when is_map(params) do
     with {:ok, query} <- query(params["q"]),
@@ -78,39 +79,39 @@ defmodule StarsmapApi.AgentInterface do
     })
   end
 
-  def object(key) when is_binary(key) do
-    case PublicObjects.public_object(key) do
-      {:ok, object} ->
-        catalog = AgentCatalogs.find(object.catalog_group)
+  def object(key) do
+    with {:ok, normalized} <- object_key(key, "key") do
+      case PublicObjects.public_object(normalized) do
+        {:ok, object} ->
+          catalog = AgentCatalogs.find(object.catalog_group)
 
-        {:ok,
-         %{
-           object: %{
-             key: object.key,
-             name: object.name,
-             aliases: object.aliases,
-             object_type: object.object_type,
-             catalog_id: object.catalog_group,
-             astrometry: object.astrometry,
-             # A core Solar System body has `identifiers`; a catalog record has `external_ids`.
-             identifiers: Map.get(object, :external_ids) || Map.get(object, :identifiers, %{}),
-             semantics: object.semantics
-           },
-           provenance: %{
-             source_type: object.source_type,
-             catalog: catalog,
-             record_links: object.external_links
-           },
-           links: object_links(object),
-           documentation_url: absolute_url("/agents")
-         }}
+          {:ok,
+           %{
+             object: %{
+               key: object.key,
+               name: object.name,
+               aliases: object.aliases,
+               object_type: object.object_type,
+               catalog_id: object.catalog_group,
+               astrometry: object.astrometry,
+               # A core Solar System body has `identifiers`; a catalog record has `external_ids`.
+               identifiers: Map.get(object, :external_ids) || Map.get(object, :identifiers, %{}),
+               semantics: object.semantics
+             },
+             provenance: %{
+               source_type: object.source_type,
+               catalog: catalog,
+               record_links: object.external_links
+             },
+             links: object_links(object),
+             documentation_url: absolute_url("/agents")
+           }}
 
-      {:error, :not_found} ->
-        error(:object_not_found, "No public SkyChart object record matches that key.", "key")
+        {:error, :not_found} ->
+          error(:object_not_found, "No public SkyChart object record matches that key.", "key")
+      end
     end
   end
-
-  def object(_), do: error(:invalid_object_key, "Object keys must be text.", "key")
 
   def catalogs do
     %{
@@ -198,17 +199,29 @@ defmodule StarsmapApi.AgentInterface do
   defp optional_object(nil), do: {:ok, nil}
   defp optional_object(""), do: {:ok, nil}
 
-  defp optional_object(key) when is_binary(key) and byte_size(key) <= 180 do
-    case PublicObjects.public_object(String.downcase(String.trim(key))) do
-      {:ok, object} ->
-        {:ok, object}
+  defp optional_object(key) do
+    with {:ok, normalized} <- object_key(key, "object_key") do
+      case PublicObjects.public_object(normalized) do
+        {:ok, object} ->
+          {:ok, object}
 
-      {:error, :not_found} ->
-        error(:object_not_found, "No public SkyChart object matches object_key.", "object_key")
+        {:error, :not_found} ->
+          error(:object_not_found, "No public SkyChart object matches object_key.", "object_key")
+      end
     end
   end
 
-  defp optional_object(_), do: error(:invalid_object_key, "object_key is invalid.", "object_key")
+  defp object_key(key, _parameter)
+       when is_binary(key) and byte_size(key) <= @max_object_key_bytes,
+       do: {:ok, key |> String.trim() |> String.downcase()}
+
+  defp object_key(_key, parameter),
+    do:
+      error(
+        :invalid_object_key,
+        "#{parameter} must be text of at most #{@max_object_key_bytes} bytes.",
+        parameter
+      )
 
   defp center(params, object) do
     x = params["center_x_au"]

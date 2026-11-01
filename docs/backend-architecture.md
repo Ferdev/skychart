@@ -58,6 +58,10 @@ The browser-facing endpoints are proxied through Phoenix, including
 `/api/ephemeris`, `/api/orbits`, `/api/trails`, `/api/observe`, and
 `/api/observe/plan`.
 
+`GET /api/observe` has the site in its query string (`lat`, `lon`). Phoenix filters
+these parameters, an error report of this route has no request, and the Python
+request log omits the query string.
+
 `POST /api/observe/plan` is the batch of the night planner
 (`backend/night_planner.py`). It ranks Messier and OpenNGC targets for one site
 and one night. The site is in the request body, so it is in no address and no

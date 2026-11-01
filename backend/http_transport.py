@@ -41,6 +41,11 @@ from backend.scientific_calculation import (
     trails_payload,
 )
 
+# The query of an observation holds the observer's site. The match stops before the
+# protocol version, so a malformed request line with a space also loses its query.
+OBSERVE_QUERY = re.compile(r"(/api/observe[^?\s]*)\?.*?(?= HTTP/\d|$)")
+
+
 class Handler(BaseHTTPRequestHandler):
     def request_id(self) -> str:
         value = self.headers.get("X-Request-ID", "unknown")
@@ -216,10 +221,9 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 groups = parse_catalog_groups(query)
-                objects = catalog_objects_for_groups(groups)
                 include_objects = parse_bool_param(query, "include_objects", True)
                 key = cache_key_payload("catalog", groups=groups, include_objects=include_objects)
-                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, objects, include_objects=include_objects)))
+                self.respond(cached_payload("api", key, lambda: catalog_summary_payload(groups, catalog_objects_for_groups(groups), include_objects=include_objects)))
             except QueryInputError as exc:
                 payload = {"error": str(exc)}
                 if exc.details is not None:
@@ -274,7 +278,8 @@ class Handler(BaseHTTPRequestHandler):
         self.respond({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 
     def log_message(self, format: str, *args: Any) -> None:
-        print(f"{self.address_string()} - {format % args}")
+        message = OBSERVE_QUERY.sub(r"\1", format % args)
+        print(f"{self.address_string()} - {message}")
 
     def respond(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> bool:
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

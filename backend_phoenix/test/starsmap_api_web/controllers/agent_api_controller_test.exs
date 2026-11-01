@@ -1,6 +1,7 @@
 defmodule StarsmapApiWeb.AgentApiControllerTest do
   use StarsmapApiWeb.ConnCase, async: false
 
+  alias StarsmapApi.AgentInterface
   alias StarsmapApi.Catalog.{PublicCache, SnapshotStore}
 
   setup do
@@ -74,6 +75,34 @@ defmodule StarsmapApiWeb.AgentApiControllerTest do
 
     error = conn |> recycle() |> get(~p"/api/agent/v1/objects/not-real") |> json_response(404)
     assert error["error"]["code"] == "object_not_found"
+  end
+
+  test "an object key has one form in the object lookup and the view link", %{conn: conn} do
+    for key <- ["ngc-224", "NGC-224", "  ngc-224  ", "\tNgC-224\n"] do
+      assert {:ok, %{object: %{key: "ngc-224"}}} = AgentInterface.object(key)
+
+      assert {:ok, %{parameters: %{object_key: "ngc-224"}}} =
+               AgentInterface.view_link(%{"object_key" => key})
+    end
+
+    longest = String.duplicate("a", 180)
+    assert {:error, %{code: "object_not_found"}} = AgentInterface.object(longest)
+
+    assert {:error, %{code: "object_not_found"}} =
+             AgentInterface.view_link(%{"object_key" => longest})
+
+    oversized = String.duplicate("a", 181)
+
+    assert {:error, %{code: "invalid_object_key", parameter: "key"}} =
+             AgentInterface.object(oversized)
+
+    assert {:error, %{code: "invalid_object_key", parameter: "object_key"}} =
+             AgentInterface.view_link(%{"object_key" => oversized})
+
+    assert {:error, %{code: "invalid_object_key", parameter: "key"}} = AgentInterface.object(nil)
+
+    error = conn |> get("/api/agent/v1/objects/#{oversized}") |> json_response(400)
+    assert error["error"]["code"] == "invalid_object_key"
   end
 
   test "object details are available for ephemeris bodies and spacecraft", %{conn: conn} do

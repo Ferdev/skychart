@@ -369,7 +369,7 @@ test.describe("3D view on a touch screen", () => {
     const toggle = page.locator("#universe-target-toggle");
     const extras = ["#universe-focus", "#universe-inspect", "#universe-sky", "#universe-target-magnitude"];
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(toggle).toHaveAccessibleName("Show all actions");
+    await expect(toggle).toHaveAccessibleName("Show all actions for the selected object");
     for (const selector of ["#universe-fly", "#universe-details"]) await expect(page.locator(selector)).toBeVisible();
     for (const selector of extras) await expect(page.locator(selector)).toBeHidden();
     const header = (await page.locator(".universe-view__header").boundingBox())!;
@@ -383,7 +383,7 @@ test.describe("3D view on a touch screen", () => {
 
     await toggle.tap();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    await expect(toggle).toHaveAccessibleName("Show fewer actions");
+    await expect(toggle).toHaveAccessibleName("Show fewer actions for the selected object");
     for (const selector of ["#universe-fly", "#universe-details", ...extras]) await expect(page.locator(selector)).toBeVisible();
     await expect(card).toBeInViewport({ ratio: 1 });
     const full = (await card.boundingBox())!;
