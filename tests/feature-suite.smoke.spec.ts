@@ -4,7 +4,8 @@ import { openAtlas, openSearchWorkspace } from "./atlas-test-utils";
 const SITE = { latitude: "-33.8568", longitude: "151.2153" };
 
 /** The sky from Earth, with the camera on the Orion Nebula at 40 degrees. */
-const EARTH_SKY = "/?v=1&c=0,0&z=24&t=2026-01-15T22:00:00.000Z&L=grid.1~photos.1&sky=earth&sc=82.0,-28.7,40.0";
+const EARTH_SKY_CAMERA = "82.0,-28.7,40.0";
+const EARTH_SKY = `/?v=1&c=0,0&z=24&t=2026-01-15T22:00:00.000Z&L=grid.1~photos.1&sky=earth&sc=${EARTH_SKY_CAMERA}`;
 
 async function openEarthSky(page: Page) {
   await openAtlas(page, EARTH_SKY);
@@ -141,6 +142,108 @@ test("the Sky overlay keeps its photos while the next area loads", async ({ page
   }
   release();
   await expect(photos).toHaveCount(1);
+});
+
+/** Moves the Sky camera with the same history entry that the Back button restores. */
+async function aimSky(page: Page, camera: string) {
+  await page.evaluate((sc) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("sc", sc);
+    window.history.pushState(null, "", url);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }, camera);
+  // Repaint frames: the area of the camera goes to the overlay with each of them.
+  for (let frame = 0; frame < 5; frame += 1) await page.evaluate(() => new Promise(requestAnimationFrame));
+}
+
+test("the Sky overlay shows cached areas during the failure backoff, and an uncached area waits", async ({ page }) => {
+  test.setTimeout(120_000);
+  // The camera angles are ecliptic. The first photo is at the Orion Nebula, and the second is at the Sky camera of `SECOND_AREA`.
+  const SECOND_AREA = "142.0,-28.7,40.0", FAILED_AREA = "202.0,-28.7,40.0", UNCACHED_AREA = "262.0,-28.7,40.0", NEAR_UNCACHED_AREA = "263.0,-28.7,40.0";
+  const first = overlayPhoto("11111111-1111-4111-8111-111111111111", 83.8, -5.4, 0.008);
+  const second = overlayPhoto("22222222-2222-4222-8222-222222222222", 135.2, -13, 0.008);
+  await page.addInitScript(() => {
+    const now = Date.now.bind(Date);
+    const clock = window as unknown as { skippedMs: number };
+    clock.skippedMs = 0;
+    Date.now = () => now() + clock.skippedMs;
+  });
+  await overlayFixture(page, [first]);
+  await openEarthSky(page);
+  const titles = page.locator(".community-sky-photo__focus");
+  await expect(titles).toHaveCount(1, { timeout: 20_000 });
+  await expect(titles).toContainText(first.title);
+
+  // The second area loads, and each other new area fails.
+  const requests: string[] = [];
+  await page.route("**/api/photos/sky?**", (route) => {
+    const ra = new URL(route.request().url()).searchParams.get("ra")!;
+    requests.push(ra);
+    return ra === "140" ? route.fulfill({ json: { photos: [second] } }) : route.fulfill({ status: 503, json: { error: "unavailable" } });
+  });
+  await aimSky(page, SECOND_AREA);
+  await expect(titles).toContainText(second.title, { timeout: 20_000 });
+  expect(requests).toHaveLength(1);
+
+  const failed = page.waitForResponse("**/api/photos/sky?**");
+  await aimSky(page, FAILED_AREA);
+  await failed;
+  expect(requests).toHaveLength(2);
+
+  // The first area is in the cache, so it comes back with no request during the backoff.
+  await aimSky(page, EARTH_SKY_CAMERA);
+  await expect(titles).toHaveCount(1);
+  await expect(titles).toContainText(first.title);
+  expect(requests).toHaveLength(2);
+
+  await aimSky(page, UNCACHED_AREA);
+  expect(requests, "an uncached area makes no request during the backoff").toHaveLength(2);
+
+  await page.evaluate(() => { (window as unknown as { skippedMs: number }).skippedMs = 31_000; });
+  const retried = page.waitForRequest("**/api/photos/sky?**");
+  await aimSky(page, NEAR_UNCACHED_AREA);
+  await retried;
+  expect(requests).toHaveLength(3);
+});
+
+test("Shift+P toggles the diagnostics, but not while the person types or holds the key", async ({ page }) => {
+  await openAtlas(page);
+  const stored = () => page.evaluate(() => localStorage.getItem("starsmap:perf"));
+  const before = await stored();
+
+  await openSearchWorkspace(page);
+  const search = page.locator("#body-search");
+  await search.focus();
+  await page.keyboard.type("PLUTO");
+  await expect(search).toHaveValue("PLUTO");
+  expect(await stored()).toBe(before);
+
+  // A text area and an editable block are text fields too.
+  for (const tag of ["textarea", "div"]) {
+    await page.evaluate((name) => {
+      const field = document.createElement(name);
+      field.id = "typing-probe";
+      if (name === "div") field.setAttribute("contenteditable", "true");
+      document.body.append(field);
+      field.focus();
+    }, tag);
+    await page.keyboard.press("Shift+P");
+    expect(await stored()).toBe(before);
+    await page.locator("#typing-probe").evaluate((field) => field.remove());
+  }
+
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Shift+P");
+  await expect.poll(stored).toBe("1");
+  await expect(page.locator("#diagnostics-toggle")).toBeChecked();
+
+  // A key that stays down sends repeated events, and they do not change the state.
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "P", shiftKey: true, repeat: true, bubbles: true })));
+  expect(await stored()).toBe("1");
+
+  await page.keyboard.press("Shift+P");
+  await expect.poll(stored).toBe("0");
+  await expect(page.locator("#diagnostics-toggle")).not.toBeChecked();
 });
 
 test("the Sky overlay aligns a photo, opens the viewer, and follows the L parameter", async ({ page }) => {

@@ -248,6 +248,21 @@ test("photo opacity lives in the settings overlays group", async ({ page }) => {
   await expect(opacity).not.toContainText("Photo opacity");
 });
 
+test("the decision log names a suspension and a reinstatement", async ({ page }) => {
+  const state = await communityFixture(page, { role: "moderator" });
+  state.signed = true;
+  await openAtlas(page);
+  await page.locator("[data-community-review]").click();
+  const hub = page.getByRole("dialog", { name: "Community photos" });
+  await hub.getByRole("button", { name: "Decision log" }).click();
+  const rows = hub.locator(".community-table tbody tr");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText("Account reinstated");
+  await expect(rows.nth(0)).toContainText("vera: Appeal accepted");
+  await expect(rows.nth(1)).toContainText("Account suspended");
+  await expect(rows.nth(1)).toContainText("vera: Repeated abuse");
+});
+
 test("moderators can hide a public photo with a reason", async ({ page }) => {
   const state = await communityFixture(page, { role: "moderator" });
   state.signed = true;
