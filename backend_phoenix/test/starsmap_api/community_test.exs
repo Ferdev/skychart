@@ -12,7 +12,8 @@ defmodule StarsmapApi.CommunityTest do
     Moderation,
     Ranking,
     Storage,
-    Token
+    Token,
+    Vote
   }
 
   alias StarsmapApi.CommunityRepo, as: Repo
@@ -865,6 +866,95 @@ defmodule StarsmapApi.CommunityTest do
     assert [%{"cover" => nil}] = Ranking.index(0).items
   end
 
+  test "a suspension refreshes the subjects of the account's photos and votes, and no other subject",
+       %{user: user, subject: own_subject} do
+    moderator =
+      Repo.insert!(%User{
+        email: "suspension-moderator@example.com",
+        handle: "suspension-moderator",
+        name: "Moderator",
+        role: "moderator"
+      })
+
+    other_author =
+      Repo.insert!(%User{
+        email: "other-author@example.com",
+        handle: "other-author",
+        name: "Other author"
+      })
+
+    # A vote has a weight only from an account with a first sign-in of more than one day ago.
+    signed_in = DateTime.add(StarsmapApi.Community.now(), -172_800)
+    user = Repo.update!(Ecto.Changeset.change(user, first_sign_in_at: signed_in))
+
+    {:ok, voted_subject} = Subjects.ensure("mars")
+    {:ok, unrelated_subject} = Subjects.ensure("venus")
+
+    own = photo(user, own_subject, "published")
+    first = photo(other_author, voted_subject, "published")
+    voted = photo(other_author, voted_subject, "published")
+    unrelated = photo(other_author, unrelated_subject, "published")
+    Repo.insert!(%Vote{user_id: user.id, photo_id: voted.id})
+
+    for subject <- [own_subject, voted_subject, unrelated_subject],
+        do: Ranking.refresh(subject.id)
+
+    assert cover_id(voted_subject) == voted.id
+    assert cover_id(own_subject) == own.id
+    version = Ranking.index(0).version
+
+    {result, queries} =
+      queries(fn -> Moderation.suspend(moderator, user.handle, "Abuse", true) end)
+
+    assert {:ok, :ok} = result
+    # The vote of a suspended account has no weight, so the older photo is the cover again.
+    assert cover_id(voted_subject) == first.id
+    assert cover_id(own_subject) == nil
+    assert changed_subjects(version) == Enum.sort([own_subject.id, voted_subject.id])
+    assert Enum.count(queries, &String.contains?(&1, ~s(INSERT INTO "subject_photo_stats"))) == 2
+    assert cover_id(unrelated_subject) == unrelated.id
+
+    version = Ranking.index(0).version
+    assert {:ok, :ok} = Moderation.suspend(moderator, user.handle, "Appeal accepted", false)
+    assert cover_id(voted_subject) == voted.id
+    assert cover_id(own_subject) == own.id
+    assert changed_subjects(version) == Enum.sort([own_subject.id, voted_subject.id])
+  end
+
+  test "the report queue builds the detail of a photo one time", %{user: user, subject: subject} do
+    reported = photo(user, subject, "published")
+    other = photo(user, subject, "published")
+
+    assert {:ok, first} = Moderation.report(reported.id, "First reason")
+    assert {:ok, _} = Moderation.report(other.id, "Other reason")
+    assert {:ok, _} = Moderation.report(reported.id, "Second reason")
+    assert {:ok, _} = Moderation.report(reported.id, "Third reason")
+
+    {rows, queries} = queries(&Moderation.reports/0)
+
+    assert Enum.map(rows, & &1.reason) ==
+             ["First reason", "Other reason", "Second reason", "Third reason"]
+
+    assert Enum.all?(rows, &(Map.keys(&1) |> Enum.sort() == [:at, :id, :photo, :reason]))
+    assert hd(rows).id == first.id
+    assert hd(rows).at == first.inserted_at
+    assert Enum.map(rows, & &1.photo.id) == [reported.id, other.id, reported.id, reported.id]
+
+    for row <- rows, do: assert(row.photo == Moderation.detail(Photos.get(row.photo.id)))
+
+    assert length(hd(rows).photo.reports) == 3
+
+    # One detail reads the open reports of its photo with one query.
+    detail_queries =
+      Enum.count(
+        queries,
+        &(String.contains?(&1, ~s(FROM "photo_reports")) and
+            String.contains?(&1, "photo_id\" = $1"))
+      )
+
+    assert detail_queries == 2
+  end
+
   describe "a moderation reason" do
     setup %{user: user, subject: subject} do
       moderator =
@@ -1114,6 +1204,50 @@ defmodule StarsmapApi.CommunityTest do
 
       _ ->
         true
+    end
+  end
+
+  defp cover_id(subject) do
+    case Repo.one(
+           from s in "subject_photo_stats",
+             where: s.subject_id == type(^subject.id, Ecto.UUID),
+             select: s.payload
+         ) do
+      %{"cover" => %{"id" => id}} -> id
+      _ -> nil
+    end
+  end
+
+  defp changed_subjects(version),
+    do: Ranking.index(version).items |> Enum.map(& &1["subject_id"]) |> Enum.sort()
+
+  # The SQL text of each query of the community database while `action` runs.
+  defp queries(action) do
+    handler = "community-test-queries-#{System.unique_integer([:positive])}"
+
+    :telemetry.attach(
+      handler,
+      [:starsmap_api, :community_repo, :query],
+      &__MODULE__.query_event/4,
+      self()
+    )
+
+    try do
+      result = action.()
+      {result, received_queries([])}
+    after
+      :telemetry.detach(handler)
+    end
+  end
+
+  def query_event(_event, _measurements, metadata, pid),
+    do: send(pid, {:community_query, metadata.query})
+
+  defp received_queries(queries) do
+    receive do
+      {:community_query, query} -> received_queries([query | queries])
+    after
+      0 -> Enum.reverse(queries)
     end
   end
 

@@ -77,6 +77,32 @@ defmodule StarsmapApi.Catalog.TargetMatchTest do
     SnapshotStore.upsert_source_objects([star("closest", closest_ra, dec)])
   end
 
+  # The SQL text of each query on the catalog view while `action` runs.
+  defp catalog_queries(action) do
+    handler = "target-match-queries-#{System.unique_integer([:positive])}"
+    :telemetry.attach(handler, [:starsmap_api, :repo, :query], &__MODULE__.query_event/4, self())
+
+    try do
+      {action.(), received_queries([])}
+    after
+      :telemetry.detach(handler)
+    end
+  end
+
+  def query_event(_event, _measurements, metadata, pid),
+    do: send(pid, {:catalog_query, metadata.query})
+
+  defp received_queries(queries) do
+    receive do
+      {:catalog_query, query} ->
+        if String.contains?(query, ~s(FROM "catalog_source_objects")),
+          do: received_queries([query | queries]),
+          else: received_queries(queries)
+    after
+      0 -> Enum.reverse(queries)
+    end
+  end
+
   test "designations, aliases, and keys resolve to one object" do
     for name <- ["M 42", "m42", "Messier 42", "M042", "Orion Nebula"] do
       assert [%{status: "matched", object: %{key: "m42"}}] = match([%{"name" => name}])
@@ -150,6 +176,56 @@ defmodule StarsmapApi.Catalog.TargetMatchTest do
     # 0.0125 degrees of right ascension at this declination and 0.01 degrees of declination.
     expected = :math.sqrt((0.0125 * :math.cos(5.395 * :math.pi() / 180)) ** 2 + 0.01 ** 2) * 3600
     assert_in_delta row.separation_arcsec, expected, 0.01
+  end
+
+  test "a position ranks coordinates and reads the full record of the nearest object only" do
+    {[row], queries} =
+      catalog_queries(fn ->
+        match([%{"ra_deg" => 83.8325, "dec_deg" => -5.4}], radius_arcmin: 60)
+      end)
+
+    assert row.object.key == "m42"
+
+    {full, ranking} = Enum.split_with(queries, &String.contains?(&1, "source_payload"))
+    assert length(full) == 1
+    assert ranking != []
+    assert Enum.all?(ranking, &String.contains?(&1, ~s("ra_deg")))
+  end
+
+  test "a position gives the same object payload as its key" do
+    assert [by_position] = match([%{"ra_deg" => 83.8325, "dec_deg" => -5.4}])
+    assert [by_key] = match([%{"key" => "m42"}])
+    assert by_position.object == by_key.object
+    assert is_float(by_position.separation_arcsec)
+  end
+
+  test "a position takes the nearest row when two source tables have one key" do
+    near = %{
+      key: "shared-key",
+      name: "Near row",
+      object_type: "star",
+      catalog_group: "bright_stars",
+      source_type: "bright_star_catalog",
+      position_model: "fixed_catalog_vector",
+      search_text: "near row",
+      aliases: [],
+      ra_deg: 150.0,
+      dec_deg: 20.0
+    }
+
+    far = %{
+      near
+      | name: "Far row",
+        search_text: "far row",
+        catalog_group: "exoplanet_systems",
+        source_type: "exoplanet_archive_system",
+        ra_deg: 150.2
+    }
+
+    SnapshotStore.upsert_source_objects([near, far])
+
+    assert [%{status: "matched", object: %{name: "Near row"}}] =
+             match([%{"ra_deg" => 150.01, "dec_deg" => 20.0}], radius_arcmin: 60)
   end
 
   test "the Andromeda galaxy is at the right separation from its published center" do
