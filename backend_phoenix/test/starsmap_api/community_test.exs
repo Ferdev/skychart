@@ -842,6 +842,26 @@ defmodule StarsmapApi.CommunityTest do
     assert hd(Photos.gallery("moon")).id == second.id
   end
 
+  describe "the reason of an anonymous report" do
+    setup %{user: user, subject: subject} do
+      %{photo: photo(user, subject, "published")}
+    end
+
+    test "counts characters in each language", %{photo: photo} do
+      assert {:ok, _} = Moderation.report(photo.id, String.duplicate("報", 2000))
+      assert {:ok, _} = Moderation.report(photo.id, "abc")
+      assert {:error, :invalid_report} = Moderation.report(photo.id, "報")
+      assert {:error, :invalid_report} = Moderation.report(photo.id, String.duplicate("報", 2001))
+      assert {:error, :invalid_report} = Moderation.report(photo.id, nil)
+      assert length(Moderation.reports()) == 2
+    end
+
+    test "combining marks do not go past the byte limit", %{photo: photo} do
+      assert {:error, :invalid_report} = Moderation.report(photo.id, long_marks())
+      assert Moderation.reports() == []
+    end
+  end
+
   test "reports are resolved by audited moderation and suspension removes public covers", %{
     user: user,
     subject: subject
@@ -1004,6 +1024,27 @@ defmodule StarsmapApi.CommunityTest do
                Moderation.cancel_votes(moderator, user.handle, String.duplicate("a", 2000))
 
       assert {:ok, _} = Moderation.suspend(moderator, user.handle, "abc", true)
+    end
+
+    test "the range counts characters in each language", %{
+      user: user,
+      moderator: moderator,
+      photo: photo
+    } do
+      assert {:ok, _} =
+               Moderation.cancel_votes(moderator, user.handle, String.duplicate("理", 2000))
+
+      assert {:error, :invalid_reason} = Moderation.review(moderator, photo.id, "hide", "理")
+
+      assert {:error, :invalid_reason} =
+               Moderation.review(moderator, photo.id, "hide", String.duplicate("理", 2001))
+    end
+
+    test "combining marks do not go past the byte limit", %{moderator: moderator, photo: photo} do
+      assert {:error, :invalid_reason} =
+               Moderation.review(moderator, photo.id, "hide", long_marks())
+
+      assert Photos.get(photo.id).status == "review"
     end
 
     test "approval without a reason still gets the default text", %{
@@ -1459,6 +1500,9 @@ defmodule StarsmapApi.CommunityTest do
       0 -> Enum.reverse(queries)
     end
   end
+
+  # Three characters with more than 8,000 bytes.
+  defp long_marks, do: "a" <> String.duplicate("\u0301", 4000) <> "bc"
 
   defp photo(user, subject, status) do
     Repo.insert!(%Photo{

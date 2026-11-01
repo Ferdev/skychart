@@ -148,6 +148,22 @@ test.describe("header search and Search panel", () => {
     await expect(page.locator("#body-search")).toHaveValue("Sirius");
   });
 
+  test("the active search filter has an underline that does not change the height of the chip", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openAtlas(page);
+    await openSearchWorkspace(page);
+    const chips = page.locator("#body-filter-buttons");
+    const active = chips.locator('[aria-pressed="true"]');
+    const other = chips.locator('[data-body-filter="star"]');
+    const before = (await other.boundingBox())!.height;
+    expect(await other.evaluate((chip) => getComputedStyle(chip).boxShadow)).toBe("none");
+    await other.click();
+    await expect(other).toHaveAttribute("aria-pressed", "true");
+    await expect(active).toHaveCount(1);
+    expect(await other.evaluate((chip) => getComputedStyle(chip).boxShadow)).toMatch(/0px -2px 0px 0px inset$/);
+    expect((await other.boundingBox())!.height).toBe(before);
+  });
+
   test("the More types menu sets a filter that shows as an active chip, and Clear filters removes it", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await openAtlas(page);

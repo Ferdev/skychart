@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectBrowserIssues, expandObjectSheet, openAtlas, selectCatalogObject, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
+import { collectBrowserIssues, expandObjectSheet, openAtlas, openSearchWorkspace, selectCatalogObject, skipIfAtlasUnavailable, skyEphemerisFixture } from "./atlas-test-utils";
 
 test.describe("Cosmic Atlas mobile layout", () => {
   test.beforeEach(async ({ page, request }) => {
@@ -543,5 +543,96 @@ test.describe("Cosmic Atlas mobile layout", () => {
 
     await expect(page.locator("#map")).toBeVisible();
     issues.assertClean();
+  });
+
+  test("the constellation search has text of 16 px, so that iOS does not zoom the page", async ({ page }) => {
+    await page.locator("#map-settings-toggle").click();
+    await page.locator('[aria-controls="scale-constellations"]').click();
+    const search = page.locator("#constellation-search");
+    await expect(search).toBeVisible();
+    expect(await search.evaluate((input) => getComputedStyle(input).fontSize)).toBe("16px");
+  });
+
+  test("each help mark of the settings has a 44 px target that does not cover its toggle", async ({ page }) => {
+    await page.locator("#map-settings-toggle").click();
+    const tips = page.locator("#map-settings .scale-collapse__header .info-tip");
+    expect(await tips.count()).toBeGreaterThan(2);
+    for (const tip of await tips.all()) {
+      await tip.scrollIntoViewIfNeeded();
+      const target = await tip.evaluate((element) => {
+        const mark = element.getBoundingClientRect();
+        const [x, y] = [mark.x + mark.width / 2, mark.y + mark.height / 2];
+        const hit = (left: number, top: number) => document.elementFromPoint(left, top) === element;
+        const toggle = element.previousElementSibling!.getBoundingClientRect();
+        return {
+          mark: [mark.width, mark.height],
+          reach: [hit(x - 21, y), hit(x + 21, y), hit(x, y - 21), hit(x, y + 21)],
+          toggleEdge: document.elementFromPoint(toggle.right - 1, toggle.y + toggle.height / 2) !== element,
+        };
+      });
+      expect(target.mark).toEqual([20, 20]);
+      expect(target.reach).toEqual([true, true, true, true]);
+      expect(target.toggleEdge, "the toggle keeps all of its width").toBe(true);
+    }
+  });
+
+  test("the Subscribe control has a 44 px target", async ({ page }) => {
+    await openSearchWorkspace(page);
+    const summary = page.locator("#now-subscribe summary");
+    await expect(summary).toBeVisible();
+    const box = (await summary.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.width).toBeGreaterThanOrEqual(44);
+  });
+
+  test("the dots of a tour have large targets on one row, and the card keeps its place", async ({ page }) => {
+    // This step selects no object. An object opens the inspector sheet, and the sheet hides the dots.
+    await page.goto("/?tour=earth-to-observable-universe&step=1");
+    await expect(page.locator("#tour-player h2")).toHaveText("The planetary neighborhood", { timeout: 45_000 });
+    const dots = page.locator("#tour-player .tour-player__dots button");
+    await expect(dots).toHaveCount(5);
+    await expect(dots.first()).toBeVisible();
+    const boxes = await Promise.all((await dots.all()).map(async (dot) => (await dot.boundingBox())!));
+    expect(new Set(boxes.map((box) => box.y)).size, "one row of dots").toBe(1);
+    expect(boxes.every((box) => box.width === 24 && box.height === 24), "the visible box stays 24 px").toBe(true);
+    // The target is 32 x 44 px, and it ends where the target of the next dot starts.
+    const target = await dots.nth(1).evaluate((dot) => {
+      const box = dot.getBoundingClientRect();
+      const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+      const at = (left: number, top: number) => document.elementFromPoint(left, top);
+      return {
+        own: [at(x - 15, y), at(x + 15, y), at(x, y - 21), at(x, y + 21)].every((element) => element === dot),
+        next: at(x + 17, y) === dot.nextElementSibling,
+      };
+    });
+    expect(target).toEqual({ own: true, next: true });
+    // A wide window has 44 px for the row and its margins: the phone uses the same height.
+    const row = (await page.locator("#tour-player .tour-player__dots").boundingBox())!;
+    const margin = await page.locator("#tour-player .tour-player__dots").evaluate((element) => getComputedStyle(element).marginBlock);
+    expect([row.height, margin]).toEqual([24, "10px"]);
+    const toolbar = (await page.locator(".atlas-toolbar").boundingBox())!;
+    const card = (await page.locator("#tour-player").boundingBox())!;
+    expect(card.y + card.height).toBeLessThanOrEqual(toolbar.y);
+  });
+
+  test("the card of a tour with the most steps stays between the header and the toolbar", async ({ page }) => {
+    const token = "0123456789abcdef0123456789abcdef";
+    const view = "v=1&c=0%2C0&z=24&t=2026-10-30T00%3A00%3A00.000Z&L=grid.1";
+    await page.route("**/api/community/config", (route) => route.fulfill({ json: { enabled: true } }));
+    await page.route(`**/api/community/shared-tours/${token}`, (route) => route.fulfill({
+      json: {
+        slug: `shared-${token}`, title: "Thirty steps", description: "", author: "Teacher",
+        steps: Array.from({ length: 30 }, (_, index) => ({ viewState: view, title: `Step ${index + 1}`, body: "" })),
+      },
+    }));
+    await page.goto(`/?tour=shared-${token}`);
+    await expect(page.locator("#tour-player h2")).toHaveText("Step 1", { timeout: 45_000 });
+    await expect(page.locator("#tour-player .tour-player__dots button")).toHaveCount(30);
+    const card = (await page.locator("#tour-player").boundingBox())!;
+    const toolbar = (await page.locator(".atlas-toolbar").boundingBox())!;
+    const header = (await page.locator(".atlas-bar").boundingBox())!;
+    expect(card.y + card.height).toBeLessThanOrEqual(toolbar.y);
+    expect(card.y).toBeGreaterThanOrEqual(header.y + header.height);
+    await expect(page.locator('#tour-player [data-tour-action="next"]')).toBeInViewport({ ratio: 1 });
   });
 });
