@@ -239,13 +239,14 @@ export class CommunityController {
 
   /** The area changes in steps, so a small movement of the view makes no request. */
   private requestOverlay(area: OverlayArea) {
-    if (area.key === this.overlayKey && (this.overlayCache.has(area.key) || this.overlayRequest)) return;
-    // A failed request must not repeat with each frame of a movement.
-    if (Date.now() < this.overlayRetryAt) return;
+    const cached = this.overlayCache.has(area.key);
+    if (area.key === this.overlayKey && (cached || this.overlayRequest)) return;
+    // A failed request must not repeat with each frame of a movement. An area in the cache makes no request.
+    if (!cached && Date.now() < this.overlayRetryAt) return;
     this.overlayRequest?.abort();
     this.overlayRequest = null;
     this.overlayKey = area.key;
-    if (this.overlayCache.has(area.key)) return;
+    if (cached) return;
     const request = new AbortController();
     this.overlayRequest = request;
     void this.api
