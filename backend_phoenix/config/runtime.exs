@@ -233,9 +233,21 @@ if config_env() != :test do
 
     worker = System.get_env("COMMUNITY_WORKER") == "true"
 
+    answer_flight_daily_usd =
+      case Float.parse(System.get_env("ANSWER_FLIGHTS_DAILY_USD", "5")) do
+        {limit, ""} when limit >= 0 -> limit
+        _ -> raise "ANSWER_FLIGHTS_DAILY_USD must be a number"
+      end
+
+    config :starsmap_api,
+      answer_flight_api_key: System.get_env("ANSWER_FLIGHTS_API_KEY"),
+      answer_flight_model_name: System.get_env("ANSWER_FLIGHTS_MODEL", "claude-opus-5-5"),
+      answer_flight_daily_usd: answer_flight_daily_usd
+
     cron = [
       {"0 3 * * *", StarsmapApi.Community.MaintenanceWorker},
-      {"*/10 * * * *", StarsmapApi.Community.RankingWorker}
+      {"*/10 * * * *", StarsmapApi.Community.RankingWorker},
+      {"0 4 * * *", StarsmapApi.Community.DeepFieldNightly}
     ]
 
     cron =
@@ -243,8 +255,16 @@ if config_env() != :test do
         do: [{"0 2 * * *", StarsmapApi.Community.BackupWorker} | cron],
         else: cron
 
+    # The position tools of an answer flight need the scientific service of the web container.
+    queues =
+      cond do
+        worker -> [media: 1, publish: 1, mail: 1]
+        System.get_env("PHX_SERVER") -> [flights: 1]
+        true -> false
+      end
+
     config :starsmap_api, StarsmapApi.CommunityJobs,
-      queues: if(worker, do: [media: 1, publish: 1, mail: 1], else: false),
+      queues: queues,
       plugins:
         if(worker,
           do: [

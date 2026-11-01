@@ -55,6 +55,7 @@ defmodule StarsmapApi.Community.SolverWorker do
               if current.status == "published", do: Ranking.refresh(current.subject_id)
               StarsmapApi.Community.Depth.enqueue(changed)
               StarsmapApi.Community.Findings.enqueue(changed)
+              StarsmapApi.Community.DeepFields.photo_ready(changed)
             end
           end)
 

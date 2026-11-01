@@ -312,3 +312,30 @@
   justify-self: start;
   margin-top: 6px;
 }
+
+/* The Ask form of the search panel. A workspace section sets `display`, so `hidden` needs its own rule. */
+.ask-section[hidden] {
+  display: none;
+}
+
+.ask-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.ask-form input {
+  min-width: 0;
+}
+
+.ask-help,
+.ask-state p,
+.ask-section [data-ask-tour] {
+  margin: 6px 0 0;
+  font-size: var(--text-xs);
+  color: var(--panel-ink-muted);
+}
+
+.ask-state p:empty {
+  display: none;
+}

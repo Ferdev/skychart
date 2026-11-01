@@ -4,6 +4,7 @@ import { t } from "../i18n";
 import { lightCurveSvg } from "../transit/lightCurve";
 import { CommunityApi, errorText, type ReviewAction, type ReviewFinding, type ReviewPhoto, type ReviewQueue, type ReviewTour, type ReviewTransit } from "./api";
 import { dateText, dateTimeText, emptyState, h, licenceText, segmented, statusBadge } from "./communityUi";
+import { paintDeepFields } from "./deepFieldReview";
 import type { PhotoDialogs } from "./photoDialogs";
 import { bindBlink, blinkMarkup, findingFacts, findingTitle } from "./photoFindings";
 
@@ -17,7 +18,7 @@ export type ReviewContext = {
   changed: () => Promise<void>;
 };
 
-type Section = "review" | "reports" | "tours" | "transits" | "findings" | "published" | "hidden" | "rejected" | "log" | "members";
+type Section = "review" | "reports" | "tours" | "transits" | "findings" | "deepFields" | "published" | "hidden" | "rejected" | "log" | "members";
 
 const PRESETS = ["notAstro", "wrongObject", "rights", "synthetic", "quality"];
 /** The section stays selected while the community window is open and closed again. */
@@ -44,6 +45,7 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
         { value: "tours", label: t("community.tab.tours"), count: counts.tours ?? 0 },
         { value: "transits", label: t("transit.tab.transits"), count: counts.transits ?? 0 },
         { value: "findings", label: t("finding.mod.section"), count: counts.findings ?? 0 },
+        { value: "deepFields", label: t("deep.mod.section") },
         { value: "published", label: t("community.status.published"), count: counts.published ?? 0 },
         { value: "hidden", label: t("community.status.hidden"), count: counts.hidden ?? 0 },
         { value: "rejected", label: t("community.status.rejected"), count: counts.rejected ?? 0 },
@@ -328,6 +330,8 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
       } else if (section === "findings") {
         const data = await api.request<{ findings: ReviewFinding[] }>("/api/community/review/findings");
         if (context.current()) paintFindings(data.findings);
+      } else if (section === "deepFields") {
+        await paintDeepFields(api, list, context.current, context.message);
       } else if (section === "log") {
         const data = await api.request<{ actions: ReviewAction[] }>("/api/community/review/log");
         if (context.current()) paintLog(data.actions);

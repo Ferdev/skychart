@@ -114,3 +114,138 @@
   font-size: var(--text-xs);
   white-space: pre-wrap;
 }
+
+/* The row of a deep field in the object inspector. */
+.community-deep-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 6px;
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.community-deep-row img {
+  width: 56px;
+  height: 42px;
+  object-fit: cover;
+  background: #000;
+  border-radius: var(--radius-sm);
+}
+
+.community-deep-row span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+/* The page of a deep field. */
+.community-dialog--deep-field {
+  width: min(1120px, calc(100vw - 32px));
+}
+
+.deep-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 12px 20px;
+}
+
+.deep-field__figure {
+  grid-column: 1;
+  margin: 0;
+  min-width: 0;
+}
+
+.deep-field__figure figcaption {
+  margin-top: 8px;
+}
+
+.deep-field__stage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #000;
+  border-radius: var(--radius-sm);
+  touch-action: none;
+  cursor: grab;
+}
+
+.deep-field__stage:active {
+  cursor: grabbing;
+}
+
+.deep-field__image {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.deep-field__image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+.deep-field__controls {
+  grid-column: 1;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.deep-field__slider {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-xs);
+  color: var(--panel-ink-muted);
+}
+
+.deep-field__side {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.deep-field__wall {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.deep-field__wall ul {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+  color: var(--panel-ink-muted);
+}
+
+@media (max-width: 760px) {
+  .deep-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .deep-field__side {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
