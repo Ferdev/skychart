@@ -373,6 +373,12 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
         reason <- [%{reason: "ab"}, %{}] do
       assert %{"error" => "invalid_reason"} = moderate.(path, Map.merge(params, reason))
     end
+
+    assert %{"error" => "invalid_report"} =
+             conn
+             |> write()
+             |> post("/api/photos/#{waiting.id}/report", %{reason: "ab"})
+             |> json_response(422)
   end
 
   test "an open session loses review access when the address leaves the list", %{conn: conn} do
@@ -570,11 +576,11 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
 
     defp public(conn, tour), do: get(conn, "/api/community/shared-tours/#{token(tour)}")
 
-    defp report(conn, tour) do
+    defp report(conn, tour, reason \\ "not suitable") do
       conn
       |> put_req_header("origin", "http://www.example.com")
       |> put_req_header("content-type", "application/json")
-      |> post("/api/community/shared-tours/#{token(tour)}/report", %{reason: "not suitable"})
+      |> post("/api/community/shared-tours/#{token(tour)}/report", %{reason: reason})
     end
 
     defp moderator do
@@ -663,6 +669,18 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
                  |> post("/api/community/tours", tour_body(extra))
                  |> json_response(422)
       end
+    end
+
+    test "the reason of a report counts characters in each language", %{
+      conn: conn,
+      author: author
+    } do
+      tour = create(conn, author)
+
+      assert %{"error" => "invalid_report"} = report(conn, tour, "報") |> json_response(422)
+      assert conn |> public(tour) |> json_response(200)
+
+      assert report(conn, tour, String.duplicate("報", 2000)) |> json_response(200)
     end
 
     test "a report holds the tour until a moderator decides", %{conn: conn, author: author} do

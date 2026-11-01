@@ -19,24 +19,6 @@
     overflow: hidden;
   }
 
-  .scale-rail {
-    right: 10px;
-    bottom: 78px;
-    left: 10px;
-    width: auto;
-    max-height: 56vh;
-    overflow-y: auto;
-  }
-
-  .workspace-panel {
-    top: 204px;
-    right: 10px;
-    bottom: 292px;
-    left: 10px;
-    width: auto;
-    max-height: none;
-  }
-
   .object-command,
   .scale-command {
     padding: 10px 12px;
@@ -147,12 +129,25 @@
     height: 20px;
   }
 
+  /* The mark stays 20 px. The target is 44 x 44 px, and the margin keeps it off the toggle at its left. */
+  .scale-collapse__header .info-tip {
+    position: relative;
+    margin-left: 9px;
+  }
+
+  .scale-collapse__header .info-tip::after {
+    position: absolute;
+    inset: -13px;
+    content: "";
+  }
+
   .workspace-panel {
     top: calc(var(--atlas-bar-bottom, 112px) + 8px);
     right: 0;
     bottom: 0;
     left: 0;
     width: auto;
+    max-height: none;
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
@@ -174,8 +169,10 @@
     background: rgba(8, 10, 9, 0.94);
   }
 
+  /* iOS zooms the page when it focuses a field with text under 16 px. */
   .search-control input,
-  .time-input-row input {
+  .time-input-row input,
+  #constellation-search {
     min-height: 44px;
     font-size: 16px;
   }

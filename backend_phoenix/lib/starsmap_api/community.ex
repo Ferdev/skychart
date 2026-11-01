@@ -13,6 +13,14 @@ defmodule StarsmapApi.Community do
 
   def now, do: DateTime.utc_now()
 
+  @doc """
+  A reason has 3 to 2,000 characters in each language. The byte limit stays because combining marks
+  make one character of any length: 2,000 characters from the form have less than 8,000 bytes.
+  """
+  def valid_reason?(text) do
+    is_binary(text) and byte_size(text) <= 8000 and String.length(text) in 3..2000
+  end
+
   # The default is the production image layout; source checkouts configure their own root.
   def backend_script(name) do
     Path.join(Application.get_env(:starsmap_api, :community_backend_root, "/app/backend"), name)
