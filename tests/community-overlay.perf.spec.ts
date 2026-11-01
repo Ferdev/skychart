@@ -18,8 +18,12 @@ function footprints(count: number) {
   });
 }
 
+/** The yaw and the pitch of the `sc` address parameter. They are numbers because the app writes `82.0` as `82`. */
+const skyHeading = (page: Page) => new URL(page.url()).searchParams.get("sc")!.split(",").slice(0, 2).map(Number);
+
 /** Frame intervals while the view moves. The drag makes one new Sky frame for each animation frame. */
 async function moveAndSample(page: Page) {
+  const headingBefore = skyHeading(page);
   await page.mouse.move(800, 500);
   await page.mouse.down();
   const samples = page.evaluate(async () => {
@@ -36,6 +40,8 @@ async function moveAndSample(page: Page) {
   for (let step = 0; step < 90; step += 1) await page.mouse.move(800 + Math.sin(step / 8) * 90, 500 + Math.cos(step / 8) * 40);
   const intervals = await samples;
   await page.mouse.up();
+  // The address changes after the drag ends. With no change, the intervals are of a view that did not move.
+  await expect.poll(() => skyHeading(page), { message: "the drag moves the Sky camera" }).not.toEqual(headingBefore);
   return { median: intervals[Math.floor(intervals.length / 2)]!, p95: intervals[Math.floor(intervals.length * 0.95)]! };
 }
 
