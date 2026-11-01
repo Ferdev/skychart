@@ -200,6 +200,7 @@ const ERROR_KEYS = new Set([
   "not_ready",
   "invalid_wcs",
   "invalid_tour",
+  "invalid_reason",
   "tour_quota",
   "transit_rejected",
   "transit_quota",
