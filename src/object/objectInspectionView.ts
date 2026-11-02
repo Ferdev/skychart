@@ -1,4 +1,4 @@
-import { formatDuration } from "../navigationMetrics";
+import { formatClockDuration, formatCount as formatExactCount, formatExactKm } from "../format/quantity";
 import { classifyBody } from "../destinationPicker";
 import { pointInRect, isPresent, type Rect, type ScreenPoint } from "../geometry";
 import { t } from "../i18n";
@@ -117,14 +117,22 @@ update() {
     [t("field.heliocentric"), this.context.formatDistance(body.position.heliocentric_distance_km)]
   ];
 
+  if (body.spacecraft || body.state_vector) {
+    overviewRows.push(
+      [t("field.earthDistance"), exactDistance(body.distance_from_earth_km)],
+      [t("field.heliocentric"), exactDistance(body.position.heliocentric_distance_km)],
+    );
+  }
+
   if (body.spacecraft) {
     const mission = body.spacecraft;
     primaryStats[1] = [t("mission.signalTime"), Number.isFinite(body.distance_from_earth_km)
-      ? formatDuration(body.distance_from_earth_km / 299792.458) : t("value.unknown")];
+      ? formatClockDuration(body.distance_from_earth_km / 299792.458) : t("value.unknown")];
     overviewRows.push(
       [t("mission.agency"), mission.agency],
       [t("mission.launch"), mission.launch_date],
-      [t("field.heliocentricSpeed"), Number.isFinite(mission.heliocentric_speed_km_s) ? `${formatNumber(mission.heliocentric_speed_km_s!)} km/s` : null],
+      [t("mission.sunSpeed"), speedWithHourlyValue(mission.heliocentric_speed_km_s)],
+      [t("mission.earthSpeed"), speedWithHourlyValue(mission.earth_relative_speed_km_s)],
       [t("field.positionModel"), t(`mission.${mission.availability}`)],
       [t("mission.coverage"), `${mission.coverage_start_tdb} – ${mission.coverage_end_tdb}`],
       [t("mission.epoch"), mission.position_epoch],
@@ -811,6 +819,16 @@ private renderRows(rows: (string | number | null | undefined)[][]) {
 }
 
 /** Source of the position of one object, for example "NASA/JPL DE440s (de440s.bsp)". */
+/** An exact distance row. A body has no such row for its own place, for example Earth from Earth. */
+function exactDistance(kilometers: number): string | null {
+  return Number.isFinite(kilometers) && kilometers > 0 ? formatExactKm(kilometers) : null;
+}
+
+function speedWithHourlyValue(kmPerSecond: number | undefined): string | null {
+  if (!Number.isFinite(kmPerSecond)) return null;
+  return `${formatNumber(kmPerSecond!)} km/s (${formatExactCount(kmPerSecond! * 3_600)} km/h)`;
+}
+
 function objectSource(body: Body): string | null {
   const source = body.catalog?.ephemeris_source?.trim();
   if (!source) return null;

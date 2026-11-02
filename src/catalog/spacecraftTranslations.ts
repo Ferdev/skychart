@@ -25,3 +25,14 @@ for (const [locale, labels] of Object.entries(provenanceLabels)) {
   SPACECRAFT_TRANSLATIONS[locale]["mission.revision"] = labels[0];
   SPACECRAFT_TRANSLATIONS[locale]["mission.audit"] = labels[1];
 }
+
+const speedLabels: Record<string, [string, string]> = {
+  en: ["Speed relative to the Sun", "Speed relative to Earth"], es: ["Velocidad respecto al Sol", "Velocidad respecto a la Tierra"],
+  fr: ["Vitesse par rapport au Soleil", "Vitesse par rapport à la Terre"], de: ["Geschwindigkeit relativ zur Sonne", "Geschwindigkeit relativ zur Erde"],
+  "pt-BR": ["Velocidade em relação ao Sol", "Velocidade em relação à Terra"], it: ["Velocità rispetto al Sole", "Velocità rispetto alla Terra"],
+  "zh-Hans": ["相对太阳的速度", "相对地球的速度"], ja: ["太陽に対する速度", "地球に対する速度"], ko: ["태양 기준 속도", "지구 기준 속도"]
+};
+for (const [locale, labels] of Object.entries(speedLabels)) {
+  SPACECRAFT_TRANSLATIONS[locale]["mission.sunSpeed"] = labels[0];
+  SPACECRAFT_TRANSLATIONS[locale]["mission.earthSpeed"] = labels[1];
+}
