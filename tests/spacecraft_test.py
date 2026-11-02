@@ -2,6 +2,7 @@ import json
 import math
 import unittest
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 from backend import spacecraft as sc
 from backend.scientific_calculation import horizons_vector_payload
@@ -60,10 +61,13 @@ class SpacecraftTest(unittest.TestCase):
         position = dict(x_km=3,y_km=4,z_km=12,x_au=3/149597870.7,y_au=4/149597870.7,z_au=12/149597870.7,
                         vx_km_s=0,vy_km_s=3,vz_km_s=4,heliocentric_distance_km=13)
         ts, eph = MagicMock(), MagicMock()
+        earth_state = eph.__getitem__.return_value.__sub__.return_value.at.return_value
+        earth_state.frame_xyz_and_velocity.return_value = (None, SimpleNamespace(km_per_s=(0.0, 3.0, 16.0)))
         with patch.object(sc,'in_coverage',return_value=True), patch('backend.scientific_calculation.horizons_vector_payload',return_value=position) as fetch, patch('backend.scientific_calculation.skyfield_context',return_value=(ts,eph)), patch('backend.scientific_calculation.vector_payload',return_value=dict(x_km=0,y_km=0,z_km=0)):
             body = sc.calculate(sc.MISSIONS['spacecraft-31'], EPOCH)
         self.assertEqual(body['distance_from_earth_km'],13)
         self.assertEqual(body['spacecraft']['heliocentric_speed_km_s'],5)
+        self.assertEqual(body['spacecraft']['earth_relative_speed_km_s'],12)
         self.assertEqual(fetch.call_args.args[1], EPOCH)
         ts.from_datetime.assert_called_with(EPOCH)
         self.assertEqual(fetch.call_args.args[0]['parent_key'],'sun')

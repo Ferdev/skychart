@@ -62,11 +62,23 @@ catalog can take a minute or more to fill in, depending on the number of eligibl
 missions and provider latency; planets and metadata remain usable throughout.
 
 Horizons supplies geometric Sun-centered ICRF vectors in KM-S at UTC epochs.
-Skyfield rotates them into the existing true ecliptic/equinox-of-date frame.
-All three axes remain available for distances. Earth separation uses Earth at the
-same epoch. Distance divided by c is an **estimated one-way light time**, not a
-live communications reading or an iterated signal light-time solution. Mission
-termination, activity and contact status are not inferred from a trajectory.
+The backend rotates them into the fixed J2000 ecliptic of the atlas, with the
+same rotation as the star catalogs. All three axes remain available for
+distances. Earth separation uses Earth's center at the same epoch. Distance
+divided by c is an **estimated one-way light time**, not a live communications
+reading or an iterated signal light-time solution. Mission termination, activity
+and contact status are not inferred from a trajectory.
+
+The object panel shows Earth and Sun distances in exact kilometers, light time
+as hh:mm:ss, and two speeds with their reference: relative to the Sun and
+relative to Earth. NASA's Voyager vital-signs table uses the speed relative to
+the Sun. NASA Eyes uses the speed relative to Earth. On 2 November 2026 these
+were 16.92 km/s and 41.54 km/s for Voyager 1.
+
+The atlas value and NASA's figures come from one trajectory. NASA's ticker draws
+a straight line between two daily samples, so it can differ by thousands of
+kilometers from a Horizons state at the same instant. The atlas rounds "now" down
+to a five-minute step, and the panel shows that epoch.
 
 Wire positions are null when loading, outside coverage, or temporarily
 unavailable. The frontend adapts them to non-finite numeric sentinels required by
@@ -100,3 +112,4 @@ Primary references: [Horizons manual](https://ssd.jpl.nasa.gov/horizons/manual.h
 [time spans](https://ssd.jpl.nasa.gov/horizons/time_spans.html),
 [API](https://ssd-api.jpl.nasa.gov/doc/horizons.html), and
 [NASA's Voyager light-day milestone](https://science.nasa.gov/mission/voyager/voyager-1/voyager-1-what-is-a-light-day/).
+

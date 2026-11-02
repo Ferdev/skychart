@@ -249,9 +249,10 @@ get Solar System positions, measure separations, and build atlas and Sky links.
 
 ## Coordinate System
 
-Positions are computed as heliocentric ecliptic Cartesian coordinates:
+Positions are computed as heliocentric ecliptic Cartesian coordinates in the fixed J2000 ecliptic frame:
 
 - The Sun is the origin.
+- Stars, deep-sky objects, planets, moons, spacecraft and small bodies all use this one frame.
 - Object positions are expressed in astronomical units and kilometers.
 - Parent-relative state vectors expose position in kilometers and velocity in kilometers per second.
 - Orbital elements are derived from the parent-relative state vector at the current epoch.

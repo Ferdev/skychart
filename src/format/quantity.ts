@@ -117,6 +117,12 @@ export function formatDistanceKm(kilometers: number, options: { auKm?: number } 
   return `${formatQuantity(kilometers)} ${units.km}`;
 }
 
+/** A distance in whole kilometres, for a comparison with a source that publishes exact figures. */
+export function formatExactKm(kilometers: number): string {
+  if (!Number.isFinite(kilometers)) return configuration.unknown;
+  return `${formatCount(kilometers)} ${configuration.units.km}`;
+}
+
 /** The unit that the distance rule selects: km below 0.1 AU, AU below 0.1 ly, ly from 0.1 ly. */
 export function distanceUnit(kilometers: number, options: { auKm?: number } = {}): "km" | "au" | "ly" {
   const auKm = options.auKm && options.auKm > 0 ? options.auKm : DEFAULT_AU_KM;
@@ -136,6 +142,14 @@ export function formatLightYears(lightYears: number, options: { auKm?: number } 
   if (!Number.isFinite(lightYears)) return configuration.unknown;
   if (Math.abs(lightYears) >= 0.1) return `${formatQuantity(lightYears)} ${configuration.units.ly}`;
   return formatDistanceKm(lightYears * LIGHT_YEAR_KM, options);
+}
+
+/** A time span in seconds as hh:mm:ss, the form that NASA uses for light time. */
+export function formatClockDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return configuration.unknown;
+  const total = Math.round(seconds);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${pad(Math.floor(total / 3_600))}:${pad(Math.floor(total / 60) % 60)}:${pad(total % 60)}`;
 }
 
 /** A time span in seconds, shown in the largest unit that keeps the number easy to read. */
