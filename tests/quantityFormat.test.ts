@@ -6,7 +6,9 @@ import {
   formatDateTime,
   formatDistanceAu,
   formatDistanceKm,
+  formatClockDuration,
   formatDuration,
+  formatExactKm,
   formatFixed,
   formatLightYears,
   formatLocale,
@@ -62,6 +64,10 @@ for (const exponent of [-9, -6, -3, 0, 3, 6, 9, 12, 15, 18, 21]) {
 }
 
 // Durations.
+assert.equal(formatClockDuration(86_271.3), "23:57:51");
+assert.equal(formatClockDuration(5.4), "00:00:05");
+assert.equal(formatClockDuration(360_000), "100:00:00");
+assert.equal(formatExactKm(25_863_479_054.08), "25,863,479,054 km");
 assert.equal(formatDuration(0.25), "250 ms");
 assert.equal(formatDuration(42), "42 s");
 assert.equal(formatDuration(90), "1.5 min");

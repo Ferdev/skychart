@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from backend.errors import QueryInputError
 from backend.payload_cache import cache_key_payload, read_cache, write_cache
+from backend.settings import ATLAS_FRAME_ID
 
 MANIFEST = json.loads((Path(__file__).resolve().parents[1] / 'backend_phoenix/priv/spacecraft.json').read_text())
 MISSIONS = {row['key']: row for row in MANIFEST['spacecraft']}
@@ -53,7 +54,7 @@ def metadata_body(mission, timestamp, status):
 
 def calculate(mission, timestamp):
     global _retry_after
-    from backend.scientific_calculation import horizons_vector_payload, skyfield_context, vector_payload
+    from backend.scientific_calculation import atlas_ecliptic_frame, horizons_vector_payload, skyfield_context, vector_payload
     body = metadata_body(mission, timestamp, 'out_of_coverage')
     if not in_coverage(mission, timestamp): return body
     try:
@@ -65,10 +66,14 @@ def calculate(mission, timestamp):
         if not all(math.isfinite(position[k]) for k in ('x_km','y_km','z_km','vx_km_s','vy_km_s','vz_km_s')):
             raise RuntimeError('Non-finite state')
         ts, eph = skyfield_context()
-        earth = vector_payload((eph['earth'] - eph['sun']).at(ts.from_datetime(timestamp)))
+        earth_state = (eph['earth'] - eph['sun']).at(ts.from_datetime(timestamp))
+        earth = vector_payload(earth_state)
+        earth_velocity = earth_state.frame_xyz_and_velocity(atlas_ecliptic_frame)[1].km_per_s
+        velocity = [position[k] for k in ('vx_km_s','vy_km_s','vz_km_s')]
         body['position'] = position
         body['distance_from_earth_km'] = math.sqrt(sum((position[k]-earth[k])**2 for k in ('x_km','y_km','z_km')))
-        body['spacecraft'].update(availability='available', heliocentric_speed_km_s=math.sqrt(sum(position[k]**2 for k in ('vx_km_s','vy_km_s','vz_km_s'))))
+        body['spacecraft'].update(availability='available', heliocentric_speed_km_s=math.hypot(*velocity),
+            earth_relative_speed_km_s=math.dist(velocity, [float(component) for component in earth_velocity]))
     except OSError:
         _retry_after = time.monotonic() + 60
         body['spacecraft']['availability'] = 'temporarily_unavailable'
@@ -112,7 +117,7 @@ def spacecraft_payload(timestamp, selected_key=''):
         if not in_coverage(mission, timestamp):
             bodies.append(metadata_body(mission,timestamp,'out_of_coverage')); continue
         key = (mission['key'], stamp)
-        disk_key = cache_key_payload('spacecraft', key=key, revision=mission['source_sha256'], frame='true_ecliptic_of_date_ut_v1')
+        disk_key = cache_key_payload('spacecraft', key=key, revision=mission['source_sha256'], frame=ATLAS_FRAME_ID)
         with _lock: result = _results.get(key)
         if result is None: result = read_cache('spacecraft', disk_key)
         if result and result.get('expires_at',0) > time.time():

@@ -10,6 +10,7 @@ export type SpacecraftMetadata = {
   availability: "loading" | "available" | "out_of_coverage" | "temporarily_unavailable";
   position_epoch: string; audited_at: string;
   heliocentric_speed_km_s?: number;
+  earth_relative_speed_km_s?: number;
 };
 
 // The wire uses null for absent coordinates. Internally NaN preserves the

@@ -9,8 +9,9 @@ from typing import Any
 from urllib.parse import urlencode
 from urllib.request import urlopen, urlretrieve
 
+import numpy as np
 from skyfield.api import Loader, Star, load_file, wgs84
-from skyfield.framelib import ecliptic_frame
+from skyfield.framelib import InertialFrame
 
 from backend.catalog_sources import (
     BODIES,
@@ -30,9 +31,11 @@ from backend.errors import QueryInputError
 from backend.payload_cache import cache_key_payload, read_cache, write_cache
 from backend.request_query import clamp_float, trail_sample_datetimes
 from backend.settings import (
+    ATLAS_FRAME_ID,
     AU_KM,
     DATA_DIR,
     EPHEMERIS_SOURCE,
+    J2000_OBLIQUITY_DEG,
     LIGHT_YEAR_KM,
     PARSEC_AU,
     SATELLITE_KERNEL_URLS,
@@ -44,6 +47,19 @@ _ephemeris: Any | None = None
 _satellite_kernels: dict[str, Any] = {}
 _horizons_vectors: dict[tuple[str, str], dict[str, float]] = {}
 _kernel_lock = threading.Lock()
+
+_COS_OBLIQUITY = math.cos(math.radians(J2000_OBLIQUITY_DEG))
+_SIN_OBLIQUITY = math.sin(math.radians(J2000_OBLIQUITY_DEG))
+# Stars, deep-sky objects and SBDB orbital elements are J2000 ecliptic. Solar
+# System vectors use this same fixed rotation, so all objects share one frame.
+ICRF_TO_ATLAS_ECLIPTIC = np.array(
+    [
+        [1.0, 0.0, 0.0],
+        [0.0, _COS_OBLIQUITY, _SIN_OBLIQUITY],
+        [0.0, -_SIN_OBLIQUITY, _COS_OBLIQUITY],
+    ]
+)
+atlas_ecliptic_frame = InertialFrame("Fixed J2000 ecliptic of the atlas.", ICRF_TO_ATLAS_ECLIPTIC)
 
 def skyfield_context() -> tuple[Any, Any]:
     global _loader, _timescale, _ephemeris
@@ -104,7 +120,7 @@ def observe_payload(key: str, latitude: float, longitude: float, timestamp: date
     return {"key":key,"name":item["name"],"observed_at_utc":isoformat_utc(timestamp),"latitude_deg":latitude,"longitude_deg":longitude,"altitude_deg":altitude,"azimuth_deg":azimuth,"rise_utc":isoformat_utc(rise) if rise else None,"transit_utc":isoformat_utc(transit[0]),"set_utc":isoformat_utc(setting) if setting else None,"summary":plain,"accuracy_note":"Geometric five-minute sampling; refraction and local obstructions are not modeled."}
 
 def vector_payload(vector: Any) -> dict[str, float]:
-    xyz_au = vector.frame_xyz(ecliptic_frame).au
+    xyz_au = vector.frame_xyz(atlas_ecliptic_frame).au
     return {
         "x_au": float(xyz_au[0]),
         "y_au": float(xyz_au[1]),
@@ -142,10 +158,7 @@ def radec_distance_position_payload(item: dict[str, Any]) -> dict[str, float]:
     equatorial_y_au = distance_au * math.cos(dec_rad) * math.sin(ra_rad)
     equatorial_z_au = distance_au * math.sin(dec_rad)
 
-    obliquity_rad = math.radians(23.4392911)
-    x_au = equatorial_x_au
-    y_au = equatorial_y_au * math.cos(obliquity_rad) + equatorial_z_au * math.sin(obliquity_rad)
-    z_au = -equatorial_y_au * math.sin(obliquity_rad) + equatorial_z_au * math.cos(obliquity_rad)
+    x_au, y_au, z_au = (float(value) for value in ICRF_TO_ATLAS_ECLIPTIC.dot((equatorial_x_au, equatorial_y_au, equatorial_z_au)))
 
     return {
         "x_au": x_au,
@@ -238,10 +251,8 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
 
     timestamp_key = timestamp.astimezone(timezone.utc).replace(microsecond=0).isoformat()
     center = horizons_center_for_item(item)
-    # The atlas renders in Skyfield's true ecliptic/equinox of date. Horizons'
-    # ECLIPTIC output is fixed to J2000, so request ICRF vectors and rotate them
-    # into the atlas frame below.
-    coordinate_frame = "true_ecliptic_of_date_ut_v1"
+    # Request ICRF vectors and rotate them below with the star catalog rotation.
+    coordinate_frame = ATLAS_FRAME_ID
     if item.get("source_type") == "spacecraft":
         # Refresh predictions daily, including the underlying vector cache.
         coordinate_frame += ":" + item["source_sha256"] + ":" + datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -289,11 +300,8 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
 
     result = str(payload.get("result", ""))
     icrf_position, icrf_velocity = parse_horizons_state_vector(result, item["name"])
-    timescale, _ephemeris = skyfield_context()
-    time = timescale.from_datetime(timestamp)
-    rotation = ecliptic_frame.rotation_at(time)
-    x_km, y_km, z_km = (float(value) for value in rotation.dot(icrf_position))
-    vx_km_s, vy_km_s, vz_km_s = (float(value) for value in rotation.dot(icrf_velocity))
+    x_km, y_km, z_km = (float(value) for value in ICRF_TO_ATLAS_ECLIPTIC.dot(icrf_position))
+    vx_km_s, vy_km_s, vz_km_s = (float(value) for value in ICRF_TO_ATLAS_ECLIPTIC.dot(icrf_velocity))
     position = {
         "x_au": x_km / AU_KM,
         "y_au": y_km / AU_KM,
@@ -434,7 +442,7 @@ def small_body_orbit_payload(
         center=center,
         around_day=isoformat_utc(around)[:10],
         period_days=round(period_days, 3),
-        coordinate_frame="true_ecliptic_of_date_ut_v1",
+        coordinate_frame=ATLAS_FRAME_ID,
         series_version=2,
     )
     cached = read_cache("horizons", disk_cache_key)
@@ -448,9 +456,7 @@ def small_body_orbit_payload(
             around + timedelta(days=fine_half_days),
             "'1 h'",
         )
-        timescale, _ephemeris = skyfield_context()
-        rotation = ecliptic_frame.rotation_at(timescale.from_datetime(around))
-        cached = {"points": orbit_points_from_rows(coarse, fine, rotation)}
+        cached = {"points": orbit_points_from_rows(coarse, fine, ICRF_TO_ATLAS_ECLIPTIC)}
         write_cache("horizons", disk_cache_key, cached)
 
     return {
@@ -597,7 +603,7 @@ def zero_trail_point(timestamp: datetime, offset_days: float) -> dict[str, float
 
 
 def trail_points_from_vector(vector: Any, samples: list[tuple[datetime, float]]) -> list[dict[str, float | str]]:
-    xyz_au = vector.frame_xyz(ecliptic_frame).au
+    xyz_au = vector.frame_xyz(atlas_ecliptic_frame).au
     distance_km = vector.distance().km
 
     points: list[dict[str, float | str]] = []
@@ -702,7 +708,7 @@ def body_state(
         )
     else:
         target = target_for_body(item, ephemeris)
-        xyz, velocity = (target - sun).at(time).frame_xyz_and_velocity(ecliptic_frame)
+        xyz, velocity = (target - sun).at(time).frame_xyz_and_velocity(atlas_ecliptic_frame)
         position_au = (float(xyz.au[0]), float(xyz.au[1]), float(xyz.au[2]))
         position_km = tuple(component * AU_KM for component in position_au)
         velocity_km_s = (float(velocity.km_per_s[0]), float(velocity.km_per_s[1]), float(velocity.km_per_s[2]))
@@ -741,7 +747,7 @@ def body_state_vector_payload(
         relative_to_name = None
 
     return {
-        "frame": "parent-centered ecliptic Cartesian" if parent_key else "heliocentric ecliptic Cartesian",
+        "frame": "parent-centered J2000 ecliptic Cartesian" if parent_key else "heliocentric J2000 ecliptic Cartesian",
         "relative_to_key": parent_key,
         "relative_to_name": relative_to_name,
         "position_km": vector_components(relative_position),
@@ -981,7 +987,7 @@ def ephemeris_payload(timestamp: datetime, groups: list[str] | None = None, keys
         "timestamp_utc": isoformat_utc(timestamp),
         "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
         "data_source": EPHEMERIS_SOURCE,
-        "coordinate_frame": "Heliocentric ecliptic Cartesian coordinates, projected top-down as x/y; z retained for distance calculations",
+        "coordinate_frame": "Heliocentric J2000 ecliptic Cartesian coordinates, projected top-down as x/y; z retained for distance calculations",
         "units": {
             "distance": "kilometers",
             "position": "astronomical units and kilometers",
@@ -1026,7 +1032,7 @@ def orbits_payload(timestamp: datetime, groups: list[str] | None = None) -> dict
         "timestamp_utc": isoformat_utc(timestamp),
         "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
         "data_source": EPHEMERIS_SOURCE,
-        "coordinate_frame": "Parent-relative ecliptic Cartesian state vectors with derived osculating orbital elements",
+        "coordinate_frame": "Parent-relative J2000 ecliptic Cartesian state vectors with derived osculating orbital elements",
         "units": {
             "distance": "kilometers",
             "velocity": "kilometers per second",
@@ -1084,7 +1090,7 @@ def trails_payload(
         "timestamp_utc": isoformat_utc(timestamp),
         "generated_at_utc": isoformat_utc(datetime.now(timezone.utc)),
         "data_source": EPHEMERIS_SOURCE,
-        "coordinate_frame": "Heliocentric ecliptic Cartesian coordinates, projected top-down as x/y; z retained for distance calculations",
+        "coordinate_frame": "Heliocentric J2000 ecliptic Cartesian coordinates, projected top-down as x/y; z retained for distance calculations",
         "units": {
             "distance": "kilometers",
             "position": "astronomical units and kilometers",
