@@ -19,7 +19,7 @@ for (const width of [1440, 390]) {
       if (url.pathname === "/api/spacecraft") {
         const bodies = spacecraftBodies(timestamp).map(body => {
           const available = body.key === "spacecraft-31" || (body.key === "spacecraft-82" && timestamp.startsWith("2010"));
-          return { ...body, spacecraft: { ...body.spacecraft, availability: available ? "available" : "out_of_coverage" },
+          return { ...body, spacecraft: { ...body.spacecraft, availability: available ? "available" : "out_of_coverage", ...(available ? { heliocentric_speed_km_s: 16.92, earth_relative_speed_km_s: 41.54 } : {}) },
             position: available ? { x_au: 150, y_au: 30, z_au: 40, x_km: 150*149597870.7, y_km: 30*149597870.7, z_km: 40*149597870.7, heliocentric_distance_km: 158*149597870.7 } : null,
             distance_from_earth_km: available ? 25_000_000_000 : null };
         });
@@ -31,6 +31,12 @@ for (const width of [1440, 390]) {
     await openAtlas(page);
     await selectCatalogObject(page, "Voyager 1", "spacecraft-31");
     await expect(page.locator("#body-info")).toContainText("Estimated one-way light time");
+    await expect(page.locator("#body-info")).toContainText("23:09:51");
+    await expect(page.locator("#body-info")).toContainText("25,000,000,000 km");
+    await expect(page.locator("#body-info")).toContainText("Speed relative to the Sun");
+    await expect(page.locator("#body-info")).toContainText("16.92 km/s (60,912 km/h)");
+    await expect(page.locator("#body-info")).toContainText("Speed relative to Earth");
+    await expect(page.locator("#body-info")).toContainText("41.54 km/s (149,544 km/h)");
     await expect(page.locator("#body-info")).toContainText("Spacecraft");
     await expect(page.locator("#center-selected")).toBeEnabled();
     const replayUrl = page.url();

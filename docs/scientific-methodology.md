@@ -7,7 +7,13 @@ visible instead of presenting every position as equally certain.
 
 ## Coordinate frame and projection
 
-Positions are normalized to heliocentric ecliptic Cartesian coordinates. The
+Positions are normalized to heliocentric ecliptic Cartesian coordinates in one
+fixed J2000 ecliptic frame. A single rotation about the ICRS `x` axis, with the
+J2000 mean obliquity of 23.4392911 degrees, applies to star and deep-sky catalogs
+and to Solar System vectors from DE440s and Horizons. SBDB orbital elements are
+already J2000 ecliptic. Longitudes are not of date: a value in the ecliptic of
+date is larger by the precession since J2000, about 0.38 degrees in 2026. Frame
+bias, about 0.02 arcseconds, is not modeled. The
 default map displays a top-down projection of the `x` and `y` axes. Source `z`
 values remain in catalog records but are not used as a visibility cut. The map
 ruler therefore measures projected `x/y` separation, not full
