@@ -231,6 +231,16 @@ body[data-universe-view] .tour-player {
   background: transparent;
   font: inherit;
   font-weight: 700;
+  /* A long object name goes on more lines in the card. Each line fragment gets its own border. */
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* A number and its unit stay on one line. */
+.tour-player__chip--fact {
   white-space: nowrap;
 }
 
