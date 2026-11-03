@@ -18,7 +18,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.community_depth import pair_sources, sky_to_pixel, write_webp  # noqa: E402
-from backend.community_sources import background, detect, read_rgb  # noqa: E402
+from backend.community_sources import ImageTooLarge, background, detect, read_rgb  # noqa: E402
 
 import numpy as np  # noqa: E402
 
@@ -144,7 +144,10 @@ def prepare(frame: dict, stars: list[dict], grid: dict, ra: np.ndarray, dec: np.
     """One frame on the grid with its scores, or the reason that the frame stays out."""
     folder = scratch / frame["id"]
     folder.mkdir()
-    pixels = read_rgb(Path(frame["path"]), folder)
+    try:
+        pixels = read_rgb(Path(frame["path"]), folder)
+    except ImageTooLarge:
+        return {"id": frame["id"], "reason": "too_large"}
     height, width = pixels.shape[:2]
     gray = pixels.astype(np.float32).mean(axis=2)
     level, _ = background(gray)

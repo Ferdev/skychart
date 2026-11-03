@@ -503,6 +503,42 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       assert [] = overlay(context.conn)
     end
 
+    test "the photographer page and JSON show only visible photos", context do
+      shown = photo(context, %{title: "Shown photo"})
+
+      for {title, status} <- [
+            {"Hidden photo", "hidden"},
+            {"Rejected photo", "rejected"},
+            {"Waiting photo", "review"},
+            {"Processing photo", "processing"}
+          ],
+          do: photo(context, %{title: title, status: status})
+
+      assert %{"photos" => [%{"id" => id}]} =
+               context.conn
+               |> get("/api/community/photographers/sky-author")
+               |> json_response(200)
+
+      assert id == shown.id
+
+      page = context.conn |> get("/u/sky-author") |> html_response(200)
+      assert page =~ "Shown photo"
+      refute page =~ "Hidden photo"
+      refute page =~ "Rejected photo"
+      refute page =~ "Waiting photo"
+      refute page =~ "Processing photo"
+
+      # A moderator hides the shown photo: it leaves both lists.
+      Repo.update!(Ecto.Changeset.change(shown, status: "hidden"))
+
+      assert %{"photos" => []} =
+               context.conn
+               |> get("/api/community/photographers/sky-author")
+               |> json_response(200)
+
+      refute context.conn |> get("/u/sky-author") |> html_response(200) =~ "Shown photo"
+    end
+
     test "a footprint outside the area is not in the response", context do
       photo(context, %{wcs: solved(%{"ra_deg" => 200.0, "dec_deg" => -40.0})})
       assert [] = overlay(context.conn)
