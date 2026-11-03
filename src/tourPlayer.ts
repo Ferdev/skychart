@@ -191,9 +191,10 @@ export class TourPlayer {
               if (segment.kind === "text") return escapeHtml(segment.text);
               const text = segment.kind === "fact" ? factText(segment, locale, this.unit) : segment.text;
               const key = chipKey(segment);
-              if (!key) return `<span class="tour-player__chip">${escapeHtml(text)}</span>`;
+              const chipClass = segment.kind === "fact" ? "tour-player__chip tour-player__chip--fact" : "tour-player__chip";
+              if (!key) return `<span class="${chipClass}">${escapeHtml(text)}</span>`;
               const asOf = segment.kind === "fact" && segment.as_of ? ` ${t("ask.asOf", { date: segment.as_of.slice(0, 10) })}` : "";
-              return `<button type="button" class="tour-player__chip" data-tour-object="${escapeHtml(key)}" title="${escapeHtml(`${t("ask.openRecord")}${asOf}`)}">${escapeHtml(text)}</button>`;
+              return `<button type="button" class="${chipClass}" data-tour-object="${escapeHtml(key)}" title="${escapeHtml(`${t("ask.openRecord")}${asOf}`)}">${escapeHtml(text)}</button>`;
             })
             .join("")}</p>`,
       )
