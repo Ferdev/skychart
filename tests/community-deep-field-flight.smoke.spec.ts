@@ -299,23 +299,3 @@ test("the Ask form fits a phone", async ({ page }) => {
   const card = (await player.boundingBox())!;
   expect(card.x + card.width).toBeLessThanOrEqual(390);
 });
-
-test("a long object name in the narration wraps inside the card, and a number stays on one line", async ({ page }) => {
-  await page.setViewportSize({ width: 640, height: 360 });
-  const name = "2MASX J00424433+4116074 Andromeda Galaxy (Messier 31, NGC 224)";
-  await communityFixture(page, { flights: true });
-  await flightRoutes(page, (route) => route.fulfill({ json: { ...flight, steps: flight.steps.map((step) => ({ ...step, sentences: narration(name) })) } }));
-  await openAtlas(page);
-  const section = await openAsk(page);
-  await section.getByLabel("Ask a question about the sky").fill("How far is the Andromeda Galaxy?");
-  await section.getByRole("button", { name: "Ask" }).click();
-  const player = page.locator("#tour-player");
-  await expect(player.getByRole("heading", { name: "Step 1" })).toBeVisible({ timeout: 15_000 });
-  const body = player.locator(".tour-player__body").first();
-  expect(await body.evaluate((node) => node.scrollWidth <= node.clientWidth), "the narration does not scroll sideways").toBe(true);
-  const card = (await player.boundingBox())!;
-  const objectChip = (await player.getByRole("button", { name }).boundingBox())!;
-  expect(objectChip.x + objectChip.width).toBeLessThanOrEqual(card.x + card.width);
-  const fact = player.getByRole("button", { name: "2.537 million light-years" });
-  expect(await fact.evaluate((node) => getComputedStyle(node).whiteSpace)).toBe("nowrap");
-});

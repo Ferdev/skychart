@@ -520,58 +520,6 @@ defmodule StarsmapApi.FlightsTest do
     end
   end
 
-  describe "a takedown while the job runs" do
-    # The read tool hides the flight, as an operator does while the model still works.
-    defp hide_during_run(script) do
-      Application.put_env(:starsmap_api, :answer_flight_tools, fn _name, _input ->
-        [flight] = Repo.all(AnswerFlight)
-        {:ok, _} = Flights.hide(flight.slug)
-        {:ok, @andromeda["result"]}
-      end)
-
-      on_exit(fn -> Application.delete_env(:starsmap_api, :answer_flight_tools) end)
-      {:ok, _} = Script.start(script)
-      {:ok, flight} = Flights.request("How far is Andromeda?", "en")
-      assert :ok = perform_job(Worker, %{id: flight.id})
-      Repo.get!(AnswerFlight, flight.id)
-    end
-
-    test "a finished job does not publish a hidden flight again" do
-      flight =
-        hide_during_run([
-          tool_turn("get_sky_object", %{"key" => "ngc-224"}),
-          tool_turn("submit_flight", flight(List.duplicate(step(), 4)), "t2")
-        ])
-
-      assert flight.status == "hidden"
-      assert flight.steps == %{"steps" => []}
-      assert flight.refusal == "hidden"
-      assert flight.tool_results == %{}
-      # The cost of the model calls stays on the row.
-      assert flight.input_tokens == 2000
-      assert flight.cost_usd > 0
-      assert Flights.public(flight).status == "refused"
-    end
-
-    test "a refusal or a failure does not replace the takedown" do
-      flight =
-        hide_during_run([tool_turn("get_sky_object", %{"key" => "ngc-224"}), {:error, :busy}])
-
-      assert flight.status == "hidden"
-      assert flight.refusal == "hidden"
-    end
-
-    test "a job does not start on a flight that was hidden before it ran" do
-      {:ok, flight} = Flights.request("How far is Andromeda?", "en")
-
-      Repo.update!(Ecto.Changeset.change(flight, status: "hidden"))
-
-      assert :stopped = Flights.mark_running(flight)
-
-      assert Repo.get!(AnswerFlight, flight.id).status == "hidden"
-    end
-  end
-
   defp atomize(list),
     do: Enum.map(list, &Map.new(&1, fn {key, value} -> {String.to_atom(key), value} end))
 

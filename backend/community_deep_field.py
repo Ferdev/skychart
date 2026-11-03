@@ -153,12 +153,11 @@ def prepare(frame: dict, stars: list[dict], grid: dict, ra: np.ndarray, dec: np.
     level, _ = background(gray)
     sources = detect(gray, threshold_sigma=6.0, limit=800)
     pairs = pair_sources(sources, stars, frame["wcs"], width, height)
-    # Trailing removes the long stars from `good`, so this check comes first and gives the true reason.
-    if pairs and float(np.median([pair["source"]["elongation"] for pair in pairs])) > MAX_ELONGATION:
-        return {"id": frame["id"], "reason": "trailed_stars"}
     good = [pair for pair in pairs if pair["source"]["peak"] < SATURATED_LEVEL and pair["source"]["elongation"] <= MAX_ELONGATION]
     if len(good) < MIN_STARS:
         return {"id": frame["id"], "reason": "too_few_stars"}
+    if float(np.median([pair["source"]["elongation"] for pair in pairs])) > MAX_ELONGATION:
+        return {"id": frame["id"], "reason": "trailed_stars"}
     fitted = alignment(good, frame["wcs"], width, height)
     if fitted is None or fitted[1] > MAX_ALIGNMENT_ERROR_PIXELS:
         return {"id": frame["id"], "reason": "poor_alignment"}

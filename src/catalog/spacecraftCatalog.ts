@@ -4,7 +4,6 @@ import type { Body } from "../atlas/contracts";
 export type SpacecraftMetadata = {
   key: string; name: string; horizons_id: string; aliases: string[];
   coverage_start_tdb: string; coverage_end_tdb: string;
-  jd_start_tdb?: number; jd_end_tdb?: number;
   source_url: string; source_revision: string | null;
   launch_date: string | null; agency: string | null;
   description?: string; mission_url?: string; end_utc?: string;
@@ -37,20 +36,6 @@ export function spacecraftBodies(timestamp: string): Body[] {
     };
   });
 }
-// TDB is 69.184 s after UTC since 2017 (37 leap seconds and 32.184 s). For an earlier date the
-// offset is some seconds smaller, which moves the edge of a window by less than a minute.
-const TDB_MINUS_UTC_DAYS = 69.184 / 86_400;
-const UNIX_EPOCH_JD = 2_440_587.5;
-
-/** The coverage test of the server (`backend/spacecraft.py`), from the manifest of the mission. */
-export function inSpacecraftCoverage(mission: SpacecraftMetadata, timestamp: string): boolean {
-  const time = Date.parse(timestamp);
-  if (!Number.isFinite(time) || typeof mission.jd_start_tdb !== "number" || typeof mission.jd_end_tdb !== "number") return false;
-  const jd = time / 86_400_000 + UNIX_EPOCH_JD + TDB_MINUS_UTC_DAYS;
-  if (jd < mission.jd_start_tdb || jd > mission.jd_end_tdb) return false;
-  return !mission.end_utc || time < Date.parse(mission.end_utc);
-}
-
 export function normalizeSpacecraftBody(body: Body): Body {
   const available = body.spacecraft?.availability === "available" && hasBodyPosition(body);
   return { ...body, radius_km: NaN, position: available ? body.position : missingSpacecraftPosition(),
@@ -93,10 +78,8 @@ export class SpacecraftLoader {
         else if (bodies.some((body) => body.spacecraft?.availability === "temporarily_unavailable")) this.timer = setTimeout(poll, 60000);
       } catch {
         if (generation !== this.generation) return;
-        // Only a mission with a trajectory at this time is unavailable. Another one stays outside its coverage.
         this.apply(spacecraftBodies(timestamp).map((body) => ({ ...body,
-          spacecraft: { ...body.spacecraft!,
-            availability: inSpacecraftCoverage(body.spacecraft!, timestamp) ? "temporarily_unavailable" : "out_of_coverage" } })));
+          spacecraft: { ...body.spacecraft!, availability: "temporarily_unavailable" } })));
         this.timer = setTimeout(poll, 15000);
       }
     };
