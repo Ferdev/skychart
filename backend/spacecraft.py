@@ -23,6 +23,7 @@ _pending = {}
 _provider_lock = threading.Lock()
 _retry_after = 0.0
 _results = {}
+_MAX_RESULTS = 512
 _worker = None
 _sequence = 0
 
@@ -82,6 +83,12 @@ def calculate(mission, timestamp):
     return body
 
 
+def _remember(key, result):
+    """Keep one result in memory, with at most _MAX_RESULTS entries. The caller holds _lock."""
+    if key not in _results and len(_results) >= _MAX_RESULTS: _results.pop(next(iter(_results)))
+    _results[key] = result
+
+
 def _run():
     while True:
         _, _, key, mission, timestamp, disk_key = _jobs.get()
@@ -92,12 +99,10 @@ def _run():
             ttl = 86400 if body['spacecraft']['availability'] == 'available' else 60
             result = {'expires_at':time.time()+ttl, 'body':body}
             if ttl > 60: write_cache('spacecraft', disk_key, result)
-            with _lock:
-                if len(_results) >= 512: _results.pop(next(iter(_results)))
-                _results[key] = result
+            with _lock: _remember(key, result)
         except Exception:
             with _lock:
-                _results[key] = {'expires_at':time.time()+60, 'body':metadata_body(mission,timestamp,'temporarily_unavailable')}
+                _remember(key, {'expires_at':time.time()+60, 'body':metadata_body(mission,timestamp,'temporarily_unavailable')})
         finally:
             with _lock: _pending.pop(key, None)
             _jobs.task_done()
@@ -119,7 +124,11 @@ def spacecraft_payload(timestamp, selected_key=''):
         key = (mission['key'], stamp)
         disk_key = cache_key_payload('spacecraft', key=key, revision=mission['source_sha256'], frame=ATLAS_FRAME_ID)
         with _lock: result = _results.get(key)
-        if result is None: result = read_cache('spacecraft', disk_key)
+        if result is None:
+            result = read_cache('spacecraft', disk_key)
+            # A valid disk result goes into memory, so that the next poll does not read the file again.
+            if result and result.get('expires_at',0) > time.time():
+                with _lock: _remember(key, result)
         if result and result.get('expires_at',0) > time.time():
             bodies.append(result['body']); continue
         with _lock:
