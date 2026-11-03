@@ -94,6 +94,25 @@ defmodule StarsmapApiWeb.DeepFieldFlightControllerTest do
            |> json_response(403)
   end
 
+  test "a signed-out visitor gets the forbidden error of a member, not a crash", %{conn: conn} do
+    # Through the router, the session plug answers first.
+    assert %{"error" => "sign_in_required"} =
+             conn |> get("/api/community/review/deep-fields") |> json_response(401)
+
+    # The controller itself also treats no user as a member.
+    visitor = assign(conn, :community_user, nil)
+    alias StarsmapApiWeb.DeepFieldController
+
+    for answer <- [
+          DeepFieldController.review(visitor, %{}),
+          DeepFieldController.open(visitor, %{"key" => "ngc-224"}),
+          DeepFieldController.close(visitor, %{"slug" => "andromeda"}),
+          DeepFieldController.rebuild(visitor, %{"slug" => "andromeda"})
+        ] do
+      assert %{"error" => "not_allowed"} = json_response(answer, 403)
+    end
+  end
+
   test "a moderator opens a field, and the owner adds and removes a frame", %{conn: conn} do
     {mod_token, mod} = signed("mod@example.com")
     moderator(mod)
