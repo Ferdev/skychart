@@ -106,6 +106,46 @@ test.describe("object inspector", () => {
     await expect(result).toBeHidden();
   });
 
+  test("a data refresh of the object keeps the Observe fields, result and error", async ({ page }) => {
+    await page.route("**/api/observe?**", (route) => route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        key: "mars", altitude_deg: 31.24, azimuth_deg: 181.5, rise_utc: null, transit_utc: "2026-10-10T23:40:00Z", set_utc: null,
+        summary: "Fixture.", accuracy_note: "Fixture accuracy note.",
+      }),
+    }));
+    // Each spacecraft poll draws the inspector again. "loading" makes the atlas poll every 2 seconds.
+    await page.route("**/api/spacecraft?**", async (route) => {
+      const response = await route.fetch();
+      const payload = await response.json() as { bodies: { spacecraft?: { availability: string } }[] };
+      for (const body of payload.bodies) if (body.spacecraft) body.spacecraft.availability = "loading";
+      await route.fulfill({ response, json: payload });
+    });
+    const nextPoll = () => page.waitForResponse((response) => response.url().includes("/api/spacecraft?"));
+    // A new load, so that the polls of this load go through the route above.
+    await openAtlas(page);
+    await selectCatalogObject(page, "Mars", "mars");
+    await page.locator('#body-info [data-object-view="observe"]').click();
+
+    await page.locator('[data-observe-location="manual"]').click();
+    await expect(page.locator("#observe-error")).toBeVisible();
+    await nextPoll();
+    await nextPoll();
+    await expect(page.locator("#observe-error")).toBeVisible();
+
+    await page.locator("#observe-lat").fill("40.4");
+    await page.locator("#observe-lon").fill("-3.7");
+    await page.locator('[data-observe-location="manual"]').click();
+    await expect(page.locator("#observe-result")).toBeVisible();
+    await nextPoll();
+    await nextPoll();
+    await expect(page.locator("#observe-result")).toBeVisible();
+    await expect(page.locator("#observe-result .observe-now")).toContainText("31.2");
+    await expect(page.locator("#observe-lat")).toHaveValue("40.4");
+    await expect(page.locator("#observe-lon")).toHaveValue("-3.7");
+    await expect(page.locator('#body-info [data-object-view="observe"]')).toHaveAttribute("aria-selected", "true");
+  });
+
   test("the comparison actions show only when they can work, and the footer button goes back to the details", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await selectCatalogObject(page, "Jupiter", "jupiter");
