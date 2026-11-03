@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openAtlas, openSearchWorkspace, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
+import { expandObjectSheet, openAtlas, openSearchWorkspace, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
 
 /** Selects the first search result whose row has the given name. Use it when the catalog key is not a fixed text. */
 async function selectFirstResult(page: Page, query: string) {
@@ -138,5 +138,20 @@ test.describe("object inspector", () => {
     await expect(compareButton).toHaveAttribute("aria-expanded", "false");
     await expect(compareButton).toContainText("Compare");
     await expect(page.locator('#body-info [data-object-view="overview"]')).toBeVisible();
+  });
+  test("a long fact value goes on more lines in a narrow inspector, and a wide inspector keeps one line", async ({ page }) => {
+    const values = page.locator("#body-info .fact-tiles dd");
+    await selectCatalogObject(page, "M31", "m31", /M31/);
+    expect(await values.first().evaluate((node) => getComputedStyle(node).whiteSpace), "one line in a wide inspector").toBe("nowrap");
+    // At 390 px and at 900 px the tiles are narrower than "3 million ly".
+    for (const width of [390, 900]) {
+      await page.setViewportSize({ width, height: 844 });
+      await openAtlas(page);
+      await selectCatalogObject(page, "M31", "m31", /M31/);
+      await expandObjectSheet(page);
+      await expect(values.first()).toBeVisible();
+      const cut = await values.evaluateAll((nodes) => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent));
+      expect(cut, `no value is cut at ${width} px`).toEqual([]);
+    }
   });
 });
