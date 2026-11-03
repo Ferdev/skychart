@@ -82,6 +82,7 @@ export class ObjectInspectionView {
   private renderedBodyKey = "";
   private activeMediaBodyKey: string | null = null;
   private activeMediaMarkup: string | null = null;
+  private activeObserveMarkup: string | null = null;
 
   constructor(private readonly context: ObjectInspectionContext) {}
 
@@ -93,6 +94,7 @@ update() {
     this.activeView = "overview";
     this.activeMediaBodyKey = null;
     this.activeMediaMarkup = null;
+    this.activeObserveMarkup = null;
     this.context.bodyInfo.innerHTML = this.renderObjectEmptyState();
     return;
   }
@@ -250,6 +252,7 @@ update() {
   // A view shows only when it has data. Notes with no other science data are part of Overview.
   const notes = this.renderObjectNotes(body);
   const sourcesContent = [this.renderIdentifierSection(body), this.renderSourceSection(body)].join("");
+  const observeMarkup = canObserveFromEarth(body) ? renderObservePanel(body) : null;
   const optionalViews: (ObjectView | null)[] = [
     {
       id: "overview",
@@ -271,7 +274,7 @@ update() {
         this.renderDataSection(t("section.orbit"), orbitRows),
       ].join(""),
     },
-    canObserveFromEarth(body) ? { id: "observe", label: t("object.viewObserve"), content: renderObservePanel(body) } : null,
+    observeMarkup ? { id: "observe", label: t("object.viewObserve"), content: observeMarkup } : null,
     sourcesContent ? { id: "sources", label: t("object.viewSources"), content: sourcesContent } : null,
   ];
   const views = optionalViews.filter(isPresent);
@@ -282,6 +285,14 @@ update() {
     && this.activeMediaMarkup === mediaMarkup;
   if (preserveMediaSection) currentMediaSection.remove();
   else this.mediaFallbacks.clear();
+  // A data refresh of the same object keeps the Observe panel: its fields, its result, its error,
+  // and the elements that a request in progress writes to.
+  const currentObservePanel = this.context.bodyInfo.querySelector<HTMLElement>(".observe-panel");
+  const preserveObservePanel = currentObservePanel != null
+    && observeMarkup != null
+    && currentObservePanel.dataset.observeKey === body.key
+    && this.activeObserveMarkup === observeMarkup;
+  if (preserveObservePanel) currentObservePanel.remove();
 
   this.context.bodyInfo.innerHTML = `
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
@@ -307,8 +318,11 @@ update() {
     if (preserveMediaSection) this.mediaFallbacks.clear();
     this.mediaFallbacks.install(this.context.bodyInfo);
   }
+  const replacementObservePanel = this.context.bodyInfo.querySelector<HTMLElement>(".observe-panel");
+  if (preserveObservePanel && replacementObservePanel) replacementObservePanel.replaceWith(currentObservePanel);
   this.activeMediaBodyKey = body.key;
   this.activeMediaMarkup = mediaMarkup;
+  this.activeObserveMarkup = observeMarkup;
 }
 
 handleViewClick(target: EventTarget | null): boolean {
