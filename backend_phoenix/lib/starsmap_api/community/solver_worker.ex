@@ -3,6 +3,7 @@ defmodule StarsmapApi.Community.SolverWorker do
   use Oban.Worker, queue: :media, max_attempts: 2, unique: [keys: [:id], period: 3600]
   alias StarsmapApi.Community.{Photos, Storage, Astrometry, Ranking}
   alias StarsmapApi.CommunityRepo, as: Repo
+  @no_solution "No supported plate solution was found"
   def available?, do: not is_nil(System.find_executable("solve-field"))
 
   # community_solve.py stops solve-field after 45 seconds, but not the processes that solve-field
@@ -39,8 +40,9 @@ defmodule StarsmapApi.Community.SolverWorker do
       try do
         image = Path.join(scratch, "photo.webp")
 
-        with :ok <- Storage.adapter().get("masters/#{id}/1600.webp", image),
-             {:ok, json} <- solve(image, scratch),
+        with {:storage, :ok} <-
+               {:storage, Storage.adapter().get("masters/#{id}/1600.webp", image)},
+             {:solve, {:ok, json}} <- {:solve, solve(image, scratch)},
              {:ok, attrs} <- Jason.decode(json),
              {:ok, wcs} <- Astrometry.validate(attrs) do
           StarsmapApi.Community.transaction(fn ->
@@ -67,9 +69,11 @@ defmodule StarsmapApi.Community.SolverWorker do
 
           :ok
         else
-          # A solve that did not end in time is a worker fault. Oban tries it again.
-          {:error, :solver_timeout} = error -> error
-          _ -> {:cancel, "No supported plate solution was found"}
+          # Oban runs the job again for an error, until `max_attempts`. A solve that did not end
+          # in time is a worker fault, so it is an error too.
+          {:storage, error} -> {:error, {:storage, error}}
+          {:solve, failure} -> failure
+          _ -> {:cancel, @no_solution}
         end
       after
         File.rm_rf(scratch)
@@ -92,9 +96,18 @@ defmodule StarsmapApi.Community.SolverWorker do
            scratch
          ]) do
       {json, 0} -> {:ok, json}
-      # `timeout` exits with 124 after its SIGTERM. After a SIGKILL the exit is 137.
-      {_, status} when status in [124, 137] -> {:error, :solver_timeout}
-      {_, status} -> {:error, {:solver_exit, status}}
+      # `timeout` exits with 124 after its SIGTERM stopped the solve.
+      {_, 124} -> {:error, :solver_timeout}
+      {output, status} -> solve_failure(output, status)
+    end
+  end
+
+  # The script writes the error JSON when the solver ran and found no solution. Another exit (a
+  # crash, a SIGKILL after the limit, or a stop at a resource limit) can be temporary.
+  defp solve_failure(output, status) do
+    case Jason.decode(output) do
+      {:ok, %{"error" => _}} -> {:cancel, @no_solution}
+      _ -> {:error, {:solver_exit, status}}
     end
   end
 end

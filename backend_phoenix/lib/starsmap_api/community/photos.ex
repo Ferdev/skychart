@@ -132,7 +132,8 @@ defmodule StarsmapApi.Community.Photos do
         []
 
       subject ->
-        # The database orders the photos of the subject and returns one page only.
+        # The database orders the photos of the subject and returns one page only. A cursor
+        # photo that left the list gives an empty page.
         page = Ranking.subject_page(subject.id, cursor, 24)
         photos = Repo.all(from p in Photo, where: p.id in ^page) |> Map.new(&{&1.id, &1})
         page |> Enum.map(&Map.fetch!(photos, &1)) |> public_many()

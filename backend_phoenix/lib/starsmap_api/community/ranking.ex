@@ -169,16 +169,23 @@ defmodule StarsmapApi.Community.Ranking do
 
   @doc """
   One page of the published photos of a subject: the highest score first, then the oldest
-  publication, then the id. The page starts after the photo `cursor`; an unknown cursor gives the
-  first page. The database sorts and limits the rows.
+  publication, then the id. The page starts after the photo `cursor`. When that photo left the
+  list (for example, a moderator hid it) or the cursor is not a photo id, its position is not
+  known, so the page is empty and the client does not get earlier photos again. The database
+  sorts and limits the rows.
   """
-  def subject_page(subject_id, cursor, limit) do
-    cursor =
-      case Ecto.UUID.dump(cursor || "") do
-        {:ok, id} -> id
-        :error -> nil
-      end
+  def subject_page(subject_id, nil, limit), do: subject_rows(subject_id, nil, limit)
 
+  def subject_page(subject_id, cursor, limit) when is_binary(cursor) do
+    case Ecto.UUID.dump(cursor) do
+      {:ok, id} -> subject_rows(subject_id, id, limit)
+      :error -> []
+    end
+  end
+
+  def subject_page(_subject_id, _cursor, _limit), do: []
+
+  defp subject_rows(subject_id, cursor, limit) do
     Repo.query!(
       """
       WITH weighted AS (
@@ -194,7 +201,7 @@ defmodule StarsmapApi.Community.Ranking do
       ),
       after AS (SELECT -score AS score, published_at, id FROM ranked WHERE id = $2)
       SELECT r.id FROM ranked r
-      WHERE NOT EXISTS (SELECT 1 FROM after)
+      WHERE $2::uuid IS NULL
         OR (-r.score, r.published_at, r.id) > (SELECT score, published_at, id FROM after)
       ORDER BY r.score DESC, r.published_at ASC, r.id ASC
       LIMIT $3

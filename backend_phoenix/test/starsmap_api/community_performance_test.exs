@@ -160,8 +160,8 @@ defmodule StarsmapApi.CommunityPerformanceTest do
                expected |> Enum.drop(10) |> Enum.take(24)
 
       assert Photos.gallery("moon", List.last(expected)) == []
-      assert Photos.gallery("moon", Ecto.UUID.generate()) |> Enum.map(& &1.id) == first
-      assert Photos.gallery("moon", "not-an-id") |> Enum.map(& &1.id) == first
+      assert Photos.gallery("moon", Ecto.UUID.generate()) == []
+      assert Photos.gallery("moon", "not-an-id") == []
       assert Photos.gallery("not-a-known-object") == []
     end
 

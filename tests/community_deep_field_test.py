@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import backend.community_deep_field as deep_field
 from backend.community_deep_field import add_weights, build, combine, fit_tone, limiting_magnitude, linearize, pixel_to_sky, sky_to_frame
 from backend.community_depth import sky_to_pixel, write_webp
 
@@ -222,3 +223,24 @@ def test_command_line_reports_a_bad_request_as_json(tmp_path):
     done = subprocess.run([sys.executable, str(script), str(bad), str(tmp_path / "out"), str(tmp_path / "scratch")], capture_output=True, text=True, timeout=60)
     assert done.returncode == 1
     assert "error" in json.loads(done.stdout)
+
+
+def prepare_with_pairs(monkeypatch, tmp_path, elongations):
+    """`prepare` with these matched stars, so the test sets the shape of each star."""
+    pairs = [{"source": {"peak": 100.0, "elongation": value, "x": 10.0 + index, "y": 10.0}, "record": {"magnitude": 6.0}} for index, value in enumerate(elongations)]
+    monkeypatch.setattr(deep_field, "read_rgb", lambda path, folder: np.zeros((300, 400, 3), dtype=np.uint8))
+    monkeypatch.setattr(deep_field, "background", lambda gray: (np.zeros_like(gray), 1.0))
+    monkeypatch.setattr(deep_field, "detect", lambda gray, threshold_sigma, limit: [])
+    monkeypatch.setattr(deep_field, "pair_sources", lambda sources, stars, wcs, width, height: pairs)
+    frame = {"id": "frame-0", "path": str(tmp_path / "frame.webp"), "wcs": frame_wcs()}
+    return deep_field.prepare(frame, [], GRID, np.zeros((1, 1)), np.zeros((1, 1)), tmp_path)
+
+
+def test_a_frame_of_trailed_stars_gives_the_trailing_reason(monkeypatch, tmp_path):
+    assert prepare_with_pairs(monkeypatch, tmp_path, [3.0] * 20) == {"id": "frame-0", "reason": "trailed_stars"}
+
+
+def test_a_frame_with_few_round_stars_gives_too_few_stars(monkeypatch, tmp_path):
+    assert prepare_with_pairs(monkeypatch, tmp_path, [1.1] * 3) == {"id": "frame-0", "reason": "too_few_stars"}
+    (tmp_path / "none").mkdir()
+    assert prepare_with_pairs(monkeypatch, tmp_path / "none", []) == {"id": "frame-0", "reason": "too_few_stars"}

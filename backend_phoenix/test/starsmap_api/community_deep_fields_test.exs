@@ -150,6 +150,28 @@ defmodule StarsmapApi.CommunityDeepFieldsTest do
     assert again.slug == "andromeda-2"
   end
 
+  test "the field of two solutions is at their mean position and width", context do
+    photo(context.ada, context.subject)
+
+    photo(context.bea, context.subject,
+      wcs: Map.merge(@solved, %{"ra_deg" => 152.0, "dec_deg" => 4.0, "pixel_scale_arcsec" => 6.0})
+    )
+
+    {:ok, field} = DeepFields.open(context.moderator, "ngc-224")
+    assert_in_delta field.ra_deg, 151.0, 1.0e-9
+    assert_in_delta field.dec_deg, 3.0, 1.0e-9
+    # The long sides are 1.0 and 1.5 degrees, so the field is 1.25 degrees wide.
+    assert_in_delta field.scale_arcsec * field.width, 1.25 * 3600, 1.0e-6
+  end
+
+  test "the mean of two solutions on each side of right ascension zero is near zero", context do
+    photo(context.ada, context.subject, wcs: Map.put(@solved, "ra_deg", 359.0))
+    photo(context.bea, context.subject, wcs: Map.put(@solved, "ra_deg", 1.0))
+
+    {:ok, field} = DeepFields.open(context.moderator, "ngc-224")
+    assert_in_delta field.ra_deg, 0.0, 1.0e-9
+  end
+
   test "a field needs a solved photo of the subject", context do
     assert {:error, :no_solved_photos} = DeepFields.open(context.moderator, "ngc-224")
     assert {:error, :not_found} = DeepFields.open(context.moderator, "ngc-999999")

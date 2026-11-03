@@ -842,6 +842,27 @@ defmodule StarsmapApi.CommunityTest do
     assert hd(Photos.gallery("moon")).id == second.id
   end
 
+  test "the gallery pages with a cursor and does not start again when the cursor photo left", %{
+    user: user,
+    subject: subject
+  } do
+    for _ <- 1..30, do: photo(user, subject, "published")
+
+    first = Photos.gallery("moon")
+    assert length(first) == 24
+    cursor = List.last(first).id
+
+    rest = Photos.gallery("moon", cursor)
+    assert length(rest) == 6
+    assert MapSet.disjoint?(MapSet.new(first, & &1.id), MapSet.new(rest, & &1.id))
+
+    Repo.update!(Ecto.Changeset.change(Repo.get!(Photo, cursor), status: "hidden"))
+
+    assert Photos.gallery("moon", cursor) == []
+    assert Photos.gallery("moon", Ecto.UUID.generate()) == []
+    assert length(Photos.gallery("moon")) == 24
+  end
+
   describe "the reason of an anonymous report" do
     setup %{user: user, subject: subject} do
       %{photo: photo(user, subject, "published")}
