@@ -54,6 +54,19 @@ defmodule StarsmapApi.Community.Annotations do
           select: %{key: s.key, name: s.name, x: s.x, y: s.y, role: s.role}
       )
 
+  @doc "The annotations of a list of photos in one query, by photo id."
+  def list_many([]), do: %{}
+
+  def list_many(ids) do
+    Repo.all(
+      from s in "photo_subjects",
+        where: s.photo_id in type(^ids, {:array, Ecto.UUID}),
+        select:
+          {type(s.photo_id, Ecto.UUID), %{key: s.key, name: s.name, x: s.x, y: s.y, role: s.role}}
+    )
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+  end
+
   def pixel(_, ra, dec) when not is_number(ra) or not is_number(dec), do: nil
 
   def pixel(w, ra, dec) do

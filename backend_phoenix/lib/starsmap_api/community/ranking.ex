@@ -141,16 +141,81 @@ defmodule StarsmapApi.Community.Ranking do
         :count
       )
 
+  # Each vote has the weight 1/k, where k is its position in the votes of one voter for one author.
+  # A filter on the author (p.user_id) keeps each window partition complete.
+  @weighted_votes """
+    SELECT v.photo_id, v.inserted_at,
+    1.0 / row_number() OVER (PARTITION BY v.user_id,p.user_id ORDER BY v.inserted_at,v.id) AS weight
+    FROM photo_votes v JOIN users u ON u.id=v.user_id JOIN photos p ON p.id=v.photo_id
+    JOIN users a ON a.id=p.user_id
+    WHERE NOT u.suspended AND NOT a.suspended AND p.status='published'
+    AND u.first_sign_in_at <= now() - interval '24 hours'
+  """
+
+  @doc "The vote counts of a list of photos in one query. A photo with no vote is not in the map."
+  def vote_counts([]), do: %{}
+
+  def vote_counts(ids),
+    do:
+      Repo.all(
+        from v in Vote,
+          join: u in User,
+          on: u.id == v.user_id,
+          where: v.photo_id in ^ids and not u.suspended,
+          group_by: v.photo_id,
+          select: {v.photo_id, count()}
+      )
+      |> Map.new()
+
+  @doc """
+  One page of the published photos of a subject: the highest score first, then the oldest
+  publication, then the id. The page starts after the photo `cursor`. When that photo left the
+  list (for example, a moderator hid it) or the cursor is not a photo id, its position is not
+  known, so the page is empty and the client does not get earlier photos again. The database
+  sorts and limits the rows.
+  """
+  def subject_page(subject_id, nil, limit), do: subject_rows(subject_id, nil, limit)
+
+  def subject_page(subject_id, cursor, limit) when is_binary(cursor) do
+    case Ecto.UUID.dump(cursor) do
+      {:ok, id} -> subject_rows(subject_id, id, limit)
+      :error -> []
+    end
+  end
+
+  def subject_page(_subject_id, _cursor, _limit), do: []
+
+  defp subject_rows(subject_id, cursor, limit) do
+    Repo.query!(
+      """
+      WITH weighted AS (
+        #{@weighted_votes}
+        AND p.user_id IN (SELECT user_id FROM photos WHERE subject_id = $1)
+      ),
+      scored AS (SELECT photo_id, sum(weight)::float AS score FROM weighted GROUP BY photo_id),
+      ranked AS (
+        SELECT p.id, coalesce(s.score, 0.0) AS score, p.published_at
+        FROM photos p JOIN users u ON u.id = p.user_id
+        LEFT JOIN scored s ON s.photo_id = p.id
+        WHERE p.subject_id = $1 AND p.status = 'published' AND NOT u.suspended
+      ),
+      after AS (SELECT -score AS score, published_at, id FROM ranked WHERE id = $2)
+      SELECT r.id FROM ranked r
+      WHERE $2::uuid IS NULL
+        OR (-r.score, r.published_at, r.id) > (SELECT score, published_at, id FROM after)
+      ORDER BY r.score DESC, r.published_at ASC, r.id ASC
+      LIMIT $3
+      """,
+      [Ecto.UUID.dump!(subject_id), cursor, limit]
+    ).rows
+    |> Enum.map(fn [id] -> Ecto.UUID.load!(id) end)
+  end
+
   def scores do
     rows =
       Repo.query!("""
         WITH weighted AS (
-          SELECT v.photo_id, v.inserted_at,
-          1.0 / row_number() OVER (PARTITION BY v.user_id,p.user_id ORDER BY v.inserted_at,v.id) AS weight
-          FROM photo_votes v JOIN users u ON u.id=v.user_id JOIN photos p ON p.id=v.photo_id
-          JOIN users a ON a.id=p.user_id
-          WHERE NOT u.suspended AND NOT a.suspended AND p.status='published'
-          AND u.first_sign_in_at <= now() - interval '24 hours'
+          #{@weighted_votes}
         )
         SELECT photo_id, sum(weight)::float,
         CASE WHEN count(*) >= 3 THEN sum(weight * power(2.0, -extract(epoch FROM (now()-inserted_at))/259200.0))::float ELSE 0 END

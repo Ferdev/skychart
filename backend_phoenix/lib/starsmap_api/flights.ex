@@ -210,44 +210,61 @@ defmodule StarsmapApi.Flights do
     end
   end
 
-  def mark_running(flight),
-    do: Repo.update!(Ecto.Changeset.change(flight, status: "running"))
+  @doc "The job starts. It is `:stopped` when the flight is no longer queued or running."
+  def mark_running(flight) do
+    case write_if_open(flight, status: "running") do
+      {1, [running]} -> running
+      {0, _} -> :stopped
+    end
+  end
 
   def publish(flight, checked, state) do
     steps = with_views(checked.steps) |> with_sources(state.results)
 
-    flight
-    |> finish(state)
-    |> Ecto.Changeset.change(%{
+    finish(flight, state,
       status: "published",
       title: checked.title || flight.question,
       steps: %{"steps" => steps},
       verifier: Map.take(checked, [:report])
-    })
-    |> Repo.update!()
+    )
   end
 
-  def refuse(flight, reason, state) do
-    flight
-    |> finish(state)
-    |> Ecto.Changeset.change(status: "refused", refusal: reason)
-    |> Repo.update!()
+  def refuse(flight, reason, state),
+    do: finish(flight, state, status: "refused", refusal: reason)
+
+  def fail(flight, reason, state),
+    do: finish(flight, state, status: "failed", refusal: String.slice(reason, 0, 200))
+
+  # The cost of the model calls always goes on the row. The result goes on it only while the
+  # flight is queued or running: an operator can hide the flight while its job runs, and the
+  # job must not publish it again. Then the result is `:stopped`.
+  defp finish(flight, state, outcome) do
+    Repo.transaction(fn ->
+      Repo.update_all(
+        from(f in AnswerFlight, where: f.id == ^flight.id),
+        inc: [
+          input_tokens: state.input_tokens,
+          output_tokens: state.output_tokens,
+          cost_usd: state.cost
+        ],
+        set: [model: state.model]
+      )
+
+      case write_if_open(flight, [tool_results: state.results] ++ outcome) do
+        {1, [finished]} -> finished
+        {0, _} -> :stopped
+      end
+    end)
+    |> elem(1)
   end
 
-  def fail(flight, reason, state) do
-    flight
-    |> finish(state)
-    |> Ecto.Changeset.change(status: "failed", refusal: String.slice(reason, 0, 200))
-    |> Repo.update!()
-  end
-
-  defp finish(flight, state) do
-    Ecto.Changeset.change(flight,
-      tool_results: state.results,
-      model: state.model,
-      input_tokens: flight.input_tokens + state.input_tokens,
-      output_tokens: flight.output_tokens + state.output_tokens,
-      cost_usd: flight.cost_usd + state.cost
+  defp write_if_open(flight, changes) do
+    Repo.update_all(
+      from(f in AnswerFlight,
+        where: f.id == ^flight.id and f.status in ["queued", "running"],
+        select: f
+      ),
+      set: [updated_at: StarsmapApi.Community.now()] ++ changes
     )
   end
 
@@ -428,12 +445,13 @@ defmodule StarsmapApi.Flights.Worker do
   def perform(%Oban.Job{args: %{"id" => id}}) do
     case Repo.get(AnswerFlight, id) do
       %AnswerFlight{status: status} = flight when status in ["queued", "running"] ->
-        flight = Flights.mark_running(flight)
-
-        case Agent.run(flight) do
-          {:publish, checked, state} -> Flights.publish(flight, checked, state)
-          {:refuse, reason, state} -> Flights.refuse(flight, reason, state)
-          {:fail, reason, state} -> Flights.fail(flight, reason, state)
+        # Each write is `:stopped` when an operator hid the flight in the meantime.
+        with %AnswerFlight{} = flight <- Flights.mark_running(flight) do
+          case Agent.run(flight) do
+            {:publish, checked, state} -> Flights.publish(flight, checked, state)
+            {:refuse, reason, state} -> Flights.refuse(flight, reason, state)
+            {:fail, reason, state} -> Flights.fail(flight, reason, state)
+          end
         end
 
         :ok

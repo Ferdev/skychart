@@ -7,7 +7,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlencode
-from urllib.request import urlopen, urlretrieve
+from urllib.request import urlopen
 
 import numpy as np
 from skyfield.api import Loader, Star, load_file, wgs84
@@ -27,7 +27,9 @@ from backend.catalog_sources import (
     catalog_summary_payload,
     filtered_catalog_objects,
 )
+from backend.bounded_cache import BoundedVectorCache, utc_day
 from backend.errors import QueryInputError
+from backend.kernel_download import download_kernel
 from backend.payload_cache import cache_key_payload, read_cache, write_cache
 from backend.request_query import clamp_float, trail_sample_datetimes
 from backend.settings import (
@@ -45,8 +47,10 @@ _loader: Loader | None = None
 _timescale: Any | None = None
 _ephemeris: Any | None = None
 _satellite_kernels: dict[str, Any] = {}
-_horizons_vectors: dict[tuple[str, str], dict[str, float]] = {}
+HORIZONS_VECTOR_CACHE_ENTRIES = 4096
+_horizons_vectors = BoundedVectorCache(HORIZONS_VECTOR_CACHE_ENTRIES)
 _kernel_lock = threading.Lock()
+_kernel_download_locks = {filename: threading.Lock() for filename in SATELLITE_KERNEL_URLS}
 
 _COS_OBLIQUITY = math.cos(math.radians(J2000_OBLIQUITY_DEG))
 _SIN_OBLIQUITY = math.sin(math.radians(J2000_OBLIQUITY_DEG))
@@ -78,19 +82,23 @@ def satellite_kernel(filename: str) -> Any:
     if filename not in SATELLITE_KERNEL_URLS:
         raise RuntimeError(f"Unknown satellite kernel: {filename}")
 
-    with _kernel_lock:
-        if filename not in _satellite_kernels:
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            path = DATA_DIR / filename
-            if not path.exists():
-                temporary_path = path.with_suffix(f"{path.suffix}.download")
-                if temporary_path.exists():
-                    temporary_path.unlink()
-                urlretrieve(SATELLITE_KERNEL_URLS[filename], str(temporary_path))
-                temporary_path.replace(path)
-            _satellite_kernels[filename] = load_file(str(path))
+    kernel = _satellite_kernels.get(filename)
+    if kernel is not None:
+        return kernel
 
-    return _satellite_kernels[filename]
+    # The download has its own lock for each file. The shared _kernel_lock of the planetary
+    # ephemeris is never held during network I/O.
+    with _kernel_download_locks[filename]:
+        kernel = _satellite_kernels.get(filename)
+        if kernel is not None:
+            return kernel
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        path = DATA_DIR / filename
+        if not path.exists():
+            download_kernel(SATELLITE_KERNEL_URLS[filename], path)
+        kernel = load_file(str(path))
+        with _kernel_lock:
+            return _satellite_kernels.setdefault(filename, kernel)
 
 
 def target_for_body(item: dict[str, Any], ephemeris: Any) -> Any:
@@ -111,12 +119,16 @@ def observe_payload(key: str, latitude: float, longitude: float, timestamp: date
         altitude, azimuth, _ = observer.at(timescale.from_datetime(at)).observe(target).apparent().altaz()
         return float(altitude.degrees), float(azimuth.degrees)
     altitude, azimuth = horizontal(timestamp)
-    samples=[(at:=timestamp+timedelta(minutes=5*i),*horizontal(at)) for i in range(289)]
+    # One Skyfield evaluation for the 289 times of the next 24 hours, not one for each time.
+    sample_times=[timestamp+timedelta(minutes=5*i) for i in range(289)]
+    sample_altitudes, sample_azimuths, _ = observer.at(timescale.from_datetimes(sample_times)).observe(target).apparent().altaz()
+    samples=list(zip(sample_times, (float(value) for value in sample_altitudes.degrees), (float(value) for value in sample_azimuths.degrees)))
     transit=max(samples,key=lambda row:row[1]); crossings=[]
     for previous,current in zip(samples,samples[1:]):
         if previous[1]<=0<current[1] or previous[1]>=0>current[1]: crossings.append(("rise" if current[1]>previous[1] else "set",current[0]))
     rise=next((at for kind,at in crossings if kind=="rise"),None); setting=next((at for kind,at in crossings if kind=="set"),None)
-    plain=(f"Above the horizon from {rise.strftime('%H:%M')} UTC; best around {transit[0].strftime('%H:%M')} UTC." if rise else f"Above the horizon now; best around {transit[0].strftime('%H:%M')} UTC." if altitude>0 else "Below the horizon during the next 24 hours from this location.")
+    # An object that is up now has its next rise after its set, so "now" comes before the rise text.
+    plain=(f"Above the horizon now; best around {transit[0].strftime('%H:%M')} UTC." if altitude>0 else f"Above the horizon from {rise.strftime('%H:%M')} UTC; best around {transit[0].strftime('%H:%M')} UTC." if rise else "Below the horizon during the next 24 hours from this location.")
     return {"key":key,"name":item["name"],"observed_at_utc":isoformat_utc(timestamp),"latitude_deg":latitude,"longitude_deg":longitude,"altitude_deg":altitude,"azimuth_deg":azimuth,"rise_utc":isoformat_utc(rise) if rise else None,"transit_utc":isoformat_utc(transit[0]),"set_utc":isoformat_utc(setting) if setting else None,"summary":plain,"accuracy_note":"Geometric five-minute sampling; refraction and local obstructions are not modeled."}
 
 def vector_payload(vector: Any) -> dict[str, float]:
@@ -255,7 +267,7 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
     coordinate_frame = ATLAS_FRAME_ID
     if item.get("source_type") == "spacecraft":
         # Refresh predictions daily, including the underlying vector cache.
-        coordinate_frame += ":" + item["source_sha256"] + ":" + datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        coordinate_frame += ":" + item["source_sha256"] + ":" + utc_day()
     cache_key = (f"{horizons_id}@{center}:{coordinate_frame}", timestamp_key)
     cached = _horizons_vectors.get(cache_key)
     if cached is not None:
@@ -270,7 +282,7 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
     )
     disk_cached = read_cache("horizons", disk_cache_key)
     if disk_cached is not None:
-        _horizons_vectors[cache_key] = disk_cached
+        _horizons_vectors.put(cache_key, disk_cached)
         return disk_cached
 
     stop_timestamp = timestamp + timedelta(minutes=1)
@@ -314,7 +326,7 @@ def horizons_vector_payload(item: dict[str, Any], timestamp: datetime) -> dict[s
         "vz_km_s": vz_km_s,
         "heliocentric_distance_km": math.sqrt(x_km * x_km + y_km * y_km + z_km * z_km),
     }
-    _horizons_vectors[cache_key] = position
+    _horizons_vectors.put(cache_key, position)
     write_cache("horizons", disk_cache_key, position)
     return position
 

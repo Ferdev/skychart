@@ -20,6 +20,7 @@ import { closestLayerLevel, formatSampleRate } from "../atlas/scienceLayerDisclo
 import { NEW_TAB_LINK_ATTRIBUTES } from "../format/links";
 import { canObserveFromEarth, renderObservePanel } from "./observePanel";
 import { ObjectMediaFallbacks } from "./objectMediaFallbacks";
+import { voyagerMilestoneKey } from "../catalog/spacecraftTranslations";
 import { renderExoplanetList, renderExoplanetOrbitSection, renderPlanetCandidateSection, renderPlanetarySystemAction } from "./exoplanetInspection";
 import type {
   Body,
@@ -133,7 +134,7 @@ update() {
       [t("mission.launch"), mission.launch_date],
       [t("mission.sunSpeed"), speedWithHourlyValue(mission.heliocentric_speed_km_s)],
       [t("mission.earthSpeed"), speedWithHourlyValue(mission.earth_relative_speed_km_s)],
-      [t("field.positionModel"), t(`mission.${mission.availability}`)],
+      [t("mission.availability"), t(`mission.${mission.availability}`)],
       [t("mission.coverage"), `${mission.coverage_start_tdb} – ${mission.coverage_end_tdb}`],
       [t("mission.epoch"), mission.position_epoch],
       [t("mission.cutoff"), mission.end_utc ?? null],
@@ -283,6 +284,7 @@ update() {
   if (preserveMediaSection) currentMediaSection.remove();
   else this.mediaFallbacks.clear();
 
+  const milestone = body.key === "spacecraft-31" && body.spacecraft ? voyagerMilestoneKey(body.spacecraft.position_epoch) : null;
   this.context.bodyInfo.innerHTML = `
     <article class="selected-object selected-object--context" style="--body-color: ${escapeHtml(body.color)}">
       <div class="object-orientation">
@@ -290,7 +292,7 @@ update() {
         ${this.renderObjectSummaryCard(body)}
         ${this.renderFactTiles(primaryStats)}${renderPlanetarySystemAction(body)}
         ${body.spacecraft ? `<p>${escapeHtml(t("mission.trajectory"))}</p>` : ""}
-        ${body.key === "spacecraft-31" ? `<p><a href="https://science.nasa.gov/mission/voyager/voyager-1/voyager-1-what-is-a-light-day/" ${NEW_TAB_LINK_ATTRIBUTES}>${escapeHtml(t("mission.milestone"))}</a></p>` : ""}
+        ${milestone ? `<p><a href="https://science.nasa.gov/mission/voyager/voyager-1/voyager-1-what-is-a-light-day/" ${NEW_TAB_LINK_ATTRIBUTES}>${escapeHtml(t(milestone))}</a></p>` : ""}
       </div>
       <nav class="object-view-tabs" role="tablist" aria-label="${escapeHtml(t("object.detailViews"))}">
         ${views.map((view) => this.renderObjectViewTab(view)).join("")}

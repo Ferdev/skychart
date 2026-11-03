@@ -38,6 +38,8 @@ for (const width of [1440, 390]) {
     await expect(page.locator("#body-info")).toContainText("Speed relative to Earth");
     await expect(page.locator("#body-info")).toContainText("41.54 km/s (149,544 km/h)");
     await expect(page.locator("#body-info")).toContainText("Spacecraft");
+    await expect(page.locator("#body-info")).toContainText("Position availability");
+    await expect(page.locator("#body-info")).toContainText("Position available");
     await expect(page.locator("#center-selected")).toBeEnabled();
     const replayUrl = page.url();
     await openAtlas(page, replayUrl);
@@ -59,6 +61,54 @@ for (const width of [1440, 390]) {
     expect(errors).toEqual([]);
   });
 }
+
+async function routeSpacecraftApi(context: import("@playwright/test").BrowserContext, spacecraft: (timestamp: string) => { status: number; body: unknown }) {
+  await context.route("**/api/**", async route => {
+    const url = new URL(route.request().url());
+    const timestamp = url.searchParams.get("timestamp") ?? "2026-09-06T00:00:00Z";
+    let payload: unknown = {};
+    if (url.pathname === "/api/ephemeris") payload = skyEphemerisFixture(timestamp);
+    if (url.pathname === "/api/catalog") payload = { object_count: 0, group_counts: {}, type_counts: {} };
+    if (url.pathname === "/api/catalog/search") payload = { objects: [], total: 0, offset: 0, limit: 50, has_more: false };
+    if (url.pathname === "/api/catalog/viewport") payload = { objects: [], total: 0 };
+    if (url.pathname === "/api/now") payload = { events: [], stale: false };
+    if (url.pathname === "/api/spacecraft") {
+      const answer = spacecraft(timestamp);
+      await route.fulfill({ status: answer.status, contentType: "application/json", body: JSON.stringify(answer.body) });
+      return;
+    }
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(payload) });
+  });
+  await context.route("**/catalog-tiles/**", route => route.fulfill({ status: 404, body: "" }));
+}
+
+async function setAtlasTime(page: import("@playwright/test").Page, value: string) {
+  await page.locator("#time-input").evaluate((input: HTMLInputElement, time) => { input.value = time; }, value);
+  await page.locator("#apply-time").evaluate((button: HTMLButtonElement) => button.click());
+}
+
+test("a failed spacecraft poll keeps a mission outside its coverage outside it", async ({ page, context }) => {
+  await routeSpacecraftApi(context, () => ({ status: 500, body: { error: "unavailable" } }));
+  await openAtlas(page);
+  await setAtlasTime(page, "2026-09-06T00:00:00");
+  await selectCatalogObject(page, "Cassini", "spacecraft-82");
+  await expect(page.locator("#body-info")).toContainText("Outside trajectory coverage");
+  await expect(page.locator("#body-info")).not.toContainText("Position temporarily unavailable");
+  await selectCatalogObject(page, "Voyager 1", "spacecraft-31");
+  await expect(page.locator("#body-info")).toContainText("Position temporarily unavailable");
+});
+
+test("the Voyager 1 light-day text follows the atlas time", async ({ page, context }) => {
+  await routeSpacecraftApi(context, timestamp => ({ status: 200, body: { timestamp_utc: timestamp, bodies: spacecraftBodies(timestamp).map(body => ({ ...body, position: null, distance_from_earth_km: null,
+    spacecraft: { ...body.spacecraft, availability: "out_of_coverage" } })) } }));
+  await openAtlas(page);
+  await setAtlasTime(page, "2026-11-01T00:00:00");
+  await selectCatalogObject(page, "Voyager 1", "spacecraft-31");
+  await expect(page.locator("#body-info")).toContainText("NASA predicts Voyager 1 will reach one light-day");
+  await setAtlasTime(page, "2026-11-20T00:00:00");
+  await expect(page.locator("#body-info")).toContainText("Voyager 1 reached one light-day from Earth on November 18, 2026");
+  await expect(page.locator("#body-info")).not.toContainText("NASA predicts");
+});
 
 test("spacecraft position refresh preserves keyboard navigation during catalog requests", async ({ page, context }) => {
   const timestamp = "2026-09-06T00:00:00Z";

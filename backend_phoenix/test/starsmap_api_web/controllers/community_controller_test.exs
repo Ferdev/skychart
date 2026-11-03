@@ -546,8 +546,75 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
     end
 
     test "the area crosses right ascension zero", context do
-      photo(context, %{wcs: solved(%{"ra_deg" => 359.0, "dec_deg" => 0.0})})
-      assert [_] = overlay(context.conn, "ra=1&dec=0&radius=5")
+      west = photo(context, %{wcs: solved(%{"ra_deg" => 359.0, "dec_deg" => 0.0})})
+      east = photo(context, %{wcs: solved(%{"ra_deg" => 1.0, "dec_deg" => 0.0})})
+      photo(context, %{wcs: solved(%{"ra_deg" => 180.0, "dec_deg" => 0.0})})
+
+      for query <- ["ra=1&dec=0&radius=5", "ra=359&dec=0&radius=5", "ra=0&dec=0&radius=1"] do
+        assert overlay(context.conn, query) |> Enum.map(& &1["id"]) |> Enum.sort() ==
+                 Enum.sort([west.id, east.id])
+      end
+    end
+
+    test "many newer photos in the same declination band do not push out an overlap", context do
+      old = DateTime.add(DateTime.utc_now(), -3600)
+      shown = photo(context, %{title: "Older", published_at: old})
+      now = DateTime.utc_now()
+
+      far =
+        for index <- 1..2_001 do
+          %{
+            id: Ecto.UUID.generate(),
+            user_id: context.author.id,
+            subject_id: context.subject.id,
+            declared_key: "moon",
+            title: "Far",
+            licence: "CC BY 4.0",
+            captured_at: now,
+            source_key: "uploads/far",
+            size_bytes: 10,
+            status: "published",
+            published_at: DateTime.add(now, index, :microsecond),
+            wcs: solved(%{"ra_deg" => 200.0}),
+            inserted_at: now,
+            updated_at: now
+          }
+        end
+
+      {2_001, _} = Repo.insert_all(Photo, far)
+
+      assert [item] = overlay(context.conn, "ra=10&dec=41&radius=2")
+      assert item["id"] == shown.id
+    end
+
+    test "a photo with its solution reference at a corner reaches its full extent", context do
+      # 6000 x 4000 pixels at 18 arcseconds: the half diagonal is 18.0 degrees, and the
+      # reference at a corner adds 18.0 degrees. A fixed 22-degree margin misses this photo.
+      corner =
+        solved(%{
+          "ra_deg" => 10.0,
+          "dec_deg" => 0.0,
+          "pixel_scale_arcsec" => 18.0,
+          "width" => 6000,
+          "height" => 4000,
+          "crpix" => [0.5, 0.5]
+        })
+
+      shown = photo(context, %{wcs: corner})
+      photo(context, %{wcs: Map.put(corner, "crpix", [3000.5, 2000.5])})
+
+      assert [item] = overlay(context.conn, "ra=10&dec=30&radius=1")
+      assert item["id"] == shown.id
+      assert [] = overlay(context.conn, "ra=10&dec=40&radius=1")
+    end
+
+    test "a solution with a value that is not a number is not in the response", context do
+      photo(context, %{wcs: solved(%{"crpix" => ["800", "600"]})})
+      photo(context, %{wcs: solved(%{"crpix" => 800})})
+      photo(context, %{wcs: solved(%{"dec_deg" => "41"})})
+      photo(context, %{wcs: solved(%{"cd" => "matrix"})})
+
+      assert [] = overlay(context.conn)
     end
 
     test "the response has a limit, and an invalid area is refused", context do

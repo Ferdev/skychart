@@ -8,10 +8,33 @@ defmodule StarsmapApi.Community.SkyOverlay do
   alias StarsmapApi.Community.{DeepFields, Photos, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
 
+  # The position and the reach of an aligned solution of the plate solver, or no row. The reach
+  # is the half diagonal plus the distance of the solution reference from the image center, in
+  # degrees, as in `photo_radius/1`. No check keeps the reference inside the image, so the reach
+  # has no fixed upper limit. Thus the full test is in SQL, and the limit counts only
+  # photos that overlap the area. A value that is not a number gives NULL, and NULL removes the row.
+  @solution """
+  SELECT n.ra, n.dec,
+    (sqrt(n.width ^ 2 + n.height ^ 2) / 2 + sqrt((n.cx - n.width / 2) ^ 2 + (n.cy - n.height / 2) ^ 2))
+      * n.scale / 3600 AS reach
+  FROM (SELECT ?::jsonb AS w) AS s
+  CROSS JOIN LATERAL (SELECT
+    CASE WHEN jsonb_typeof(s.w -> 'ra_deg') = 'number' THEN (s.w ->> 'ra_deg')::float8 END AS ra,
+    CASE WHEN jsonb_typeof(s.w -> 'dec_deg') = 'number' THEN (s.w ->> 'dec_deg')::float8 END AS dec,
+    CASE WHEN jsonb_typeof(s.w -> 'pixel_scale_arcsec') = 'number'
+      THEN (s.w ->> 'pixel_scale_arcsec')::float8 END AS scale,
+    CASE WHEN jsonb_typeof(s.w -> 'width') = 'number' THEN (s.w ->> 'width')::float8 END AS width,
+    CASE WHEN jsonb_typeof(s.w -> 'height') = 'number' THEN (s.w ->> 'height')::float8 END AS height,
+    CASE WHEN jsonb_typeof(s.w -> 'crpix') = 'array' AND jsonb_array_length(s.w -> 'crpix') = 2
+      AND jsonb_typeof(s.w -> 'crpix' -> 0) = 'number' THEN (s.w -> 'crpix' ->> 0)::float8 END AS cx,
+    CASE WHEN jsonb_typeof(s.w -> 'crpix') = 'array' AND jsonb_array_length(s.w -> 'crpix') = 2
+      AND jsonb_typeof(s.w -> 'crpix' -> 1) = 'number' THEN (s.w -> 'crpix' ->> 1)::float8 END AS cy
+  ) AS n
+  WHERE s.w ->> 'projection' = 'TAN' AND s.w ->> 'frame' = 'ICRS' AND s.w ->> 'epoch' = 'J2000'
+    AND s.w ->> 'status' = 'solved'
+    AND CASE WHEN jsonb_typeof(s.w -> 'cd') = 'array' THEN jsonb_array_length(s.w -> 'cd') = 4 ELSE false END
+  """
   @limit 200
-  @candidates 2_000
-  # `Astrometry.validate/1` refuses a field wider than 30 degrees: the half diagonal is below 22.
-  @largest_photo_radius_deg 22.0
   @fields ~w(ra_deg dec_deg pixel_scale_arcsec rotation_deg width height cd crpix projection frame epoch status)
   @r :math.pi() / 180
 
@@ -19,26 +42,26 @@ defmodule StarsmapApi.Community.SkyOverlay do
 
   @doc "Photos that overlap the circle of `radius` degrees around the J2000 position."
   def list(ra, dec, radius) do
-    margin = radius + @largest_photo_radius_deg
-
     Repo.all(
       from [p, u] in Photos.published(),
+        inner_lateral_join: s in fragment(@solution, p.wcs),
+        on: true,
         where:
-          fragment("?->>'status' = 'solved'", p.wcs) and
-            fragment(
-              "(?->>'dec_deg')::float8 BETWEEN ? AND ?",
-              p.wcs,
-              ^(dec - margin),
-              ^(dec + margin)
-            ),
+          fragment(
+            "acosd(least(1.0, greatest(-1.0, sind(?) * sind(?) + cosd(?) * cosd(?) * cosd(? - ?)))) <= ? + ?",
+            type(^dec, :float),
+            s.dec,
+            type(^dec, :float),
+            s.dec,
+            type(^ra, :float),
+            s.ra,
+            type(^radius, :float),
+            s.reach
+          ),
         order_by: [desc: p.published_at, desc: p.id],
-        limit: @candidates,
+        limit: @limit,
         select: {p, u.name}
     )
-    |> Enum.filter(fn {photo, _author} ->
-      aligned?(photo.wcs) and overlaps?(photo.wcs, ra, dec, radius)
-    end)
-    |> Enum.take(@limit)
     |> Enum.map(&item/1)
     |> then(&(deep_fields(ra, dec, radius) ++ &1))
   end
@@ -54,15 +77,6 @@ defmodule StarsmapApi.Community.SkyOverlay do
   end
 
   defp wcs_strings(wcs), do: Map.new(wcs, fn {key, value} -> {to_string(key), value} end)
-
-  defp aligned?(
-         %{"projection" => "TAN", "frame" => "ICRS", "epoch" => "J2000", "status" => "solved"} = w
-       ),
-       do:
-         Enum.all?(~w(ra_deg dec_deg pixel_scale_arcsec width height), &is_number(w[&1])) and
-           length(w["cd"] || []) == 4 and length(w["crpix"] || []) == 2
-
-  defp aligned?(_), do: false
 
   defp overlaps?(w, ra, dec, radius),
     do: separation(ra, dec, w["ra_deg"], w["dec_deg"]) <= radius + photo_radius(w)
