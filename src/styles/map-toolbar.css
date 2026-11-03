@@ -1,7 +1,7 @@
 /* Common map actions stay visible; detailed controls open above the toolbar. */
 .scale-rail.atlas-toolbar {
   container-type: inline-size;
-  width: min(620px, calc(100vw - 32px), calc(100vw - var(--workspace-width, 0px) - 48px));
+  width: min(620px, calc(100vw - 32px), calc(100vw - var(--workspace-width) - 48px));
   padding: 10px 12px;
   gap: 8px;
   border-radius: 14px;
@@ -274,10 +274,6 @@
     overflow: visible;
   }
 
-  /*
-   * Five columns: in a compact window the Share button is in the header, and the toolbar share slot
-   * (#share-slot-toolbar) is hidden (shareButtonPlacement.ts uses the same media query).
-   */
   .toolbar-zoom { grid-template-columns: auto 44px minmax(0, 1fr) 44px auto; gap: 6px; }
   .toolbar-3d-button { min-height: 44px; padding: 0 10px; }
   .toolbar-settings-button, .share-trigger { padding: 0 9px; min-height: 44px; }

@@ -101,8 +101,8 @@ defmodule StarsmapApiWeb.CommunityPageController do
 
       user ->
         cards =
-          Photos.by_author(user.id, 24)
-          |> Photos.public_many()
+          Photos.by_author(user.id)
+          |> Enum.take(24)
           |> Enum.map_join("", &card/1)
 
         html(
@@ -130,7 +130,9 @@ defmodule StarsmapApiWeb.CommunityPageController do
     end
   end
 
-  defp card(p) do
+  defp card(photo) do
+    p = Photos.public(photo)
+
     "<a href=\"/photos/#{p.id}\"><img src=\"#{h(p.thumbnail_url)}\" alt=\"#{h(p.title)}\">#{h(p.title)}</a>"
   end
 
