@@ -171,6 +171,7 @@
 }
 
 .object-orientation {
+  container: object-orientation / inline-size;
   display: grid;
   gap: 12px;
   padding: 18px 18px 16px;
@@ -195,6 +196,17 @@
 .object-orientation .fact-tiles dd {
   margin-top: 4px;
   font-size: 0.9rem;
+}
+
+/* In a narrow inspector, a long value goes on more lines. Only a wide inspector cuts it with an ellipsis. */
+@container object-orientation (max-width: 460px) {
+  .object-orientation .fact-tiles dd {
+    overflow: visible;
+    line-height: 1.25;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 .object-view-tabs {
