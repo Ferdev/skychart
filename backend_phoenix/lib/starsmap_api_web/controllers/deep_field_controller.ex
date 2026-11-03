@@ -108,7 +108,11 @@ defmodule StarsmapApiWeb.DeepFieldController do
 
   defp respond(conn, {:error, reason}), do: error(conn, :unprocessable_entity, reason)
 
-  defp moderator?(conn), do: conn.assigns.community_user.role in ["admin", "moderator"]
+  # A signed-out visitor is not a moderator, so the action answers 403 and does not crash.
+  defp moderator?(%{assigns: %{community_user: %{role: role}}}),
+    do: role in ["admin", "moderator"]
+
+  defp moderator?(_conn), do: false
 
   defp error(conn, status, reason), do: conn |> put_status(status) |> json(%{error: reason})
 end
