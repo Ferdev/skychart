@@ -268,7 +268,7 @@ defmodule StarsmapApiWeb.CommunityController do
 
         json(conn, %{
           photographer: Map.put(stats, :joined_at, user.inserted_at),
-          photos: user.id |> Photos.by_author(48) |> Photos.public_many(),
+          photos: user.id |> Photos.by_author() |> Enum.take(48) |> Enum.map(&Photos.public/1),
           findings: Findings.for_author(user.id)
         })
     end

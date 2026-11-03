@@ -36,34 +36,3 @@ for (const [locale, labels] of Object.entries(speedLabels)) {
   SPACECRAFT_TRANSLATIONS[locale]["mission.sunSpeed"] = labels[0];
   SPACECRAFT_TRANSLATIONS[locale]["mission.earthSpeed"] = labels[1];
 }
-
-// The label of the row that shows the `mission.<availability>` state of the position.
-const availabilityLabels: Record<string, string> = {
-  en: "Position availability", es: "Disponibilidad de la posición", fr: "Disponibilité de la position",
-  de: "Verfügbarkeit der Position", "pt-BR": "Disponibilidade da posição", it: "Disponibilità della posizione",
-  "zh-Hans": "位置可用性", ja: "位置データの状況", ko: "위치 제공 상태"
-};
-for (const [locale, label] of Object.entries(availabilityLabels)) SPACECRAFT_TRANSLATIONS[locale]["mission.availability"] = label;
-
-// The NASA date of one light-day between Voyager 1 and Earth. The panel uses the atlas time:
-// before this date it shows the prediction, and from this date it shows the past tense.
-const VOYAGER_LIGHT_DAY_UTC = Date.parse("2026-11-18T00:00:00Z");
-const milestoneReached: Record<string, string> = {
-  en: "Voyager 1 reached one light-day from Earth on November 18, 2026, as NASA predicted.",
-  es: "Voyager 1 llegó a un día luz de la Tierra el 18 de noviembre de 2026, como había previsto la NASA.",
-  fr: "Voyager 1 a atteint un jour-lumière de la Terre le 18 novembre 2026, comme la NASA l’avait prévu.",
-  de: "Wie von der NASA vorhergesagt, war Voyager 1 am 18. November 2026 einen Lichttag von der Erde entfernt.",
-  "pt-BR": "A Voyager 1 chegou a um dia-luz da Terra em 18 de novembro de 2026, como a NASA previa.",
-  it: "Voyager 1 è arrivata a un giorno luce dalla Terra il 18 novembre 2026, come previsto dalla NASA.",
-  "zh-Hans": "如NASA所预计，旅行者1号于2026年11月18日到达距地球一光日的位置。",
-  ja: "NASAの予測どおり、ボイジャー1号は2026年11月18日に地球から1光日の距離に達しました。",
-  ko: "NASA의 예측대로 보이저 1호는 2026년 11월 18일 지구에서 1광일 거리에 도달했습니다."
-};
-for (const [locale, text] of Object.entries(milestoneReached)) SPACECRAFT_TRANSLATIONS[locale]["mission.milestoneReached"] = text;
-
-/** The milestone text of Voyager 1 at this atlas time, or null for a time that is not valid. */
-export function voyagerMilestoneKey(atlasTime: string): "mission.milestone" | "mission.milestoneReached" | null {
-  const time = Date.parse(atlasTime);
-  if (!Number.isFinite(time)) return null;
-  return time < VOYAGER_LIGHT_DAY_UTC ? "mission.milestone" : "mission.milestoneReached";
-}
