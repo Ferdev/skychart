@@ -3,6 +3,7 @@ defmodule StarsmapApi.Community.SolverWorker do
   use Oban.Worker, queue: :media, max_attempts: 2, unique: [keys: [:id], period: 3600]
   alias StarsmapApi.Community.{Photos, Storage, Astrometry, Ranking}
   alias StarsmapApi.CommunityRepo, as: Repo
+  @no_solution "No supported plate solution was found"
   def available?, do: not is_nil(System.find_executable("solve-field"))
 
   def enqueue(user, id) do
@@ -28,13 +29,15 @@ defmodule StarsmapApi.Community.SolverWorker do
       try do
         image = Path.join(scratch, "photo.webp")
 
-        with :ok <- Storage.adapter().get("masters/#{id}/1600.webp", image),
-             {json, 0} <-
-               System.cmd("python3", [
-                 StarsmapApi.Community.backend_script("community_solve.py"),
-                 image,
-                 scratch
-               ]),
+        with {:storage, :ok} <-
+               {:storage, Storage.adapter().get("masters/#{id}/1600.webp", image)},
+             {:solve, {json, 0}} <-
+               {:solve,
+                System.cmd("python3", [
+                  StarsmapApi.Community.backend_script("community_solve.py"),
+                  image,
+                  scratch
+                ])},
              {:ok, attrs} <- Jason.decode(json),
              {:ok, wcs} <- Astrometry.validate(attrs) do
           StarsmapApi.Community.transaction(fn ->
@@ -61,13 +64,25 @@ defmodule StarsmapApi.Community.SolverWorker do
 
           :ok
         else
-          _ -> {:cancel, "No supported plate solution was found"}
+          # Oban runs the job again for an error, until `max_attempts`.
+          {:storage, error} -> {:error, {:storage, error}}
+          {:solve, {output, status}} -> solve_failure(output, status)
+          _ -> {:cancel, @no_solution}
         end
       after
         File.rm_rf(scratch)
       end
     else
       :ok
+    end
+  end
+
+  # The script writes the error JSON when the solver ran and found no solution. Another exit (a
+  # crash, or a stop at a resource limit) can be temporary.
+  defp solve_failure(output, status) do
+    case Jason.decode(output) do
+      {:ok, %{"error" => _}} -> {:cancel, @no_solution}
+      _ -> {:error, {:solver_exit, status}}
     end
   end
 end

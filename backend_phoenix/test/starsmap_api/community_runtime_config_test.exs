@@ -35,11 +35,13 @@ defmodule StarsmapApi.CommunityRuntimeConfigTest do
     COMMUNITY_MEDIA_URL
   )
 
+  @answer_flights ~w(ANSWER_FLIGHTS_DAILY_USD ANSWER_FLIGHTS_MODEL ANSWER_FLIGHTS_API_KEY)
+
   setup do
-    names = ["COMMUNITY_POOL_SIZE" | Map.keys(@settings)]
+    names = ["COMMUNITY_POOL_SIZE" | @answer_flights] ++ Map.keys(@settings)
     previous = Map.new(names, &{&1, System.get_env(&1)})
     System.put_env(@settings)
-    System.delete_env("COMMUNITY_POOL_SIZE")
+    Enum.each(["COMMUNITY_POOL_SIZE" | @answer_flights], &System.delete_env/1)
 
     on_exit(fn ->
       Enum.each(previous, fn
@@ -112,6 +114,34 @@ defmodule StarsmapApi.CommunityRuntimeConfigTest do
 
     assert config[:starsmap_api][:community_mail_token] == nil
     assert config[:starsmap_api][:community_media_url] == "/api/community/media"
+  end
+
+  test "blank answer-flight settings give the defaults" do
+    for name <- @answer_flights, do: System.put_env(name, "")
+
+    config = read()[:starsmap_api]
+
+    assert config[:answer_flight_daily_usd] == 5.0
+    assert config[:answer_flight_model_name] == "claude-opus-5-5"
+    assert config[:answer_flight_api_key] == nil
+  end
+
+  test "answer-flight settings that are set are used" do
+    System.put_env("ANSWER_FLIGHTS_DAILY_USD", "2.5")
+    System.put_env("ANSWER_FLIGHTS_MODEL", "claude-sonnet-5-5")
+    System.put_env("ANSWER_FLIGHTS_API_KEY", "key")
+
+    config = read()[:starsmap_api]
+
+    assert config[:answer_flight_daily_usd] == 2.5
+    assert config[:answer_flight_model_name] == "claude-sonnet-5-5"
+    assert config[:answer_flight_api_key] == "key"
+  end
+
+  test "an answer-flight daily cap that is not a number stops the boot" do
+    System.put_env("ANSWER_FLIGHTS_DAILY_USD", "abc")
+
+    assert_raise RuntimeError, ~r/ANSWER_FLIGHTS_DAILY_USD must be a number/, fn -> read() end
   end
 
   defp cron(config) do

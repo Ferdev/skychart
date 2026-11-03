@@ -181,9 +181,14 @@ defmodule StarsmapApi.Community.DeepFields do
     |> Enum.filter(&aligned?/1)
   end
 
+  # For an even count, the mean of the two middle values.
   defp median(values) do
     sorted = Enum.sort(values)
-    Enum.at(sorted, div(length(sorted), 2)) * 1.0
+    middle = div(length(sorted), 2)
+
+    if rem(length(sorted), 2) == 1,
+      do: Enum.at(sorted, middle) * 1.0,
+      else: (Enum.at(sorted, middle - 1) + Enum.at(sorted, middle)) / 2
   end
 
   # The field of a target near right ascension zero must not move to the opposite side of the sky.

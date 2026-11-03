@@ -130,10 +130,21 @@ defmodule StarsmapApi.Community.Photos do
           end)
           |> Enum.map(&elem(&1, 0))
 
-        start = if cursor, do: (Enum.find_index(ids, &(&1 == cursor)) || -1) + 1, else: 0
-        page = Enum.slice(ids, start, 24)
+        page = gallery_page(ids, cursor)
         photos = Repo.all(from p in Photo, where: p.id in ^page) |> Map.new(&{&1.id, &1})
         Enum.map(page, &(photos |> Map.fetch!(&1) |> public()))
+    end
+  end
+
+  # The page after the cursor photo. When that photo left the list (for example, a moderator hid
+  # it), its position is not known, so the page is empty and the client does not get earlier
+  # photos again.
+  defp gallery_page(ids, nil), do: Enum.take(ids, 24)
+
+  defp gallery_page(ids, cursor) do
+    case Enum.find_index(ids, &(&1 == cursor)) do
+      nil -> []
+      index -> Enum.slice(ids, index + 1, 24)
     end
   end
 
