@@ -1,13 +1,16 @@
 import json
+import struct
 import subprocess
 import sys
+import zlib
 from pathlib import Path
 
 import numpy as np
 import pytest
 
 from backend.community_depth import CELL, build, cut_layers, pair_sources, sky_to_pixel, write_webp
-from backend.community_sources import detect, read_rgb
+from backend import community_sources
+from backend.community_sources import ImageTooLarge, detect, read_rgb
 
 WCS = {"ra_deg": 150.0, "dec_deg": 2.0, "pixel_scale_arcsec": 2.0, "rotation_deg": 0.0, "width": 800, "height": 600}
 
@@ -55,6 +58,41 @@ def test_an_opaque_image_keeps_its_values_and_three_bands(tmp_path):
     assert decoded.shape == (64, 64, 3)
     assert tuple(decoded[15, 15]) == (140, 90, 40)
     assert tuple(decoded[40, 40]) == (30, 30, 30)
+
+
+def crafted_png(path, width, height):
+    """A PNG whose header gives a large size, with almost no data: the shape of a decompression bomb."""
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(b"\0" * 64)) + chunk(b"IEND", b""))
+    return path
+
+
+def test_an_image_above_the_pixel_limit_stops_before_any_decode(tmp_path, monkeypatch):
+    image = crafted_png(tmp_path / "bomb.png", 20_000, 20_000)
+    commands = []
+    real_run = community_sources.subprocess.run
+
+    def recording_run(command, *args, **kwargs):
+        commands.append(command)
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(community_sources.subprocess, "run", recording_run)
+    with pytest.raises(ImageTooLarge):
+        read_rgb(image, tmp_path)
+    assert commands and all(command[0] == "vipsheader" for command in commands)
+    assert not (tmp_path / "flat.png").exists()
+
+
+def test_an_image_at_the_pixel_limit_still_decodes(tmp_path):
+    pixels = np.full((40, 50, 3), 70, dtype=np.uint8)
+    image = tmp_path / "small.webp"
+    write_webp(pixels, image, "[lossless]")
+    assert read_rgb(image, tmp_path, max_pixels=40 * 50).shape == (40, 50, 3)
+    with pytest.raises(ImageTooLarge):
+        read_rgb(image, tmp_path, max_pixels=40 * 50 - 1)
 
 
 def test_pairs_are_strict_and_a_solution_offset_is_removed():

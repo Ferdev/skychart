@@ -1,6 +1,8 @@
 import json
+import struct
 import subprocess
 import sys
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -71,6 +73,16 @@ def request(tmp_path, stars, specs):
         save(image, path)
         frames.append({"id": f"frame-{index}", "path": str(path), "wcs": wcs})
     return {"grid": GRID, "stars": stars, "frames": frames}
+
+
+def crafted_png(path, width, height):
+    """A PNG whose header gives a large size, with almost no data."""
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(b"\0" * 64)) + chunk(b"IEND", b""))
+    return path
 
 
 def test_pixel_to_sky_is_the_inverse_of_the_frame_projection():
@@ -173,6 +185,20 @@ def test_one_frame_that_cannot_be_used_keeps_a_reason_and_the_others_build(tmp_p
     result = build(request(tmp_path, stars, specs), tmp_path / "out", tmp_path / "scratch")
     assert result["rejected"] == [{"id": "frame-4", "reason": "too_few_stars"}]
     assert len(result["frames"]) == 4
+
+
+def test_a_frame_above_the_pixel_limit_keeps_a_reason_and_the_others_build(tmp_path):
+    stars = star_field()
+    specs = []
+    for index in range(3):
+        wcs = frame_wcs(ra=150.0 + 0.002 * index)
+        specs.append((wcs, render(stars, wcs, 0.5, 900.0, 30, 0.00002, seed=index)))
+    data = request(tmp_path, stars, specs)
+    bomb = crafted_png(tmp_path / "bomb.png", 20_000, 20_000)
+    data["frames"].append({"id": "frame-bomb", "path": str(bomb), "wcs": frame_wcs()})
+    result = build(data, tmp_path / "out", tmp_path / "scratch")
+    assert result["rejected"] == [{"id": "frame-bomb", "reason": "too_large"}]
+    assert len(result["frames"]) == 3
 
 
 def test_a_build_with_too_few_frames_writes_no_image(tmp_path):
