@@ -34,6 +34,7 @@
     "test:universe-flight": "node --experimental-strip-types tests/universeFlight.test.ts",
     "test:universe-transfer": "node --experimental-strip-types tests/universeTransfer.test.ts",
     "test:universe-bodies": "node --experimental-strip-types tests/universeBodyGeometry.test.ts",
+    "test:universe-orbits": "node --experimental-strip-types tests/universeOrbits.test.ts",
     "test:universe-appearance": "node --experimental-strip-types tests/universeAppearance.test.ts",
     "test:universe-photometry": "node --experimental-strip-types tests/universePhotometry.test.ts",
     "test:constellations": "node --experimental-strip-types tests/constellations.test.ts",

@@ -33,6 +33,7 @@ const en: Record<string, string> = {
   "universe3d.eyebrow": "Free-flight view",
   "universe3d.title": "3D Universe",
   "universe3d.reset": "Reset flight",
+  "universe3d.orbits": "Orbits",
   "universe3d.find": "Find destination",
   "universe3d.searchClose": "Close",
   "universe3d.searchPlaceholder": "Search objects",
