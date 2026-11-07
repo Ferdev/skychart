@@ -11,6 +11,8 @@ export type UniverseViewOptions = {
   toggleButton: HTMLButtonElement;
   closeButton: HTMLButtonElement;
   resetButton: HTMLButtonElement;
+  /** Shows or hides the orbits of the loaded planets in the 3D view. */
+  orbitsButton: HTMLButtonElement;
   findButton: HTMLButtonElement;
   searchDialog: HTMLDialogElement;
   searchCloseButton: HTMLButtonElement;

@@ -35,6 +35,7 @@ import { deepSkyModel } from "./universeDeepSkyModel";
 import { UniverseDeepSkyRenderer } from "./universeDeepSkyRenderer";
 import { bodyToUniversePoint, catalogPointIsHostBound, sampleDuringFlight, validCatalogPoint, type CatalogUniversePoint, type UniversePoint } from "./universePointModel";
 import { UniverseExoplanetSystems } from "./universeExoplanets";
+import { UniverseOrbitOverlay } from "./universeOrbits";
 import { universeTargetCardText } from "./universeTargetCard";
 import { UniverseCameraTurn } from "./universeCameraTurn";
 import { EXIT_CONFIRM_WINDOW_MS, ExitConfirmation, universeEscapeAction } from "./universeEscape";
@@ -104,6 +105,7 @@ export class UniverseViewController {
   private readonly exoplanetSystems: UniverseExoplanetSystems;
   private readonly cameraTurn: UniverseCameraTurn;
   private readonly exitConfirmation = new ExitConfirmation();
+  private readonly orbitOverlay: UniverseOrbitOverlay;
 
   constructor(private readonly options: UniverseViewOptions) {
     this.exoplanetSystems = new UniverseExoplanetSystems(options.loadPlanetarySystem, () => {
@@ -130,6 +132,7 @@ export class UniverseViewController {
     options.toggleButton.addEventListener("click", () => this.open(options.initialState()));
     options.closeButton.addEventListener("click", () => this.close());
     options.resetButton.addEventListener("click", () => this.reset());
+    this.orbitOverlay = new UniverseOrbitOverlay(options.orbitsButton, () => { this.baseRenderKey = ""; this.requestRender(); });
     this.destinationSearch = new UniverseDestinationSearch({
       findButton: options.findButton, dialog: options.searchDialog, closeButton: options.searchCloseButton,
       input: options.searchInput, results: options.searchResults, active: () => this.active,
@@ -411,7 +414,11 @@ export class UniverseViewController {
     const quality = this.quality.frame(renderStarted, moving);
     const baseKey = `${backdropKey}:${useWebgl ? moving ? "flight" : `${this.position.x},${this.position.y},${this.position.z}` : "fallback"}`;
     const redrawBase = moving || !useWebgl || this.baseRenderKey !== baseKey;
-    if (redrawBase) context.drawImage(this.backdropCanvas!, 0, 0, width, height);
+    if (redrawBase) {
+      context.drawImage(this.backdropCanvas!, 0, 0, width, height);
+      this.orbitOverlay.draw(context, this.options.bodyByKey().values(), this.options.bodyByKey(),
+        this.position, project, width, this.target?.key);
+    }
     const baseDone = performance.now();
     const framePoints = this.points();
     const occluders = bodyOccluders(framePoints, this.position, this.camera, width, height);
