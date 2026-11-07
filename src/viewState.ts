@@ -1,4 +1,5 @@
 import { normalizeHiddenConstellations } from "./atlas/constellationStyles.ts";
+import { wrapPitchDegrees } from "./sky/skyProjection.ts";
 
 export const VIEW_STATE_VERSION = 1;
 
@@ -168,14 +169,15 @@ export function normalizeUniverseViewState(value: UniverseViewState): UniverseVi
   const numbers = position && [position.x, position.y, position.z, value.yawDeg, value.pitchDeg, value.fovDeg, value.moveStepAu];
   if (!numbers || !numbers.every((item) => typeof item === "number" && Number.isFinite(item))) return null;
   if (numbers.slice(0, 3).some((item) => Math.abs(item) > 1e18)) return null;
-  if (value.pitchDeg < -89.5 || value.pitchDeg > 89.5 || value.fovDeg < 20 || value.fovDeg > 110) return null;
+  // The 3D camera can turn over a pole, so its pitch has the full [-180, 180] range.
+  if (value.pitchDeg < -180 || value.pitchDeg > 180 || value.fovDeg < 20 || value.fovDeg > 110) return null;
   if (value.moveStepAu < 1e-12 || value.moveStepAu > 1e18) return null;
   const targetKey = value.targetKey === undefined ? null : normalizeObserverKey(value.targetKey);
   if (value.targetKey !== undefined && !targetKey) return null;
   return {
     positionAu: { ...position },
     yawDeg: normalizeDegrees(value.yawDeg),
-    pitchDeg: value.pitchDeg,
+    pitchDeg: wrapPitchDegrees(value.pitchDeg),
     fovDeg: value.fovDeg,
     moveStepAu: value.moveStepAu,
     ...(targetKey ? { targetKey } : {}),
