@@ -38,6 +38,7 @@ export function createUniverseViewController(dom: typeof atlasDom, options: Univ
     toggleButton: dom.universeToggle,
     closeButton: dom.universeClose,
     resetButton: dom.universeReset,
+    orbitsButton: dom.universeOrbits,
     findButton: dom.universeFind,
     searchDialog: dom.universeSearchDialog,
     searchCloseButton: dom.universeSearchClose,
