@@ -43,6 +43,24 @@ export function normalizeCamera(camera: SkyCamera): SkyCamera {
   };
 }
 
+/**
+ * The free-flight 3D camera has no pitch limit: it can turn over a pole and continue.
+ * Pitch wraps to [-180, 180). A pitch above 90 degrees (or below -90) looks back over the pole
+ * with the view upside down.
+ */
+export function normalizeFreeCamera(camera: SkyCamera): SkyCamera {
+  return {
+    yawDeg: normalizeDegrees(camera.yawDeg),
+    pitchDeg: wrapPitchDegrees(camera.pitchDeg),
+    fovDeg: clamp(camera.fovDeg, 20, 110),
+  };
+}
+
+/** Pitch in [-180, 180). */
+export function wrapPitchDegrees(value: number): number {
+  return ((value + 180) % 360 + 360) % 360 - 180;
+}
+
 export function projectDirection(
   direction: Vector3,
   camera: SkyCamera,
@@ -56,7 +74,8 @@ export function projectDirection(
 export function createSkyProjector(camera: SkyCamera, width: number, height: number, clipMargin = 16):
   (direction: Vector3) => SkyProjection | null {
   if (width <= 0 || height <= 0) return () => null;
-  const normalizedCamera = normalizeCamera(camera);
+  // The sky view clamps its own pitch; the 3D view can look over a pole, so do not clamp here.
+  const normalizedCamera = normalizeFreeCamera(camera);
   const yaw = normalizedCamera.yawDeg * DEG_TO_RAD;
   const pitch = normalizedCamera.pitchDeg * DEG_TO_RAD;
   const forward = {

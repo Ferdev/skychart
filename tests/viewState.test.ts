@@ -47,7 +47,11 @@ assert.deepEqual(
 );
 assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&sky=earth&sc=0,0,72&sl=2")?.sky, undefined);
 assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&sky=earth&sc=0,0,72&sf=asteroid,future")?.sky, undefined);
-assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,95,72,1")?.universe, undefined);
+// The 3D camera can turn over a pole: a pitch past 90 degrees is a valid upside-down view.
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,95,72,1")?.universe?.pitchDeg, 95);
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,-150,72,1")?.universe?.pitchDeg, -150);
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,180,72,1")?.universe?.pitchDeg, -180);
+assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,181,72,1")?.universe, undefined);
 assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&u3=0,0,0&u3c=0,0,72,0")?.universe, undefined);
 assert.equal(decodeViewState("?v=1&c=0,0&z=1&t=now&L=&sky=earth&sc=0,0,72&u3=0,0,0&u3c=0,0,72,1"), null);
 
