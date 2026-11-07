@@ -9,7 +9,8 @@ const DEG_TO_RAD = Math.PI / 180;
 
 export function universeCameraBasis(yawDeg: number, pitchDeg: number) {
   const yaw = yawDeg * DEG_TO_RAD;
-  const pitch = clamp(pitchDeg, -89.5, 89.5) * DEG_TO_RAD;
+  // No pitch limit: past 90 degrees the camera has turned over the pole and is upside down.
+  const pitch = pitchDeg * DEG_TO_RAD;
   return {
     forward: {
       x: Math.cos(pitch) * Math.cos(yaw),
@@ -23,6 +24,25 @@ export function universeCameraBasis(yawDeg: number, pitchDeg: number) {
       z: Math.cos(pitch),
     },
   };
+}
+
+/** True when the camera has turned over a pole, so the view is upside down. */
+export function cameraUpsideDown(pitchDeg: number): boolean {
+  return Math.cos(pitchDeg * DEG_TO_RAD) < 0;
+}
+
+/**
+ * Yaw change for a horizontal look input (a drag or an arrow key).
+ * Upside down, a turn about the ecliptic pole moves the view the other way on the screen,
+ * so the sign changes and the sky still follows the pointer.
+ */
+export function lookYawDelta(pitchDeg: number, screenDeltaDeg: number): number {
+  return cameraUpsideDown(pitchDeg) ? screenDeltaDeg : -screenDeltaDeg;
+}
+
+/** Ecliptic direction of flight, in degrees, for the trip map. Over a pole it is opposite to the yaw. */
+export function cameraHeadingDeg(yawDeg: number, pitchDeg: number): number {
+  return cameraUpsideDown(pitchDeg) ? (yawDeg + 180) % 360 : yawDeg;
 }
 
 export function moveUniversePosition(

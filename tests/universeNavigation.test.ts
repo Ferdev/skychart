@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { moveUniversePosition, universeCameraBasis, universeEntryAim, universeEntryState } from "../src/navigation/universeNavigation.ts";
+import {
+  cameraHeadingDeg, cameraUpsideDown, lookYawDelta, moveUniversePosition, universeCameraBasis, universeEntryAim, universeEntryState,
+} from "../src/navigation/universeNavigation.ts";
 
 const near = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} ≈ ${expected}`);
 
@@ -54,4 +56,37 @@ for (const [scale, step] of [[1, 0.001], [63_241, 1], [6.324e10, 1e7], [6.324e16
   assert.ok(Number.isFinite(moved.x) && moved.x > scale, `movement must remain representable at ${scale} AU`);
 }
 
+
+// Free look: the basis turns over a pole with no stop at 89.5 degrees.
+const straightUp = universeCameraBasis(0, 90);
+near(straightUp.forward.z, 1);
+near(straightUp.up.x, -1);
+const overPole = universeCameraBasis(0, 120);
+near(overPole.forward.x, Math.cos(120 * Math.PI / 180));
+near(overPole.forward.z, Math.sin(120 * Math.PI / 180));
+assert.ok(overPole.forward.x < 0 && overPole.up.z < 0, "past 90 degrees the camera looks back over the pole, upside down");
+near(overPole.right.y, 1);
+// The basis stays orthonormal for every pitch.
+for (const pitch of [-179, -120, -90, -45, 0, 60, 90, 135, 179]) {
+  const b = universeCameraBasis(37, pitch);
+  const dot = (a: typeof b.up, c: typeof b.up) => a.x * c.x + a.y * c.y + a.z * c.z;
+  near(dot(b.forward, b.right), 0);
+  near(dot(b.forward, b.up), 0);
+  near(dot(b.right, b.up), 0);
+  near(dot(b.forward, b.forward), 1);
+  near(dot(b.up, b.up), 1);
+}
+const climbed = moveUniversePosition({ x: 0, y: 0, z: 0 }, 0, 150, "forward", 2);
+assert.ok(climbed.x < 0 && climbed.z > 0, "flight follows the camera over the pole");
+
+assert.equal(cameraUpsideDown(0), false);
+assert.equal(cameraUpsideDown(89.5), false);
+assert.equal(cameraUpsideDown(120), true);
+assert.equal(cameraUpsideDown(-120), true);
+// A drag to the right turns left upright; upside down the yaw sign changes so the sky still follows the pointer.
+assert.equal(lookYawDelta(10, 5), -5);
+assert.equal(lookYawDelta(150, 5), 5);
+assert.equal(cameraHeadingDeg(30, 10), 30);
+assert.equal(cameraHeadingDeg(30, 150), 210);
+assert.equal(cameraHeadingDeg(270, -150), 90);
 console.log("universe navigation tests passed");

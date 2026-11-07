@@ -85,6 +85,41 @@ test.describe("3D view controls", () => {
     issues.assertClean();
   });
 
+  test("a drag turns the view over a pole with no stop", async ({ page }) => {
+    const issues = collectBrowserIssues(page);
+    await openAtlas(page, START);
+    await enter3d(page);
+    const camera = () => new URL(page.url()).searchParams.get("u3c")?.split(",").map(Number) ?? [];
+    const wrap = (value: number) => ((value + 180) % 360 + 360) % 360 - 180;
+    const box = (await page.locator("#universe-map").boundingBox())!;
+    const x = box.x + box.width / 2;
+    // A drag turns the view by the field of view over the short side of the view, for each pixel.
+    const [, startPitch, fov] = camera();
+    const pixels = 50 * Math.max(240, Math.min(box.width, box.height)) / fov!;
+    const drag = async (direction: 1 | -1) => {
+      const middle = box.y + box.height / 2;
+      await page.mouse.move(x, middle - direction * pixels / 2);
+      await page.mouse.down();
+      await page.mouse.move(x, middle + direction * pixels / 2, { steps: 10 });
+      await page.mouse.up();
+    };
+    // Two drags of 50 degrees each go past the zenith: the old view stopped at 89.5 degrees.
+    await drag(1);
+    await drag(1);
+    await expect.poll(() => camera()[1]).toBeCloseTo(wrap(startPitch! + 100), 0);
+    expect(Math.abs(camera()[1]!)).toBeGreaterThan(90);
+    // The same drag the other way goes back over the zenith, and then over the nadir.
+    for (let step = 0; step < 4; step += 1) await drag(-1);
+    await expect.poll(() => camera()[1]).toBeCloseTo(wrap(startPitch! - 100), 0);
+    expect(Math.abs(camera()[1]!)).toBeGreaterThan(90);
+    // The URL with a pitch past the pole opens the same view again.
+    const before = new URL(page.url()).searchParams.get("u3c");
+    await page.reload();
+    await expect(page.locator("#universe-view")).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("u3c")).toBe(before);
+    issues.assertClean();
+  });
+
   test("the gravity route shows its on state with a mark, and keeps its name", async ({ page }) => {
     await openAtlas(page, START);
     await enter3d(page);

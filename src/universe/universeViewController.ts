@@ -1,7 +1,7 @@
 import { community } from "../community/communityController";
 import { GUIDED_DEEP_SKY_KEYS } from "../atlas/atlasDefinitions";
 import { trackEvent } from "../analytics";
-import type { UniverseMove } from "../navigation/universeNavigation";
+import { cameraHeadingDeg, lookYawDelta, type UniverseMove } from "../navigation/universeNavigation";
 import { autopilotTravel, thrustScale, turnCameraToward, UniverseFlight } from "../navigation/universeFlight";
 import { gravityBodies, planTransfer, playbackTimeFraction, transferPosition, transferSpeed, TRANSFER_PLAYBACK_SECONDS, type TransferResult } from "../navigation/universeTransfer";
 import { formatCount } from "../format/quantity";
@@ -18,7 +18,7 @@ import { SkySelectionConnectorView } from "../sky/skySelectionConnectorView";
 import {
   cameraForDirection,
   createSkyProjector,
-  normalizeCamera,
+  normalizeFreeCamera,
   relativeDirection,
   type SkyCamera,
   type Vector3,
@@ -185,7 +185,7 @@ export class UniverseViewController {
     if (!this.active) return undefined;
     return normalizeUniverseViewState({
       positionAu: { ...this.position },
-      ...normalizeCamera(this.camera),
+      ...normalizeFreeCamera(this.camera),
       moveStepAu: this.moveStepAu,
       ...(this.targetKey ? { targetKey: this.targetKey } : {}),
     }) ?? undefined;
@@ -198,7 +198,7 @@ export class UniverseViewController {
     this.position = historyMode === "push"
       ? safeUniverseEntryPosition(normalized.positionAu, normalized, this.options.bodyByKey().values())
       : { ...normalized.positionAu };
-    this.camera = normalizeCamera(normalized);
+    this.camera = normalizeFreeCamera(normalized);
     this.moveStepAu = Math.max(normalized.moveStepAu, positionPrecisionStep(this.position));
     const selected = this.options.selectedBody();
     this.targetKey = normalized.targetKey ?? selected?.key ?? null;
@@ -275,7 +275,7 @@ export class UniverseViewController {
     if (!this.initialState) return;
     this.stopFlight();
     this.position = { ...this.initialState.positionAu };
-    this.camera = normalizeCamera(this.initialState);
+    this.camera = normalizeFreeCamera(this.initialState);
     this.moveStepAu = Math.max(this.initialState.moveStepAu, positionPrecisionStep(this.position));
     this.minimap.restart(this.position);
     this.afterNavigation();
@@ -583,7 +583,7 @@ export class UniverseViewController {
     const bodies = [...this.options.bodyByKey().values()].flatMap((body) => bodyToUniversePoint(body) ?? []);
     this.minimap.setScene({ target: this.target, bodies, route: result && "plan" in result ? result.plan.points : null,
       catalog: this.flightCatalogPoints, minimumSpanAu: this.moveStepAu * 4 });
-    this.minimap.draw(this.position, this.camera.yawDeg);
+    this.minimap.draw(this.position, cameraHeadingDeg(this.camera.yawDeg, this.camera.pitchDeg));
   }
 
   private updateTarget(): void {
@@ -769,7 +769,7 @@ export class UniverseViewController {
       this.speedAu = tracking && this.transfer ? transferSpeed(this.transfer, this.position)
         : Math.hypot(this.position.x - from.x, this.position.y - from.y, this.position.z - from.z) / seconds;
       this.requestRender();
-      this.minimap.draw(this.position, this.camera.yawDeg);
+      this.minimap.draw(this.position, cameraHeadingDeg(this.camera.yawDeg, this.camera.pitchDeg));
       if (!this.flying) { this.endFlight(); return; }
       if (now - this.lastFlightUiAt >= 100) {
         this.lastFlightUiAt = now;
@@ -886,7 +886,10 @@ export class UniverseViewController {
     const dy = point.y - this.lastPointer.y;
     if (Math.hypot(dx, dy) > 1) this.dragMoved = true;
     const degreesPerPixel = this.camera.fovDeg / Math.max(240, Math.min(this.options.canvas.clientWidth, this.options.canvas.clientHeight));
-    this.camera = normalizeCamera({ ...this.camera, yawDeg: this.camera.yawDeg - dx * degreesPerPixel, pitchDeg: this.camera.pitchDeg + dy * degreesPerPixel });
+    // No pitch limit: a drag past a pole turns the view over it.
+    this.camera = normalizeFreeCamera({ ...this.camera,
+      yawDeg: this.camera.yawDeg + lookYawDelta(this.camera.pitchDeg, dx * degreesPerPixel),
+      pitchDeg: this.camera.pitchDeg + dy * degreesPerPixel });
     this.lastPointer = point;
     this.afterNavigation();
   }
@@ -922,8 +925,8 @@ export class UniverseViewController {
       void this.selectAt({ x: this.options.canvas.clientWidth / 2, y: this.options.canvas.clientHeight / 2 });
       return;
     }
-    else if (event.key === "ArrowLeft") this.camera.yawDeg -= event.shiftKey ? 10 : 3;
-    else if (event.key === "ArrowRight") this.camera.yawDeg += event.shiftKey ? 10 : 3;
+    else if (event.key === "ArrowLeft") this.camera.yawDeg += lookYawDelta(this.camera.pitchDeg, event.shiftKey ? 10 : 3);
+    else if (event.key === "ArrowRight") this.camera.yawDeg += lookYawDelta(this.camera.pitchDeg, event.shiftKey ? -10 : -3);
     else if (event.key === "ArrowUp") this.camera.pitchDeg += event.shiftKey ? 10 : 3;
     else if (event.key === "ArrowDown") this.camera.pitchDeg -= event.shiftKey ? 10 : 3;
     else if (event.key === "Escape") { event.preventDefault(); this.escape(); return; }
@@ -932,7 +935,7 @@ export class UniverseViewController {
     this.exitConfirmation.reset();
     if (!movement) {
       this.cameraTurn.cancel();
-      this.camera = normalizeCamera(this.camera);
+      this.camera = normalizeFreeCamera(this.camera);
       this.afterNavigation();
     }
   }
