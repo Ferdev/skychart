@@ -78,6 +78,13 @@ test("free-flight 3D universe navigation moves through catalog coordinates and r
   await expect(page.locator("#universe-map")).toBeFocused();
   await expect(page.locator("#universe-status")).toHaveText("2 sampled catalog positions loaded");
   await expect(page.locator("#universe-minimap")).toHaveAttribute("data-route", "none");
+  // The planet orbits show at first, and the header switch hides and shows them again.
+  const orbitsToggle = page.locator("#universe-orbits");
+  await expect(orbitsToggle).toHaveAttribute("aria-pressed", "true");
+  await orbitsToggle.click();
+  await expect(orbitsToggle).toHaveAttribute("aria-pressed", "false");
+  await orbitsToggle.click();
+  await expect(orbitsToggle).toHaveAttribute("aria-pressed", "true");
   // With no selected object the view starts with the Sun in its centre, and the autopilot says that it has no target.
   await expect(page.locator("#universe-autopilot")).toHaveText("Cruise forward");
   await expect.poll(async () => (await page.evaluate(() => window.__ATLAS_DIAGNOSTICS__!.universeLabels())).map((label) => label.name)).toContain("Sun");
