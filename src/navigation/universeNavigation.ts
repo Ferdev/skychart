@@ -1,6 +1,6 @@
 import { clamp } from "../geometry.ts";
-import type { Vector3 } from "../sky/skyProjection.ts";
-import { cameraForDirection, relativeDirection } from "../sky/skyProjection.ts";
+import type { SkyCamera, Vector3 } from "../sky/skyProjection.ts";
+import { cameraForDirection, normalizeFreeCamera, relativeDirection } from "../sky/skyProjection.ts";
 import type { UniverseViewState } from "../viewState.ts";
 
 export type UniverseMove = "forward" | "back" | "left" | "right" | "up" | "down";
@@ -43,6 +43,26 @@ export function lookYawDelta(pitchDeg: number, screenDeltaDeg: number): number {
 /** Ecliptic direction of flight, in degrees, for the trip map. Over a pole it is opposite to the yaw. */
 export function cameraHeadingDeg(yawDeg: number, pitchDeg: number): number {
   return cameraUpsideDown(pitchDeg) ? (yawDeg + 180) % 360 : yawDeg;
+}
+
+/**
+ * Turn the camera for a look input: `rightDeg` is a drag to the right, `downDeg` a drag down.
+ * There is no pitch limit: a turn past a pole continues over it.
+ */
+export function lookCamera(camera: SkyCamera, rightDeg: number, downDeg: number): SkyCamera {
+  return normalizeFreeCamera({ ...camera,
+    yawDeg: camera.yawDeg + lookYawDelta(camera.pitchDeg, rightDeg), pitchDeg: camera.pitchDeg + downDeg });
+}
+
+const ARROW_LOOK: Record<string, readonly [number, number]> = {
+  ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1],
+};
+
+/** The camera after an arrow key: 3 degrees, or 10 with Shift. Null for other keys. */
+export function arrowLookCamera(camera: SkyCamera, key: string, shift: boolean): SkyCamera | null {
+  const look = ARROW_LOOK[key];
+  const step = shift ? 10 : 3;
+  return look ? lookCamera(camera, look[0] * step, look[1] * step) : null;
 }
 
 export function moveUniversePosition(

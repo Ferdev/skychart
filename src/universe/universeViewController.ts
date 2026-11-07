@@ -1,7 +1,7 @@
 import { community } from "../community/communityController";
 import { GUIDED_DEEP_SKY_KEYS } from "../atlas/atlasDefinitions";
 import { trackEvent } from "../analytics";
-import { cameraHeadingDeg, lookYawDelta, type UniverseMove } from "../navigation/universeNavigation";
+import { arrowLookCamera, cameraHeadingDeg, lookCamera, type UniverseMove } from "../navigation/universeNavigation";
 import { autopilotTravel, thrustScale, turnCameraToward, UniverseFlight } from "../navigation/universeFlight";
 import { gravityBodies, planTransfer, playbackTimeFraction, transferPosition, transferSpeed, TRANSFER_PLAYBACK_SECONDS, type TransferResult } from "../navigation/universeTransfer";
 import { formatCount } from "../format/quantity";
@@ -893,10 +893,7 @@ export class UniverseViewController {
     const dy = point.y - this.lastPointer.y;
     if (Math.hypot(dx, dy) > 1) this.dragMoved = true;
     const degreesPerPixel = this.camera.fovDeg / Math.max(240, Math.min(this.options.canvas.clientWidth, this.options.canvas.clientHeight));
-    // No pitch limit: a drag past a pole turns the view over it.
-    this.camera = normalizeFreeCamera({ ...this.camera,
-      yawDeg: this.camera.yawDeg + lookYawDelta(this.camera.pitchDeg, dx * degreesPerPixel),
-      pitchDeg: this.camera.pitchDeg + dy * degreesPerPixel });
+    this.camera = lookCamera(this.camera, dx * degreesPerPixel, dy * degreesPerPixel);
     this.lastPointer = point;
     this.afterNavigation();
   }
@@ -923,6 +920,7 @@ export class UniverseViewController {
     if (event.key === "Shift") { this.shiftHeld = true; return; }
     const key = event.key.toLowerCase();
     const movement = keyMovement(key);
+    const looked = arrowLookCamera(this.camera, event.key, event.shiftKey);
     if (movement) {
       if (!event.repeat && !this.heldMoves.has(movement)) this.nudge(movement);
       if (!event.repeat) this.heldMoves.add(movement);
@@ -932,10 +930,7 @@ export class UniverseViewController {
       void this.selectAt({ x: this.options.canvas.clientWidth / 2, y: this.options.canvas.clientHeight / 2 });
       return;
     }
-    else if (event.key === "ArrowLeft") this.camera.yawDeg += lookYawDelta(this.camera.pitchDeg, event.shiftKey ? 10 : 3);
-    else if (event.key === "ArrowRight") this.camera.yawDeg += lookYawDelta(this.camera.pitchDeg, event.shiftKey ? -10 : -3);
-    else if (event.key === "ArrowUp") this.camera.pitchDeg += event.shiftKey ? 10 : 3;
-    else if (event.key === "ArrowDown") this.camera.pitchDeg -= event.shiftKey ? 10 : 3;
+    else if (looked) this.camera = looked;
     else if (event.key === "Escape") { event.preventDefault(); this.escape(); return; }
     else return;
     event.preventDefault();

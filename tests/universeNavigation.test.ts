@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {
-  cameraHeadingDeg, cameraUpsideDown, lookYawDelta, moveUniversePosition, universeCameraBasis, universeEntryAim, universeEntryState,
+  arrowLookCamera, cameraHeadingDeg, cameraUpsideDown, lookCamera, lookYawDelta, moveUniversePosition, universeCameraBasis, universeEntryAim, universeEntryState,
 } from "../src/navigation/universeNavigation.ts";
 
 const near = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-10, `${actual} ≈ ${expected}`);
@@ -89,4 +89,12 @@ assert.equal(lookYawDelta(150, 5), 5);
 assert.equal(cameraHeadingDeg(30, 10), 30);
 assert.equal(cameraHeadingDeg(30, 150), 210);
 assert.equal(cameraHeadingDeg(270, -150), 90);
+// A look input continues over a pole, and wraps the pitch.
+assert.deepEqual(lookCamera({ yawDeg: 10, pitchDeg: 80, fovDeg: 72 }, 4, 20), { yawDeg: 6, pitchDeg: 100, fovDeg: 72 });
+assert.deepEqual(lookCamera({ yawDeg: 10, pitchDeg: 170, fovDeg: 72 }, 4, 20), { yawDeg: 14, pitchDeg: -170, fovDeg: 72 });
+assert.deepEqual(arrowLookCamera({ yawDeg: 10, pitchDeg: 88, fovDeg: 72 }, "ArrowUp", true), { yawDeg: 10, pitchDeg: 98, fovDeg: 72 });
+assert.deepEqual(arrowLookCamera({ yawDeg: 10, pitchDeg: 0, fovDeg: 72 }, "ArrowLeft", false), { yawDeg: 7, pitchDeg: 0, fovDeg: 72 });
+assert.deepEqual(arrowLookCamera({ yawDeg: 10, pitchDeg: 0, fovDeg: 72 }, "ArrowRight", false), { yawDeg: 13, pitchDeg: 0, fovDeg: 72 });
+assert.equal(arrowLookCamera({ yawDeg: 10, pitchDeg: 0, fovDeg: 72 }, "w", false), null);
+
 console.log("universe navigation tests passed");
