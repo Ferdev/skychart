@@ -1,6 +1,6 @@
 import { clamp } from "../geometry.ts";
-import type { Vector3 } from "../sky/skyProjection.ts";
-import { cameraForDirection, relativeDirection } from "../sky/skyProjection.ts";
+import type { SkyCamera, Vector3 } from "../sky/skyProjection.ts";
+import { cameraForDirection, normalizeFreeCamera, relativeDirection } from "../sky/skyProjection.ts";
 import type { UniverseViewState } from "../viewState.ts";
 
 export type UniverseMove = "forward" | "back" | "left" | "right" | "up" | "down";
@@ -9,7 +9,8 @@ const DEG_TO_RAD = Math.PI / 180;
 
 export function universeCameraBasis(yawDeg: number, pitchDeg: number) {
   const yaw = yawDeg * DEG_TO_RAD;
-  const pitch = clamp(pitchDeg, -89.5, 89.5) * DEG_TO_RAD;
+  // No pitch limit: past 90 degrees the camera has turned over the pole and is upside down.
+  const pitch = pitchDeg * DEG_TO_RAD;
   return {
     forward: {
       x: Math.cos(pitch) * Math.cos(yaw),
@@ -23,6 +24,45 @@ export function universeCameraBasis(yawDeg: number, pitchDeg: number) {
       z: Math.cos(pitch),
     },
   };
+}
+
+/** True when the camera has turned over a pole, so the view is upside down. */
+export function cameraUpsideDown(pitchDeg: number): boolean {
+  return Math.cos(pitchDeg * DEG_TO_RAD) < 0;
+}
+
+/**
+ * Yaw change for a horizontal look input (a drag or an arrow key).
+ * Upside down, a turn about the ecliptic pole moves the view the other way on the screen,
+ * so the sign changes and the sky still follows the pointer.
+ */
+export function lookYawDelta(pitchDeg: number, screenDeltaDeg: number): number {
+  return cameraUpsideDown(pitchDeg) ? screenDeltaDeg : -screenDeltaDeg;
+}
+
+/** Ecliptic direction of flight, in degrees, for the trip map. Over a pole it is opposite to the yaw. */
+export function cameraHeadingDeg(yawDeg: number, pitchDeg: number): number {
+  return cameraUpsideDown(pitchDeg) ? (yawDeg + 180) % 360 : yawDeg;
+}
+
+/**
+ * Turn the camera for a look input: `rightDeg` is a drag to the right, `downDeg` a drag down.
+ * There is no pitch limit: a turn past a pole continues over it.
+ */
+export function lookCamera(camera: SkyCamera, rightDeg: number, downDeg: number): SkyCamera {
+  return normalizeFreeCamera({ ...camera,
+    yawDeg: camera.yawDeg + lookYawDelta(camera.pitchDeg, rightDeg), pitchDeg: camera.pitchDeg + downDeg });
+}
+
+const ARROW_LOOK: Record<string, readonly [number, number]> = {
+  ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1],
+};
+
+/** The camera after an arrow key: 3 degrees, or 10 with Shift. Null for other keys. */
+export function arrowLookCamera(camera: SkyCamera, key: string, shift: boolean): SkyCamera | null {
+  const look = ARROW_LOOK[key];
+  const step = shift ? 10 : 3;
+  return look ? lookCamera(camera, look[0] * step, look[1] * step) : null;
 }
 
 export function moveUniversePosition(
