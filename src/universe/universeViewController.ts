@@ -35,7 +35,7 @@ import { deepSkyModel } from "./universeDeepSkyModel";
 import { UniverseDeepSkyRenderer } from "./universeDeepSkyRenderer";
 import { bodyToUniversePoint, catalogPointIsHostBound, sampleDuringFlight, validCatalogPoint, type CatalogUniversePoint, type UniversePoint } from "./universePointModel";
 import { UniverseExoplanetSystems } from "./universeExoplanets";
-import { drawUniverseOrbits, universeOrbits } from "./universeOrbits";
+import { UniverseOrbitOverlay } from "./universeOrbits";
 import { universeTargetCardText } from "./universeTargetCard";
 import { UniverseCameraTurn } from "./universeCameraTurn";
 import { EXIT_CONFIRM_WINDOW_MS, ExitConfirmation, universeEscapeAction } from "./universeEscape";
@@ -105,7 +105,7 @@ export class UniverseViewController {
   private readonly exoplanetSystems: UniverseExoplanetSystems;
   private readonly cameraTurn: UniverseCameraTurn;
   private readonly exitConfirmation = new ExitConfirmation();
-  private showOrbits = true;
+  private readonly orbitOverlay: UniverseOrbitOverlay;
 
   constructor(private readonly options: UniverseViewOptions) {
     this.exoplanetSystems = new UniverseExoplanetSystems(options.loadPlanetarySystem, () => {
@@ -132,8 +132,7 @@ export class UniverseViewController {
     options.toggleButton.addEventListener("click", () => this.open(options.initialState()));
     options.closeButton.addEventListener("click", () => this.close());
     options.resetButton.addEventListener("click", () => this.reset());
-    options.orbitsButton.setAttribute("aria-pressed", String(this.showOrbits));
-    options.orbitsButton.addEventListener("click", () => this.toggleOrbits());
+    this.orbitOverlay = new UniverseOrbitOverlay(options.orbitsButton, () => { this.baseRenderKey = ""; this.requestRender(); });
     this.destinationSearch = new UniverseDestinationSearch({
       findButton: options.findButton, dialog: options.searchDialog, closeButton: options.searchCloseButton,
       input: options.searchInput, results: options.searchResults, active: () => this.active,
@@ -273,13 +272,6 @@ export class UniverseViewController {
     this.exoplanetSystems.reset();
     this.requestRender();
     void this.loadCatalog();
-  }
-
-  private toggleOrbits(): void {
-    this.showOrbits = !this.showOrbits;
-    this.options.orbitsButton.setAttribute("aria-pressed", String(this.showOrbits));
-    this.baseRenderKey = "";
-    this.requestRender();
   }
 
   private reset(): void {
@@ -424,11 +416,8 @@ export class UniverseViewController {
     const redrawBase = moving || !useWebgl || this.baseRenderKey !== baseKey;
     if (redrawBase) {
       context.drawImage(this.backdropCanvas!, 0, 0, width, height);
-      if (this.showOrbits) {
-        drawUniverseOrbits(context,
-          universeOrbits(this.options.bodyByKey().values(), this.options.bodyByKey()),
-          this.position, project, width, this.target?.key);
-      }
+      this.orbitOverlay.draw(context, this.options.bodyByKey().values(), this.options.bodyByKey(),
+        this.position, project, width, this.target?.key);
     }
     const baseDone = performance.now();
     const framePoints = this.points();

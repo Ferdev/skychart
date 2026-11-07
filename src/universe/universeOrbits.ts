@@ -51,6 +51,32 @@ export function universeOrbits(bodies: Iterable<Body>, bodyByKey: ReadonlyMap<st
   return orbits;
 }
 
+/** The Orbits switch of the 3D view and the rings it controls. */
+export class UniverseOrbitOverlay {
+  private visible = true;
+  private readonly button: HTMLButtonElement;
+  private readonly onChange: () => void;
+
+  constructor(button: HTMLButtonElement, onChange: () => void) {
+    this.button = button;
+    this.onChange = onChange;
+    button.setAttribute("aria-pressed", "true");
+    button.addEventListener("click", () => this.toggle());
+  }
+
+  toggle(): void {
+    this.visible = !this.visible;
+    this.button.setAttribute("aria-pressed", String(this.visible));
+    this.onChange();
+  }
+
+  draw(context: CanvasRenderingContext2D, bodies: Iterable<Body>, bodyByKey: ReadonlyMap<string, Body>,
+    observer: Vector3, project: Projector, width: number, selectedKey?: string): void {
+    if (!this.visible) return;
+    drawUniverseOrbits(context, universeOrbits(bodies, bodyByKey), observer, project, width, selectedKey);
+  }
+}
+
 /** Draws the orbits under the catalog points. A ring behind the camera is split. */
 export function drawUniverseOrbits(
   context: CanvasRenderingContext2D,
