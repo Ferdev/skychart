@@ -27,17 +27,19 @@ def header(source: str, field: str) -> int:
 def read_rgb(image: Path, scratch: Path, size: int | None = None, max_pixels: int = MAX_PIXELS) -> np.ndarray:
     """Decodes an image to a height x width x 3 array of bytes with vips. A `size` reduces the long side.
 
-    An image with more than `max_pixels` pixels gives `ImageTooLarge` before the full decode.
+    An image with more than `max_pixels` pixels gives `ImageTooLarge` before any decode, also before
+    the reduction to `size`.
     """
     source = str(image)
+    # vipsheader reads only the header, so this check costs no decode. It reads the original, so
+    # that a decompression bomb does not reach `vips thumbnail` either.
+    source_width, source_height = header(source, "width"), header(source, "height")
+    if source_width <= 0 or source_height <= 0 or source_width * source_height > max_pixels:
+        raise ImageTooLarge(f"Image of {source_width} x {source_height} pixels exceeds {max_pixels} pixels")
     if size:
         small = scratch / "small.png"
         subprocess.run(["vips", "thumbnail", source, str(small), str(size), "--height", str(size), "--size", "down"], check=True, capture_output=True, timeout=60)
         source = str(small)
-    # vipsheader reads only the header, so this check costs no decode.
-    source_width, source_height = header(source, "width"), header(source, "height")
-    if source_width <= 0 or source_height <= 0 or source_width * source_height > max_pixels:
-        raise ImageTooLarge(f"Image of {source_width} x {source_height} pixels exceeds {max_pixels} pixels")
     flat = scratch / "flat.png"
     # `flatten` takes the last band as alpha, also in an opaque image. So it runs only when an alpha exists.
     source_bands = header(source, "bands")

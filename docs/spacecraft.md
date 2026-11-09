@@ -77,8 +77,9 @@ were 16.92 km/s and 41.54 km/s for Voyager 1.
 
 The atlas value and NASA's figures come from one trajectory. NASA's ticker draws
 a straight line between two daily samples, so it can differ by thousands of
-kilometers from a Horizons state at the same instant. The atlas rounds "now" down
-to a five-minute step, and the panel shows that epoch.
+kilometers from a Horizons state at the same instant. The atlas rounds each
+requested time down to a five-minute step, and the panel shows that epoch. All
+times in one step share one Horizons request and one cached result.
 
 Wire positions are null when loading, outside coverage, or temporarily
 unavailable. The frontend adapts them to non-finite numeric sentinels required by

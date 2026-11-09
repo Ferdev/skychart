@@ -1,4 +1,6 @@
 """Locks, sampling and memory bounds of the scientific backend."""
+import hashlib
+import http.server
 import io
 import json
 import tempfile
@@ -17,6 +19,7 @@ from backend import spacecraft as sc
 from backend.catalog_sources import BODY_BY_KEY
 
 KERNEL = "mar099s.bsp"
+KERNEL_BYTES = b"kernel bytes"
 EPOCH = datetime(2026, 9, 6, tzinfo=timezone.utc)
 
 
@@ -43,8 +46,11 @@ class SatelliteKernelDownloadTest(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.data_dir = patch.object(science, "DATA_DIR", Path(self.directory.name))
         self.data_dir.start()
+        self.digests = patch.dict(science.SATELLITE_KERNEL_SHA256, {KERNEL: hashlib.sha256(KERNEL_BYTES).hexdigest()})
+        self.digests.start()
 
     def tearDown(self):
+        self.digests.stop()
         self.data_dir.stop()
         self.directory.cleanup()
         science._satellite_kernels.clear()
@@ -107,6 +113,61 @@ class SatelliteKernelDownloadTest(unittest.TestCase):
             patch.object(science, "load_file", return_value=loaded),
         ):
             self.assertIs(science.satellite_kernel(KERNEL), loaded)
+
+    def test_a_kernel_with_another_digest_is_not_published(self):
+        with patch.object(kernel_download, "urlopen", return_value=io.BytesIO(b"tampered bytes")):
+            with self.assertRaises(kernel_download.KernelDigestError):
+                science.satellite_kernel(KERNEL)
+        self.assertEqual(list(Path(self.directory.name).iterdir()), [])
+        self.assertNotIn(KERNEL, science._satellite_kernels)
+
+    def test_each_kernel_url_has_a_digest(self):
+        self.assertEqual(set(science.SATELLITE_KERNEL_URLS), set(science.SATELLITE_KERNEL_SHA256))
+
+
+class KernelDigestHttpTest(unittest.TestCase):
+    """The download from a local HTTP server, with no patch of urlopen."""
+
+    def setUp(self):
+        body = self.body = {"value": KERNEL_BYTES}
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body["value"])))
+                self.end_headers()
+                self.wfile.write(body["value"])
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}/{KERNEL}"
+        self.directory = tempfile.TemporaryDirectory()
+        self.path = Path(self.directory.name) / KERNEL
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.directory.cleanup()
+
+    def test_a_wrong_body_publishes_nothing_and_leaves_no_temporary_file(self):
+        self.body["value"] = b"kernel bytez"
+        with self.assertRaises(kernel_download.KernelDigestError):
+            kernel_download.download_kernel(self.url, self.path, hashlib.sha256(KERNEL_BYTES).hexdigest())
+        self.assertEqual(list(Path(self.directory.name).iterdir()), [])
+
+    def test_a_truncated_body_publishes_nothing(self):
+        self.body["value"] = KERNEL_BYTES[:-1]
+        with self.assertRaises(kernel_download.KernelDigestError):
+            kernel_download.download_kernel(self.url, self.path, hashlib.sha256(KERNEL_BYTES).hexdigest())
+        self.assertEqual(list(Path(self.directory.name).iterdir()), [])
+
+    def test_the_expected_body_is_published(self):
+        kernel_download.download_kernel(self.url, self.path, hashlib.sha256(KERNEL_BYTES).hexdigest())
+        self.assertEqual([p.name for p in Path(self.directory.name).iterdir()], [KERNEL])
+        self.assertEqual(self.path.read_bytes(), KERNEL_BYTES)
 
 
 class ObserveSamplingTest(unittest.TestCase):
@@ -173,6 +234,7 @@ class SpacecraftMemoryCacheTest(unittest.TestCase):
             patch.object(sc, "_jobs") as jobs,
         ):
             jobs.full.return_value = True
+            jobs.qsize.return_value = jobs.maxsize = 256
             sc.spacecraft_payload(EPOCH)
         self.assertEqual(sc._results, {})
 

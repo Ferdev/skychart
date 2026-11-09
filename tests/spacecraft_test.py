@@ -1,7 +1,7 @@
 import json
 import math
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 from backend import spacecraft as sc
@@ -117,5 +117,41 @@ class SpacecraftTest(unittest.TestCase):
         with sc._lock:
             sc._pending.clear()
             while not sc._jobs.empty(): sc._jobs.get_nowait(); sc._jobs.task_done()
+
+    def clear_jobs(self):
+        with sc._lock:
+            sc._pending.clear()
+            while not sc._jobs.empty(): sc._jobs.get_nowait(); sc._jobs.task_done()
+
+    def test_times_in_one_five_minute_step_share_one_job(self):
+        self.clear_jobs()
+        first, second = EPOCH + timedelta(minutes=7, seconds=12), EPOCH + timedelta(minutes=7, seconds=13)
+        try:
+            with patch.object(sc,'_worker',True), patch.object(sc,'in_coverage',return_value=True), patch.object(sc,'read_cache',return_value=None):
+                payload = sc.spacecraft_payload(first,'spacecraft-31')
+                keys = sorted(job[2] for job in sc._jobs.queue)
+                again = sc.spacecraft_payload(second,'spacecraft-31')
+                self.assertEqual(sorted(job[2] for job in sc._jobs.queue), keys)
+            self.assertEqual({key[1] for key in keys}, {(EPOCH + timedelta(minutes=5)).isoformat()})
+            self.assertTrue(all(job[4] == EPOCH + timedelta(minutes=5) for job in sc._jobs.queue))
+            # The browser compares the answer with its request time; the panel shows the epoch.
+            self.assertEqual(payload['timestamp_utc'], first.isoformat())
+            self.assertEqual(again['timestamp_utc'], second.isoformat())
+            self.assertEqual(payload['bodies'][0]['spacecraft']['position_epoch'], (EPOCH + timedelta(minutes=5)).isoformat())
+        finally:
+            self.clear_jobs()
+
+    def test_background_jobs_leave_room_for_the_selected_craft(self):
+        self.clear_jobs()
+        try:
+            with sc._lock:
+                for index in range(sc._jobs.maxsize - sc._SELECTED_RESERVE):
+                    sc._jobs.put_nowait((1, -index - 1, ('filler', str(index)), None, None, None))
+            with patch.object(sc,'_worker',True), patch.object(sc,'in_coverage',return_value=True), patch.object(sc,'read_cache',return_value=None):
+                sc.spacecraft_payload(EPOCH,'spacecraft-31')
+            queued = [job[2] for job in sc._jobs.queue if job[2][0] != 'filler']
+            self.assertEqual(queued, [('spacecraft-31', EPOCH.isoformat())])
+        finally:
+            self.clear_jobs()
 
 if __name__ == '__main__': unittest.main()

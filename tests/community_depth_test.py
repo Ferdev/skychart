@@ -86,6 +86,31 @@ def test_an_image_above_the_pixel_limit_stops_before_any_decode(tmp_path, monkey
     assert not (tmp_path / "flat.png").exists()
 
 
+def test_a_reduced_read_checks_the_original_before_the_thumbnail(tmp_path, monkeypatch):
+    image = crafted_png(tmp_path / "bomb.png", 20_000, 20_000)
+    commands = []
+    real_run = community_sources.subprocess.run
+
+    def recording_run(command, *args, **kwargs):
+        commands.append(command)
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(community_sources.subprocess, "run", recording_run)
+    with pytest.raises(ImageTooLarge):
+        read_rgb(image, tmp_path, size=1600)
+    assert commands and all(command[0] == "vipsheader" for command in commands)
+    assert not (tmp_path / "small.png").exists()
+
+
+def test_a_reduced_read_of_an_image_under_the_limit_still_decodes(tmp_path):
+    pixels = np.full((40, 50, 3), 70, dtype=np.uint8)
+    image = tmp_path / "small-source.webp"
+    write_webp(pixels, image, "[lossless]")
+    assert read_rgb(image, tmp_path, size=25, max_pixels=40 * 50).shape == (20, 25, 3)
+    with pytest.raises(ImageTooLarge):
+        read_rgb(image, tmp_path, size=25, max_pixels=40 * 50 - 1)
+
+
 def test_an_image_at_the_pixel_limit_still_decodes(tmp_path):
     pixels = np.full((40, 50, 3), 70, dtype=np.uint8)
     image = tmp_path / "small.webp"

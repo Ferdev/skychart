@@ -134,6 +134,14 @@ defmodule StarsmapApi.CommunityTransitsTest do
 
     assert {:error, :invalid_transit} = Transits.submit(author, %{params() | "instrument" => ""})
     assert {:error, :invalid_transit} = Transits.submit(author, %{params() | "frame_count" => 3})
+
+    for count <- [100_001, 3_000_000_000] do
+      assert {:error, :invalid_transit} =
+               Transits.submit(author, %{params() | "frame_count" => count})
+    end
+
+    assert Repo.aggregate(TransitObservation, :count) == 0
+    assert {:ok, _} = Transits.submit(author, %{params() | "frame_count" => 100_000})
   end
 
   test "only a moderator approves, and each decision has an audit record", %{

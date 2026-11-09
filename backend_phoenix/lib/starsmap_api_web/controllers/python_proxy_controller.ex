@@ -54,20 +54,23 @@ defmodule StarsmapApiWeb.PythonProxyController do
     end
   end
 
+  # One deadline bounds the whole request, so an upstream that sends a byte now and then
+  # cannot hold the request open longer than the timeout.
   defp request(url, request_id, body) do
     uri = URI.parse(url)
+    deadline = System.monotonic_time(:millisecond) + request_timeout()
 
     with :ok <- validate_uri(uri),
          {:ok, socket} <-
            :gen_tcp.connect(
              String.to_charlist(uri.host),
              uri.port || 80,
-             [:binary, active: false, packet: :raw],
-             request_timeout()
+             [:binary, active: false, packet: :raw, send_timeout: request_timeout()],
+             remaining(deadline)
            ) do
       try do
         with :ok <- :gen_tcp.send(socket, request_bytes(uri, request_id, body)),
-             {:ok, response} <- recv_all(socket, <<>>) do
+             {:ok, response} <- recv_all(socket, <<>>, deadline) do
           parse_response(response)
         end
       after
@@ -124,13 +127,21 @@ defmodule StarsmapApiWeb.PythonProxyController do
     ]
   end
 
-  defp recv_all(socket, acc) do
-    case :gen_tcp.recv(socket, 0, request_timeout()) do
-      {:ok, chunk} -> recv_all(socket, acc <> chunk)
-      {:error, :closed} -> {:ok, acc}
-      {:error, reason} -> {:error, reason}
+  defp recv_all(socket, acc, deadline) do
+    case remaining(deadline) do
+      0 ->
+        {:error, :timeout}
+
+      time ->
+        case :gen_tcp.recv(socket, 0, time) do
+          {:ok, chunk} -> recv_all(socket, acc <> chunk, deadline)
+          {:error, :closed} -> {:ok, acc}
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
+
+  defp remaining(deadline), do: max(deadline - System.monotonic_time(:millisecond), 0)
 
   defp parse_response(response) do
     case :binary.split(response, "\r\n\r\n") do

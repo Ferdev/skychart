@@ -838,6 +838,21 @@ defmodule StarsmapApi.CommunityTest do
     assert Repo.get!(Photo, photo.id).declared_key == "mars"
   end
 
+  test "the twenty-first upload of one day is refused", %{user: user} do
+    attrs = %{
+      "key" => "mars",
+      "size_bytes" => 1,
+      "rights_confirmed" => true,
+      "title" => "Mars fixture",
+      "licence" => "CC0",
+      "captured_at" => "2026-10-08T00:00:00Z"
+    }
+
+    for _ <- 1..20, do: assert({:ok, %Photo{}} = Photos.create(user, attrs))
+    assert {:error, :upload_quota} = Photos.create(user, attrs)
+    assert Repo.aggregate(from(p in Photo, where: p.user_id == ^user.id), :count) == 20
+  end
+
   test "vote weights, trend threshold and cover changes are deterministic", %{
     user: user,
     subject: subject
