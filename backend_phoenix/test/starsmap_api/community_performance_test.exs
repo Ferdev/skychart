@@ -40,6 +40,10 @@ defmodule StarsmapApi.CommunityPerformanceTest do
     end
   end
 
+  defmodule FailingStorage do
+    def get(_key, _path), do: {:error, :timeout}
+  end
+
   setup do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
@@ -299,6 +303,37 @@ defmodule StarsmapApi.CommunityPerformanceTest do
       assert stopped?(sleep)
       assert Repo.get!(Photo, photo.id).wcs == nil
     end
+  end
+
+  test "a storage read failure retries the solver job", %{user: user, subject: subject} do
+    storage = Application.fetch_env!(:starsmap_api, :community_storage)
+    Application.put_env(:starsmap_api, :community_storage, FailingStorage)
+    on_exit(fn -> Application.put_env(:starsmap_api, :community_storage, storage) end)
+    photo = photo(user, subject, "review", nil)
+
+    assert {:error, :timeout} = SolverWorker.perform(%Oban.Job{args: %{"id" => photo.id}})
+    assert Path.wildcard(Path.join(Storage.root(), "solve-#{photo.id}-*")) == []
+  end
+
+  test "an unsolved image still cancels the solver job", %{user: user, subject: subject} do
+    root = Application.fetch_env!(:starsmap_api, :community_backend_root)
+    fixture = Path.join(System.tmp_dir!(), "unsolved-image-#{Ecto.UUID.generate()}")
+    File.mkdir_p!(fixture)
+    File.write!(Path.join(fixture, "community_solve.py"), "import sys\nsys.exit(1)\n")
+    Application.put_env(:starsmap_api, :community_backend_root, fixture)
+    photo = photo(user, subject, "review", nil)
+    master = Storage.local_path("masters/#{photo.id}/1600.webp")
+    File.mkdir_p!(Path.dirname(master))
+    File.write!(master, "webp")
+
+    on_exit(fn ->
+      Application.put_env(:starsmap_api, :community_backend_root, root)
+      File.rm_rf(fixture)
+      File.rm_rf(Path.dirname(master))
+    end)
+
+    assert {:cancel, "No supported plate solution was found"} =
+             SolverWorker.perform(%Oban.Job{args: %{"id" => photo.id}})
   end
 
   test "a photo deleted while its solve finishes ends the job cleanly", %{

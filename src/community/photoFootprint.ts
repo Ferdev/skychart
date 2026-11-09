@@ -61,6 +61,10 @@ export function footprintDirections(
     wcs.pixel_scale_arcsec <= 0
   )
     return [];
+  // A CD matrix with a value that is not a number has no corners: no footprint is better than a wrong one.
+  const linear = wcs.cd?.length === 4 && wcs.crpix?.length === 2;
+  if (linear && ![...wcs.cd!, ...wcs.crpix!].every((value) => typeof value === "number" && Number.isFinite(value)))
+    return [];
   const center = {
     x: Math.cos(dec) * Math.cos(ra),
     y: Math.cos(dec) * Math.sin(ra),
@@ -82,11 +86,13 @@ export function footprintDirections(
       dy = ((sy * wcs.height * 0.5 * wcs.pixel_scale_arcsec) / 3600) * r;
     let x = dx * Math.cos(rotation) - dy * Math.sin(rotation),
       y = dx * Math.sin(rotation) + dy * Math.cos(rotation);
-    if (wcs.cd?.length === 4 && wcs.crpix?.length === 2) {
-      const px = (sx < 0 ? 0.5 : wcs.width + 0.5) - wcs.crpix[0],
-        py = (sy < 0 ? 0.5 : wcs.height + 0.5) - wcs.crpix[1];
-      x = (wcs.cd[0] * px + wcs.cd[1] * py) * r;
-      y = (wcs.cd[2] * px + wcs.cd[3] * py) * r;
+    if (linear) {
+      const [a, b, c, d] = wcs.cd!,
+        [cx, cy] = wcs.crpix!;
+      const px = (sx < 0 ? 0.5 : wcs.width + 0.5) - cx!,
+        py = (sy < 0 ? 0.5 : wcs.height + 0.5) - cy!;
+      x = (a! * px + b! * py) * r;
+      y = (c! * px + d! * py) * r;
     }
     const eq = {
       x: center.x + x * east.x + y * north.x,

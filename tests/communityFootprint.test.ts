@@ -33,6 +33,14 @@ test("unsupported astrometry never draws a footprint", () => {
   assert.deepEqual(footprintDirections({ ...wcs, frame: "unknown" }), []);
   assert.deepEqual(footprintDirections({ ...wcs, projection: "SIP" }), []);
 });
+test("a CD matrix or reference pixel that is not a number draws no footprint", () => {
+  const solved = { ...wcs, cd: [-0.0003, 0, 0, 0.0003], crpix: [50.5, 50.5] };
+  assert.equal(footprintDirections(solved).length, 4);
+  assert.deepEqual(footprintDirections({ ...solved, cd: [NaN, 0, 0, 0.0003] }), []);
+  assert.deepEqual(footprintDirections({ ...solved, cd: [-0.0003, 0, Infinity, 0.0003] }), []);
+  assert.deepEqual(footprintDirections({ ...solved, crpix: [50.5, NaN] }), []);
+  assert.deepEqual(footprintDirections({ ...solved, cd: [-0.0003, null, 0, 0.0003] as unknown as number[] }), []);
+});
 test("the footprint scan stops at the limit and looks up no later points", () => {
   const points = Array.from({ length: 100 }, (_, index) => ({ key: `k${index}` }));
   const frames = [{ points: points.slice(0, 20) }, { points: points.slice(20) }];

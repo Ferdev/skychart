@@ -57,14 +57,16 @@ export class PhotoDialogs {
             });
             this.api.user = data.user;
             this.api.csrf = data.csrf;
-            // The session gives the count of photos that wait for a moderator.
-            if (this.api.moderator) await this.api.session();
-            view.dialog.close();
-            this.changed();
-            after?.();
           } catch (error) {
             view.message.textContent = errorText(error);
+            return;
           }
+          // The sign-in is done. The session gives the count of photos that wait for a moderator;
+          // without it the count stays out of date, and the person is still signed in.
+          if (this.api.moderator) await this.api.session({ keepUser: true });
+          view.dialog.close();
+          this.changed();
+          after?.();
         });
       } catch (error) {
         view.message.textContent = errorText(error);
@@ -168,7 +170,10 @@ export class PhotoDialogs {
       voteButton.textContent = `${t("community.appreciate")} · ${formatCount(photo.votes)}`;
     };
     paintVote();
-    voteButton.disabled = this.api.user?.handle === photo.author.handle;
+    const ownPhoto = this.api.user?.handle === photo.author.handle;
+    // A signed-in reader may have appreciated this photo before. The button waits for that state,
+    // so that the first click removes a saved vote and does not send a second one.
+    voteButton.disabled = ownPhoto || Boolean(this.api.user);
     voteButton.onclick = async () => {
       if (!this.api.user) {
         view.dialog.close();
@@ -205,9 +210,12 @@ export class PhotoDialogs {
     if (this.api.user) {
       try {
         voted = (await this.api.request<{ present: boolean }>(`/api/community/photos/${photo.id}/vote`)).present;
-        if (voteButton.isConnected) paintVote();
       } catch {
         /* The vote state is optional: the button stays usable. */
+      }
+      if (voteButton.isConnected) {
+        paintVote();
+        voteButton.disabled = ownPhoto;
       }
     }
   }
