@@ -76,6 +76,23 @@ export function readFrame(buffer: ArrayBuffer): FitsFrame {
   return { header, width, height, pixels };
 }
 
+/** A pixel at or above this part of the full range can be clipped, so the measure of its star is not linear. */
+const SATURATION_FRACTION = 0.95;
+const INT16_MAX = 32_767;
+
+/**
+ * The pixel value from which a star is too bright to measure. DATAMAX gives the full range when the camera
+ * writes it. Without it, a 16-bit frame has its full range from the format: the largest stored value with
+ * BSCALE and BZERO. A camera that writes unsigned data (BZERO = 32768) gives 65,535. Other frames have no limit.
+ */
+export function saturationLimit(header: FitsHeader): number {
+  if (typeof header.DATAMAX === "number") return header.DATAMAX * SATURATION_FRACTION;
+  if (Number(header.BITPIX) !== 16) return Infinity;
+  const scale = typeof header.BSCALE === "number" ? header.BSCALE : 1;
+  const zero = typeof header.BZERO === "number" ? header.BZERO : 0;
+  return (INT16_MAX * scale + zero) * SATURATION_FRACTION;
+}
+
 const JD_UNIX_EPOCH = 2440587.5;
 
 function isoToJd(value: unknown): number | null {

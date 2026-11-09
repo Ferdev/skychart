@@ -301,8 +301,63 @@ defmodule StarsmapApi.CommunityPerformanceTest do
     end
   end
 
+  test "a photo deleted while its solve finishes ends the job cleanly", %{
+    user: user,
+    subject: subject
+  } do
+    root = Application.fetch_env!(:starsmap_api, :community_backend_root)
+    fixture = Path.join(System.tmp_dir!(), "finished-solver-#{Ecto.UUID.generate()}")
+    started = Path.join(fixture, "started")
+    continue = Path.join(fixture, "continue")
+    File.mkdir_p!(fixture)
+
+    File.write!(Path.join(fixture, "community_solve.py"), """
+    import json, pathlib, time
+    pathlib.Path(#{inspect(started)}).touch()
+    deadline = time.monotonic() + 5
+    while not pathlib.Path(#{inspect(continue)}).exists():
+        if time.monotonic() > deadline:
+            raise SystemExit('test did not release the solver')
+        time.sleep(0.01)
+    print(json.dumps({'ra_deg': 83.8, 'dec_deg': -5.4, 'pixel_scale_arcsec': 2.0, 'rotation_deg': 0.0, 'width': 1600, 'height': 1200, 'cd': [-0.001, 0.0, 0.0, 0.001], 'crpix': [800.5, 600.5]}))
+    """)
+
+    Application.put_env(:starsmap_api, :community_backend_root, fixture)
+    photo = photo(user, subject, "review", nil)
+    master = Storage.local_path("masters/#{photo.id}/1600.webp")
+    File.mkdir_p!(Path.dirname(master))
+    File.write!(master, "webp")
+
+    on_exit(fn ->
+      File.touch(continue)
+      Application.put_env(:starsmap_api, :community_backend_root, root)
+      File.rm_rf(fixture)
+      File.rm_rf(Path.dirname(master))
+    end)
+
+    task = Task.async(fn -> SolverWorker.perform(%Oban.Job{args: %{"id" => photo.id}}) end)
+    assert :ok = await_file(started)
+    Repo.delete!(photo)
+    File.touch!(continue)
+    assert :ok = Task.await(task)
+    assert Repo.get(Photo, photo.id) == nil
+    assert Path.wildcard(Path.join(Storage.root(), "solve-#{photo.id}-*")) == []
+  end
+
   test "the Oban timeout of the solver job comes after the command limit" do
     assert SolverWorker.timeout(%Oban.Job{}) > :timer.seconds(90 + 5)
+  end
+
+  defp await_file(path, tries \\ 500)
+  defp await_file(path, 0), do: flunk("Timed out waiting for #{path}")
+
+  defp await_file(path, tries) do
+    if File.exists?(path) do
+      :ok
+    else
+      Process.sleep(10)
+      await_file(path, tries - 1)
+    end
   end
 
   # The order of the gallery before the database sorted it: all the photos, sorted in Elixir.

@@ -8,6 +8,15 @@ import { bindLocaleControlPlacement } from "./localeControlPlacement";
 import { bindShareButtonPlacement } from "./shareButtonPlacement";
 import { bindObjectSheet } from "../object/objectSheet";
 
+/** Keeps the diagnostics choice for the next visit. A browser can block storage; then the choice stays for this page only. */
+function storePerformanceEnabled(enabled: boolean) {
+  try {
+    window.localStorage.setItem("starsmap:perf", enabled ? "1" : "0");
+  } catch {
+    // Storage is optional.
+  }
+}
+
 interface AtlasEventState {
   sizeMode: SizeMode;
   displayLayers: Record<DisplayLayer, boolean>;
@@ -97,7 +106,7 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
     // In a text field, Shift+P is a capital letter. A key that stays down must not flip the display repeatedly.
     if (event.repeat || isTextEntry(event.target)) return;
     state.performanceEnabled = !state.performanceEnabled;
-    window.localStorage.setItem("starsmap:perf", state.performanceEnabled ? "1" : "0");
+    storePerformanceEnabled(state.performanceEnabled);
     dom.diagnosticsToggle.checked = state.performanceEnabled;
     options.updatePerformanceHud();
   });
@@ -128,7 +137,7 @@ export function bindAtlasEvents(options: AtlasEventBindingsOptions): void {
   });
   dom.diagnosticsToggle.addEventListener("change", () => {
     state.performanceEnabled = dom.diagnosticsToggle.checked;
-    window.localStorage.setItem("starsmap:perf", state.performanceEnabled ? "1" : "0");
+    storePerformanceEnabled(state.performanceEnabled);
     options.updatePerformanceHud();
   });
   options.mapInteraction.bind();
