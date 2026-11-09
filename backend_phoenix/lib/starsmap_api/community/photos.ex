@@ -6,9 +6,9 @@ defmodule StarsmapApi.Community.Photos do
   @licences ["All rights reserved", "CC BY 4.0", "CC BY-SA 4.0", "CC0"]
 
   def create(user, attrs) do
-    with {:ok, subject} <- Subjects.ensure(attrs["key"]),
-         {:ok, size} <- size(attrs["size_bytes"]),
-         true <- attrs["rights_confirmed"] == true and attrs["synthetic"] != true do
+    with {:ok, size} <- size(attrs["size_bytes"]),
+         true <- attrs["rights_confirmed"] == true and attrs["synthetic"] != true,
+         {:ok, subject} <- Subjects.ensure(attrs["key"]) do
       StarsmapApi.Community.transaction(fn ->
         count =
           Repo.aggregate(
@@ -258,6 +258,13 @@ defmodule StarsmapApi.Community.Photos do
         limit: ^limit,
         select: p
     )
+  end
+
+  @doc "One page of published photos and whether another row follows it."
+  def recent_page(offset \\ 0, limit \\ 24)
+      when is_integer(offset) and offset >= 0 and is_integer(limit) and limit > 0 do
+    {page, rest} = recent(offset, limit + 1) |> Enum.split(limit)
+    {page, rest != []}
   end
 
   @doc "Published photos of one author, newest first. The database applies the limit."

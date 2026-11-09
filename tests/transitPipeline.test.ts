@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { frameMidTimeJd, headerWcs, readFrame, scaledWcs, skyToPixel, type FrameWcs } from "../src/transit/fitsFrame.ts";
+import { frameMidTimeJd, headerWcs, readFrame, saturationLimit, scaledWcs, skyToPixel, type FrameWcs } from "../src/transit/fitsFrame.ts";
 import { lightCurveSvg } from "../src/transit/lightCurve.ts";
 import { apertureRadius, detectStars, measureAperture, measureFrame, pixelMapping, placeStars, relativeLightCurve, typicalWidth, type FrameMeasure } from "../src/transit/photometry.ts";
 
@@ -85,6 +85,28 @@ test("a star follows a drift from frame to frame, and a lost star drops the fram
   assert.ok(Math.hypot(stars[0]!.x - 63, stars[0]!.y - 52) < 0.5);
   assert.equal(measureFrame(pixels, 260, 160, [{ x: 60, y: 50 }, { x: 120, y: 130 }], 5), null);
   assert.equal(measureFrame(pixels, 260, 160, [{ x: 60, y: 50 }, { x: 200, y: 60 }], 5, 1, 110), null);
+});
+
+test("the saturation limit comes from DATAMAX or from the 16-bit range of the frame", () => {
+  assert.equal(saturationLimit({ BITPIX: 16, BZERO: 32768, DATAMAX: 4095 }), 4095 * 0.95);
+  assert.equal(saturationLimit({ BITPIX: 16, BZERO: 32768, BSCALE: 1 }), 65535 * 0.95);
+  assert.equal(saturationLimit({ BITPIX: 16 }), 32767 * 0.95);
+  assert.equal(saturationLimit({ BITPIX: -32 }), Infinity);
+});
+
+test("a 16-bit frame without DATAMAX is kept below the limit and dropped above it", () => {
+  const limit = 65535 * 0.95;
+  const frameWithPeak = (peak: number) => {
+    const sky = 100;
+    const pixels = starField(260, 160, [{ x: 60, y: 50, flux: (peak - sky) * 2 * Math.PI * 2.25 }, { x: 200, y: 60, flux: 15000 }], sky);
+    return readFrame(fitsFile({ BZERO: 32768, BSCALE: 1 }, 260, 160, [...pixels].map((value) => Math.round(value) - 32768)));
+  };
+  const places = [{ x: 60, y: 50 }, { x: 200, y: 60 }];
+  for (const [peak, kept] of [[limit - 60, true], [limit + 60, false]] as const) {
+    const frame = frameWithPeak(peak);
+    const stars = measureFrame(frame.pixels, frame.width, frame.height, places, 5, 1, saturationLimit(frame.header));
+    assert.equal(stars !== null, kept, `peak ${peak}`);
+  }
 });
 
 test("the target is matched to Gaia and comparison stars are near it in brightness", () => {

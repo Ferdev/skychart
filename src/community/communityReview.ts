@@ -63,16 +63,22 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
     );
   };
 
-  /** Sends one decision, then loads the section again. */
-  const decide = async (photo: ReviewPhoto, action: string, reason?: string) => {
+  /** Sends one decision, then loads the section again. True when the server saved the decision. */
+  const decide = async (photo: ReviewPhoto, action: string, reason?: string): Promise<boolean> => {
     try {
       await api.request(`/api/community/photos/${photo.id}/review`, "POST", { action, reason: reason ?? "" });
+    } catch (error) {
+      context.message(errorText(error));
+      return false;
+    }
+    try {
       context.message(t("community.mod.done"));
       await context.changed();
       await load(true);
     } catch (error) {
       context.message(errorText(error));
     }
+    return true;
   };
 
   const facts = (photo: ReviewPhoto) =>
@@ -131,7 +137,10 @@ export async function renderReview(panel: HTMLElement, context: ReviewContext) {
             const action = button.dataset.action!;
             if (action === "approve" || action === "restore") {
               button.disabled = true;
-              void decide(photo, action);
+              // A failed request leaves the photo in the list, so the moderator can try again.
+              void decide(photo, action).then((saved) => {
+                if (!saved) button.disabled = false;
+              });
               return;
             }
             // Rejection and hiding need a reason, because the photographer reads it.

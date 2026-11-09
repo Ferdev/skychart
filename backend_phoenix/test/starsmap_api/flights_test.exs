@@ -281,6 +281,47 @@ defmodule StarsmapApi.FlightsTest do
       assert Flights.nearby_tour(%AnswerFlight{normalized_question: "words"}, []) == nil
     end
 
+    test "dates and catalog numbers pass, and phone numbers are still rejected" do
+      for question <- [
+            "What is visible on 2026-11-05 near Vega?",
+            "Tell me about Gaia DR3 4373465352415301632",
+            "Where is 2MASX J00424433+4116074 tonight?"
+          ] do
+        assert {:ok, _} = Flights.request(question, "en"), question
+      end
+
+      for question <- [
+            "Call +1 (555) 010-9999 about Mars",
+            "Call 555 010 9999 about Mars",
+            "Ring (555) 010-9999 about the Moon"
+          ] do
+        assert {:error, :question_rejected} = Flights.request(question, "en"), question
+      end
+    end
+
+    test "requests for one new question at the same time start one job" do
+      flights =
+        1..8
+        |> Task.async_stream(fn _ -> Flights.request("How far is Andromeda?", "en") end)
+        |> Enum.map(fn {:ok, {:ok, flight}} -> flight.id end)
+
+      assert length(Enum.uniq(flights)) == 1
+      assert [_] = all_enqueued(worker: Worker)
+      assert Repo.aggregate(AnswerFlight, :count) == 1
+    end
+
+    test "a flight is not stale while its job can still run" do
+      assert Flights.job_limit_seconds() * 1000 == Worker.timeout(%Oban.Job{})
+      {:ok, flight} = Flights.request("How far is Andromeda?", "en")
+      {:ok, _} = Flights.mark_running(flight)
+      recent = DateTime.add(DateTime.utc_now(), -Flights.job_limit_seconds(), :second)
+      Repo.update_all(AnswerFlight, set: [updated_at: recent])
+      Repo.delete_all(Oban.Job)
+
+      assert {:ok, %{status: "running"}} = Flights.request("How far is Andromeda?", "en")
+      assert all_enqueued(worker: Worker) == []
+    end
+
     test "a job that stopped leaves a row that a new request starts again" do
       {:ok, flight} = Flights.request("How far is Andromeda?", "en")
       Repo.delete_all(Oban.Job)
@@ -505,6 +546,62 @@ defmodule StarsmapApi.FlightsTest do
       [step | _] = flight.steps["steps"]
       assert step["view_state"] =~ "v=1"
       assert step["view_state"] =~ "o=mars"
+    end
+
+    test "a second job for one flight makes no model call" do
+      stub_read_tool()
+
+      {:ok, _} =
+        Script.start([
+          tool_turn("get_sky_object", %{"key" => "ngc-224"}),
+          tool_turn("submit_flight", flight(List.duplicate(step(), 4)), "t2")
+        ])
+
+      {:ok, flight} = Flights.request("How far is Andromeda?", "en")
+      assert :ok = perform_job(Worker, %{id: flight.id})
+      assert :ok = perform_job(Worker, %{id: flight.id})
+      assert length(Script.requests()) == 2
+      assert Repo.get!(AnswerFlight, flight.id).status == "published"
+
+      # A running flight already has its job.
+      Repo.update_all(AnswerFlight, set: [status: "running"])
+      assert :ok = perform_job(Worker, %{id: flight.id})
+      assert length(Script.requests()) == 2
+    end
+
+    for {name, finish} <- [
+          published: [
+            {"get_sky_object", %{"key" => "ngc-224"}},
+            {"submit_flight", :flight}
+          ],
+          refused: [{"get_sky_object", %{"key" => "ngc-224"}}, {"decline_question", :decline}]
+        ] do
+      test "a flight hidden during its job stays hidden when the job is #{name}" do
+        {:ok, flight} = Flights.request("How far is Andromeda?", "en")
+
+        Application.put_env(:starsmap_api, :answer_flight_tools, fn _name, _input ->
+          {:ok, _} = Flights.hide(flight.slug)
+          {:ok, @andromeda["result"]}
+        end)
+
+        on_exit(fn -> Application.delete_env(:starsmap_api, :answer_flight_tools) end)
+
+        turns =
+          unquote(Macro.escape(finish))
+          |> Enum.with_index()
+          |> Enum.map(fn
+            {{tool, :flight}, i} -> tool_turn(tool, flight(List.duplicate(step(), 4)), "t#{i}")
+            {{tool, :decline}, i} -> tool_turn(tool, %{"reason" => "off_topic"}, "t#{i}")
+            {{tool, input}, i} -> tool_turn(tool, input, "t#{i}")
+          end)
+
+        {:ok, _} = Script.start(turns)
+        assert :ok = perform_job(Worker, %{id: flight.id})
+        stored = Repo.get!(AnswerFlight, flight.id)
+        assert stored.status == "hidden"
+        assert stored.refusal == "hidden"
+        assert stored.steps == %{"steps" => []}
+      end
     end
 
     test "a hidden flight is a refusal for each reader" do

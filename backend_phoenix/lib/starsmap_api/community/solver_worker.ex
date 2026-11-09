@@ -39,34 +39,40 @@ defmodule StarsmapApi.Community.SolverWorker do
       try do
         image = Path.join(scratch, "photo.webp")
 
-        with :ok <- Storage.adapter().get("masters/#{id}/1600.webp", image),
+        with {:storage, :ok} <-
+               {:storage, Storage.adapter().get("masters/#{id}/1600.webp", image)},
              {:ok, json} <- solve(image, scratch),
              {:ok, attrs} <- Jason.decode(json),
              {:ok, wcs} <- Astrometry.validate(attrs) do
           StarsmapApi.Community.transaction(fn ->
-            current = Photos.get(id)
+            case Photos.get(id) do
+              nil ->
+                :ok
 
-            if current.status in ["review", "published"] do
-              changed =
-                Repo.update!(
-                  Ecto.Changeset.change(current,
-                    wcs:
-                      Map.merge(wcs, Map.take(attrs, ["cd", "crpix"]))
-                      |> Map.merge(%{"source" => "Astrometry.net", "status" => "solved"})
-                  )
-                )
+              current ->
+                if current.status in ["review", "published"] do
+                  changed =
+                    Repo.update!(
+                      Ecto.Changeset.change(current,
+                        wcs:
+                          Map.merge(wcs, Map.take(attrs, ["cd", "crpix"]))
+                          |> Map.merge(%{"source" => "Astrometry.net", "status" => "solved"})
+                      )
+                    )
 
-              StarsmapApi.Community.Annotations.rebuild(changed)
+                  StarsmapApi.Community.Annotations.rebuild(changed)
 
-              if current.status == "published", do: Ranking.refresh(current.subject_id)
-              StarsmapApi.Community.Depth.enqueue(changed)
-              StarsmapApi.Community.Findings.enqueue(changed)
-              StarsmapApi.Community.DeepFields.photo_ready(changed)
+                  if current.status == "published", do: Ranking.refresh(current.subject_id)
+                  StarsmapApi.Community.Depth.enqueue(changed)
+                  StarsmapApi.Community.Findings.enqueue(changed)
+                  StarsmapApi.Community.DeepFields.photo_ready(changed)
+                end
             end
           end)
 
           :ok
         else
+          {:storage, {:error, reason}} -> {:error, reason}
           # A solve that did not end in time is a worker fault. Oban tries it again.
           {:error, :solver_timeout} = error -> error
           _ -> {:cancel, "No supported plate solution was found"}

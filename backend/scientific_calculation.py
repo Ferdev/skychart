@@ -127,7 +127,15 @@ def observe_payload(key: str, latitude: float, longitude: float, timestamp: date
     for previous,current in zip(samples,samples[1:]):
         if previous[1]<=0<current[1] or previous[1]>=0>current[1]: crossings.append(("rise" if current[1]>previous[1] else "set",current[0]))
     rise=next((at for kind,at in crossings if kind=="rise"),None); setting=next((at for kind,at in crossings if kind=="set"),None)
-    plain=(f"Above the horizon from {rise.strftime('%H:%M')} UTC; best around {transit[0].strftime('%H:%M')} UTC." if rise else f"Above the horizon now; best around {transit[0].strftime('%H:%M')} UTC." if altitude>0 else "Below the horizon during the next 24 hours from this location.")
+    if altitude>0:
+        plain=f"Above the horizon now; best around {transit[0].strftime('%H:%M')} UTC."
+        if setting:
+            plain=f"Above the horizon now; sets around {setting.strftime('%H:%M')} UTC"
+            plain+=f"; next rises around {rise.strftime('%H:%M')} UTC." if rise and rise>setting else "."
+    elif rise:
+        plain=f"Above the horizon from {rise.strftime('%H:%M')} UTC; best around {transit[0].strftime('%H:%M')} UTC."
+    else:
+        plain="Below the horizon during the next 24 hours from this location."
     return {"key":key,"name":item["name"],"observed_at_utc":isoformat_utc(timestamp),"latitude_deg":latitude,"longitude_deg":longitude,"altitude_deg":altitude,"azimuth_deg":azimuth,"rise_utc":isoformat_utc(rise) if rise else None,"transit_utc":isoformat_utc(transit[0]),"set_utc":isoformat_utc(setting) if setting else None,"summary":plain,"accuracy_note":"Geometric five-minute sampling; refraction and local obstructions are not modeled."}
 
 def vector_payload(vector: Any) -> dict[str, float]:

@@ -142,6 +142,49 @@ def test_sigma_clip_removes_a_trail_that_only_one_frame_has(tmp_path):
     assert depth[5].max() == 12
 
 
+def noise_frames(tmp_path, count, shape, seed=5):
+    """Frames of sky noise with a deviation of 1 in each band, as the stacker measures it."""
+    rng = np.random.default_rng(seed)
+    frames = []
+    for index in range(count):
+        path = tmp_path / f"noise-{index}.npy"
+        np.save(path, rng.normal(0, 1, (*shape, 3)).astype(np.float32))
+        frames.append({"path": path, "weight": 1 / count, "noise": 1 / np.sqrt(3)})
+    return frames
+
+
+def test_three_frames_remove_a_hot_pixel_of_one_frame(tmp_path):
+    shape = (20, 30)
+    frames = noise_frames(tmp_path, 3, shape)
+    hot = np.load(frames[0]["path"])
+    hot[10, 12, :] = 80
+    np.save(frames[0]["path"], hot)
+    others = [np.load(frame["path"])[10, 12] for frame in frames[1:]]
+    stack, depth = combine(frames, shape)
+    assert np.allclose(stack[10, 12], np.mean(others, axis=0), atol=1e-5)
+    assert depth[10, 12] == 2
+
+
+def test_a_trail_of_one_frame_leaves_a_small_stack(tmp_path):
+    shape = (40, 60)
+    frames = noise_frames(tmp_path, 4, shape)
+    trail = np.load(frames[2]["path"])
+    trail[20, :, :] = 40
+    np.save(frames[2]["path"], trail)
+    stack, depth = combine(frames, shape)
+    assert abs(float(stack[20].mean())) < 1.5
+    assert depth[20].max() <= 3
+
+
+def test_noise_alone_keeps_nearly_all_values(tmp_path):
+    shape = (100, 100)
+    for count in (3, 5):
+        frames = noise_frames(tmp_path, count, shape, seed=count)
+        _, depth = combine(frames, shape)
+        # A 3-sigma test keeps 99.7 % of normal values. A frame counts in the depth with its 3 bands.
+        assert float(depth.mean()) / count > 0.99
+
+
 def test_two_frames_are_never_clipped(tmp_path):
     shape = (8, 8)
     frames = []

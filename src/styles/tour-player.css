@@ -168,7 +168,9 @@ body[data-universe-view] .tour-player {
     border-radius: 0;
   }
 
-  #app:has(.map-hud[data-workspace-tab="object"]) > .tour-player .tour-player__body {
+  /* The text, the sources and the author line can be long. Only they scroll, so the actions stay in view. */
+  #app:has(.map-hud[data-workspace-tab="object"]) > .tour-player .tour-player__content {
+    min-height: 0;
     overflow-y: auto;
   }
 

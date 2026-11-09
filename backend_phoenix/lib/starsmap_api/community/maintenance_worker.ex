@@ -5,23 +5,53 @@ defmodule StarsmapApi.Community.MaintenanceWorker do
   alias StarsmapApi.Community.{Photo, Token, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
 
+  require Logger
+
+  @batch 200
+
   def perform(_) do
     cutoff = DateTime.add(StarsmapApi.Community.now(), -604_800)
     Repo.delete_all(from t in Token, where: t.expires_at < ^cutoff)
 
+    # A photo whose bytes are gone has a mark, so that each run takes the next oldest photos.
     photos =
       Repo.all(
         from p in Photo,
-          where: p.status in ["uploading", "failed", "rejected"] and p.inserted_at < ^cutoff,
-          limit: 200
+          where:
+            p.status in ["uploading", "failed", "rejected"] and p.inserted_at < ^cutoff and
+              fragment("(?->>'source_removed_at') IS NULL", p.assets),
+          order_by: [asc: p.inserted_at, asc: p.id],
+          limit: @batch
       )
 
-    Enum.reduce_while(photos, :ok, fn photo, _ ->
-      case Storage.adapter().delete(photo.source_key) do
-        result when result in [:ok, {:error, :enoent}] -> {:cont, :ok}
-        error -> {:halt, error}
-      end
-    end)
+    # One failed delete does not stop the others. The job fails at the end, so that Oban tries
+    # again; the photos that were done have their mark and are not read again.
+    failures =
+      Enum.reject(photos, fn photo ->
+        case Storage.adapter().delete(photo.source_key) do
+          result when result in [:ok, {:error, :enoent}] ->
+            mark_removed(photo)
+            true
+
+          error ->
+            Logger.warning("Upload bytes of photo #{photo.id} not removed: #{inspect(error)}")
+            false
+        end
+      end)
+
+    if failures == [], do: :ok, else: {:error, {:upload_cleanup_failed, length(failures)}}
+  end
+
+  defp mark_removed(photo) do
+    marker = %{"source_removed_at" => DateTime.to_iso8601(StarsmapApi.Community.now())}
+
+    Repo.update_all(
+      from(p in Photo,
+        where: p.id == ^photo.id,
+        update: [set: [assets: fragment("? || ?", p.assets, type(^marker, :map))]]
+      ),
+      []
+    )
   end
 end
 

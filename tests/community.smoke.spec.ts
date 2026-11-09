@@ -366,6 +366,31 @@ test("community row stays reachable on a tablet-width screen", async ({ page }) 
   await expect(page.locator(".community-menu")).toBeHidden();
 });
 
+test("the newest gallery uses the response to show and remove Load more", async ({ page }) => {
+  await communityFixture(page);
+  const offsets: string[] = [];
+  await page.route("**/api/community/rankings?**", (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get("period") !== "new") return route.fallback();
+    const offset = url.searchParams.get("offset") ?? "0";
+    offsets.push(offset);
+    return route.fulfill({ json: {
+      photos: [{ ...photo, id: `new-${offset}`, title: `New photo ${offset}` }],
+      has_more: offset === "0",
+    } });
+  });
+  await openAtlas(page);
+  await page.locator('[data-community-tab="gallery"]').click();
+  const hub = page.getByRole("dialog", { name: "Community photos" });
+  await hub.getByRole("button", { name: "Newest" }).click();
+  const more = hub.getByRole("button", { name: "Load more" });
+  await expect(more).toBeVisible();
+  await more.click();
+  await expect(more).toHaveCount(0);
+  await expect(hub.locator(".community-card")).toHaveCount(2);
+  expect(offsets).toEqual(["0", "1"]);
+});
+
 test("the community window shows the gallery, the photographers, and the coverage", async ({ page }) => {
   const state = await communityFixture(page);
   await openAtlas(page);

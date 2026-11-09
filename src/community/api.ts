@@ -256,7 +256,11 @@ export class CommunityApi {
     }
     return response.json() as Promise<T>;
   }
-  async session() {
+  /**
+   * Reads the session from the server. A failed request signs out locally, unless `keepUser` is
+   * set: then the person stays signed in and only the count of the review queue stays as it was.
+   */
+  async session(options: { keepUser?: boolean } = {}) {
     try {
       const data = await this.request<{ user: User | null; csrf: string; review_count?: number }>(
         "/api/community/session",
@@ -265,9 +269,7 @@ export class CommunityApi {
       this.csrf = data.csrf;
       this.reviewCount = data.review_count ?? 0;
     } catch {
-      this.user = null;
-      this.csrf = "";
-      this.reviewCount = 0;
+      if (!options.keepUser) this.signOutLocally();
     }
   }
   get moderator() {

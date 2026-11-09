@@ -1,6 +1,7 @@
 defmodule StarsmapApi.Community.Annotations do
   @moduledoc "J2000 named deep-sky context in a validated TAN photo; never measurements."
   import Ecto.Query
+  alias StarsmapApi.Community.FieldCatalog
   alias StarsmapApi.CommunityRepo, as: Repo
   @r :math.pi() / 180
 
@@ -12,14 +13,9 @@ defmodule StarsmapApi.Community.Annotations do
       radius = max(w["width"], w["height"]) * w["pixel_scale_arcsec"] / 3600
       # Two small, named catalogs. No scan of Gaia or the bulk galaxy catalogs.
       objects =
-        StarsmapApi.Repo.all(
-          from o in StarsmapApi.Catalog.CatalogSourceObject,
-            where:
-              o.catalog_group in ["messier_deep_sky", "ngc_ic_deep_sky"] and
-                o.dec_deg >= ^(w["dec_deg"] - radius) and o.dec_deg <= ^(w["dec_deg"] + radius),
-            order_by: [asc_nulls_last: o.apparent_magnitude, asc: o.key],
-            limit: 1000,
-            select: %{key: o.key, name: o.name, ra: o.ra_deg, dec: o.dec_deg}
+        FieldCatalog.cone(w["ra_deg"], w["dec_deg"], radius,
+          groups: ["messier_deep_sky", "ngc_ic_deep_sky"],
+          limit: 1000
         )
 
       entries =

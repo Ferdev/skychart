@@ -329,6 +329,35 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
              conn |> get("/api/community/photographers/#{member.handle}") |> json_response(200)
   end
 
+  test "new rankings report whether another page exists", %{conn: conn} do
+    author = Repo.insert!(%User{email: "pages@example.com", handle: "pages", name: "Pages"})
+    {:ok, subject} = Subjects.ensure("moon")
+    now = StarsmapApi.Community.now()
+
+    for i <- 1..25 do
+      Repo.insert!(%Photo{
+        user_id: author.id,
+        subject_id: subject.id,
+        declared_key: "moon",
+        title: "Photo #{i}",
+        licence: "CC BY 4.0",
+        captured_at: now,
+        status: "published",
+        source_key: "uploads/page-#{i}",
+        size_bytes: 3,
+        published_at: DateTime.add(now, -i)
+      })
+    end
+
+    assert %{"photos" => first, "has_more" => true} =
+             conn |> get("/api/community/rankings?period=new") |> json_response(200)
+
+    assert length(first) == 24
+
+    assert %{"photos" => [_], "has_more" => false} =
+             conn |> get("/api/community/rankings?period=new&offset=24") |> json_response(200)
+  end
+
   test "a moderation reason out of range gets its own error, not a permission error", %{
     conn: conn
   } do
@@ -717,6 +746,32 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       assert conn |> public(tour) |> json_response(200)
 
       assert report(conn, tour, String.duplicate("報", 2000)) |> json_response(200)
+    end
+
+    test "the reason of a moderator counts characters in each language", %{
+      conn: conn,
+      author: author
+    } do
+      tour = create(conn, author)
+      mod = moderator()
+
+      hide = fn reason ->
+        conn
+        |> as(mod)
+        |> post("/api/community/tours/#{tour["id"]}/review", %{action: "hide", reason: reason})
+      end
+
+      assert %{"error" => "invalid_reason"} =
+               hide.(String.duplicate("a", 2001)) |> json_response(422)
+
+      assert %{"error" => "invalid_reason"} = hide.("  a ") |> json_response(422)
+      assert %{"status" => "hidden"} = hide.(String.duplicate("報", 700)) |> json_response(200)
+
+      assert %{"error" => "not_allowed"} =
+               conn
+               |> as(author)
+               |> post("/api/community/tours/#{tour["id"]}/review", %{action: "hide", reason: "x"})
+               |> json_response(422)
     end
 
     test "a report holds the tour until a moderator decides", %{conn: conn, author: author} do

@@ -256,10 +256,14 @@ if config_env() != :test do
         else: cron
 
     # The position tools of an answer flight need the scientific service of the web container.
+    # That is the release with PHX_SERVER=true, or `mix phx.server` in development, which does
+    # not set PHX_SERVER. A `bin/starsmap_api eval` command has no PHX_SERVER and no queue.
+    web_server = config_env() == :dev or System.get_env("PHX_SERVER") in ~w(true 1)
+
     queues =
       cond do
         worker -> [media: 1, publish: 1, mail: 1]
-        System.get_env("PHX_SERVER") -> [flights: 1]
+        web_server -> [flights: 1]
         true -> false
       end
 

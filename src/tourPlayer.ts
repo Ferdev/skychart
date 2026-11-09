@@ -47,6 +47,8 @@ export class TourPlayer {
   private plate = document.createElement("section");
   private speaking = false;
   private arrival: Promise<unknown> = Promise.resolve();
+  private trackSession = true;
+  private completed = false;
 
   constructor(private adapter: TourPlayerAdapter) {
     Object.assign(this.plate, { id: "tour-player", className: "tour-player", hidden: true });
@@ -104,16 +106,18 @@ export class TourPlayer {
     this.plate.setAttribute("aria-label", this.adapter.translate("tour.label"));
     this.plate.hidden = false;
     try {
-      await this.begin(tour, 0);
+      await this.begin(tour, 0, false);
     } catch {
       if (!transition.signal.aborted) this.error(this.adapter.translate("tour.unavailable"));
     }
   }
 
-  private async begin(tour: Tour, step: number) {
+  private async begin(tour: Tour, step: number, trackSession = true) {
     if (!Array.isArray(tour.steps) || !tour.steps.length || tour.steps.some((item) => !decodeViewState(item.viewState))) throw new Error("Tour data is invalid");
     this.tour = tour;
-    this.adapter.track("tour_started", { tour: analyticsName(tour.slug) });
+    this.trackSession = trackSession;
+    this.completed = false;
+    if (trackSession) this.adapter.track("tour_started", { tour: analyticsName(tour.slug) });
     await this.go(Math.min(Math.max(step, 0), tour.steps.length - 1), true);
     if (!this.transition?.signal.aborted) this.plate.querySelector<HTMLButtonElement>("[data-tour-action='next']")?.focus();
   }
@@ -147,7 +151,10 @@ export class TourPlayer {
     const next = this.tour.steps[index + 1];
     if (next) this.adapter.prewarm(decodeViewState(next.viewState)!);
     if (!restoring && step.holdMs && next) this.timer = window.setTimeout(() => void this.go(index + 1), step.holdMs);
-    if (index === this.tour.steps.length - 1) this.adapter.track("tour_completed", { tour: analyticsName(this.tour.slug) });
+    if (this.trackSession && !this.completed && index === this.tour.steps.length - 1) {
+      this.completed = true;
+      this.adapter.track("tour_completed", { tour: analyticsName(this.tour.slug) });
+    }
     if (this.speaking) this.speak();
   }
 
@@ -230,9 +237,11 @@ export class TourPlayer {
       </div>
       <p class="tour-player__progress">${escapeHtml(t("tour.stepOf", { step: this.index + 1, total }))}</p>
       <h2 tabindex="-1">${escapeHtml(step.title)}</h2>
-      ${step.sentences?.length ? this.narration(step.sentences) : `<p class="tour-player__body">${escapeHtml(step.body)}</p>`}
-      ${step.sources?.length ? this.sources(step.sources) : ""}
-      ${tour.author ? `<p class="tour-player__progress">${escapeHtml(t("tour.sharedBy", { name: tour.author }))}</p>` : ""}
+      <div class="tour-player__content">
+        ${step.sentences?.length ? this.narration(step.sentences) : `<p class="tour-player__body">${escapeHtml(step.body)}</p>`}
+        ${step.sources?.length ? this.sources(step.sources) : ""}
+        ${tour.author ? `<p class="tour-player__progress">${escapeHtml(t("tour.sharedBy", { name: tour.author }))}</p>` : ""}
+      </div>
       <div class="tour-player__dots" role="group" aria-label="${escapeHtml(t("tour.progress"))}">${dots}</div>
       <div class="tour-player__actions">
         <button type="button" class="secondary-action" data-tour-action="previous" ${this.index === 0 ? "disabled" : ""}>${escapeHtml(t("tour.previous"))}</button>
