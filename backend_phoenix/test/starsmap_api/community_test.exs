@@ -47,20 +47,33 @@ defmodule StarsmapApi.CommunityTest do
     for url <- [
           "https://skychart.org/api/observe?key=mars&lat=1.5&lon=2.5",
           "https://skychart.org/api/observe/plan",
-          "https://skychart.org/api/catalog/match"
+          "https://skychart.org/api/catalog/match",
+          "https://host/api/photos",
+          "https://host/community?x=1"
         ] do
       event = %{
         request: %{url: url, data: %{"latitude_deg" => 1.0}},
         extra: %{a: 1},
-        user: %{},
-        breadcrumbs: []
+        user: %{id: 1},
+        breadcrumbs: [%{message: "private"}]
       }
 
-      assert Privacy.scrub(event).request == %{}
+      assert Privacy.scrub(event) == %{
+               request: %{},
+               extra: %{},
+               user: %{},
+               breadcrumbs: []
+             }
     end
 
-    public = %{request: %{url: "https://skychart.org/api/catalog/search"}}
-    assert Privacy.scrub(public) == public
+    for url <- [
+          "https://skychart.org/api/catalog/search",
+          "https://skychart.org/api/photos-public",
+          "https://skychart.org/community-archive"
+        ] do
+      public = %{request: %{url: url}}
+      assert Privacy.scrub(public) == public
+    end
   end
 
   test "email codes are one-time and wrong attempts persist" do
