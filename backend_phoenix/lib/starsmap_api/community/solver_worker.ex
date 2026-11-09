@@ -39,7 +39,8 @@ defmodule StarsmapApi.Community.SolverWorker do
       try do
         image = Path.join(scratch, "photo.webp")
 
-        with :ok <- Storage.adapter().get("masters/#{id}/1600.webp", image),
+        with {:storage, :ok} <-
+               {:storage, Storage.adapter().get("masters/#{id}/1600.webp", image)},
              {:ok, json} <- solve(image, scratch),
              {:ok, attrs} <- Jason.decode(json),
              {:ok, wcs} <- Astrometry.validate(attrs) do
@@ -71,6 +72,7 @@ defmodule StarsmapApi.Community.SolverWorker do
 
           :ok
         else
+          {:storage, {:error, reason}} -> {:error, reason}
           # A solve that did not end in time is a worker fault. Oban tries it again.
           {:error, :solver_timeout} = error -> error
           _ -> {:cancel, "No supported plate solution was found"}

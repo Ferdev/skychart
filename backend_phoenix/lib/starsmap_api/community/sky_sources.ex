@@ -13,22 +13,22 @@ defmodule StarsmapApi.Community.SkySources do
     do: Application.get_env(:starsmap_api, :community_sky_sources, __MODULE__.Http)
 
   @doc "`02:10:30.50` and `+05 10'30.5\"` as degrees."
-  def sexagesimal(ra, dec) do
-    with [h, m, s] <- ra |> String.split(":") |> Enum.map(&Float.parse/1),
+  # A part that does not parse gives nil, so that only that row leaves the list.
+  def sexagesimal(ra, dec) when is_binary(ra) and is_binary(dec) do
+    with [{hh, _}, {min, _}, {sec, _}] <- ra |> String.split(":") |> Enum.map(&Float.parse/1),
          [{dd, _}, {mm, _}, {ss, _}] <-
            ~r/([+-]?\d+)[^\d]+(\d+)[^\d]+([\d.]+)/
            |> Regex.run(String.trim(dec), capture: :all_but_first)
            |> List.wrap()
            |> Enum.map(&Float.parse/1) do
-      {hh, _} = h
-      {min, _} = m
-      {sec, _} = s
       sign = if String.starts_with?(String.trim(dec), "-"), do: -1, else: 1
       {(hh + min / 60 + sec / 3600) * 15, sign * (abs(dd) + mm / 60 + ss / 3600)}
     else
       _ -> nil
     end
   end
+
+  def sexagesimal(_ra, _dec), do: nil
 
   @doc "The rows of the JPL response, without the fields that the sweep does not use."
   def parse_small_bodies(payload, limit_magnitude) do

@@ -134,8 +134,12 @@ defmodule StarsmapApi.Community.Tours do
     tour = if StarsmapApi.Community.uuid(id), do: Repo.get(Tour, id)
 
     cond do
-      actor.role not in ["moderator", "admin"] or byte_size(reason) not in 3..2000 ->
+      actor.role not in ["moderator", "admin"] ->
         {:error, :not_allowed}
+
+      # The limit is in characters, as for the reasons of photos: a reason in any script fits.
+      not StarsmapApi.Community.valid_reason?(reason) or String.length(String.trim(reason)) < 3 ->
+        {:error, :invalid_reason}
 
       is_nil(tour) ->
         {:error, :not_found}

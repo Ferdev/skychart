@@ -430,10 +430,14 @@ defmodule StarsmapApi.Catalog.PointQueries do
         if local_only? or featured_keys == [] do
           []
         else
+          # The database returns the rows in no fixed order. They keep the order of the request.
+          rank = featured_keys |> Enum.with_index() |> Map.new()
+
           base_query
           |> where([object], object.key in ^featured_keys)
           |> select([object], struct(object, ^@sky_fields))
           |> Repo.all(timeout: @sky_query_timeout)
+          |> Enum.sort_by(&Map.fetch!(rank, &1.key))
         end
 
       nearby_rows =

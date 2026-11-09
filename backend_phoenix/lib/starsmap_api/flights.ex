@@ -46,15 +46,19 @@ defmodule StarsmapApi.Flights do
   @min_question 8
   @max_question 200
   @default_view "v=1&c=0%2C0&z=24&t=now"
+  # Oban stops a flight job after this time.
+  @job_limit_seconds 300
   # A job that stopped with a deploy leaves its row. After this time, a new request starts again.
-  @stale_seconds 600
+  # It is longer than the job limit, so that a live job is never started a second time.
+  @stale_seconds 2 * @job_limit_seconds
   @reusable ~w(published refused hidden)
   # Personal data has no place on a public page, and a link is never a sky question.
   @personal [
     ~r/[^\s@]+@[^\s@]+\.[^\s@]+/u,
-    ~r/https?:\/\/|www\./iu,
-    ~r/(?:\+?\d[\s().-]*){8,}/u
+    ~r/https?:\/\/|www\./iu
   ]
+  # A run of digits with the separators of a phone number. `phone?/1` decides on each run.
+  @digit_run ~r/(?<![\w+])(?:\+\s*)?\(?\d[\d\s().-]*\d\)?/u
 
   def enabled? do
     StarsmapApi.Community.enabled?() and
@@ -130,11 +134,32 @@ defmodule StarsmapApi.Flights do
       String.length(text) < @min_question -> {:error, :question_rejected}
       String.length(text) > @max_question -> {:error, :question_rejected}
       Enum.any?(@personal, &(text =~ &1)) -> {:error, :question_rejected}
+      phone?(text) -> {:error, :question_rejected}
       true -> {:ok, text}
     end
   end
 
   defp clean_question(_), do: {:error, :question_rejected}
+
+  # A phone number has a plus and 8 or more digits, or 10 to 15 digits in groups. A date such as
+  # 2026-11-05 and a catalog number with no separators, such as a Gaia DR3 id, are no phone number.
+  defp phone?(text) do
+    @digit_run
+    |> Regex.scan(text)
+    |> Enum.any?(fn [run] ->
+      digits = run |> String.replace(~r/\D/u, "") |> String.length()
+
+      cond do
+        String.starts_with?(run, "+") -> digits >= 8
+        not String.match?(run, ~r/[\s().-]/u) -> false
+        String.match?(run, ~r/\d{4}-\d{2}-\d{2}/u) -> false
+        true -> digits in 10..15
+      end
+    end)
+  end
+
+  @doc "The longest time of one flight job, in seconds."
+  def job_limit_seconds, do: @job_limit_seconds
 
   defp check_locale(locale) do
     if locale in Verifier.locales(), do: {:ok, locale}, else: {:error, :question_rejected}
@@ -149,23 +174,33 @@ defmodule StarsmapApi.Flights do
     if over_budget?() do
       {:error, :daily_limit}
     else
-      Repo.transaction(fn ->
-        flight =
-          Repo.insert!(
-            %AnswerFlight{
-              slug: slug(normalized, locale),
-              question: text,
-              normalized_question: normalized,
-              locale: locale,
-              status: "queued"
-            },
-            on_conflict: {:replace, [:updated_at]},
-            conflict_target: [:normalized_question, :locale],
-            returning: true
-          )
+      now = StarsmapApi.Community.now()
 
-        {:ok, _} = Oban.insert(StarsmapApi.CommunityJobs, Worker.new(%{id: flight.id}))
-        flight
+      row = %{
+        id: Ecto.UUID.generate(),
+        slug: slug(normalized, locale),
+        question: text,
+        normalized_question: normalized,
+        locale: locale,
+        status: "queued",
+        inserted_at: now,
+        updated_at: now
+      }
+
+      Repo.transaction(fn ->
+        # Two requests for one new question can arrive at the same time. Only the request that
+        # inserts the row starts a job. The other gets the row of the first.
+        case Repo.insert_all(AnswerFlight, [row],
+               on_conflict: :nothing,
+               conflict_target: [:normalized_question, :locale]
+             ) do
+          {1, _} ->
+            {:ok, _} = Oban.insert(StarsmapApi.CommunityJobs, Worker.new(%{id: row.id}))
+            Repo.get!(AnswerFlight, row.id)
+
+          {0, _} ->
+            Repo.get_by!(AnswerFlight, normalized_question: normalized, locale: locale)
+        end
       end)
     end
   end
@@ -210,45 +245,58 @@ defmodule StarsmapApi.Flights do
     end
   end
 
-  def mark_running(flight),
-    do: Repo.update!(Ecto.Changeset.change(flight, status: "running"))
+  @doc """
+  The job takes a queued flight. Only one job can take it: a second job for the same flight, or a
+  job for a flight that is now hidden, gets `:taken` and makes no model call.
+  """
+  def mark_running(%AnswerFlight{id: id} = flight) do
+    now = StarsmapApi.Community.now()
+
+    case Repo.update_all(from(f in AnswerFlight, where: f.id == ^id and f.status == "queued"),
+           set: [status: "running", updated_at: now]
+         ) do
+      {1, _} -> {:ok, %{flight | status: "running", updated_at: now}}
+      {0, _} -> :taken
+    end
+  end
 
   def publish(flight, checked, state) do
     steps = with_views(checked.steps) |> with_sources(state.results)
 
-    flight
-    |> finish(state)
-    |> Ecto.Changeset.change(%{
+    finish(flight, state,
       status: "published",
       title: checked.title || flight.question,
       steps: %{"steps" => steps},
       verifier: Map.take(checked, [:report])
-    })
-    |> Repo.update!()
-  end
-
-  def refuse(flight, reason, state) do
-    flight
-    |> finish(state)
-    |> Ecto.Changeset.change(status: "refused", refusal: reason)
-    |> Repo.update!()
-  end
-
-  def fail(flight, reason, state) do
-    flight
-    |> finish(state)
-    |> Ecto.Changeset.change(status: "failed", refusal: String.slice(reason, 0, 200))
-    |> Repo.update!()
-  end
-
-  defp finish(flight, state) do
-    Ecto.Changeset.change(flight,
-      tool_results: state.results,
-      model: state.model,
-      input_tokens: flight.input_tokens + state.input_tokens,
-      output_tokens: flight.output_tokens + state.output_tokens,
-      cost_usd: flight.cost_usd + state.cost
     )
+  end
+
+  def refuse(flight, reason, state),
+    do: finish(flight, state, status: "refused", refusal: reason)
+
+  def fail(flight, reason, state),
+    do: finish(flight, state, status: "failed", refusal: String.slice(reason, 0, 200))
+
+  # The result goes in only while the flight is still running. A flight that the operator hid
+  # during the job stays hidden. The spend of the job is in the daily total in each case.
+  defp finish(%AnswerFlight{id: id} = flight, state, changes) do
+    changes =
+      changes ++
+        [
+          tool_results: state.results,
+          model: state.model,
+          input_tokens: flight.input_tokens + state.input_tokens,
+          output_tokens: flight.output_tokens + state.output_tokens,
+          cost_usd: flight.cost_usd + state.cost,
+          updated_at: StarsmapApi.Community.now()
+        ]
+
+    case Repo.update_all(from(f in AnswerFlight, where: f.id == ^id and f.status == "running"),
+           set: changes
+         ) do
+      {1, _} -> {:ok, Repo.get!(AnswerFlight, id)}
+      {0, _} -> {:error, :not_running}
+    end
   end
 
   # A step with no place keeps the view of the step before it.
@@ -422,24 +470,21 @@ defmodule StarsmapApi.Flights.Worker do
   alias StarsmapApi.Flights.{Agent, AnswerFlight}
 
   @impl true
-  def timeout(_job), do: :timer.minutes(5)
+  def timeout(_job), do: :timer.seconds(Flights.job_limit_seconds())
 
   @impl true
   def perform(%Oban.Job{args: %{"id" => id}}) do
-    case Repo.get(AnswerFlight, id) do
-      %AnswerFlight{status: status} = flight when status in ["queued", "running"] ->
-        flight = Flights.mark_running(flight)
-
-        case Agent.run(flight) do
-          {:publish, checked, state} -> Flights.publish(flight, checked, state)
-          {:refuse, reason, state} -> Flights.refuse(flight, reason, state)
-          {:fail, reason, state} -> Flights.fail(flight, reason, state)
-        end
-
-        :ok
-
-      _ ->
-        :ok
+    # A running flight has a job already. A job that stopped leaves it running, and a new
+    # request starts that flight again after the stale time.
+    with %AnswerFlight{status: "queued"} = flight <- Repo.get(AnswerFlight, id),
+         {:ok, flight} <- Flights.mark_running(flight) do
+      case Agent.run(flight) do
+        {:publish, checked, state} -> Flights.publish(flight, checked, state)
+        {:refuse, reason, state} -> Flights.refuse(flight, reason, state)
+        {:fail, reason, state} -> Flights.fail(flight, reason, state)
+      end
     end
+
+    :ok
   end
 end

@@ -230,12 +230,35 @@ defmodule StarsmapApi.CommunityFindingsTest do
     assert Repo.get!(Photo, p.id).site_lat == nil
   end
 
+  test "the report names only the lists that the sweep compared the point with", %{
+    author: a,
+    moderator: m,
+    subject: s
+  } do
+    p = photo(a, s)
+    second = photo(a, s, captured_at: ~U[2026-11-02 22:00:00.000000Z])
+    {:ok, :ok} = Findings.store(p, [candidate()])
+    {:ok, :ok} = Findings.store(second, [candidate()])
+    [finding] = Findings.review_list() |> Enum.filter(&(&1.photo_id == p.id))
+
+    Repo.update!(Ecto.Changeset.change(p, assets: %{"sweep" => %{"searched" => ["dr11"]}}))
+    assert {:ok, reviewed} = Findings.review(m, finding.id, "approve", "")
+    assert reviewed.report =~ "Absent from: Legacy Surveys DR11\n"
+    refute reviewed.report =~ "Gaia"
+    refute reviewed.report =~ "ALeRCE"
+
+    Repo.update!(Ecto.Changeset.change(Repo.get!(Photo, p.id), assets: %{}))
+    refute Findings.report(Repo.get!(Finding, finding.id)) =~ "Absent from"
+  end
+
   test "the rows of the JPL service become degrees" do
     payload = %{
       "data_first_pass" => [
         ["1234 Name", "01:30:00.00", "-05 30'36.0\"", "0", "0", "0", "15.2", "0", "0", "1", "1"],
         ["faint", "01:30:00.00", "+05 00'00.0\"", "0", "0", "0", "23.0", "0", "0", "1", "1"],
-        ["no mag", "01:30:00.00", "+05 00'00.0\"", "0", "0", "0", "n.a.", "0", "0", "1", "1"]
+        ["no mag", "01:30:00.00", "+05 00'00.0\"", "0", "0", "0", "n.a.", "0", "0", "1", "1"],
+        ["bad ra", "abc:10:20", "+05 00'00.0\"", "0", "0", "0", "15.0", "0", "0", "1", "1"],
+        ["no ra", nil, "+05 00'00.0\"", "0", "0", "0", "15.0", "0", "0", "1", "1"]
       ]
     }
 
@@ -244,6 +267,16 @@ defmodule StarsmapApi.CommunityFindingsTest do
 
     assert_in_delta ra, 22.5, 1.0e-9
     assert_in_delta dec, -5.51, 1.0e-9
+  end
+
+  test "a right ascension or a declination that does not parse gives no position" do
+    assert SkySources.sexagesimal("abc:10:20", "+05 10'30.5\"") == nil
+    assert SkySources.sexagesimal("02:10", "+05 10'30.5\"") == nil
+    assert SkySources.sexagesimal("02:10:30.50", "north") == nil
+    assert SkySources.sexagesimal(nil, "+05:10:30.5") == nil
+    assert {ra, dec} = SkySources.sexagesimal("02:10:30.50", "+05:10:30.5")
+    assert_in_delta ra, 32.627083333, 1.0e-6
+    assert_in_delta dec, 5.175138889, 1.0e-6
   end
 
   test "the rows of the survey service have numbers and a missing magnitude" do

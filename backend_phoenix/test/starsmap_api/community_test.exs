@@ -798,20 +798,31 @@ defmodule StarsmapApi.CommunityTest do
     assert query["X-Amz-Expires"] == "900"
   end
 
-  test "upload metadata rejects oversized files and absent rights", %{user: user} do
-    assert {:error, _} =
+  test "upload metadata rejects oversized files and absent rights before creating a subject", %{
+    user: user
+  } do
+    subjects = Repo.aggregate(StarsmapApi.Community.Subject, :count)
+
+    for attrs <- [
+          %{"size_bytes" => 60_000_001, "rights_confirmed" => true},
+          %{"size_bytes" => 1, "rights_confirmed" => false}
+        ] do
+      assert {:error, _} = Photos.create(user, Map.put(attrs, "key", "mars"))
+      assert Repo.aggregate(StarsmapApi.Community.Subject, :count) == subjects
+    end
+
+    assert {:ok, %Photo{} = photo} =
              Photos.create(user, %{
-               "key" => "moon",
-               "size_bytes" => 60_000_001,
-               "rights_confirmed" => true
+               "key" => "mars",
+               "size_bytes" => 1,
+               "rights_confirmed" => true,
+               "title" => "Mars fixture",
+               "licence" => "CC0",
+               "captured_at" => "2026-10-08T00:00:00Z"
              })
 
-    assert {:error, _} =
-             Photos.create(user, %{
-               "key" => "moon",
-               "size_bytes" => 1,
-               "rights_confirmed" => false
-             })
+    assert Repo.aggregate(StarsmapApi.Community.Subject, :count) == subjects + 1
+    assert Repo.get!(Photo, photo.id).declared_key == "mars"
   end
 
   test "vote weights, trend threshold and cover changes are deterministic", %{
@@ -1667,6 +1678,74 @@ defmodule StarsmapApi.CommunityTest do
 
   # Three characters with more than 8,000 bytes.
   defp long_marks, do: "a" <> String.duplicate("\u0301", 4000) <> "bc"
+
+  defmodule FailingDelete do
+    @moduledoc "Local storage where the delete of one key fails."
+    def delete(key) do
+      if key == Application.fetch_env!(:starsmap_api, :community_test_failing_key),
+        do: {:error, :eacces},
+        else: StarsmapApi.Community.Storage.Local.delete(key)
+    end
+  end
+
+  test "the upload cleanup goes past the first batch and past a failed delete", %{
+    user: user,
+    subject: subject
+  } do
+    old = DateTime.add(StarsmapApi.Community.now(), -30 * 86_400)
+    now = StarsmapApi.Community.now()
+
+    rows =
+      for i <- 1..201 do
+        %{
+          id: Ecto.UUID.generate(),
+          user_id: user.id,
+          subject_id: subject.id,
+          declared_key: "moon",
+          title: "Abandoned",
+          licence: "CC0",
+          captured_at: now,
+          status: "failed",
+          source_key: "uploads/cleanup-#{i}-#{Ecto.UUID.generate()}",
+          size_bytes: 1,
+          inserted_at: DateTime.add(old, i),
+          updated_at: now
+        }
+      end
+
+    Repo.insert_all(Photo, rows)
+    keys = Enum.map(rows, & &1.source_key)
+
+    for key <- keys do
+      File.mkdir_p!(Path.dirname(Storage.local_path(key)))
+      File.write!(Storage.local_path(key), "bytes")
+    end
+
+    on_exit(fn -> Enum.each(keys, &File.rm(Storage.local_path(&1))) end)
+    left = fn -> Enum.count(keys, &File.exists?(Storage.local_path(&1))) end
+
+    storage = Application.fetch_env!(:starsmap_api, :community_storage)
+    Application.put_env(:starsmap_api, :community_storage, FailingDelete)
+    Application.put_env(:starsmap_api, :community_test_failing_key, Enum.at(keys, 10))
+
+    on_exit(fn ->
+      Application.put_env(:starsmap_api, :community_storage, storage)
+      Application.delete_env(:starsmap_api, :community_test_failing_key)
+    end)
+
+    job = %Oban.Job{args: %{}}
+
+    assert {:error, {:upload_cleanup_failed, 1}} =
+             StarsmapApi.Community.MaintenanceWorker.perform(job)
+
+    # The batch of 200 is done except the failed photo, and the 201st waits for the next run.
+    assert left.() == 2
+
+    Application.put_env(:starsmap_api, :community_test_failing_key, "none")
+    assert :ok = StarsmapApi.Community.MaintenanceWorker.perform(job)
+    assert left.() == 0
+    assert :ok = StarsmapApi.Community.MaintenanceWorker.perform(job)
+  end
 
   defp photo(user, subject, status) do
     Repo.insert!(%Photo{
