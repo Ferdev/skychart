@@ -292,7 +292,7 @@ defmodule StarsmapApiWeb.CommunityController do
     {photos, has_more} = params["offset"] |> offset() |> Photos.recent_page()
 
     json(conn, %{
-      photos: Enum.map(photos, &Photos.public/1),
+      photos: Photos.public_many(photos),
       has_more: has_more
     })
   end
@@ -300,7 +300,7 @@ defmodule StarsmapApiWeb.CommunityController do
   def rankings(conn, params),
     do:
       json(conn, %{
-        photos: Ranking.ranked(params["period"]) |> Enum.take(24) |> Enum.map(&Photos.public/1)
+        photos: Ranking.ranked(params["period"]) |> Enum.take(24) |> Photos.public_many()
       })
 
   def review_queue(conn, _) do

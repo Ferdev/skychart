@@ -4,6 +4,17 @@ defmodule StarsmapApi.Community.Ranking do
   alias StarsmapApi.Community.{Photo, User, Vote, Photos, Subjects}
   alias StarsmapApi.CommunityRepo, as: Repo
 
+  # Each vote has the weight 1/k, where k is its position in the votes of one voter for one author.
+  # A filter on the author (p.user_id) keeps each window partition complete.
+  @weighted_votes """
+    SELECT v.photo_id, v.inserted_at,
+    1.0 / row_number() OVER (PARTITION BY v.user_id,p.user_id ORDER BY v.inserted_at,v.id) AS weight
+    FROM photo_votes v JOIN users u ON u.id=v.user_id JOIN photos p ON p.id=v.photo_id
+    JOIN users a ON a.id=p.user_id
+    WHERE NOT u.suspended AND NOT a.suspended AND p.status='published'
+    AND u.first_sign_in_at <= now() - interval '24 hours'
+  """
+
   def vote(user, photo_id, present) do
     StarsmapApi.Community.transaction(fn ->
       photo = Photos.get(photo_id) || Repo.rollback(:not_found)
@@ -39,90 +50,102 @@ defmodule StarsmapApi.Community.Ranking do
     do: DateTime.diff(StarsmapApi.Community.now(), at) < 86400
 
   def refresh_author(user_id) do
+    scores = scores()
+
     Repo.all(
       from p in Photo, where: p.user_id == ^user_id, distinct: p.subject_id, select: p.subject_id
     )
-    |> Enum.each(&refresh/1)
+    |> Enum.each(&refresh(&1, scores))
   end
 
-  def photographers, do: photographer_rows() |> Enum.take(50)
+  def photographers,
+    do: photographer_rows("ORDER BY rank LIMIT 50", []) |> Enum.map(&Map.delete(&1, :rank))
 
   @doc "Public statistics of one photographer, with the position in the listing."
-  def photographer(handle) do
-    rows = photographer_rows()
-
-    case Enum.find_index(rows, &(&1.handle == handle)) do
-      nil -> nil
-      index -> rows |> Enum.at(index) |> Map.put(:rank, index + 1)
+  def photographer(handle) when is_binary(handle) do
+    case photographer_rows("WHERE handle = $1", [handle]) do
+      [row] -> row
+      [] -> nil
     end
   end
 
-  defp photographer_rows do
-    scores = scores()
+  def photographer(_), do: nil
 
-    covers =
-      Repo.all(from s in "subject_photo_stats", select: s.payload)
-      |> Enum.reduce(%{}, fn p, result ->
-        case get_in(p, ["cover", "author", "handle"]) do
-          nil -> result
-          handle -> Map.update(result, handle, 1, &(&1 + 1))
-        end
-      end)
-
-    firsts =
-      Repo.all(
-        from s in StarsmapApi.Community.Subject,
-          join: p in Photo,
-          on: p.id == s.first_photo_id,
-          join: u in User,
-          on: u.id == p.user_id,
-          where: not u.suspended and p.status == "published",
-          select: u.handle
+  # The database ranks all photographers and returns only the rows of `tail`. The h-index of a
+  # photographer is the number of positions i where the i-th best photo score is at least i.
+  # The order is h-index, covers and first photos (highest first), then the handle in byte order.
+  defp photographer_rows(tail, params) do
+    Repo.query!(
+      """
+      WITH weighted AS (
+        #{@weighted_votes}
+      ),
+      scored AS (SELECT photo_id, sum(weight)::float AS score FROM weighted GROUP BY photo_id),
+      published AS (
+        SELECT p.id, p.user_id, p.subject_id, coalesce(s.score, 0.0) AS score
+        FROM photos p JOIN users u ON u.id = p.user_id
+        LEFT JOIN scored s ON s.photo_id = p.id
+        WHERE p.status = 'published' AND NOT u.suspended
+      ),
+      positions AS (
+        SELECT user_id, score, row_number() OVER (PARTITION BY user_id ORDER BY score DESC) AS i
+        FROM published
+      ),
+      h AS (SELECT user_id, count(*) FILTER (WHERE score >= i) AS h_index FROM positions GROUP BY user_id),
+      authors AS (
+        SELECT user_id, count(*) AS photos, count(DISTINCT subject_id) AS objects
+        FROM published GROUP BY user_id
+      ),
+      covers AS (
+        SELECT payload -> 'cover' -> 'author' ->> 'handle' AS handle, count(*) AS covers
+        FROM subject_photo_stats
+        WHERE payload -> 'cover' -> 'author' ->> 'handle' IS NOT NULL
+        GROUP BY 1
+      ),
+      firsts AS (
+        SELECT u.handle, count(*) AS first_photos
+        FROM subjects s JOIN photos p ON p.id = s.first_photo_id JOIN users u ON u.id = p.user_id
+        WHERE NOT u.suspended AND p.status = 'published'
+        GROUP BY u.handle
+      ),
+      votes AS (
+        SELECT p.user_id, count(*) AS votes
+        FROM photo_votes v JOIN users u ON u.id = v.user_id JOIN photos p ON p.id = v.photo_id
+        WHERE NOT u.suspended AND p.status = 'published'
+        GROUP BY p.user_id
+      ),
+      ranked AS (
+        SELECT u.handle, u.name, h.h_index, a.photos, a.objects,
+          coalesce(v.votes, 0) AS votes, coalesce(c.covers, 0) AS covers,
+          coalesce(f.first_photos, 0) AS first_photos,
+          row_number() OVER (
+            ORDER BY h.h_index DESC, coalesce(c.covers, 0) DESC,
+              coalesce(f.first_photos, 0) DESC, u.handle COLLATE "C"
+          ) AS rank
+        FROM authors a JOIN users u ON u.id = a.user_id JOIN h ON h.user_id = a.user_id
+        LEFT JOIN votes v ON v.user_id = a.user_id
+        LEFT JOIN covers c ON c.handle = u.handle
+        LEFT JOIN firsts f ON f.handle = u.handle
       )
-      |> Enum.frequencies()
-
-    votes =
-      Repo.all(
-        from v in Vote,
-          join: u in User,
-          on: u.id == v.user_id,
-          join: p in Photo,
-          on: p.id == v.photo_id,
-          where: not u.suspended and p.status == "published",
-          group_by: p.user_id,
-          select: {p.user_id, count()}
-      )
-      |> Map.new()
-
-    rows =
-      Repo.all(
-        from [p, u] in Photos.published(), select: {p.id, u.id, u.handle, u.name, p.subject_id}
-      )
-
-    rows
-    |> Enum.group_by(&elem(&1, 1))
-    |> Enum.map(fn {user_id, photos} ->
-      [{_, _, handle, name, _} | _] = photos
-
-      values =
-        photos
-        |> Enum.map(fn {id, _, _, _, _} -> Map.get(scores, id, %{score: 0.0}).score end)
-        |> Enum.sort(:desc)
-
-      h = values |> Enum.with_index(1) |> Enum.count(fn {v, i} -> v >= i end)
-
+      SELECT handle, name, h_index, photos, objects, votes, covers, first_photos, rank
+      FROM ranked
+      #{tail}
+      """,
+      params
+    ).rows
+    |> Enum.map(fn [handle, name, h, photos, objects, votes, covers, firsts, rank] ->
       %{
         handle: handle,
         name: name,
         h_index: h,
-        photos: length(photos),
-        objects: photos |> Enum.map(&elem(&1, 4)) |> Enum.uniq() |> length(),
-        votes: Map.get(votes, user_id, 0),
-        covers: Map.get(covers, handle, 0),
-        first_photos: Map.get(firsts, handle, 0)
+        photos: photos,
+        objects: objects,
+        votes: votes,
+        covers: covers,
+        first_photos: firsts,
+        rank: rank
       }
     end)
-    |> Enum.sort_by(&{-&1.h_index, -&1.covers, -&1.first_photos, &1.handle})
   end
 
   def voted?(user, id),
@@ -140,17 +163,6 @@ defmodule StarsmapApi.Community.Ranking do
         ),
         :count
       )
-
-  # Each vote has the weight 1/k, where k is its position in the votes of one voter for one author.
-  # A filter on the author (p.user_id) keeps each window partition complete.
-  @weighted_votes """
-    SELECT v.photo_id, v.inserted_at,
-    1.0 / row_number() OVER (PARTITION BY v.user_id,p.user_id ORDER BY v.inserted_at,v.id) AS weight
-    FROM photo_votes v JOIN users u ON u.id=v.user_id JOIN photos p ON p.id=v.photo_id
-    JOIN users a ON a.id=p.user_id
-    WHERE NOT u.suspended AND NOT a.suspended AND p.status='published'
-    AND u.first_sign_in_at <= now() - interval '24 hours'
-  """
 
   @doc "The vote counts of a list of photos in one query. A photo with no vote is not in the map."
   def vote_counts([]), do: %{}
@@ -253,7 +265,9 @@ defmodule StarsmapApi.Community.Ranking do
     ranked ++ tail
   end
 
-  def refresh(subject_id) do
+  def refresh(subject_id), do: refresh(subject_id, scores())
+
+  def refresh(subject_id, scores) do
     candidates =
       Repo.all(
         from [p, _] in Photos.published(),
@@ -261,8 +275,6 @@ defmodule StarsmapApi.Community.Ranking do
           order_by: [asc: p.published_at, asc: p.id],
           select: p
       )
-
-    scores = scores()
 
     cover =
       candidates

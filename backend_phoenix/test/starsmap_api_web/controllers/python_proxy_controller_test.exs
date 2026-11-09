@@ -109,6 +109,45 @@ defmodule StarsmapApiWeb.PythonProxyControllerTest do
     assert request =~ "X-Request-ID: #{payload["request_id"]}"
   end
 
+  test "a large response in many writes reaches the client byte for byte", %{conn: conn} do
+    {:ok, listener} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
+    {:ok, port} = :inet.port(listener)
+    # About 4 MB of JSON with a different byte pattern in each part.
+    parts =
+      for i <- 1..64,
+          do: Jason.encode!(%{"part" => i, "data" => String.duplicate("#{rem(i, 10)}", 65_536)})
+
+    body = "[" <> Enum.join(parts, ",") <> "]"
+
+    server =
+      Task.async(fn ->
+        {:ok, socket} = :gen_tcp.accept(listener)
+        {:ok, _request} = :gen_tcp.recv(socket, 0, 2_000)
+
+        :ok =
+          :gen_tcp.send(
+            socket,
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n"
+          )
+
+        for offset <- 0..(byte_size(body) - 1)//32_768 do
+          size = min(32_768, byte_size(body) - offset)
+          :ok = :gen_tcp.send(socket, binary_part(body, offset, size))
+        end
+
+        :gen_tcp.close(socket)
+        :gen_tcp.close(listener)
+      end)
+
+    System.put_env("PYTHON_BACKEND_URL", "http://127.0.0.1:#{port}")
+    response = get(conn, ~p"/api/ephemeris")
+    Task.await(server)
+
+    assert response.status == 200
+    assert response.resp_body == body
+    assert byte_size(response.resp_body) > 4_000_000
+  end
+
   test "a night plan sends the site in the body and in no address or log line", %{conn: conn} do
     {:ok, listener} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true])
     {:ok, port} = :inet.port(listener)

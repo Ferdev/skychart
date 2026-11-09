@@ -4,6 +4,8 @@ defmodule StarsmapApiWeb.DeepFieldController do
   alias StarsmapApi.Community.{DeepField, DeepFieldBuild, DeepFields, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
 
+  @s3_timeout 30_000
+
   def show(conn, %{"slug" => slug}) do
     case DeepFields.public(slug) do
       {:ok, field} -> json(conn, field)
@@ -39,11 +41,83 @@ defmodule StarsmapApiWeb.DeepFieldController do
         do: send_file(conn, 200, path),
         else: error(conn, :not_found, :not_found)
     else
-      case ExAws.S3.get_object(Application.fetch_env!(:starsmap_api, :community_s3_bucket), key)
-           |> ExAws.request() do
-        {:ok, %{body: bytes}} -> send_resp(conn, 200, bytes)
-        _ -> error(conn, :not_found, :not_found)
+      send_s3(conn, key)
+    end
+  end
+
+  # The object goes to the client one chunk at a time, so a request holds one chunk in memory
+  # and not the full image. A missing object gives 404 before the response starts.
+  defp send_s3(conn, key) do
+    bucket = Application.fetch_env!(:starsmap_api, :community_s3_bucket)
+    opts = [async: :once] ++ Application.get_env(:ex_aws, :hackney_opts, recv_timeout: 30_000)
+
+    with {:ok, url} <-
+           ExAws.S3.presigned_url(ExAws.Config.new(:s3), :get, bucket, key, expires_in: 60),
+         {:ok, ref} <- :hackney.request(:get, url, [], "", opts) do
+      case s3_status(ref) do
+        {200, length} ->
+          conn |> send_chunked(200) |> s3_chunks(ref, length)
+
+        _ ->
+          :hackney.close(ref)
+          error(conn, :not_found, :not_found)
       end
+    else
+      _ -> error(conn, :not_found, :not_found)
+    end
+  end
+
+  defp s3_status(ref) do
+    receive do
+      {:hackney_response, ^ref, {:status, status, _}} ->
+        receive do
+          {:hackney_response, ^ref, {:headers, headers}} -> {status, content_length(headers)}
+        after
+          @s3_timeout -> :timeout
+        end
+
+      {:hackney_response, ^ref, _} ->
+        :error
+    after
+      @s3_timeout -> :timeout
+    end
+  end
+
+  defp content_length(headers) do
+    Enum.find_value(headers, fn {name, value} ->
+      if String.downcase(name) == "content-length", do: String.to_integer(value)
+    end)
+  end
+
+  # `left` is the number of bytes still to come. hackney ends a body that the server cut short
+  # with `done`, so the count tells a complete image from a part of one.
+  defp s3_chunks(conn, ref, left) do
+    :hackney.stream_next(ref)
+
+    receive do
+      {:hackney_response, ^ref, :done} when left in [0, nil] ->
+        conn
+
+      {:hackney_response, ^ref, :done} ->
+        raise "deep-field media stream failed: #{left} bytes missing"
+
+      {:hackney_response, ^ref, {:error, reason}} ->
+        raise "deep-field media stream failed: #{inspect(reason)}"
+
+      {:hackney_response, ^ref, chunk} when is_binary(chunk) ->
+        case chunk(conn, chunk) do
+          {:ok, conn} ->
+            s3_chunks(conn, ref, left && left - byte_size(chunk))
+
+          {:error, _closed} ->
+            :hackney.close(ref)
+            conn
+        end
+    after
+      @s3_timeout ->
+        :hackney.close(ref)
+        # The status is sent. Only a broken connection tells the client the image is incomplete.
+        raise "deep-field media stream timed out"
     end
   end
 
