@@ -291,13 +291,13 @@ defmodule StarsmapApiWeb.CommunityController do
   def rankings(conn, %{"period" => "new"} = params),
     do:
       json(conn, %{
-        photos: params["offset"] |> offset() |> Photos.recent() |> Enum.map(&Photos.public/1)
+        photos: params["offset"] |> offset() |> Photos.recent() |> Photos.public_many()
       })
 
   def rankings(conn, params),
     do:
       json(conn, %{
-        photos: Ranking.ranked(params["period"]) |> Enum.take(24) |> Enum.map(&Photos.public/1)
+        photos: Ranking.ranked(params["period"]) |> Enum.take(24) |> Photos.public_many()
       })
 
   def review_queue(conn, _) do

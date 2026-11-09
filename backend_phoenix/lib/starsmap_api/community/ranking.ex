@@ -39,10 +39,12 @@ defmodule StarsmapApi.Community.Ranking do
     do: DateTime.diff(StarsmapApi.Community.now(), at) < 86400
 
   def refresh_author(user_id) do
+    scores = scores()
+
     Repo.all(
       from p in Photo, where: p.user_id == ^user_id, distinct: p.subject_id, select: p.subject_id
     )
-    |> Enum.each(&refresh/1)
+    |> Enum.each(&refresh(&1, scores))
   end
 
   def photographers, do: photographer_rows() |> Enum.take(50)
@@ -253,7 +255,9 @@ defmodule StarsmapApi.Community.Ranking do
     ranked ++ tail
   end
 
-  def refresh(subject_id) do
+  def refresh(subject_id), do: refresh(subject_id, scores())
+
+  def refresh(subject_id, scores) do
     candidates =
       Repo.all(
         from [p, _] in Photos.published(),
@@ -261,8 +265,6 @@ defmodule StarsmapApi.Community.Ranking do
           order_by: [asc: p.published_at, asc: p.id],
           select: p
       )
-
-    scores = scores()
 
     cover =
       candidates

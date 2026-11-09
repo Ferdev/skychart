@@ -5,6 +5,9 @@ defmodule StarsmapApi.CommunityPerformanceTest do
   """
   use ExUnit.Case, async: false
   import Ecto.Query
+  import Phoenix.ConnTest
+
+  @endpoint StarsmapApiWeb.Endpoint
 
   alias StarsmapApi.Community.{
     Action,
@@ -202,6 +205,67 @@ defmodule StarsmapApi.CommunityPerformanceTest do
         assert Map.update!(single, :in_frame, &Enum.sort_by(&1, fn a -> a.key end)) ==
                  Map.update!(item, :in_frame, &Enum.sort_by(&1, fn a -> a.key end))
       end
+    end
+  end
+
+  test "one vote scores the weighted votes once for all of an author's subjects", %{
+    user: user,
+    subject: subject
+  } do
+    {:ok, mars} = Subjects.ensure("mars")
+    now = StarsmapApi.Community.now()
+    moon_photo = photo(user, subject, "published", now)
+    mars_photo = photo(user, mars, "published", now)
+
+    {{:ok, %{votes: 1}}, queries} =
+      queries(fn -> Ranking.vote(voter("refresh-voter"), mars_photo.id, true) end)
+
+    assert Enum.count(queries, &String.contains?(&1, "WITH weighted AS")) == 1
+
+    for {subject, photo} <- [{subject, moon_photo}, {mars, mars_photo}] do
+      payload =
+        Repo.one!(
+          from s in "subject_photo_stats",
+            where: s.subject_id == type(^subject.id, Ecto.UUID),
+            select: s.payload
+        )
+
+      assert payload["cover"]["id"] == photo.id
+      assert payload["count"] == 1
+    end
+  end
+
+  test "both ranking responses use fixed queries and the batched public payloads", %{
+    user: user,
+    subject: subject
+  } do
+    for period <- ["new", "all"] do
+      now = StarsmapApi.Community.now()
+      photo(user, subject, "published", now)
+
+      {small, small_queries} =
+        queries(fn ->
+          build_conn() |> get("/api/community/rankings?period=#{period}") |> json_response(200)
+        end)
+
+      assert length(small["photos"]) == 1
+
+      for i <- 1..23, do: photo(user, subject, "published", DateTime.add(now, -i))
+
+      {large, large_queries} =
+        queries(fn ->
+          build_conn() |> get("/api/community/rankings?period=#{period}") |> json_response(200)
+        end)
+
+      assert length(large["photos"]) == 24
+      assert length(large_queries) == length(small_queries)
+
+      for item <- large["photos"] do
+        expected = item["id"] |> Photos.get() |> Photos.public() |> Jason.encode!() |> Jason.decode!()
+        assert item == expected
+      end
+
+      Repo.delete_all(from p in Photo, where: p.user_id == ^user.id)
     end
   end
 
