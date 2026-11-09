@@ -46,6 +46,11 @@ defmodule StarsmapApi.Community.Findings do
   @second_frame_arcsec 4.0
   @min_gap_seconds 3600
   @max_candidates_for_query 200
+  @searched_lists [
+    {"dr11", "Legacy Surveys DR11"},
+    {"gaia", "Gaia DR3 slice of the atlas"},
+    {"alerce", "ALeRCE ZTF objects"}
+  ]
 
   def enqueue(%Photo{} = photo) do
     if sweepable?(photo) do
@@ -129,8 +134,9 @@ defmodule StarsmapApi.Community.Findings do
         on: p.id == f.photo_id,
         where:
           f.kind == "candidate" and f.photo_id != ^photo.id and
-            f.dec_deg >= ^(finding.dec_deg - box) and f.dec_deg <= ^(finding.dec_deg + box) and
             f.state in ["waiting_second", "review"],
+        where: ^FieldCatalog.within(finding.ra_deg, finding.dec_deg, box),
+        order_by: [asc: f.inserted_at, asc: f.id],
         limit: @max_candidates_for_query,
         select: {f, p.captured_at}
     )
@@ -367,11 +373,23 @@ defmodule StarsmapApi.Community.Findings do
       "Magnitude estimate: #{finding.magnitude || "unknown"} (no standard band)",
       "Near: #{finding.near_name || finding.near_key || "unknown"}",
       "Second frame (UTC): #{second && DateTime.to_iso8601(second.captured_at)}",
-      "Absent from: Legacy Surveys DR11, Gaia DR3 slice of the atlas, ALeRCE ZTF objects",
+      absence(photo),
       "Equipment: #{photo.equipment || "unknown"}",
       "Observer: #{author.name}"
     ]
+    |> Enum.reject(&is_nil/1)
     |> Enum.join("\n")
+  end
+
+  # Only the lists that the sweep of this photo compared the point with. An older sweep has no
+  # record of them, and its report then makes no claim of absence.
+  defp absence(photo) do
+    searched = List.wrap(get_in(photo.assets || %{}, ["sweep", "searched"]))
+
+    case for({key, name} <- @searched_lists, key in searched, do: name) do
+      [] -> nil
+      names -> "Absent from: " <> Enum.join(names, ", ")
+    end
   end
 
   def export(user),
@@ -395,6 +413,8 @@ end
 defmodule StarsmapApi.Community.SweepWorker do
   @moduledoc "One discovery sweep. It runs in the serial media queue, on the private master."
   use Oban.Worker, queue: :media, max_attempts: 3, unique: [keys: [:id], period: 3600]
+  # The Gaia rows of one field. A field with more stars gives only the brightest ones.
+  @gaia_limit 3000
 
   alias StarsmapApi.Community.{Annotations, FieldCatalog, Findings, Photos, SkySources, Storage}
   alias StarsmapApi.CommunityRepo, as: Repo
@@ -483,14 +503,18 @@ defmodule StarsmapApi.Community.SweepWorker do
 
     survey = if radius <= @max_survey_radius, do: value(sources.dr11(ra, dec, radius))
 
+    gaia =
+      FieldCatalog.cone(ra, dec, radius, limit: @gaia_limit)
+      |> Enum.map(&Map.take(&1, [:ra, :dec]))
+
     %{
       wcs: w,
       bodies: bodies,
       dr11: survey,
       transients: value(sources.transients(ra, dec, radius)),
-      gaia:
-        FieldCatalog.cone(ra, dec, radius, limit: 3000)
-        |> Enum.map(&Map.take(&1, [:ra, :dec])),
+      gaia: gaia,
+      # A full list means that the field has fewer stars than the limit: none was left out.
+      gaia_complete: length(gaia) < @gaia_limit,
       galaxies:
         FieldCatalog.cone(ra, dec, radius, groups: FieldCatalog.named_groups(), limit: 500)
         |> Enum.filter(&(&1.object_type in ["galaxy", "active_galaxy"]))

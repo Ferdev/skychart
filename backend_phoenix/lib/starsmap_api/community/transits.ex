@@ -25,6 +25,7 @@ defmodule StarsmapApi.Community.Transits do
   @daily_solves 10
   @max_frame_bytes 4_000_000
   @states ["review", "approved", "rejected", "hidden"]
+  @public_timings 200
 
   @doc "A fit for the light curve window. Nothing is stored."
   def preview(params) do
@@ -170,24 +171,44 @@ defmodule StarsmapApi.Community.Transits do
 
   @doc "Approved timings of a planet or of its host, with the summary of each planet."
   def public_list(key) do
+    approved =
+      from o in TransitObservation,
+        join: u in User,
+        on: u.id == o.user_id,
+        where:
+          o.review_state == "approved" and not u.suspended and
+            (o.object_key == ^key or o.host_key == ^key)
+
+    # The list shows the newest timings only. The fit of each planet uses all of its approved
+    # timings, with only the fields that the fit reads.
     rows =
       Repo.all(
-        from o in TransitObservation,
-          join: u in User,
-          on: u.id == o.user_id,
-          where:
-            o.review_state == "approved" and not u.suspended and
-              (o.object_key == ^key or o.host_key == ^key),
+        from [o, u] in approved,
           order_by: [desc: o.mid_time_utc],
-          limit: 200,
+          limit: @public_timings,
           select: {o, u}
+      )
+
+    fit =
+      Repo.all(
+        from [o, _u] in approved,
+          select:
+            struct(o, [
+              :id,
+              :object_key,
+              :user_id,
+              :epoch,
+              :uncertainty_minutes,
+              :o_minus_c_minutes,
+              :predicted_uncertainty_minutes,
+              :checks
+            ])
       )
 
     %{
       timings: Enum.map(rows, fn {o, u} -> public(o, u) end),
       planets:
-        rows
-        |> Enum.map(&elem(&1, 0))
+        fit
         |> Enum.group_by(& &1.object_key)
         |> Enum.map(fn {planet, group} -> Map.put(summary(group), :key, planet) end)
     }

@@ -19,6 +19,9 @@ defmodule StarsmapApi.Community.SkyOverlay do
 
   @doc "Photos that overlap the circle of `radius` degrees around the J2000 position."
   def list(ra, dec, radius) do
+    {ra, dec} = {ra * 1.0, dec * 1.0}
+    # The candidate rows are photos whose center is in this wider circle. The sky distance is
+    # tested in the query, so that the row limit counts only photos near the area.
     margin = radius + @largest_photo_radius_deg
 
     Repo.all(
@@ -30,6 +33,16 @@ defmodule StarsmapApi.Community.SkyOverlay do
               p.wcs,
               ^(dec - margin),
               ^(dec + margin)
+            ) and
+            fragment(
+              "sin(radians(?)) * sin(radians((?->>'dec_deg')::float8)) + cos(radians(?)) * cos(radians((?->>'dec_deg')::float8)) * cos(radians((?->>'ra_deg')::float8 - ?)) >= ?",
+              ^dec,
+              p.wcs,
+              ^dec,
+              p.wcs,
+              p.wcs,
+              ^ra,
+              ^:math.cos(min(margin, 180.0) * @r)
             ),
         order_by: [desc: p.published_at, desc: p.id],
         limit: @candidates,

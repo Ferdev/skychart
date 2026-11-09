@@ -748,6 +748,32 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       assert report(conn, tour, String.duplicate("報", 2000)) |> json_response(200)
     end
 
+    test "the reason of a moderator counts characters in each language", %{
+      conn: conn,
+      author: author
+    } do
+      tour = create(conn, author)
+      mod = moderator()
+
+      hide = fn reason ->
+        conn
+        |> as(mod)
+        |> post("/api/community/tours/#{tour["id"]}/review", %{action: "hide", reason: reason})
+      end
+
+      assert %{"error" => "invalid_reason"} =
+               hide.(String.duplicate("a", 2001)) |> json_response(422)
+
+      assert %{"error" => "invalid_reason"} = hide.("  a ") |> json_response(422)
+      assert %{"status" => "hidden"} = hide.(String.duplicate("報", 700)) |> json_response(200)
+
+      assert %{"error" => "not_allowed"} =
+               conn
+               |> as(author)
+               |> post("/api/community/tours/#{tour["id"]}/review", %{action: "hide", reason: "x"})
+               |> json_response(422)
+    end
+
     test "a report holds the tour until a moderator decides", %{conn: conn, author: author} do
       tour = create(conn, author)
       assert report(conn, tour) |> json_response(200)

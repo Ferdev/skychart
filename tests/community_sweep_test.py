@@ -60,6 +60,9 @@ def test_a_new_point_near_a_galaxy_is_a_candidate():
     assert len(candidates) == 1
     assert candidates[0]["near_key"] == "ngc-3000"
     assert candidates[0]["magnitude"] is not None
+    assert result["stats"]["searched"] == ["dr11", "alerce"]
+    complete = classify([dict(item) for item in sources], request(dr11=survey, gaia_complete=True))
+    assert complete["stats"]["searched"] == ["dr11", "gaia", "alerce"]
 
 
 def test_a_new_point_far_from_each_galaxy_is_not_a_candidate():
@@ -83,6 +86,17 @@ def test_a_gaia_star_or_a_known_body_is_not_a_candidate():
     assert result["stats"]["candidates"] == 0
     assert result["stats"]["bodies_recovered"] == 1
     assert result["findings"][0]["designation"] == "(433) Eros" and result["findings"][0]["recovered"]
+
+
+def test_a_body_of_magnitude_zero_stays_among_the_brightest():
+    bodies = [{"name": f"faint {index}", "ra": 150.0, "dec": 2.0, "magnitude": 5.0} for index in range(40)]
+    bodies.append({"name": "bright", "ra": 150.0, "dec": 2.0, "magnitude": 0.0})
+    bodies.append({"name": "no magnitude", "ra": 150.0, "dec": 2.0, "magnitude": None})
+    result = classify([], request(bodies=bodies))
+    names = [row["designation"] for row in result["findings"] if row["kind"] == "known_body"]
+    assert len(names) == 40
+    assert names[0] == "bright"
+    assert "no magnitude" not in names
 
 
 def test_doubt_gives_no_candidates_but_keeps_known_bodies():

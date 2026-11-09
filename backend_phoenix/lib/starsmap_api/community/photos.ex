@@ -6,9 +6,9 @@ defmodule StarsmapApi.Community.Photos do
   @licences ["All rights reserved", "CC BY 4.0", "CC BY-SA 4.0", "CC0"]
 
   def create(user, attrs) do
-    with {:ok, subject} <- Subjects.ensure(attrs["key"]),
-         {:ok, size} <- size(attrs["size_bytes"]),
-         true <- attrs["rights_confirmed"] == true and attrs["synthetic"] != true do
+    with {:ok, size} <- size(attrs["size_bytes"]),
+         true <- attrs["rights_confirmed"] == true and attrs["synthetic"] != true,
+         {:ok, subject} <- Subjects.ensure(attrs["key"]) do
       StarsmapApi.Community.transaction(fn ->
         count =
           Repo.aggregate(

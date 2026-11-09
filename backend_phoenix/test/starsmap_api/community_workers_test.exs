@@ -92,6 +92,41 @@ defmodule StarsmapApi.CommunityWorkersTest do
     assert Repo.get!(Photo, photo.id).assets["sweep"]["stop"] == "no_survey"
   end
 
+  defmodule FailingGet do
+    @moduledoc "Local storage with a read that fails, as a network store can fail for a moment."
+    def get(_key, _path), do: {:error, :timeout}
+  end
+
+  test "a storage read failure retries the depth job", %{photo: photo} do
+    storage = Application.fetch_env!(:starsmap_api, :community_storage)
+    Application.put_env(:starsmap_api, :community_storage, FailingGet)
+    on_exit(fn -> Application.put_env(:starsmap_api, :community_storage, storage) end)
+
+    assert {:error, :timeout} = DepthWorker.perform(%Oban.Job{args: %{"id" => photo.id}})
+  end
+
+  test "a depth script that runs out of time retries, and bad output cancels", %{photo: photo} do
+    root = Path.join(System.tmp_dir!(), "depth-script-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(root)
+    backend = Application.get_env(:starsmap_api, :community_backend_root)
+    Application.put_env(:starsmap_api, :community_backend_root, root)
+
+    on_exit(fn ->
+      if backend,
+        do: Application.put_env(:starsmap_api, :community_backend_root, backend),
+        else: Application.delete_env(:starsmap_api, :community_backend_root)
+
+      File.rm_rf(root)
+    end)
+
+    script = Path.join(root, "community_depth.py")
+    File.write!(script, "import sys\nsys.exit(124)\n")
+    assert {:error, :depth_timeout} = DepthWorker.perform(%Oban.Job{args: %{"id" => photo.id}})
+
+    File.write!(script, "print('not json')\n")
+    assert {:cancel, _} = DepthWorker.perform(%Oban.Job{args: %{"id" => photo.id}})
+  end
+
   test "the depth worker runs its script and an empty field gives no layers", %{photo: photo} do
     assert :ok = DepthWorker.perform(%Oban.Job{args: %{"id" => photo.id}})
     refute Depth.ready?(photo)

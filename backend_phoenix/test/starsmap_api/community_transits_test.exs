@@ -58,7 +58,12 @@ defmodule StarsmapApi.CommunityTransitsTest do
 
   defp user(handle, role),
     do:
-      Repo.insert!(%User{email: "#{handle}@example.com", handle: handle, name: handle, role: role})
+      Repo.insert!(%User{
+        email: "#{handle}@example.com",
+        handle: handle,
+        name: handle,
+        role: role
+      })
 
   defp params(key \\ "exoplanet-wasp-12-b") do
     %{
@@ -178,6 +183,49 @@ defmodule StarsmapApi.CommunityTransitsTest do
     assert two.community_uncertainty_minutes < one.community_uncertainty_minutes
     assert two.count == 2
     assert two.epoch == 3100
+  end
+
+  test "the fit of a planet uses each approved timing, and the list shows the newest", %{
+    author: author
+  } do
+    now = StarsmapApi.Community.now()
+
+    rows =
+      for epoch <- 1..205 do
+        %{
+          id: Ecto.UUID.generate(),
+          user_id: author.id,
+          object_key: "exoplanet-wasp-12-b",
+          host_key: "exosys-wasp-12",
+          object_name: "WASP-12 b",
+          target_status: "confirmed",
+          epoch: epoch,
+          night: ~D[2026-12-05],
+          mid_time_bjd: 1.0 * epoch,
+          mid_time_utc: DateTime.add(now, epoch * 60),
+          uncertainty_minutes: 1.0,
+          o_minus_c_minutes: if(epoch <= 5, do: 50.0, else: 0.0),
+          predicted_uncertainty_minutes: 2.0,
+          depth_ppt: 10.0,
+          duration_minutes: 100.0,
+          frame_count: 30,
+          instrument: "x",
+          method_version: "m",
+          review_state: "approved",
+          checks: %{
+            "ephemeris" => %{"reference_time_err_days" => 1.0e-3, "period_err_days" => 4.0e-7}
+          },
+          inserted_at: now,
+          updated_at: now
+        }
+      end
+
+    Repo.insert_all(TransitObservation, rows)
+    assert %{timings: timings, planets: [planet]} = Transits.public_list("exosys-wasp-12")
+    assert length(timings) == 200
+    assert planet.count == 205
+    # The five oldest timings are only in the fit: they move its mean.
+    assert planet.mean_o_minus_c_minutes > 0
   end
 
   test "a suspended observer leaves the public record", %{author: author, moderator: moderator} do

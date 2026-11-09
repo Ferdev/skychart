@@ -9,6 +9,8 @@ defmodule StarsmapApi.Community.FieldCatalog do
   alias StarsmapApi.Catalog.CatalogSourceObject
 
   @r :math.pi() / 180
+  # A small margin on the database bounds, so that a rounding error never drops a row at the edge.
+  @slack_deg 1.0e-6
   @gaia_groups ["gaia_local_stars", "gaia_500pc_stars", "gaia_10kpc_bright_stars"]
   @named_groups ["messier_deep_sky", "ngc_ic_deep_sky", "simbad_extragalactic"]
 
@@ -18,14 +20,11 @@ defmodule StarsmapApi.Community.FieldCatalog do
   def cone(ra, dec, radius, options \\ []) do
     groups = Keyword.get(options, :groups, @gaia_groups)
     limit = Keyword.get(options, :limit, 500)
-    max_magnitude = Keyword.get(options, :max_magnitude, 99.0)
-    width = radius / max(:math.cos(min(abs(dec) + radius, 89.9) * @r), 0.01)
 
     query =
       from o in CatalogSourceObject,
-        where:
-          o.catalog_group in ^groups and o.dec_deg >= ^(dec - radius) and
-            o.dec_deg <= ^(dec + radius),
+        where: o.catalog_group in ^groups,
+        where: ^within(ra, dec, radius),
         order_by: [asc_nulls_last: o.apparent_magnitude, asc: o.key],
         limit: ^limit,
         select: %{
@@ -42,14 +41,57 @@ defmodule StarsmapApi.Community.FieldCatalog do
         }
 
     query =
-      if is_float(Keyword.get(options, :max_magnitude)),
-        do: where(query, [o], o.apparent_magnitude <= ^max_magnitude),
-        else: query
+      case Keyword.get(options, :max_magnitude) do
+        magnitude when is_number(magnitude) ->
+          where(query, [o], o.apparent_magnitude <= ^(magnitude * 1.0))
+
+        _ ->
+          query
+      end
 
     query
-    |> where(^right_ascension(ra, width))
     |> StarsmapApi.Repo.all(timeout: 15_000)
     |> Enum.filter(&(separation(ra, dec, &1.ra, &1.dec) <= radius))
+  end
+
+  @doc """
+  A filter for the rows of the first binding, by their `ra_deg` and `dec_deg` columns: the rows
+  in the circle of `radius` degrees. The declination and right-ascension bounds can use the
+  index. The spherical test then removes the corners of that box in the database, so that a row
+  limit counts only rows in the circle. It is a little wider than the circle: an exact check with
+  `separation/4` comes after it.
+  """
+  def within(ra, dec, radius) do
+    ra = :math.fmod(:math.fmod(ra * 1.0, 360.0) + 360.0, 360.0)
+    dec = dec * 1.0
+    cos_radius = :math.cos(min(radius + @slack_deg, 180.0) * @r)
+
+    dynamic(
+      [o],
+      o.dec_deg >= ^(dec - radius - @slack_deg) and o.dec_deg <= ^(dec + radius + @slack_deg) and
+        ^right_ascension(ra, ra_half_width(dec, radius)) and
+        fragment(
+          "sin(radians(?)) * sin(radians(?)) + cos(radians(?)) * cos(radians(?)) * cos(radians(? - ?)) >= ?",
+          ^dec,
+          o.dec_deg,
+          ^dec,
+          o.dec_deg,
+          o.ra_deg,
+          ^ra,
+          ^cos_radius
+        )
+    )
+  end
+
+  # The largest difference in right ascension inside the circle. When the circle contains a
+  # pole, each right ascension is in it.
+  defp ra_half_width(dec, radius) do
+    if abs(dec) + radius >= 90 do
+      180.0
+    else
+      ratio = :math.sin(radius * @r) / :math.cos(dec * @r)
+      if ratio >= 1, do: 180.0, else: :math.asin(ratio) / @r + @slack_deg
+    end
   end
 
   @doc "The angle between two directions, in degrees. It is exact at small angles."
