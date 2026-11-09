@@ -311,6 +311,27 @@ test("Shift+P toggles the diagnostics, but not while the person types or holds t
   await expect(page.locator("#diagnostics-toggle")).not.toBeChecked();
 });
 
+test("Shift+P toggles the diagnostics when the browser refuses to store the choice", async ({ page }) => {
+  await page.addInitScript(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key === "starsmap:perf") throw new DOMException("Storage is blocked", "SecurityError");
+      return setItem.call(this, key, value);
+    };
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await openAtlas(page);
+  const toggle = page.locator("#diagnostics-toggle");
+  const before = await toggle.isChecked();
+
+  await page.keyboard.press("Shift+P");
+  await expect(toggle).toBeChecked({ checked: !before });
+  await page.keyboard.press("Shift+P");
+  await expect(toggle).toBeChecked({ checked: before });
+  expect(errors).toEqual([]);
+});
+
 test("the Sky overlay aligns a photo, opens the viewer, and follows the L parameter", async ({ page }) => {
   test.setTimeout(120_000);
   await overlayFixture(page, [overlayPhoto("11111111-1111-4111-8111-111111111111", 83.8, -5.4, 0.008), overlayPhoto("22222222-2222-4222-8222-222222222222", 200, -40, 0.001)]);
