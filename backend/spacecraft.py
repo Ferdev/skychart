@@ -13,11 +13,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from backend.errors import QueryInputError
 from backend.payload_cache import cache_key_payload, read_cache, write_cache
-from backend.settings import ATLAS_FRAME_ID
+from backend.settings import ATLAS_FRAME_ID, LIVE_TIMESTAMP_BUCKET_SECONDS
 
 MANIFEST = json.loads((Path(__file__).resolve().parents[1] / 'backend_phoenix/priv/spacecraft.json').read_text())
 MISSIONS = {row['key']: row for row in MANIFEST['spacecraft']}
 _jobs = queue.PriorityQueue(maxsize=256)
+# The last places of the queue are only for the selected craft, so that background jobs cannot fill it.
+_SELECTED_RESERVE = 32
 _lock = threading.Lock()
 _pending = {}
 _provider_lock = threading.Lock()
@@ -112,15 +114,20 @@ def _run():
 def spacecraft_payload(timestamp, selected_key=''):
     global _worker, _sequence
     if selected_key and selected_key not in MISSIONS: raise QueryInputError('Unknown spacecraft key')
-    stamp = timestamp.isoformat()
+    # Each request time in one five-minute step gives the same epoch, job and cache entry, so that many
+    # distinct times cannot fill the queue, the provider allowance and the disk cache. The answer keeps
+    # the requested time, which the browser compares; position_epoch shows the epoch of the position.
+    from backend.request_query import bucket_datetime
+    epoch = bucket_datetime(timestamp, LIVE_TIMESTAMP_BUCKET_SECONDS)
+    stamp = epoch.isoformat()
     bodies = []
     with _lock:
         if _worker is None:
             _worker = threading.Thread(target=_run, daemon=True, name='spacecraft-horizons'); _worker.start()
     missions = sorted(MISSIONS.values(), key=lambda m: (m['key'] != selected_key, m['horizons_id'] not in ('-31','-32','-98')))
     for mission in missions:
-        if not in_coverage(mission, timestamp):
-            bodies.append(metadata_body(mission,timestamp,'out_of_coverage')); continue
+        if not in_coverage(mission, epoch):
+            bodies.append(metadata_body(mission,epoch,'out_of_coverage')); continue
         key = (mission['key'], stamp)
         disk_key = cache_key_payload('spacecraft', key=key, revision=mission['source_sha256'], frame=ATLAS_FRAME_ID)
         with _lock: result = _results.get(key)
@@ -133,8 +140,9 @@ def spacecraft_payload(timestamp, selected_key=''):
             bodies.append(result['body']); continue
         with _lock:
             priority = 0 if mission['key'] == selected_key else 1
-            if (key not in _pending or priority < _pending[key]) and not _jobs.full():
+            room = not _jobs.full() if priority == 0 else _jobs.qsize() < _jobs.maxsize - _SELECTED_RESERVE
+            if (key not in _pending or priority < _pending[key]) and room:
                 _sequence += 1; _pending[key] = priority
-                _jobs.put_nowait((priority, _sequence, key, mission, timestamp, disk_key))
-        bodies.append(metadata_body(mission,timestamp,'loading'))
-    return {'timestamp_utc':stamp, 'bodies':bodies}
+                _jobs.put_nowait((priority, _sequence, key, mission, epoch, disk_key))
+        bodies.append(metadata_body(mission,epoch,'loading'))
+    return {'timestamp_utc':timestamp.isoformat(), 'bodies':bodies}

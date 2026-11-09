@@ -20,6 +20,7 @@ defmodule StarsmapApi.Community.TourReport do
   schema "tour_reports" do
     field :tour_id, Ecto.UUID
     field :reason, :string
+    field :reporter, :string
     field :resolved_at, :utc_datetime_usec
     timestamps(type: :utc_datetime_usec)
   end

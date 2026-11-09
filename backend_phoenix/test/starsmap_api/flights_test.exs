@@ -510,6 +510,26 @@ defmodule StarsmapApi.FlightsTest do
       assert length(Script.requests()) == 1
     end
 
+    test "flights that start together under the cap make one model call past it" do
+      # One model turn of the script costs 0.008 USD, so the first call goes past this cap.
+      Application.put_env(:starsmap_api, :answer_flight_daily_usd, 0.005)
+      stub_read_tool()
+      turns = for id <- 1..6, do: tool_turn("get_sky_object", %{"key" => "ngc-224"}, "t#{id}")
+      {:ok, _} = Script.start(turns)
+
+      flights =
+        ["How far is Andromeda?", "How far is Vega now?", "How far is Sirius now?"]
+        |> Enum.map(fn question -> Task.async(fn -> Flights.request(question, "en") end) end)
+        |> Enum.map(&Task.await/1)
+        |> Enum.map(fn {:ok, flight} -> flight end)
+
+      for flight <- flights, do: assert(:ok = perform_job(Worker, %{id: flight.id}))
+
+      assert length(Script.requests()) == 1
+      assert Enum.all?(flights, &(Repo.get!(AnswerFlight, &1.id).refusal == "daily_limit"))
+      assert {:error, :daily_limit} = Flights.request("How far is Deneb now?", "en")
+    end
+
     test "a model cannot call a tool outside the read list" do
       flight =
         run([

@@ -356,7 +356,15 @@ defmodule StarsmapApiWeb.CommunityController do
   end
 
   def report_tour(conn, %{"token" => token} = p),
-    do: respond(conn, Tours.report(token, p["reason"]), fn _ -> %{ok: true} end)
+    do: respond(conn, Tours.report(token, p["reason"], reporter(conn)), fn _ -> %{ok: true} end)
+
+  # One IPv6 client can use each address of its /64 network, so the /64 is the client.
+  defp reporter(conn) do
+    case StarsmapApiWeb.ClientIp.resolve(conn) do
+      {a, b, c, d, _, _, _, _} -> "#{:inet.ntoa({a, b, c, d, 0, 0, 0, 0})}/64"
+      ip -> ip |> :inet.ntoa() |> to_string()
+    end
+  end
 
   def tours(conn, _), do: json(conn, %{tours: Tours.list(conn.assigns.community_user)})
 

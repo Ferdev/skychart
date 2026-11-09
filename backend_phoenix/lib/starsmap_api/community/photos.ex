@@ -10,6 +10,10 @@ defmodule StarsmapApi.Community.Photos do
          true <- attrs["rights_confirmed"] == true and attrs["synthetic"] != true,
          {:ok, subject} <- Subjects.ensure(attrs["key"]) do
       StarsmapApi.Community.transaction(fn ->
+        # The lock on the user row puts parallel uploads of one person in sequence, so the
+        # count of each one includes the photos of the others.
+        Repo.one!(from(u in User, where: u.id == ^user.id, lock: "FOR UPDATE", select: u.id))
+
         count =
           Repo.aggregate(
             from(p in Photo,

@@ -61,7 +61,7 @@ defmodule StarsmapApi.Community.Moderation do
       "reports",
       Repo.aggregate(from(r in Report, where: is_nil(r.resolved_at)), :count)
     )
-    |> Map.put("tours", max(Tours.open_report_count(), Tours.held_count()))
+    |> Map.put("tours", Tours.waiting_count())
     |> Map.put("transits", Transits.pending_count())
     |> Map.put("findings", Findings.pending_count())
   end

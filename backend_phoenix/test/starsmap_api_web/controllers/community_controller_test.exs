@@ -1,5 +1,6 @@
 defmodule StarsmapApiWeb.CommunityControllerTest do
   use StarsmapApiWeb.ConnCase, async: false
+  import Ecto.Query
   alias StarsmapApi.Community.{Accounts, Photos, User, Subjects, Photo}
   alias StarsmapApi.CommunityRepo, as: Repo
 
@@ -648,6 +649,22 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       |> post("/api/community/shared-tours/#{token(tour)}/report", %{reason: reason})
     end
 
+    # One report from each of `count` different public client addresses.
+    defp reports(conn, tour, count) do
+      for n <- 1..count do
+        assert %{conn | remote_ip: {198, 51, 100, n}} |> report(tour) |> json_response(200)
+      end
+    end
+
+    defp open_reports(tour) do
+      Repo.aggregate(
+        from(r in StarsmapApi.Community.TourReport,
+          where: r.tour_id == ^tour["id"] and is_nil(r.resolved_at)
+        ),
+        :count
+      )
+    end
+
     defp moderator do
       account = sign_in("tour-moderator@example.com")
       user = Repo.update!(Ecto.Changeset.change(account.user, role: "moderator"))
@@ -774,10 +791,16 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
                |> json_response(422)
     end
 
-    test "a report holds the tour until a moderator decides", %{conn: conn, author: author} do
+    test "reports from three clients hold the tour until a moderator decides", %{
+      conn: conn,
+      author: author
+    } do
       tour = create(conn, author)
-      assert report(conn, tour) |> json_response(200)
+      reports(conn, tour, 2)
+      assert conn |> public(tour) |> json_response(200)
+      reports(conn, tour, 3)
       assert conn |> public(tour) |> json_response(404)
+      assert open_reports(tour) == 3
 
       mod = moderator()
 
@@ -785,7 +808,7 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
                conn |> as(mod) |> get("/api/community/review/tours") |> json_response(200)
 
       assert item["status"] == "held"
-      assert [%{"reason" => "not suitable"}] = item["reports"]
+      assert [%{"reason" => "not suitable"}, _, _] = item["reports"]
 
       assert %{"counts" => %{"tours" => 1}} =
                conn |> as(mod) |> get("/api/community/review") |> json_response(200)
@@ -804,12 +827,78 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       assert %{"tours" => []} =
                conn |> as(mod) |> get("/api/community/review/tours") |> json_response(200)
 
-      # A kept tour stays open after a new report, and the report waits in the queue.
-      assert report(conn, tour) |> json_response(200)
+      # A kept tour stays open after new reports, and the reports wait in the queue.
+      reports(conn, tour, 3)
       assert conn |> public(tour) |> json_response(200)
 
       assert %{"tours" => [_]} =
                conn |> as(mod) |> get("/api/community/review/tours") |> json_response(200)
+    end
+
+    test "repeated reports of one client do not hold a tour", %{conn: conn, author: author} do
+      tour = create(conn, author)
+      client = %{conn | remote_ip: {203, 0, 113, 7}}
+
+      for _ <- 1..10, do: assert(client |> report(tour) |> json_response(200))
+
+      # The addresses of one IPv6 /64 network are one client.
+      for n <- 1..5 do
+        ipv6 = %{conn | remote_ip: {0x2001, 0xDB8, 1, 2, 0, 0, 0, n}}
+        assert ipv6 |> report(tour) |> json_response(200)
+      end
+
+      assert conn |> public(tour) |> json_response(200)
+      assert open_reports(tour) == 2
+
+      # The tour is held when another client reports it too.
+      assert %{conn | remote_ip: {203, 0, 113, 8}} |> report(tour) |> json_response(200)
+
+      assert conn |> public(tour) |> json_response(404)
+    end
+
+    test "a change of a kept tour waits for a moderator again", %{conn: conn, author: author} do
+      tour = create(conn, author)
+      mod = moderator()
+
+      keep = fn ->
+        conn
+        |> as(mod)
+        |> post("/api/community/tours/#{tour["id"]}/review", %{action: "keep"})
+        |> json_response(200)
+      end
+
+      edit = fn extra ->
+        conn
+        |> as(author)
+        |> patch("/api/community/tours/#{tour["id"]}", tour_body(extra))
+        |> json_response(200)
+      end
+
+      # A tour that no moderator kept stays open after a change.
+      assert %{"status" => "shared"} = edit.(%{title: "Lesson one, again"})
+      assert conn |> public(tour) |> json_response(200)
+
+      keep.()
+      # The same content again is no change.
+      assert %{"status" => "shared"} = edit.(%{title: "Lesson one, again"})
+      assert conn |> public(tour) |> json_response(200)
+
+      changed_steps = [%{viewState: @view, title: "Other start", body: "New text"}]
+      assert %{"status" => "held"} = edit.(%{title: "Lesson one, again", steps: changed_steps})
+      assert conn |> public(tour) |> json_response(404)
+
+      assert %{"tours" => [%{"status" => "held", "reports" => []}]} =
+               conn |> as(mod) |> get("/api/community/review/tours") |> json_response(200)
+
+      keep.()
+      assert conn |> public(tour) |> json_response(200)
+
+      for field <- [%{title: "A new title"}, %{description: "A new description"}] do
+        assert %{"status" => "held"} =
+                 edit.(Map.merge(%{title: "Lesson one, again", steps: changed_steps}, field))
+
+        keep.()
+      end
     end
 
     test "a tour that a moderator hid stops opening and the author reads the reason", %{
@@ -886,6 +975,53 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
       response = get(conn, "/?tour=shared-0123456789abcdef0123456789abcdef")
       assert get_resp_header(response, "x-robots-tag") == ["noindex"]
     end
+  end
+
+  defmodule CountingFit do
+    @behaviour StarsmapApi.Community.TransitFit
+    def fit(_key, _points) do
+      send(Application.get_env(:starsmap_api, :fit_test_pid), :fit)
+      {:ok, %{"accepted" => true}}
+    end
+  end
+
+  test "the transit preview needs a session and has the limit of each person", %{conn: conn} do
+    Application.put_env(:starsmap_api, :community_transit_fit, CountingFit)
+    Application.put_env(:starsmap_api, :fit_test_pid, self())
+
+    on_exit(fn ->
+      Application.delete_env(:starsmap_api, :community_transit_fit)
+      Application.delete_env(:starsmap_api, :fit_test_pid)
+    end)
+
+    body = %{
+      key: "exoplanet-wasp-12-b",
+      points: for(i <- 1..30, do: [2_461_014.8 + i / 1440, 1.0, 0.002])
+    }
+
+    assert conn
+           |> put_req_header("origin", "http://www.example.com")
+           |> put_req_header("content-type", "application/json")
+           |> post("/api/community/transits/fit", body)
+           |> json_response(401)
+
+    refute_received :fit
+
+    account = sign_in("fitter@example.com")
+
+    for _ <- 1..30,
+        do:
+          assert(
+            conn
+            |> as(account)
+            |> post("/api/community/transits/fit", body)
+            |> json_response(200)
+          )
+
+    assert conn |> as(account) |> post("/api/community/transits/fit", body) |> response(429)
+
+    assert length(for(_ <- 1..30, do: assert_received(:fit))) == 30
+    refute_received :fit
   end
 
   test "public transit timings have no session and writes need one", %{conn: conn} do
