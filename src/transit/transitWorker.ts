@@ -3,7 +3,7 @@
  * Reads FITS frames and measures stars outside the main thread. Frames stay here: the
  * worker returns numbers and a small preview. It reads one file at a time to keep memory low.
  */
-import { FitsError, frameMidTimeJd, headerWcs, readFrame, type FrameWcs } from "./fitsFrame.ts";
+import { FitsError, frameMidTimeJd, headerWcs, readFrame, saturationLimit, type FrameWcs } from "./fitsFrame.ts";
 import { apertureRadius, detectStars, measureFrame, relativeLightCurve, stretchedPreview, typicalWidth, type Detection, type FrameMeasure, type LightCurve } from "./photometry.ts";
 
 export type WorkerRequest =
@@ -42,7 +42,7 @@ async function measure(files: File[], start: { x: number; y: number }[], radius:
     const frame = readFrame(await file.arrayBuffer());
     const time = frameMidTimeJd(frame.header);
     const gain = [frame.header.GAIN, frame.header.EGAIN].find((value) => typeof value === "number" && value > 0) as number | undefined;
-    const limit = typeof frame.header.DATAMAX === "number" ? frame.header.DATAMAX * 0.95 : frame.header.BITPIX === 16 ? 62_000 : Infinity;
+    const limit = saturationLimit(frame.header);
     const stars = time === null ? null : measureFrame(frame.pixels, frame.width, frame.height, places, radius, gain, limit);
     if (time === null || !stars) {
       dropped += 1;

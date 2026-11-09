@@ -154,7 +154,7 @@ export async function communityFixture(page: Page, options: { role?: string; fli
     } else if (path.endsWith("/complete")) data = { status: "processing" };
     else if (path === "/api/community/rankings") {
       state.rankingRequests.push(new URL(route.request().url()).searchParams.get("period") ?? "");
-      data = { photos: state.removed ? [] : [{ ...photo, votes: state.votes }] };
+      data = { photos: state.removed ? [] : [{ ...photo, votes: state.votes }], has_more: false };
     }
     else if (path === "/api/catalog")
       data = {

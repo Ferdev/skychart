@@ -288,11 +288,14 @@ defmodule StarsmapApiWeb.CommunityController do
   def report(conn, %{"id" => id} = p),
     do: respond(conn, Moderation.report(id, p["reason"]), fn _ -> %{ok: true} end)
 
-  def rankings(conn, %{"period" => "new"} = params),
-    do:
-      json(conn, %{
-        photos: params["offset"] |> offset() |> Photos.recent() |> Enum.map(&Photos.public/1)
-      })
+  def rankings(conn, %{"period" => "new"} = params) do
+    {photos, has_more} = params["offset"] |> offset() |> Photos.recent_page()
+
+    json(conn, %{
+      photos: Enum.map(photos, &Photos.public/1),
+      has_more: has_more
+    })
+  end
 
   def rankings(conn, params),
     do:

@@ -260,6 +260,13 @@ defmodule StarsmapApi.Community.Photos do
     )
   end
 
+  @doc "One page of published photos and whether another row follows it."
+  def recent_page(offset \\ 0, limit \\ 24)
+      when is_integer(offset) and offset >= 0 and is_integer(limit) and limit > 0 do
+    {page, rest} = recent(offset, limit + 1) |> Enum.split(limit)
+    {page, rest != []}
+  end
+
   @doc "Published photos of one author, newest first. The database applies the limit."
   def by_author(id, limit \\ 100) when is_integer(limit) and limit > 0,
     do:
