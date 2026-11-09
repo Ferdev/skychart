@@ -113,17 +113,20 @@ defmodule StarsmapApi.Community.Privacy do
     end)
   end
 
+  @scrubbed_path_prefixes [
+    "/community",
+    "/api/photos",
+    "/api/flights",
+    "/api/observe",
+    "/api/catalog/match"
+  ]
+
   def scrub(event) do
     request = Map.get(event, :request) || %{}
     url = Map.get(request, :url) || Map.get(request, "url") || ""
+    path = URI.parse(url).path || ""
 
-    if String.contains?(url, [
-         "/community/",
-         "/api/photos/",
-         "/api/flights",
-         "/api/observe",
-         "/api/catalog/match"
-       ]) do
+    if Enum.any?(@scrubbed_path_prefixes, &(path == &1 or String.starts_with?(path, &1 <> "/"))) do
       %{event | request: %{}, extra: %{}, user: %{}, breadcrumbs: []}
     else
       event

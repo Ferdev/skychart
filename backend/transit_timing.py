@@ -170,6 +170,31 @@ def _solve(flux: np.ndarray, error: np.ndarray, time: np.ndarray, shape: np.ndar
     return float(residual @ residual), solution
 
 
+def _chi_square_grid(flux: np.ndarray, error: np.ndarray, time: np.ndarray, middles: np.ndarray, duration: float, ingress: float) -> np.ndarray:
+    """The chi-square of `_solve` for each middle, in one batch.
+
+    The terms 1 and (time - middle) span the same plane for each middle, so the fit of each middle
+    is the baseline fit plus the part of the trapezoid that is not in that plane.
+    """
+    weights = 1.0 / error
+    target = flux * weights
+    base, _ = np.linalg.qr(np.stack([weights, time * weights], axis=1))
+    residual = target - base @ (base.T @ target)
+    total = float(residual @ residual)
+    rows = []
+    # Blocks of middles keep the shape table small for a long light curve.
+    for start in range(0, len(middles), 64):
+        block = middles[start : start + 64]
+        shapes = trapezoid(time[None, :], block[:, None], duration, ingress) * weights
+        free = shapes - (shapes @ base) @ base.T
+        size = np.einsum("ij,ij->i", free, free)
+        scale = np.einsum("ij,ij->i", shapes, shapes)
+        # A shape inside the plane (or no shape) does not improve the fit: lstsq gives the baseline.
+        explained = np.where(size > 1e-12 * np.maximum(scale, 1e-300), (free @ residual) ** 2 / np.where(size > 0, size, 1.0), 0.0)
+        rows.append(np.maximum(total - explained, 0.0))
+    return np.concatenate(rows) if rows else np.empty(0)
+
+
 def _curvature_error(middles: np.ndarray, chi_square: np.ndarray) -> float:
     """The width of the chi-square curve near its minimum: the distance at which it rises by 1."""
     near = chi_square <= chi_square.min() + 4.0
@@ -215,12 +240,11 @@ def fit_transit(target: dict[str, Any], bjd: np.ndarray, flux: np.ndarray, error
     reach = min(max(catalog_duration, 5 * predicted_error, 30.0), 240.0)
 
     def scan(middles: np.ndarray, scales: tuple[float, ...]) -> np.ndarray:
-        table = np.full((len(scales), len(middles)), np.inf)
-        for row, scale in enumerate(scales):
+        rows = []
+        for scale in scales:
             duration = catalog_duration * scale
-            for column, middle in enumerate(middles):
-                table[row, column], _ = _solve(relative, sigma, minutes - middle, trapezoid(minutes, float(middle), duration, duration * ingress_share))
-        return table
+            rows.append(_chi_square_grid(relative, sigma, minutes, middles, duration, duration * ingress_share))
+        return np.stack(rows)
 
     coarse = np.arange(-reach, reach + COARSE_STEP_MINUTES / 2, COARSE_STEP_MINUTES)
     table = scan(coarse, DURATION_SCALES)
