@@ -68,7 +68,7 @@ defmodule StarsmapApiWeb.FlightController do
         "<li><a href=\"#{h(source["url"])}\">#{h(source["name"])}</a> #{h(source["catalog"] || "")}</li>"
       end)
 
-    "<ul>#{items}</ul>"
+    "<ul aria-label=\"Sources\">#{items}</ul>"
   end
 
   defp h(value),

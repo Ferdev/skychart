@@ -71,8 +71,10 @@ export function bindMinimapToggle(panel: HTMLElement, button: HTMLButtonElement,
   const show = (collapsed: boolean) => {
     panel.dataset.collapsed = String(collapsed);
     const label = translate(collapsed ? "universe3d.minimapShow" : "universe3d.minimapHide");
-    for (const control of menuButton ? [button, menuButton] : [button]) control.setAttribute("aria-expanded", String(!collapsed));
-    button.setAttribute("aria-label", label);
+    for (const control of menuButton ? [button, menuButton] : [button]) {
+      control.setAttribute("aria-expanded", String(!collapsed));
+      control.setAttribute("aria-label", label);
+    }
     button.title = label;
     button.textContent = collapsed ? "+" : "−";
     if (menuButton) menuButton.textContent = label;

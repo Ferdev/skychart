@@ -38,6 +38,24 @@ export type TourPlayerAdapter = {
   openObject?(key: string): void;
 };
 
+/** Roles of the controls that use the arrow keys or Escape for their own work. */
+const KEY_WIDGETS = "select, [contenteditable]:not([contenteditable='false']), [role='tab'], [role='tablist'], [role='slider'], [role='spinbutton'], [role='listbox'], [role='option'], [role='menu'], [role='menubar'], [role='menuitem'], [role='menuitemcheckbox'], [role='menuitemradio'], [role='radiogroup'], [role='radio'], [role='grid'], [role='tree'], [role='treegrid'], [role='combobox']";
+const DIALOGS = "dialog, [role='dialog'], [role='alertdialog']";
+
+/**
+ * The arrow keys and Escape go to the tour only when no other control uses them: not in a text field,
+ * a select, a tab, a slider, a list or a menu, and not in a dialog other than the tour card.
+ */
+export function tourOwnsKey(event: KeyboardEvent, plate: HTMLElement): boolean {
+  if (event.defaultPrevented) return false;
+  const target = event.target;
+  if (!(target instanceof Element)) return true;
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return false;
+  if (target.closest(KEY_WIDGETS)) return false;
+  const dialog = target.closest(DIALOGS);
+  return !dialog || dialog === plate || plate.contains(dialog);
+}
+
 /** The card that shows one step of a guided tour and moves the atlas to the view of that step. */
 export class TourPlayer {
   private tour: Tour | null = null;
@@ -45,6 +63,9 @@ export class TourPlayer {
   private timer: number | null = null;
   private transition: AbortController | null = null;
   private plate = document.createElement("section");
+  /** A screen reader hears only the step number and the title of a new step, not the whole card. */
+  private announcer = document.createElement("p");
+  private announced = "";
   private speaking = false;
   private arrival: Promise<unknown> = Promise.resolve();
   private trackSession = true;
@@ -52,8 +73,10 @@ export class TourPlayer {
 
   constructor(private adapter: TourPlayerAdapter) {
     Object.assign(this.plate, { id: "tour-player", className: "tour-player", hidden: true });
-    this.plate.setAttribute("aria-live", "polite");
-    document.querySelector("#app")?.append(this.plate);
+    Object.assign(this.announcer, { id: "tour-player-status", className: "sr-only" });
+    this.announcer.setAttribute("aria-live", "polite");
+    this.announcer.setAttribute("aria-atomic", "true");
+    document.querySelector("#app")?.append(this.plate, this.announcer);
     this.plate.addEventListener("click", (event) => {
       const target = event.target as HTMLElement;
       const action = target.closest<HTMLButtonElement>("[data-tour-action]")?.dataset.tourAction;
@@ -69,7 +92,7 @@ export class TourPlayer {
       if (dot) void this.go(Number(dot.dataset.tourStep));
     });
     window.addEventListener("keydown", (event) => {
-      if (this.plate.hidden || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (this.plate.hidden || !tourOwnsKey(event, this.plate)) return;
       if (event.key === "ArrowRight") { event.preventDefault(); void this.go(this.index + 1); }
       if (event.key === "ArrowLeft") { event.preventDefault(); void this.go(this.index - 1); }
       if (event.key === "Escape") this.close();
@@ -226,6 +249,12 @@ export class TourPlayer {
     const tour = this.tour!;
     const step = tour.steps[this.index]!;
     const total = tour.steps.length;
+    // The new card replaces the old buttons. The focus goes back to the same control of the new card.
+    const focused = document.activeElement as HTMLElement | null;
+    const focusTarget = focused && this.plate.contains(focused)
+      ? focused.dataset.tourAction ? `[data-tour-action="${focused.dataset.tourAction}"]`
+        : focused.dataset.tourStep ? `[data-tour-step="${focused.dataset.tourStep}"]` : "h2"
+      : null;
     // A done step and the current step have a fill. The current step is larger.
     const dots = tour.steps.map((_, i) =>
       `<button type="button" data-tour-step="${i}" data-tour-dot="${i < this.index ? "done" : i === this.index ? "current" : "next"}" aria-label="${escapeHtml(t("tour.goToStep", { step: i + 1 }))}" aria-current="${i === this.index ? "step" : "false"}"></button>`).join("");
@@ -250,6 +279,20 @@ export class TourPlayer {
         ${tour.flight ? `<a class="text-action" href="/flights/${escapeHtml(tour.flight)}">${escapeHtml(t("ask.page"))}</a>` : ""}
         ${tour.slug.startsWith(SHARED_TOUR_PREFIX) && this.adapter.report ? `<button type="button" class="text-action" data-tour-action="report">${escapeHtml(t("tour.report"))}</button>` : ""}
       </div>`;
+    if (focusTarget) {
+      // A disabled button cannot have the focus (Next on the last step): the title of the step gets it.
+      const control = this.plate.querySelector<HTMLElement>(`${focusTarget}:not(:disabled)`) ?? this.plate.querySelector<HTMLElement>("h2");
+      control?.focus({ preventScroll: true });
+    }
+    this.announce(`${t("tour.stepOf", { step: this.index + 1, total })}: ${step.title}`);
+  }
+
+  /** The text changes only for a new step, so the speech button and a new language are not read again. */
+  private announce(text: string) {
+    const key = `${this.tour?.slug}#${this.index}`;
+    if (key === this.announced) return;
+    this.announced = key;
+    this.announcer.textContent = text;
   }
 
   private error(message: string) {
@@ -267,6 +310,8 @@ export class TourPlayer {
     this.speaking = false;
     this.stopVoice();
     this.plate.hidden = true;
+    this.announced = "";
+    this.announcer.textContent = "";
     if (wasActive) this.adapter.closed();
   }
 }
