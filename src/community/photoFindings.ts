@@ -56,7 +56,11 @@ export async function mountFindings(api: CommunityApi, root: HTMLElement, stage:
     mark.dataset.kind = finding.kind;
     mark.style.left = `${finding.x * 100}%`;
     mark.style.top = `${finding.y * 100}%`;
-    mark.title = findingTitle(finding);
+    const title = findingTitle(finding);
+    const kind = t(`finding.kind.${finding.kind}`);
+    mark.title = title;
+    mark.setAttribute("role", "img");
+    mark.setAttribute("aria-label", finding.designation ? `${title} · ${kind}` : kind);
     stage.append(mark);
   }
   const own = api.user?.handle === photo.author.handle;

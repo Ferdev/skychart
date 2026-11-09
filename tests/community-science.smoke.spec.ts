@@ -244,6 +244,14 @@ test("the author sees private findings, and a moderator reviews timings and cand
   const viewer = page.getByRole("dialog", { name: "Sun portrait" });
   await expect(viewer.getByRole("heading", { name: "Found in this photo" })).toBeVisible();
   await expect(viewer.locator(".community-finding-mark")).toHaveCount(2);
+  const candidateMark = viewer.locator('.community-finding-mark[data-kind="candidate"]');
+  const bodyMark = viewer.locator('.community-finding-mark[data-kind="known_body"]');
+  await expect(candidateMark).toHaveAccessibleName("Unconfirmed candidate");
+  await expect(bodyMark).toHaveAccessibleName("(433) Eros · Known asteroid or comet");
+  expect(await candidateMark.evaluate((mark) => getComputedStyle(mark).borderStyle)).toBe("dashed");
+  expect(await candidateMark.evaluate((mark) => getComputedStyle(mark).borderRadius)).toBe("4px");
+  expect(await bodyMark.evaluate((mark) => getComputedStyle(mark).borderStyle)).toBe("solid");
+  expect(await bodyMark.evaluate((mark) => getComputedStyle(mark).borderRadius)).toBe("50%");
   await expect(viewer).toContainText("(433) Eros");
   await expect(viewer).toContainText("Unconfirmed candidate");
   await expect(viewer.getByText("Unconfirmed point source")).toBeHidden();

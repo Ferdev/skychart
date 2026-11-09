@@ -142,8 +142,11 @@ test.describe("Cosmic Atlas mobile layout", () => {
     await expect(page.locator(".atlas-bar #share-menu-button")).toHaveCount(1);
     expect(geometry.shareTrigger!.width, "44 px touch target").toBeGreaterThanOrEqual(44);
     expect(geometry.shareTrigger!.height, "44 px touch target").toBeGreaterThanOrEqual(44);
+    const shareTrigger = page.locator("#share-menu-button");
+    await expect(shareTrigger.locator("span")).toBeHidden();
+    await expect(shareTrigger).toHaveAccessibleName("Share");
 
-    await page.locator("#share-menu-button").click();
+    await shareTrigger.click();
     await expect(page.locator("#share-popover")).toBeVisible();
     await expect(page.locator("#export-image")).toBeVisible();
     await page.locator("#export-resolution").selectOption("4k");
@@ -465,6 +468,7 @@ test.describe("Cosmic Atlas mobile layout", () => {
     // The menu shows the trip map. The map is between the view centre and the flight controls.
     await more.click();
     await expect(page.locator("#universe-minimap-menu-toggle")).toHaveText("Show trip map");
+    await expect(page.locator("#universe-minimap-menu-toggle")).toHaveAccessibleName("Show trip map");
     await page.locator("#universe-minimap-menu-toggle").click();
     await expect(more).toHaveAttribute("aria-expanded", "false");
     await expect(page.locator("#universe-minimap")).toBeVisible();
