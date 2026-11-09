@@ -113,9 +113,15 @@ def _zero_point(sources: list[dict], survey: list[dict]) -> float | None:
     return float(np.median(values)) if len(values) >= 5 else None
 
 
+def body_magnitude(row: dict) -> float:
+    """The sort key of a body: brightest first, and a body with no magnitude last. Magnitude 0 is bright."""
+    magnitude = row.get("magnitude")
+    return float(magnitude) if isinstance(magnitude, (int, float)) and math.isfinite(magnitude) else 99.0
+
+
 def classify(sources: list[dict], request: dict) -> dict:
     """Findings of one frame, in the fractions of the image. An unknown or doubtful survey gives no candidates."""
-    bodies = sorted(request.get("bodies") or [], key=lambda row: row.get("magnitude") or 99)[:MAX_BODIES]
+    bodies = sorted(request.get("bodies") or [], key=body_magnitude)[:MAX_BODIES]
     findings: list[dict] = []
     stats: dict = {"sources": len(sources), "bodies_listed": len(bodies), "bodies_recovered": 0, "candidates": 0, "stop": None}
     taken: set[int] = set()
@@ -155,6 +161,9 @@ def classify(sources: list[dict], request: dict) -> dict:
     zero_point = _zero_point(sources, survey)
     residual = [index for index in np.flatnonzero(nearest > SURVEY_MATCH_ARCSEC * 1.5).tolist() if index not in taken]
     gaia = request.get("gaia") or []
+    # The lists that each candidate was compared with. A report names only these. The Gaia list
+    # counts only when it has each atlas star of the field, and not only the brightest ones.
+    stats["searched"] = ["dr11", "gaia", "alerce"] if request.get("gaia") is not None and request.get("gaia_complete") else ["dr11", "alerce"]
     if gaia and residual:
         separation, _ = _nearest([sources[index] for index in residual], gaia)
         residual = [index for index, value in zip(residual, separation) if value > SURVEY_MATCH_ARCSEC]

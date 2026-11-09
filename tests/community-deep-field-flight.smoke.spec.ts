@@ -106,6 +106,24 @@ test("the owner adds a frame with consent and can remove it", async ({ page }) =
   expect(calls.some((call) => call.method === "DELETE")).toBe(true);
 });
 
+test("a quick second submit of the consent form sends one request", async ({ page }) => {
+  await communityFixture(page);
+  const calls = await deepRoutes(page);
+  await page.route("**/api/community/session", (route) => route.fulfill({ json: { user: { id: "user", handle: "reader", name: "Reader", role: "member" }, csrf: "test-csrf", review_count: 0 } }));
+  await openAtlas(page);
+  await selectCatalogObject(page, "Sun", "sun");
+  await page.locator(".community-gallery [data-photo]").first().click();
+  const viewer = page.getByRole("dialog", { name: "Sun portrait" });
+  await viewer.getByRole("button", { name: "Add my frame" }).click();
+  const consent = page.getByRole("dialog", { name: "Add this photo to Andromeda" });
+  await consent.locator("form").evaluate((form: HTMLFormElement) => {
+    form.requestSubmit();
+    form.requestSubmit();
+  });
+  await expect(viewer).toContainText("It joins the image at the next rebuild");
+  expect(calls.filter((call) => call.method === "POST")).toHaveLength(1);
+});
+
 async function openAsk(page: Page) {
   await openSearchWorkspace(page);
   return page.locator("#ask-section");

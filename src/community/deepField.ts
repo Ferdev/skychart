@@ -162,14 +162,20 @@ export function deepFieldRow(row: DeepFieldRow): string {
 export function addFrameDialog(api: CommunityApi, photoId: string, fieldTitle: string, done: (frame: DeepFrame) => void) {
   const view = openDialog(t("deep.addTitle", { title: fieldTitle }), { eyebrow: t("deep.title") });
   view.body.innerHTML = `<form class="community-form"><p class="community-help">${h(t("deep.addText"))}</p><label class="community-check"><input type="checkbox" name="future"><span>${h(t("deep.addFuture"))}</span></label><div class="community-actions"><button class="primary-action">${h(t("deep.add"))}</button></div></form>`;
-  view.body.querySelector("form")!.onsubmit = async (event) => {
+  const form = view.body.querySelector("form")!;
+  const submit = form.querySelector<HTMLButtonElement>(".primary-action")!;
+  form.onsubmit = async (event) => {
     event.preventDefault();
-    const future = (event.target as HTMLFormElement).future.checked as boolean;
+    // One request at a time: a double click or a second Enter sends nothing more.
+    if (submit.disabled) return;
+    submit.disabled = true;
+    const future = form.future.checked as boolean;
     try {
       const frame = await api.request<DeepFrame>(`/api/community/photos/${photoId}/deep-frame`, "POST", { future });
       view.dialog.close();
       done(frame);
     } catch (error) {
+      submit.disabled = false;
       view.message.textContent = errorText(error);
     }
   };

@@ -204,7 +204,8 @@ defmodule StarsmapApi.Community.DepthWorker do
     output = Path.join(scratch, "output")
     File.write!(request, Jason.encode!(%{records: Depth.records(photo), wcs: photo.wcs}))
 
-    with :ok <- Storage.adapter().get("masters/#{photo.id}/1600.webp", image),
+    with {:storage, :ok} <-
+           {:storage, Storage.adapter().get("masters/#{photo.id}/1600.webp", image)},
          {json, 0} <-
            System.cmd("timeout", [
              to_string(@limit_seconds),
@@ -215,10 +216,16 @@ defmodule StarsmapApi.Community.DepthWorker do
              output
            ]),
          {:ok, result} <- Jason.decode(json),
-         :ok <- persist(photo, output, result) do
+         {:storage, :ok} <- {:storage, persist(photo, output, result)} do
       Depth.store(Photos.get(photo.id), result)
       :ok
     else
+      # A storage fault or a script that did not end in time can pass at the next attempt.
+      {:storage, {:error, reason}} -> {:error, reason}
+      {:storage, other} -> {:error, other}
+      # `timeout` exits with 124 after its SIGTERM, and with 137 after a SIGKILL.
+      {_output, status} when status in [124, 137] -> {:error, :depth_timeout}
+      # The output of the script is not valid: the same photo gives the same result again.
       _ -> {:cancel, "The depth layers cannot be built"}
     end
   end

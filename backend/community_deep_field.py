@@ -34,6 +34,8 @@ MIN_OVERLAP = 0.1
 CLIP_SIGMA = 3.0
 # Each pixel needs this many frames before a clip can remove a value: two values have no outlier.
 MIN_CLIP_FRAMES = 3
+# Each pass of the clip reads this many rows of a frame at a time.
+CLIP_BLOCK_ROWS = 128
 LIMIT_SIGMA = 5.0
 LIMIT_PIXEL_SAMPLES = 400_000
 
@@ -198,37 +200,75 @@ def add_weights(frames: list[dict]) -> None:
 
 
 def combine(frames: list[dict], shape: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
-    """A weighted mean with a sigma clip, by two passes over the frames on disk."""
+    """A weighted mean with a sigma clip, by two passes over the frames on disk.
+
+    Each value is compared with the other frames only. A value that is in the statistics that test
+    it pulls the mean and the scatter towards itself: with ten frames or fewer, one satellite trail
+    could then never be more than three sigma away. The scatter of a few other frames is a poor
+    measure, so the limit is never below the sky noise that each frame measured.
+    """
     height, width = shape
-    weight_sum = np.zeros((height, width, 3), dtype=np.float32)
-    first = np.zeros((height, width, 3), dtype=np.float32)
-    second = np.zeros((height, width, 3), dtype=np.float32)
+    weight_sum = np.zeros((height, width, 3), dtype=np.float64)
+    first = np.zeros((height, width, 3), dtype=np.float64)
+    second = np.zeros((height, width, 3), dtype=np.float64)
+    # Sums of w**2 and of (w * noise)**2, for the scatter of a weighted mean. The bands of an
+    # aligned frame have the same empty pixels, so one band gives these sums.
+    weight_squares = np.zeros((height, width, 1), dtype=np.float64)
+    noise_squares = np.zeros((height, width, 1), dtype=np.float64)
     count = np.zeros((height, width), dtype=np.uint16)
-    for frame in frames:
-        aligned = np.load(frame["path"])
-        valid = np.isfinite(aligned)
-        values = np.where(valid, aligned, 0)
-        weight_sum += valid * np.float32(frame["weight"])
-        first += values * np.float32(frame["weight"])
-        second += values * values * np.float32(frame["weight"])
-        count += valid[:, :, 0].astype(np.uint16)
-    mean = np.divide(first, weight_sum, out=np.zeros_like(first), where=weight_sum > 0)
-    variance = np.divide(second, weight_sum, out=np.zeros_like(second), where=weight_sum > 0) - mean**2
-    limit = CLIP_SIGMA * np.sqrt(np.clip(variance, 0, None))
+    for frame, rows, valid, x in frame_blocks(frames, height):
+        weight = float(frame["weight"])
+        weight_sum[rows] += valid * weight
+        first[rows] += x * weight
+        second[rows] += x * x * weight
+        weight_squares[rows] += valid[:, :, :1] * weight**2
+        noise_squares[rows] += valid[:, :, :1] * (weight * band_noise(frame)) ** 2
+        count[rows] += valid[:, :, 0].astype(np.uint16)
     clip_allowed = (count >= MIN_CLIP_FRAMES)[:, :, None]
 
     kept_weight = np.zeros((height, width, 3), dtype=np.float32)
     kept_sum = np.zeros((height, width, 3), dtype=np.float32)
     depth = np.zeros((height, width), dtype=np.uint16)
-    for frame in frames:
-        aligned = np.load(frame["path"])
-        valid = np.isfinite(aligned)
-        kept = valid & (~clip_allowed | (np.abs(np.where(valid, aligned, mean) - mean) <= limit))
-        kept_weight += kept * np.float32(frame["weight"])
-        kept_sum += np.where(kept, aligned, 0) * np.float32(frame["weight"])
-        depth += kept.all(axis=2).astype(np.uint16)
+    for frame, rows, valid, x in frame_blocks(frames, height):
+        weight = float(frame["weight"])
+        noise = band_noise(frame)
+        own = valid * weight
+        others = weight_sum[rows] - own
+        usable = others > 0
+        mean = np.divide(first[rows] - own * x, others, out=np.zeros_like(x), where=usable)
+        spread = np.divide(second[rows] - own * x * x, others, out=np.zeros_like(x), where=usable) - mean**2
+        other_squares = weight_squares[rows] - valid[:, :, :1] * weight**2
+        # The scatter of one frame from the weighted scatter of the others, without its bias.
+        effective = others**2 - other_squares
+        frame_variance = np.divide(others**2 * np.clip(spread, 0, None), effective, out=np.zeros_like(x), where=effective > 0)
+        # The difference of the value and the mean of the others has the scatter of both.
+        mean_share = np.divide(other_squares, others**2, out=np.zeros_like(x), where=usable)
+        floor = noise**2 + np.divide(noise_squares[rows] - valid[:, :, :1] * (weight * noise) ** 2, others**2, out=np.zeros_like(x), where=usable)
+        limit = CLIP_SIGMA * np.sqrt(np.maximum(frame_variance * (1 + mean_share), floor))
+        kept = valid & (~clip_allowed[rows] | (np.abs(x - mean) <= limit))
+        kept_weight[rows] += kept * np.float32(weight)
+        kept_sum[rows] += np.where(kept, x, 0.0).astype(np.float32) * np.float32(weight)
+        depth[rows] += kept.all(axis=2).astype(np.uint16)
     stack = np.divide(kept_sum, kept_weight, out=np.full_like(kept_sum, np.nan), where=kept_weight > 0)
     return stack, depth
+
+
+def frame_blocks(frames: list[dict], height: int):
+    """Each frame in blocks of rows: the rows, the mask of values, and the values with 0 for no value.
+    A block keeps the temporary arrays small on a large grid."""
+    for frame in frames:
+        aligned = np.load(frame["path"], mmap_mode="r")
+        for top in range(0, height, CLIP_BLOCK_ROWS):
+            rows = slice(top, min(height, top + CLIP_BLOCK_ROWS))
+            value = np.asarray(aligned[rows], dtype=np.float64)
+            valid = np.isfinite(value)
+            yield frame, rows, valid, np.where(valid, value, 0.0)
+
+
+def band_noise(frame: dict) -> float:
+    """The sky noise of one color band. The frame measures it on the mean of the three bands, and
+    the bands of a processed image can be independent: then one band has sqrt(3) times this noise."""
+    return float(frame.get("noise") or 0.0) * np.sqrt(3)
 
 
 def sky_noise(gray: np.ndarray) -> float:

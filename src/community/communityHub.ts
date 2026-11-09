@@ -206,7 +206,11 @@ export class CommunityHub {
         more.type = "button";
         more.className = "secondary-action community-more";
         more.textContent = t("community.loadMore");
-        more.onclick = () => void load().catch((error) => (this.view!.message.textContent = errorText(error)));
+        // The window can close while the request runs. Then there is no message line to write to.
+        more.onclick = () =>
+          void load().catch((error) => {
+            if (current() && this.view) this.view.message.textContent = errorText(error);
+          });
         grid.after(more);
       }
     };
