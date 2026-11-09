@@ -91,30 +91,37 @@ defmodule StarsmapApi.Community.Tours do
 
   @doc "The tours that wait for a moderator and the tours that a moderator hid."
   def review_list do
-    Repo.all(
-      from t in Tour,
-        join: u in User,
-        on: u.id == t.user_id,
-        left_join: r in TourReport,
-        on: r.tour_id == t.id and is_nil(r.resolved_at),
-        where: t.status in ["held", "hidden"] or not is_nil(r.id),
-        distinct: t.id,
-        select: {t, u.handle, u.name}
-    )
-    |> Enum.sort_by(fn {tour, _, _} -> tour.updated_at end, {:desc, DateTime})
-    |> Enum.take(50)
-    |> Enum.map(fn {tour, handle, name} ->
+    open = from r in TourReport, where: r.tour_id == parent_as(:tour).id and is_nil(r.resolved_at)
+
+    tours =
+      Repo.all(
+        from t in Tour,
+          as: :tour,
+          join: u in User,
+          on: u.id == t.user_id,
+          where: t.status in ["held", "hidden"] or exists(open),
+          order_by: [desc: t.updated_at, asc: t.id],
+          limit: 50,
+          select: {t, u.handle, u.name}
+      )
+
+    ids = Enum.map(tours, fn {tour, _, _} -> tour.id end)
+
+    reports =
+      Repo.all(
+        from r in TourReport,
+          where: r.tour_id in ^ids and is_nil(r.resolved_at),
+          order_by: [asc: r.inserted_at, asc: r.id],
+          select: {r.tour_id, %{reason: r.reason, at: r.inserted_at}}
+      )
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+
+    Enum.map(tours, fn {tour, handle, name} ->
       Map.take(tour, [:id, :title, :description, :steps, :status, :moderation_reason, :updated_at])
       |> Map.merge(%{
         url: "/?tour=#{@shared_prefix}#{tour.token}",
         author: %{handle: handle, name: name},
-        reports:
-          Repo.all(
-            from r in TourReport,
-              where: r.tour_id == ^tour.id and is_nil(r.resolved_at),
-              order_by: [asc: r.inserted_at],
-              select: %{reason: r.reason, at: r.inserted_at}
-          )
+        reports: Map.get(reports, tour.id, [])
       })
     end)
   end

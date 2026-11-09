@@ -6,6 +6,8 @@ import pytest
 from backend.errors import QueryInputError
 from backend.night_planner import night_plan_payload
 from backend.transit_timing import (
+    _chi_square_grid,
+    _solve,
     barycentric_times,
     fit_transit,
     predicted_uncertainty_days,
@@ -139,3 +141,16 @@ def test_fit_payload_converts_frame_times_to_barycentric_time():
     result = transit_fit_payload({"key": WASP_12, "points": points})
     assert result["epoch"] == 3000
     assert result["o_minus_c_minutes"] == pytest.approx(2.0, abs=3 * result["uncertainty_minutes"])
+
+
+def test_the_batched_grid_equals_one_least_squares_fit_per_middle():
+    target = target_by_key(WASP_12)
+    bjd, flux, error = light_curve(target, 3000, shift_minutes=4.2, seed=9, noise=0.003)
+    time = (bjd - bjd.mean()) * 1440
+    duration = target["duration_hours"] * 60
+    # The middles reach far outside the light curve, where the shape is zero.
+    middles = np.arange(-400.0, 400.5, 2.5)
+    grid = _chi_square_grid(flux, error, time, middles, duration, duration * 0.2)
+    loop = np.array([_solve(flux, error, time - m, trapezoid(time, float(m), duration, duration * 0.2))[0] for m in middles])
+    np.testing.assert_allclose(grid, loop, rtol=1e-9)
+    assert int(np.argmin(grid)) == int(np.argmin(loop))

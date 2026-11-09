@@ -17,6 +17,9 @@ defmodule StarsmapApi.CommunityTransitsTest do
   defmodule StubFit do
     @behaviour StarsmapApi.Community.TransitFit
     def fit(key, _points) do
+      if pid = Application.get_env(:starsmap_api, :community_test_fit_pid),
+        do: send(pid, {:transit_fit, key})
+
       accepted = key != "exoplanet-flat-b"
 
       {:ok,
@@ -50,7 +53,13 @@ defmodule StarsmapApi.CommunityTransitsTest do
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Repo)
     Ecto.Adapters.SQL.Sandbox.mode(Repo, {:shared, self()})
     Application.put_env(:starsmap_api, :community_transit_fit, StubFit)
-    on_exit(fn -> Application.delete_env(:starsmap_api, :community_transit_fit) end)
+    Application.put_env(:starsmap_api, :community_test_fit_pid, self())
+
+    on_exit(fn ->
+      Application.delete_env(:starsmap_api, :community_transit_fit)
+      Application.delete_env(:starsmap_api, :community_test_fit_pid)
+    end)
+
     author = user("observer", "member")
     moderator = user("reviewer", "moderator")
     {:ok, author: author, moderator: moderator}
@@ -58,7 +67,12 @@ defmodule StarsmapApi.CommunityTransitsTest do
 
   defp user(handle, role),
     do:
-      Repo.insert!(%User{email: "#{handle}@example.com", handle: handle, name: handle, role: role})
+      Repo.insert!(%User{
+        email: "#{handle}@example.com",
+        handle: handle,
+        name: handle,
+        role: role
+      })
 
   defp params(key \\ "exoplanet-wasp-12-b") do
     %{
@@ -96,7 +110,7 @@ defmodule StarsmapApi.CommunityTransitsTest do
   end
 
   test "an account can send ten timings a day", %{author: author} do
-    for epoch <- 1..10 do
+    for epoch <- 1..9 do
       Repo.insert!(%TransitObservation{
         user_id: author.id,
         object_key: "k",
@@ -118,7 +132,13 @@ defmodule StarsmapApi.CommunityTransitsTest do
       })
     end
 
+    # The tenth timing of the day runs the fit and is stored.
+    assert {:ok, _} = Transits.submit(author, params())
+    assert_received {:transit_fit, _}
+
+    # The eleventh is refused before the fit service runs.
     assert {:error, :transit_quota} = Transits.submit(author, params())
+    refute_received {:transit_fit, _}
   end
 
   test "invalid measurements are refused before the fit", %{author: author} do
