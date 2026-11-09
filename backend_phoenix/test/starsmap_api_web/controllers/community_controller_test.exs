@@ -329,6 +329,35 @@ defmodule StarsmapApiWeb.CommunityControllerTest do
              conn |> get("/api/community/photographers/#{member.handle}") |> json_response(200)
   end
 
+  test "new rankings report whether another page exists", %{conn: conn} do
+    author = Repo.insert!(%User{email: "pages@example.com", handle: "pages", name: "Pages"})
+    {:ok, subject} = Subjects.ensure("moon")
+    now = StarsmapApi.Community.now()
+
+    for i <- 1..25 do
+      Repo.insert!(%Photo{
+        user_id: author.id,
+        subject_id: subject.id,
+        declared_key: "moon",
+        title: "Photo #{i}",
+        licence: "CC BY 4.0",
+        captured_at: now,
+        status: "published",
+        source_key: "uploads/page-#{i}",
+        size_bytes: 3,
+        published_at: DateTime.add(now, -i)
+      })
+    end
+
+    assert %{"photos" => first, "has_more" => true} =
+             conn |> get("/api/community/rankings?period=new") |> json_response(200)
+
+    assert length(first) == 24
+
+    assert %{"photos" => [_], "has_more" => false} =
+             conn |> get("/api/community/rankings?period=new&offset=24") |> json_response(200)
+  end
+
   test "a moderation reason out of range gets its own error, not a permission error", %{
     conn: conn
   } do

@@ -187,7 +187,7 @@ export class CommunityHub {
     let photos: Photo[] = [];
     const load = async () => {
       const offset = this.sort === "new" && photos.length ? `&offset=${photos.length}` : "";
-      const data = await this.api.request<{ photos: Photo[] }>(`/api/community/rankings?period=${this.sort}${offset}`);
+      const data = await this.api.request<{ photos: Photo[]; has_more?: boolean }>(`/api/community/rankings?period=${this.sort}${offset}`);
       if (!current()) return;
       photos = [...photos, ...data.photos.filter((photo) => !photos.some((old) => old.id === photo.id))];
       grid.removeAttribute("aria-busy");
@@ -201,7 +201,7 @@ export class CommunityHub {
         .map((photo, index) => photoCard(photo, { object: true, rank: this.sort === "all" && photo.votes > 0 ? index + 1 : undefined }))
         .join("");
       this.bindPhotos(grid, photos);
-      if (this.sort === "new" && data.photos.length === 24) {
+      if (this.sort === "new" && data.has_more) {
         const more = document.createElement("button");
         more.type = "button";
         more.className = "secondary-action community-more";

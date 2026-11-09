@@ -45,24 +45,28 @@ defmodule StarsmapApi.Community.SolverWorker do
              {:ok, attrs} <- Jason.decode(json),
              {:ok, wcs} <- Astrometry.validate(attrs) do
           StarsmapApi.Community.transaction(fn ->
-            current = Photos.get(id)
+            case Photos.get(id) do
+              nil ->
+                :ok
 
-            if current.status in ["review", "published"] do
-              changed =
-                Repo.update!(
-                  Ecto.Changeset.change(current,
-                    wcs:
-                      Map.merge(wcs, Map.take(attrs, ["cd", "crpix"]))
-                      |> Map.merge(%{"source" => "Astrometry.net", "status" => "solved"})
-                  )
-                )
+              current ->
+                if current.status in ["review", "published"] do
+                  changed =
+                    Repo.update!(
+                      Ecto.Changeset.change(current,
+                        wcs:
+                          Map.merge(wcs, Map.take(attrs, ["cd", "crpix"]))
+                          |> Map.merge(%{"source" => "Astrometry.net", "status" => "solved"})
+                      )
+                    )
 
-              StarsmapApi.Community.Annotations.rebuild(changed)
+                  StarsmapApi.Community.Annotations.rebuild(changed)
 
-              if current.status == "published", do: Ranking.refresh(current.subject_id)
-              StarsmapApi.Community.Depth.enqueue(changed)
-              StarsmapApi.Community.Findings.enqueue(changed)
-              StarsmapApi.Community.DeepFields.photo_ready(changed)
+                  if current.status == "published", do: Ranking.refresh(current.subject_id)
+                  StarsmapApi.Community.Depth.enqueue(changed)
+                  StarsmapApi.Community.Findings.enqueue(changed)
+                  StarsmapApi.Community.DeepFields.photo_ready(changed)
+                end
             end
           end)
 
