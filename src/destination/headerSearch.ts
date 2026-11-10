@@ -12,6 +12,7 @@ type HeaderSearchOptions = {
 /**
  * The header search field opens the Search panel: by a click, by text, by the `/` key, and by Ctrl+K (Cmd+K).
  * Text that the user types in the header field moves to the field of the panel.
+ * Text of an input method (Japanese, Chinese, Korean) moves when the composition ends.
  */
 export function bindHeaderSearch(options: HeaderSearchOptions): void {
   const { field, panelField } = options;
@@ -26,8 +27,15 @@ export function bindHeaderSearch(options: HeaderSearchOptions): void {
     panelField.dispatchEvent(new Event("input", { bubbles: true }));
   };
 
-  field.addEventListener("input", moveTextToPanel);
+  // An input method (IME) composes a word in the field. The word moves to the panel when it is complete.
+  field.addEventListener("input", (event) => {
+    if ((event as InputEvent).isComposing) return;
+    moveTextToPanel();
+  });
+  field.addEventListener("compositionend", moveTextToPanel);
   field.addEventListener("keydown", (event) => {
+    // Enter during a composition selects the word of the input method.
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key !== "Enter" && event.key !== "ArrowDown") return;
     event.preventDefault();
     options.openSearch();
