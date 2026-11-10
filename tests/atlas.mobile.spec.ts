@@ -142,8 +142,11 @@ test.describe("Cosmic Atlas mobile layout", () => {
     await expect(page.locator(".atlas-bar #share-menu-button")).toHaveCount(1);
     expect(geometry.shareTrigger!.width, "44 px touch target").toBeGreaterThanOrEqual(44);
     expect(geometry.shareTrigger!.height, "44 px touch target").toBeGreaterThanOrEqual(44);
+    const shareTrigger = page.locator("#share-menu-button");
+    await expect(shareTrigger.locator("span")).toBeHidden();
+    await expect(shareTrigger).toHaveAccessibleName("Share");
 
-    await page.locator("#share-menu-button").click();
+    await shareTrigger.click();
     await expect(page.locator("#share-popover")).toBeVisible();
     await expect(page.locator("#export-image")).toBeVisible();
     await page.locator("#export-resolution").selectOption("4k");
@@ -274,6 +277,36 @@ test.describe("Cosmic Atlas mobile layout", () => {
     expect(landscape.headerRight, "header card is at the left of the side panel").toBeLessThanOrEqual(landscape.panelLeft);
     expect(landscape.toolbarRight, "toolbar is at the left of the side panel").toBeLessThanOrEqual(landscape.panelLeft);
     issues.assertClean();
+  });
+
+  test("a swipe on the sheet header opens and closes the sheet, and a pinch there zooms the page", async ({ page }) => {
+    // The address selects Mars, so the test does not need the catalog search.
+    await openAtlas(page, "/?perf=1&v=1&c=0%2C0&z=0.02&t=now&o=mars");
+    await expect(page.locator("#selected-summary-name")).toHaveText("Mars");
+    const toggle = page.locator("#object-sheet-toggle");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const header = page.locator(".object-workspace .selected-object-header");
+    expect(await header.evaluate((element) => getComputedStyle(element).touchAction)).toBe("pinch-zoom");
+    expect(await page.locator(".workspace-sheet-grip").evaluate((element) => getComputedStyle(element).touchAction)).toBe("none");
+
+    const client = await page.context().newCDPSession(page);
+    const touchOnHeader = async (moves: (step: number) => { x: number; y: number }[]) => {
+      const box = (await header.boundingBox())!;
+      const at = (step: number) => moves(step).map((point, id) => ({ id, x: box.x + box.width / 2 + point.x, y: box.y + 30 + point.y }));
+      await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(0) });
+      for (let step = 1; step <= 8; step += 1) await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(step) });
+      await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    };
+    // One finger: a swipe up opens the sheet, and a swipe down closes it.
+    await touchOnHeader((step) => [{ x: 0, y: -step * 12 }]);
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await touchOnHeader((step) => [{ x: 0, y: step * 12 }]);
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(await page.evaluate(() => window.visualViewport!.scale)).toBe(1);
+
+    // Two fingers on the header zoom the page. The browser keeps this gesture.
+    await touchOnHeader((step) => [{ x: -20 - step * 8, y: 0 }, { x: 20 + step * 8, y: 0 }]);
+    await expect.poll(() => page.evaluate(() => window.visualViewport!.scale)).toBeGreaterThan(1.2);
   });
 
   test("scrolls the object sheet by touch and keeps each detail tab in reach", async ({ page }) => {
@@ -465,6 +498,7 @@ test.describe("Cosmic Atlas mobile layout", () => {
     // The menu shows the trip map. The map is between the view centre and the flight controls.
     await more.click();
     await expect(page.locator("#universe-minimap-menu-toggle")).toHaveText("Show trip map");
+    await expect(page.locator("#universe-minimap-menu-toggle")).toHaveAccessibleName("Show trip map");
     await page.locator("#universe-minimap-menu-toggle").click();
     await expect(more).toHaveAttribute("aria-expanded", "false");
     await expect(page.locator("#universe-minimap")).toBeVisible();
@@ -601,11 +635,14 @@ test.describe("Cosmic Atlas mobile layout", () => {
       const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
       const at = (left: number, top: number) => document.elementFromPoint(left, top);
       return {
-        own: [at(x - 15, y), at(x + 15, y), at(x, y - 21), at(x, y + 21)].every((element) => element === dot),
-        next: at(x + 17, y) === dot.nextElementSibling,
+        // The first and the last pixel of the target. If the next target overlaps, it is on top there.
+        own: [at(x - 16, y), at(x + 15, y), at(x, y - 22), at(x, y + 21)].every((element) => element === dot),
+        next: at(x + 16, y) === dot.nextElementSibling,
+        previous: at(x - 17, y) === dot.previousElementSibling,
+        size: [getComputedStyle(dot, "::after").width, getComputedStyle(dot, "::after").height],
       };
     });
-    expect(target).toEqual({ own: true, next: true });
+    expect(target).toEqual({ own: true, next: true, previous: true, size: ["32px", "44px"] });
     // A wide window has 44 px for the row and its margins: the phone uses the same height.
     const row = (await page.locator("#tour-player .tour-player__dots").boundingBox())!;
     const margin = await page.locator("#tour-player .tour-player__dots").evaluate((element) => getComputedStyle(element).marginBlock);

@@ -455,7 +455,7 @@ defmodule StarsmapApiWeb.DeepFieldFlightControllerTest do
       assert html =~ "How far is &lt;Mars&gt;?"
       assert html =~ "/?tour=answer-abc123&amp;step=0"
       assert html =~ "It is 1.5 au"
-      assert html =~ "/o/mars"
+      assert html =~ ~s(<ul aria-label="Sources"><li><a href="/o/mars">Mars</a> JPL</li></ul>)
 
       assert conn |> get("/flights/none") |> html_response(404)
       {:ok, _} = Flights.hide(flight.slug)

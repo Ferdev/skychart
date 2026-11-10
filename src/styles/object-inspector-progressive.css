@@ -453,9 +453,10 @@
     transform: translateX(-50%);
   }
 
+  /* A one-finger drag on the header moves the sheet (objectSheet.ts). A pinch stays with the browser, so the page can zoom. */
   #app:not(:has(> [data-object-inspector="true"])) .object-workspace .selected-object-header {
     padding-top: 20px;
-    touch-action: none;
+    touch-action: pinch-zoom;
   }
 
   #app:not(:has(> [data-object-inspector="true"])) .object-workspace .object-sheet-toggle {

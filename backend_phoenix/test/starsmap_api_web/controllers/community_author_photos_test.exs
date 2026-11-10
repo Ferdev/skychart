@@ -40,7 +40,7 @@ defmodule StarsmapApiWeb.CommunityAuthorPhotosTest do
 
     for photo <- photos do
       assert html =~
-               ~s(<a href="/photos/#{photo.id}"><img src="/api/community/media/#{photo.id}/320")
+               ~s(<a href="/photos/#{photo.id}"><img loading="lazy" src="/api/community/media/#{photo.id}/320" alt="">#{photo.title}</a>)
     end
   end
 

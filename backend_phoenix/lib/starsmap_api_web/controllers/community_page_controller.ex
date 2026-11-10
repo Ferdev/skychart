@@ -130,8 +130,9 @@ defmodule StarsmapApiWeb.CommunityPageController do
     end
   end
 
+  # The title is the text of the link, so the image has no alt text: a screen reader reads the title once.
   defp card(p) do
-    "<a href=\"/photos/#{p.id}\"><img src=\"#{h(p.thumbnail_url)}\" alt=\"#{h(p.title)}\">#{h(p.title)}</a>"
+    "<a href=\"/photos/#{p.id}\"><img loading=\"lazy\" src=\"#{h(p.thumbnail_url)}\" alt=\"\">#{h(p.title)}</a>"
   end
 
   defp h(value),

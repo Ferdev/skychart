@@ -214,12 +214,15 @@ test.describe("3D view controls", () => {
     await page.keyboard.press("Escape");
 
     const toggle = page.locator("#universe-minimap-toggle");
+    const menuToggle = page.locator("#universe-minimap-menu-toggle");
     await expect(page.locator("#universe-minimap")).toBeVisible();
     await expect(toggle).toHaveAccessibleName("Hide trip map");
+    await expect(menuToggle).toHaveAttribute("aria-label", "Hide trip map");
     await toggle.click();
     await expect(page.locator("#universe-minimap")).toBeHidden();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(toggle).toHaveAccessibleName("Show trip map");
+    await expect(menuToggle).toHaveAttribute("aria-label", "Show trip map");
     await expectFlightKeysWork(page);
     // The choice stays after a reload.
     await page.reload({ waitUntil: "domcontentloaded" });
