@@ -292,7 +292,7 @@ defmodule StarsmapApiWeb.CommunityController do
     {photos, has_more} = params["offset"] |> offset() |> Photos.recent_page()
 
     json(conn, %{
-      photos: Enum.map(photos, &Photos.public/1),
+      photos: Photos.public_many(photos),
       has_more: has_more
     })
   end
@@ -300,7 +300,7 @@ defmodule StarsmapApiWeb.CommunityController do
   def rankings(conn, params),
     do:
       json(conn, %{
-        photos: Ranking.ranked(params["period"]) |> Enum.take(24) |> Enum.map(&Photos.public/1)
+        photos: Ranking.ranked(params["period"]) |> Enum.take(24) |> Photos.public_many()
       })
 
   def review_queue(conn, _) do
@@ -356,7 +356,15 @@ defmodule StarsmapApiWeb.CommunityController do
   end
 
   def report_tour(conn, %{"token" => token} = p),
-    do: respond(conn, Tours.report(token, p["reason"]), fn _ -> %{ok: true} end)
+    do: respond(conn, Tours.report(token, p["reason"], reporter(conn)), fn _ -> %{ok: true} end)
+
+  # One IPv6 client can use each address of its /64 network, so the /64 is the client.
+  defp reporter(conn) do
+    case StarsmapApiWeb.ClientIp.resolve(conn) do
+      {a, b, c, d, _, _, _, _} -> "#{:inet.ntoa({a, b, c, d, 0, 0, 0, 0})}/64"
+      ip -> ip |> :inet.ntoa() |> to_string()
+    end
+  end
 
   def tours(conn, _), do: json(conn, %{tours: Tours.list(conn.assigns.community_user)})
 

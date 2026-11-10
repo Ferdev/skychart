@@ -40,6 +40,7 @@ from backend.settings import (
     J2000_OBLIQUITY_DEG,
     LIGHT_YEAR_KM,
     PARSEC_AU,
+    SATELLITE_KERNEL_SHA256,
     SATELLITE_KERNEL_URLS,
     SECONDS_PER_DAY,
 )
@@ -95,7 +96,7 @@ def satellite_kernel(filename: str) -> Any:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         path = DATA_DIR / filename
         if not path.exists():
-            download_kernel(SATELLITE_KERNEL_URLS[filename], path)
+            download_kernel(SATELLITE_KERNEL_URLS[filename], path, SATELLITE_KERNEL_SHA256[filename])
         kernel = load_file(str(path))
         with _kernel_lock:
             return _satellite_kernels.setdefault(filename, kernel)

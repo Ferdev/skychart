@@ -3,8 +3,11 @@ defmodule StarsmapApi.Community.Tours do
   Guided tours of a signed-in person, shared from an unlisted address.
 
   A tour has one of three states. `shared` opens for each person with the address.
-  `held` is the state after a report: the tour does not open until a moderator decides,
-  and a tour that a moderator already kept stays open and only waits in the queue.
+  `held` is the state after reports from three different clients: the tour does not open until
+  a moderator decides. Each report goes to the queue, and one client counts once for each tour,
+  so one visitor cannot take a tour offline. A tour that a moderator already kept stays open
+  after reports and only waits in the queue. When its author changes the title, description or
+  steps of a kept tour, it is `held` until a moderator decides on the new content.
   `hidden` is a decision of a moderator. The step format is the one of the published tours.
   """
   import Ecto.Query
@@ -12,6 +15,9 @@ defmodule StarsmapApi.Community.Tours do
   alias StarsmapApi.CommunityRepo, as: Repo
 
   @shared_prefix "shared-"
+  # The number of different clients whose open reports hold a tour that no moderator kept.
+  # It is also in the moduledoc.
+  @hold_reporters 3
   @per_account 50
   @max_steps 30
   @max_title 120
@@ -38,14 +44,28 @@ defmodule StarsmapApi.Community.Tours do
   end
 
   def update(user, id, attrs) do
-    with %Tour{} = tour <- owned(user, id),
-         {:ok, fields} <- fields(attrs) do
-      {:ok, tour |> Ecto.Changeset.change(fields) |> Repo.update!() |> own()}
-    else
-      nil -> {:error, :not_found}
-      error -> error
+    with {:ok, fields} <- fields(attrs) do
+      StarsmapApi.Community.transaction(fn ->
+        case owned(user, id) do
+          nil ->
+            Repo.rollback(:not_found)
+
+          tour ->
+            tour |> Ecto.Changeset.change(review_changes(tour, fields)) |> Repo.update!() |> own()
+        end
+      end)
     end
   end
+
+  # A keep decision is for the content that the moderator read. New content of a kept tour
+  # waits for a moderator again.
+  defp review_changes(%Tour{status: "shared", reviewed_at: %DateTime{}} = tour, fields) do
+    if Map.take(tour, Map.keys(fields)) == fields,
+      do: fields,
+      else: Map.merge(fields, %{status: "held", reviewed_at: nil})
+  end
+
+  defp review_changes(_tour, fields), do: fields
 
   def delete(user, id) do
     case owned(user, id) do
@@ -75,12 +95,24 @@ defmodule StarsmapApi.Community.Tours do
     end
   end
 
-  def report(token, reason) do
+  @doc """
+  A report of a visitor. `client` is the address of the client; only a keyed hash of it, different
+  for each tour, is stored. A second open report of one client on one tour adds nothing.
+  """
+  def report(token, reason, client) when is_binary(client) do
     with true <- StarsmapApi.Community.valid_reason?(reason),
          {tour, _author} <- open_tour(token) do
       StarsmapApi.Community.transaction(fn ->
-        Repo.insert!(%TourReport{tour_id: tour.id, reason: reason})
-        if is_nil(tour.reviewed_at), do: hold(tour)
+        reporter = reporter(tour, client)
+
+        unless Repo.exists?(
+                 from r in TourReport,
+                   where:
+                     r.tour_id == ^tour.id and r.reporter == ^reporter and is_nil(r.resolved_at)
+               ),
+               do: Repo.insert!(%TourReport{tour_id: tour.id, reason: reason, reporter: reporter})
+
+        if is_nil(tour.reviewed_at) and open_reporters(tour) >= @hold_reporters, do: hold(tour)
         :ok
       end)
     else
@@ -91,38 +123,51 @@ defmodule StarsmapApi.Community.Tours do
 
   @doc "The tours that wait for a moderator and the tours that a moderator hid."
   def review_list do
-    Repo.all(
-      from t in Tour,
-        join: u in User,
-        on: u.id == t.user_id,
-        left_join: r in TourReport,
-        on: r.tour_id == t.id and is_nil(r.resolved_at),
-        where: t.status in ["held", "hidden"] or not is_nil(r.id),
-        distinct: t.id,
-        select: {t, u.handle, u.name}
-    )
-    |> Enum.sort_by(fn {tour, _, _} -> tour.updated_at end, {:desc, DateTime})
-    |> Enum.take(50)
-    |> Enum.map(fn {tour, handle, name} ->
+    open = from r in TourReport, where: r.tour_id == parent_as(:tour).id and is_nil(r.resolved_at)
+
+    tours =
+      Repo.all(
+        from t in Tour,
+          as: :tour,
+          join: u in User,
+          on: u.id == t.user_id,
+          where: t.status in ["held", "hidden"] or exists(open),
+          order_by: [desc: t.updated_at, asc: t.id],
+          limit: 50,
+          select: {t, u.handle, u.name}
+      )
+
+    ids = Enum.map(tours, fn {tour, _, _} -> tour.id end)
+
+    reports =
+      Repo.all(
+        from r in TourReport,
+          where: r.tour_id in ^ids and is_nil(r.resolved_at),
+          order_by: [asc: r.inserted_at, asc: r.id],
+          select: {r.tour_id, %{reason: r.reason, at: r.inserted_at}}
+      )
+      |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+
+    Enum.map(tours, fn {tour, handle, name} ->
       Map.take(tour, [:id, :title, :description, :steps, :status, :moderation_reason, :updated_at])
       |> Map.merge(%{
         url: "/?tour=#{@shared_prefix}#{tour.token}",
         author: %{handle: handle, name: name},
-        reports:
-          Repo.all(
-            from r in TourReport,
-              where: r.tour_id == ^tour.id and is_nil(r.resolved_at),
-              order_by: [asc: r.inserted_at],
-              select: %{reason: r.reason, at: r.inserted_at}
-          )
+        reports: Map.get(reports, tour.id, [])
       })
     end)
   end
 
-  def open_report_count,
-    do: Repo.aggregate(from(r in TourReport, where: is_nil(r.resolved_at)), :count)
+  @doc "The tours that wait for a moderator: held, or with an open report."
+  def waiting_count do
+    reported =
+      from(r in TourReport, where: r.tour_id == parent_as(:tour).id and is_nil(r.resolved_at))
 
-  def held_count, do: Repo.aggregate(from(t in Tour, where: t.status == "held"), :count)
+    Repo.aggregate(
+      from(t in Tour, as: :tour, where: t.status == "held" or exists(reported)),
+      :count
+    )
+  end
 
   @doc "`keep` and `restore` open the tour again, and `hide` closes it. Each decision has an audit record."
   def review(actor, id, action, reason)
@@ -195,6 +240,21 @@ defmodule StarsmapApi.Community.Tours do
   end
 
   def delete_all(user), do: Repo.delete_all(from t in Tour, where: t.user_id == ^user.id)
+
+  defp reporter(tour, client),
+    do:
+      StarsmapApi.Community.Accounts.hash("tour-report:#{tour.id}:#{client}")
+      |> Base.encode16(case: :lower)
+      |> binary_part(0, 32)
+
+  # A report from before the reporter column has no reporter, and counts as one.
+  defp open_reporters(tour) do
+    Repo.one(
+      from r in TourReport,
+        where: r.tour_id == ^tour.id and is_nil(r.resolved_at),
+        select: fragment("count(DISTINCT coalesce(?, ?::text))", r.reporter, r.id)
+    )
+  end
 
   defp hold(%Tour{status: "shared"} = tour),
     do: tour |> Ecto.Changeset.change(status: "held") |> Repo.update!()

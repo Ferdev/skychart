@@ -33,3 +33,8 @@ EPHEMERIS_SOURCE = (
 SATELLITE_KERNEL_URLS = {
     "mar099s.bsp": "https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/satellites/mar099s.bsp",
 }
+# The SHA-256 of each kernel in SATELLITE_KERNEL_URLS. A download with another digest is not published.
+# mar099s.bsp: 67,594,240 bytes, from NAIF on 2026-11-09, the same as the copy of 2026-07-12.
+SATELLITE_KERNEL_SHA256 = {
+    "mar099s.bsp": "997dc93ba640e476da7a494d2237dcdeb145e528db37be8ccee588c615e4e1ff",
+}

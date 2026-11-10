@@ -204,6 +204,8 @@ defmodule StarsmapApi.Community.DepthWorker do
     output = Path.join(scratch, "output")
     File.write!(request, Jason.encode!(%{records: Depth.records(photo), wcs: photo.wcs}))
 
+    # The stripped 1600 derivative. `Moderation.publish_files/1` copies these bytes unchanged to
+    # the public 1600 image. The private master is `masters/<id>/master.png`.
     with {:storage, :ok} <-
            {:storage, Storage.adapter().get("masters/#{photo.id}/1600.webp", image)},
          {json, 0} <-

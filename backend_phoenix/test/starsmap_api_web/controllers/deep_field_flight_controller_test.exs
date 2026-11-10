@@ -240,6 +240,133 @@ defmodule StarsmapApiWeb.DeepFieldFlightControllerTest do
              conn |> get("/api/objects/ngc-224/photos") |> json_response(200)
   end
 
+  describe "media from S3" do
+    setup do
+      {:ok, listener} =
+        :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true, ip: {127, 0, 0, 1}])
+
+      {:ok, {_, port}} = :inet.sockname(listener)
+      storage = Application.fetch_env!(:starsmap_api, :community_storage)
+      bucket = Application.get_env(:starsmap_api, :community_s3_bucket)
+
+      aws =
+        for key <- [:access_key_id, :secret_access_key, :region, :s3],
+            do: {key, Application.get_env(:ex_aws, key)}
+
+      Application.put_env(:starsmap_api, :community_storage, Storage.S3)
+      Application.put_env(:starsmap_api, :community_s3_bucket, "media-bucket")
+      Application.put_env(:ex_aws, :access_key_id, "test")
+      Application.put_env(:ex_aws, :secret_access_key, "test")
+      Application.put_env(:ex_aws, :region, "fsn1")
+      Application.put_env(:ex_aws, :s3, scheme: "http://", host: "127.0.0.1", port: port)
+
+      on_exit(fn ->
+        :gen_tcp.close(listener)
+        Application.put_env(:starsmap_api, :community_storage, storage)
+
+        if bucket,
+          do: Application.put_env(:starsmap_api, :community_s3_bucket, bucket),
+          else: Application.delete_env(:starsmap_api, :community_s3_bucket)
+
+        for {key, value} <- aws do
+          if is_nil(value),
+            do: Application.delete_env(:ex_aws, key),
+            else: Application.put_env(:ex_aws, key, value)
+        end
+      end)
+
+      {:ok, listener: listener}
+    end
+
+    test "the current image streams in chunks with the media headers", %{
+      conn: conn,
+      listener: listener
+    } do
+      owner = Repo.insert!(%User{email: "a@e.com", handle: "ada", name: "Ada"})
+      other = Repo.insert!(%User{email: "b@e.com", handle: "bea", name: "Bea"})
+      field = field_with_build(owner, other)
+      key = DeepFields.file_key(field, 1, "stack")
+      parts = for i <- 1..8, do: :binary.copy(<<i>>, 256 * 1024)
+      server = s3_server(listener, 200, parts)
+
+      response = conn |> get("/api/deep-fields/andromeda/media/1/stack")
+
+      assert response.status == 200
+      assert response.state == :chunked
+      assert response.resp_body == IO.iodata_to_binary(parts)
+      assert get_resp_header(response, "content-type") == ["image/webp; charset=utf-8"]
+      assert get_resp_header(response, "x-content-type-options") == ["nosniff"]
+      assert get_resp_header(response, "cache-control") == ["public, max-age=300"]
+
+      request = Task.await(server)
+      assert request =~ "GET /media-bucket/#{key}?"
+      assert request =~ "X-Amz-Signature="
+    end
+
+    test "a stream that breaks after the status does not end as a complete image", %{
+      conn: conn,
+      listener: listener
+    } do
+      owner = Repo.insert!(%User{email: "a@e.com", handle: "ada", name: "Ada"})
+      other = Repo.insert!(%User{email: "b@e.com", handle: "bea", name: "Bea"})
+      field_with_build(owner, other)
+      server = s3_server(listener, 200, [:binary.copy("x", 1024)], 4096)
+
+      assert_raise RuntimeError, ~r/deep-field media stream failed: 3072 bytes missing/, fn ->
+        get(conn, "/api/deep-fields/andromeda/media/1/stack")
+      end
+
+      Task.await(server)
+    end
+
+    test "a missing object is not found, and an old version does not reach S3", %{
+      conn: conn,
+      listener: listener
+    } do
+      owner = Repo.insert!(%User{email: "a@e.com", handle: "ada", name: "Ada"})
+      other = Repo.insert!(%User{email: "b@e.com", handle: "bea", name: "Bea"})
+      field_with_build(owner, other)
+
+      # The build check runs before the read: no connection reaches the server.
+      assert conn |> get("/api/deep-fields/andromeda/media/2/stack") |> json_response(404)
+      assert {:error, :timeout} = :gen_tcp.accept(listener, 100)
+
+      server = s3_server(listener, 404, ["<Error><Code>NoSuchKey</Code></Error>"])
+      missing = conn |> get("/api/deep-fields/andromeda/media/1/stack")
+      assert missing.status == 404
+      assert Jason.decode!(missing.resp_body) == %{"error" => "not_found"}
+      Task.await(server)
+    end
+  end
+
+  # A server that answers like S3 and sends the body in separate writes.
+  # A `length` larger than the parts closes the connection before the end of the body.
+  defp s3_server(listener, status, parts, length \\ nil) do
+    Task.async(fn ->
+      {:ok, socket} = :gen_tcp.accept(listener, 5_000)
+      request = s3_request(socket, "")
+      length = length || parts |> IO.iodata_to_binary() |> byte_size()
+
+      :ok =
+        :gen_tcp.send(socket, [
+          "HTTP/1.1 #{status} Test\r\n",
+          "content-type: image/webp\r\n",
+          "content-length: #{length}\r\n",
+          "connection: close\r\n\r\n"
+        ])
+
+      for part <- parts, do: :ok = :gen_tcp.send(socket, part)
+      :gen_tcp.close(socket)
+      request
+    end)
+  end
+
+  defp s3_request(socket, acc) do
+    {:ok, data} = :gen_tcp.recv(socket, 0, 5_000)
+    acc = acc <> data
+    if String.contains?(acc, "\r\n\r\n"), do: acc, else: s3_request(socket, acc)
+  end
+
   test "a view link of a moving body is an error, not a crash", %{conn: conn} do
     assert %{"error" => %{"code" => "coordinates_not_available"}} =
              conn |> get("/api/agent/v1/view-link?object_key=mars") |> json_response(400)

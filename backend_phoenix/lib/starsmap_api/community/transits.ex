@@ -24,6 +24,9 @@ defmodule StarsmapApi.Community.Transits do
   @daily_quota 10
   @daily_solves 10
   @max_frame_bytes 4_000_000
+  # The most frames of one night. A cadence of one second for 27 hours stays under it, and the
+  # value fits the integer column.
+  @max_frames 100_000
   @states ["review", "approved", "rejected", "hidden"]
   @public_timings 200
 
@@ -38,6 +41,8 @@ defmodule StarsmapApi.Community.Transits do
          {:ok, night} <- night(params["night"]),
          {:ok, frames} <- frames(params["frame_count"], points),
          {:ok, target} <- target(params),
+         # A person over the quota does not start a fit. The check in `insert` stops a race.
+         :ok <- quota(user),
          {:ok, %{"accepted" => true} = fit} <- TransitFit.fit(key, points) do
       insert(user, key, target, night, frames, instrument, points, fit, params)
     else
@@ -47,17 +52,21 @@ defmodule StarsmapApi.Community.Transits do
     end
   end
 
+  defp quota(user) do
+    since = DateTime.add(StarsmapApi.Community.now(), -86_400)
+
+    count =
+      Repo.aggregate(
+        from(o in TransitObservation, where: o.user_id == ^user.id and o.inserted_at > ^since),
+        :count
+      )
+
+    if count >= @daily_quota, do: {:error, :transit_quota}, else: :ok
+  end
+
   defp insert(user, key, target, night, frames, instrument, points, fit, params) do
     StarsmapApi.Community.transaction(fn ->
-      since = DateTime.add(StarsmapApi.Community.now(), -86_400)
-
-      count =
-        Repo.aggregate(
-          from(o in TransitObservation, where: o.user_id == ^user.id and o.inserted_at > ^since),
-          :count
-        )
-
-      if count >= @daily_quota, do: Repo.rollback(:transit_quota)
+      with {:error, reason} <- quota(user), do: Repo.rollback(reason)
 
       {:ok, moment, _} = DateTime.from_iso8601(fit["mid_time_utc"])
       id = Ecto.UUID.generate()
@@ -155,8 +164,9 @@ defmodule StarsmapApi.Community.Transits do
 
   defp night(_), do: {:error, :invalid_transit}
 
-  defp frames(value, points) when is_integer(value) and value >= length(points),
-    do: {:ok, value}
+  defp frames(value, points)
+       when is_integer(value) and value >= length(points) and value <= @max_frames,
+       do: {:ok, value}
 
   defp frames(_, _), do: {:error, :invalid_transit}
 
