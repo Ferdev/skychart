@@ -51,6 +51,100 @@ test.describe("guided tours", () => {
     await expect(page.locator("#tour-player h2")).toHaveText("The Sun at the center");
   });
 
+  test("the arrow keys and Escape stay with a tab or a dialog that has the focus", async ({ page }) => {
+    await page.goto("/?tour=near-the-sun&step=0");
+    await expect(page.locator("#loading-screen")).toBeHidden({ timeout: 45_000 });
+    await expect(page.locator("#tour-player h2")).toHaveText("The Sun at the center");
+    await expect(page.locator("#selected-summary-name")).toHaveText("Sun");
+    // The tour puts the focus on Next when the first step arrives.
+    await expect(page.locator("[data-tour-action='next']")).toBeFocused();
+
+    // An inspector tab uses the arrow keys to move between the tabs.
+    const tabs = page.locator("#body-info [data-object-view]");
+    await tabs.first().focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(tabs.nth(1)).toBeFocused();
+    await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+    await page.waitForTimeout(500);
+    await expect(page.locator("#tour-player h2")).toHaveText("The Sun at the center");
+    expect(new URL(page.url()).searchParams.get("step")).toBe("0");
+
+    // Escape closes the dialog, not the tour.
+    await page.evaluate(() => {
+      const dialog = document.createElement("dialog");
+      dialog.id = "test-dialog";
+      dialog.innerHTML = "<button type=\"button\">OK</button>";
+      document.body.append(dialog);
+      dialog.showModal();
+    });
+    await expect(page.locator("#test-dialog button")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#test-dialog")).toBeHidden();
+    await expect(page.locator("#tour-player")).toBeVisible();
+
+    // With the focus in the tour card, the keys go to the tour.
+    await page.locator("[data-tour-action='next']").focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator("#tour-player h2")).toHaveText("The nearest measured stars");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#tour-player")).toBeHidden();
+  });
+
+  test("the focus stays on the same tour control, and only the new step is announced", async ({ page }) => {
+    const token = "0123456789abcdef0123456789abcdef";
+    const view = "v=1&c=0%2C0&z=24&t=2026-10-30T00%3A00%3A00.000Z&L=grid.1";
+    await page.route("**/api/community/config", (route) => route.fulfill({ json: { enabled: true } }));
+    await page.route(`**/api/community/shared-tours/${token}`, (route) => route.fulfill({
+      json: {
+        slug: `shared-${token}`, title: "Three steps", description: "", author: "Teacher", narrated: true,
+        steps: ["One", "Two", "Three"].map((title) => ({ viewState: view, title, body: "", sentences: [[{ kind: "text", text: `${title}.` }]] })),
+      },
+    }));
+    await page.goto(`/?tour=shared-${token}`);
+    const plate = page.locator("#tour-player");
+    const status = page.locator("#tour-player-status");
+    await expect(plate.locator("h2")).toHaveText("One", { timeout: 45_000 });
+    await expect(plate).not.toHaveAttribute("aria-live");
+    await expect(status).toHaveAttribute("aria-live", "polite");
+    await expect(status).toHaveText("Step 1 of 3: One");
+
+    const next = plate.locator("[data-tour-action='next']");
+    await expect(next).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(plate.locator("h2")).toHaveText("Two");
+    await expect(next).toBeFocused();
+    await expect(status).toHaveText("Step 2 of 3: Two");
+
+    // A step dot keeps the focus on the same dot.
+    await plate.locator("[data-tour-step='0']").focus();
+    await page.keyboard.press("Enter");
+    await expect(plate.locator("h2")).toHaveText("One");
+    await expect(plate.locator("[data-tour-step='0']")).toBeFocused();
+
+    // The speech button keeps the focus, and the step is not announced again.
+    await page.evaluate(() => {
+      window.speechSynthesis.speak = () => {};
+      window.speechSynthesis.cancel = () => {};
+    });
+    const speak = plate.locator("[data-tour-action='speak']");
+    await speak.focus();
+    await page.keyboard.press("Enter");
+    await expect(speak).toHaveAttribute("aria-pressed", "true");
+    await expect(speak).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(speak).toHaveAttribute("aria-pressed", "false");
+    await expect(status).toHaveText("Step 1 of 3: One");
+
+    // Next is disabled on the last step, so the title of the step gets the focus.
+    await plate.locator("[data-tour-step='1']").click();
+    await expect(plate.locator("h2")).toHaveText("Two");
+    await next.focus();
+    await page.keyboard.press("Enter");
+    await expect(plate.locator("h2")).toHaveText("Three");
+    await expect(next).toBeDisabled();
+    await expect(plate.locator("h2")).toBeFocused();
+  });
+
   test("closing during a transition prevents its history commit", async ({ page }) => {
     await page.goto("/?tour=near-the-sun&step=0");
     await expect(page.locator("#loading-screen")).toBeHidden({ timeout: 45_000 });

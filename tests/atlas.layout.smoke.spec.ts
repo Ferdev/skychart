@@ -107,6 +107,25 @@ test.describe("header search and Search panel", () => {
     await expect(page.locator('#body-picker [data-body-key="mars"]').first()).toBeVisible();
   });
 
+  test("a word of an input method stays in the header field until the composition ends", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openAtlas(page);
+    const header = page.locator("#header-search");
+    const panelField = page.locator("#body-search");
+    await header.focus();
+    const client = await page.context().newCDPSession(page);
+    await client.send("Input.imeSetComposition", { text: "に", selectionStart: 1, selectionEnd: 1 });
+    await client.send("Input.imeSetComposition", { text: "にほん", selectionStart: 3, selectionEnd: 3 });
+    await expect(header).toBeFocused();
+    await expect(header).toHaveValue("にほん");
+    await expect(panelField).toHaveValue("");
+    // The word is complete: it moves to the Search panel.
+    await client.send("Input.insertText", { text: "日本" });
+    await expect(panelField).toBeFocused();
+    await expect(panelField).toHaveValue("日本");
+    await expect(header).toHaveValue("");
+  });
+
   test("the panel has one scroll area, and the results are directly below the field", async ({ page }) => {
     // The server reads live feeds, so the number of events changes from day to day.
     const events = ["A", "B", "C", "D"].map((name, index) => ({ title: `Event ${name}`, summary: `Fixture ${name}.`, starts_at: `2026-07-2${index}T12:00:00Z`, catalog_key: null, url: `https://example.org/event-${name}` }));
