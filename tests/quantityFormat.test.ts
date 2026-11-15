@@ -126,10 +126,10 @@ assert.equal(formatDateTime(instant, { dateStyle: "medium", timeZone: "UTC" }), 
 assert.equal(formatDateTime("not a date"), "unknown");
 setFormatLocale("en");
 
-console.log("quantity format tests passed");
-
 // A coordinate keeps its precision from one million also, so that a short move changes the text.
 assert.equal(formatQuantity(1.000312, 7, 7), "1.000312");
 assert.equal(formatQuantity(1_000_158, 7, 7), "1.000158 million");
 assert.notEqual(formatQuantity(1_000_158, 7, 7), formatQuantity(1_000_000, 7, 7));
 assert.equal(formatQuantity(1_000_158), "1 million");
+
+console.log("quantity format tests passed");

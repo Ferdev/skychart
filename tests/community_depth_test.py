@@ -173,8 +173,20 @@ def test_build_writes_webp_layers_and_fractions(tmp_path: Path):
 
 def test_the_script_reports_a_bad_request(tmp_path: Path):
     script = Path(__file__).resolve().parents[1] / "backend" / "community_depth.py"
+    image = tmp_path / "1600.webp"
+    write_webp(rgb(field([(100, 120, 120)])), image, "[Q=95]")
     request = tmp_path / "request.json"
     request.write_text(json.dumps({"records": []}), encoding="utf-8")
-    run = subprocess.run([sys.executable, str(script), "missing.webp", str(request), str(tmp_path / "out")], capture_output=True, text=True)
+    run = subprocess.run([sys.executable, str(script), str(image), str(request), str(tmp_path / "out")], capture_output=True, text=True, timeout=30)
+    assert run.returncode == 1
+    assert "wcs" in json.loads(run.stdout)["error"].lower()
+
+
+def test_the_script_reports_a_missing_image(tmp_path: Path):
+    script = Path(__file__).resolve().parents[1] / "backend" / "community_depth.py"
+    image = tmp_path / "missing.webp"
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps({"records": [], "wcs": WCS}), encoding="utf-8")
+    run = subprocess.run([sys.executable, str(script), str(image), str(request), str(tmp_path / "out")], capture_output=True, text=True, timeout=30)
     assert run.returncode == 1
     assert "error" in json.loads(run.stdout)

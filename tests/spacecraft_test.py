@@ -68,6 +68,7 @@ class SpacecraftTest(unittest.TestCase):
         self.assertEqual(body['distance_from_earth_km'],13)
         self.assertEqual(body['spacecraft']['heliocentric_speed_km_s'],5)
         self.assertEqual(body['spacecraft']['earth_relative_speed_km_s'],12)
+        fetch.assert_called_once()
         self.assertEqual(fetch.call_args.args[1], EPOCH)
         ts.from_datetime.assert_called_with(EPOCH)
         self.assertEqual(fetch.call_args.args[0]['parent_key'],'sun')
@@ -105,18 +106,19 @@ class SpacecraftTest(unittest.TestCase):
             self.assertIsNone(sc.calculate(sc.MISSIONS['spacecraft-31'], EPOCH)['position'])
 
     def test_catalog_poll_is_nonblocking_and_bounded(self):
-        with patch.object(sc,'_worker',True), patch.object(sc,'in_coverage',return_value=True), patch.object(sc,'read_cache',return_value=None):
-            payload = sc.spacecraft_payload(EPOCH,'spacecraft-31')
-            self.assertEqual(len(payload['bodies']),len(sc.MISSIONS))
-            self.assertTrue(all(b['spacecraft']['availability']=='loading' for b in payload['bodies']))
-            size=sc._jobs.qsize()
-            sc.spacecraft_payload(EPOCH,'spacecraft-31')
-            self.assertEqual(sc._jobs.qsize(),size)
-            self.assertLessEqual(size,256)
-            self.assertEqual(sc._jobs.queue[0][3]['key'],'spacecraft-31')
-        with sc._lock:
-            sc._pending.clear()
-            while not sc._jobs.empty(): sc._jobs.get_nowait(); sc._jobs.task_done()
+        self.clear_jobs()
+        try:
+            with patch.object(sc,'_worker',True), patch.object(sc,'in_coverage',return_value=True), patch.object(sc,'read_cache',return_value=None):
+                payload = sc.spacecraft_payload(EPOCH,'spacecraft-31')
+                self.assertEqual(len(payload['bodies']),len(sc.MISSIONS))
+                self.assertTrue(all(b['spacecraft']['availability']=='loading' for b in payload['bodies']))
+                size=sc._jobs.qsize()
+                sc.spacecraft_payload(EPOCH,'spacecraft-31')
+                self.assertEqual(sc._jobs.qsize(),size)
+                self.assertLessEqual(size,256)
+                self.assertEqual(sc._jobs.queue[0][3]['key'],'spacecraft-31')
+        finally:
+            self.clear_jobs()
 
     def clear_jobs(self):
         with sc._lock:
