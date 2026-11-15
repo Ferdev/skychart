@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import os
 import re
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -34,6 +36,8 @@ STATIC_RECOGNIZED_DWARF_PLANETS = {
 AU_KM = 149_597_870.700
 DEFAULT_ASTEROID_ALBEDO = 0.14
 DEFAULT_COMET_ALBEDO = 0.04
+NEO_ADAPTER_NAME = "all_near_earth_asteroids"
+SBDB_PAGE_SIZE = 2000
 
 FIELDS = [
     "spkid",
@@ -91,15 +95,14 @@ SOURCE_ADAPTERS = [
         },
     },
     {
-        "name": "bright_near_earth_asteroids",
+        "name": NEO_ADAPTER_NAME,
         "api": "sbdb_query",
         "family": "asteroid",
+        "paginate": True,
         "params": {
             "sb-kind": "a",
             "sb-group": "neo",
-            "sb-cdata": json.dumps({"AND": ["H|DF"]}, separators=(",", ":")),
-            "sort": "H",
-            "limit": os.environ.get("SMALL_BODY_NEO_LIMIT", "6000"),
+            "sort": "spkid",
         },
     },
     {
@@ -151,11 +154,45 @@ def fetch_satellite_json(params: dict[str, str]) -> dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
-def fetch_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def fetch_sbdb_pages(adapter: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    """Read a complete selection, refusing inconsistent or truncated pagination."""
+    if not adapter.get("paginate"):
+        yield fetch_json(adapter["params"])
+        return
+
+    offset = 0
+    total = None
+    fields = None
+    seen: set[str] = set()
+    while total is None or offset < total:
+        payload = fetch_json({
+            **adapter["params"], "limit": str(SBDB_PAGE_SIZE), "limit-from": str(offset),
+        })
+        page_total = int(payload["count"])
+        if total is not None and (page_total != total or payload.get("fields") != fields):
+            raise ValueError("JPL selection changed during pagination; retry the refresh")
+        total = page_total
+        fields = payload.get("fields", [])
+        values = payload.get("data", [])
+        if len(values) != min(SBDB_PAGE_SIZE, total - offset):
+            raise ValueError("JPL returned an incomplete page; catalog was not replaced")
+        for value in values:
+            if len(value) != len(fields):
+                raise ValueError("JPL returned a malformed row")
+            spkid = str(dict(zip(fields, value)).get("spkid") or "").strip()
+            if not spkid or spkid in seen:
+                raise ValueError("JPL returned a missing or repeated SPK-ID; retry the refresh")
+            seen.add(spkid)
+        offset += len(values)
+        print(f"Fetched {offset}/{total} {adapter['name']}", flush=True)
+        yield payload
+
+
+def fetch_rows(adapters: list[dict[str, Any]] | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     by_spkid: dict[str, dict[str, Any]] = {}
     slice_meta: list[dict[str, Any]] = []
 
-    for adapter in SOURCE_ADAPTERS:
+    for adapter in SOURCE_ADAPTERS if adapters is None else adapters:
         if adapter["api"] == "sb_sat":
             rows, count, total_count = fetch_satellite_adapter_rows(adapter)
             for row in rows:
@@ -174,25 +211,24 @@ def fetch_rows() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             )
             continue
 
-        payload = fetch_json(adapter["params"])
-        fields = [str(field) for field in payload["fields"]]
         count = 0
-
-        for values in payload.get("data", []):
-            row = dict(zip(fields, values))
-            spkid = str(row.get("spkid") or "").strip()
-            if not spkid:
-                continue
-            existing = by_spkid.get(spkid)
-            if existing:
-                existing.setdefault("_selection", []).append(adapter["name"])
-                existing.setdefault("_source_adapters", []).append(adapter["name"])
-            else:
-                row["_selection"] = [adapter["name"]]
-                row["_source_adapters"] = [adapter["name"]]
-                row["_source_family"] = adapter["family"]
-                by_spkid[spkid] = row
-            count += 1
+        for payload in fetch_sbdb_pages(adapter):
+            fields = [str(field) for field in payload.get("fields", [])]
+            for values in payload.get("data", []):
+                row = dict(zip(fields, values))
+                spkid = str(row.get("spkid") or "").strip()
+                if not spkid:
+                    continue
+                existing = by_spkid.get(spkid)
+                if existing:
+                    existing.setdefault("_selection", []).append(adapter["name"])
+                    existing.setdefault("_source_adapters", []).append(adapter["name"])
+                else:
+                    row["_selection"] = [adapter["name"]]
+                    row["_source_adapters"] = [adapter["name"]]
+                    row["_source_family"] = adapter["family"]
+                    by_spkid[spkid] = row
+                count += 1
 
         slice_meta.append(
             {
@@ -589,17 +625,123 @@ def reject_none(value: Any) -> Any:
     return value
 
 
+def build_objects(
+    rows: list[dict[str, Any]], target_jd: float, slice_meta: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    objects = []
+    for source_slice in slice_meta:
+        source_slice.update(imported_count=0, rejected_count=0, rejected_designations=[])
+    metadata = {item["name"]: item for item in slice_meta}
+    for row in rows:
+        item = build_object(row, target_jd)
+        for name in row.get("_selection", []):
+            if name not in metadata:
+                continue
+            entry = metadata[name]
+            if item is None:
+                entry["rejected_count"] += 1
+                entry["rejected_designations"].append(primary_designation(row) or str(row.get("spkid")))
+                entry["rejection_reason"] = "Missing or unsupported orbital elements for two-body map placement."
+            else:
+                entry["imported_count"] += 1
+        if item is not None:
+            objects.append(reject_none(item))
+    return objects
+
+
+def refresh_neos(payload: dict[str, Any], generated_at: datetime) -> dict[str, Any]:
+    """Replace the NEO selection while retaining the other saved selections."""
+    adapter = next(item for item in SOURCE_ADAPTERS if item["name"] == NEO_ADAPTER_NAME)
+    rows, metadata = fetch_rows([adapter])
+    retrieved_at = generated_at.isoformat().replace("+00:00", "Z")
+    objects = build_objects(rows, julian_day(generated_at), metadata)
+    if not objects:
+        raise ValueError("JPL returned no usable near-Earth asteroids; catalog was not replaced")
+    metadata[0]["retrieved_at_utc"] = retrieved_at
+    neo_selections = {"bright_near_earth_asteroids", NEO_ADAPTER_NAME}
+    retained = {}
+    other_selections = {}
+    for item in payload["objects"]:
+        selections = item.get("facts", {}).get("selection_slices", [])
+        others = [name for name in selections if name not in neo_selections]
+        other_selections[item["key"]] = others
+        if not neo_selections.intersection(selections) or others:
+            if neo_selections.intersection(selections):
+                item = {**item, "facts": {**item["facts"]}}
+                for field in ("selection_slices", "source_adapters"):
+                    item["facts"][field] = [
+                        name for name in item["facts"].get(field, []) if name not in neo_selections
+                    ]
+            retained[item["key"]] = item
+    for item in objects:
+        for field in ("selection_slices", "source_adapters"):
+            item["facts"][field] = list(dict.fromkeys(
+                other_selections.get(item["key"], []) + item["facts"][field]
+            ))
+        retained[item["key"]] = item
+    payload["objects"] = list(retained.values())
+    source = payload["source"]
+    for field in ("query_slices", "source_adapters"):
+        source[field] = [item for item in source.get(field, []) if item["name"] not in neo_selections]
+    source["source_adapters"].extend(metadata)
+    payload["snapshot_lineage"] = {
+        "assembly_mode": "base_snapshot_plus_explicit_slice",
+        "base_snapshot_generated_at_utc": payload["generated_at_utc"],
+        "assembled_at_utc": retrieved_at,
+        "explicit_slice_generated_at_utc": retrieved_at,
+        "note": "The complete near-Earth asteroid selection was refreshed; other saved selections were retained.",
+        "position_targets": "Per-object Julian dates are recorded in facts.position_generated_for_jd_utc.",
+    }
+    payload["generated_at_utc"] = retrieved_at
+    payload["selection"]["description"] = (
+        "Large diameter-known asteroids, all near-Earth asteroids with usable orbital elements, "
+        "and the other saved small-body selections."
+    )
+    return payload
+
+
+def write_catalog(payload: dict[str, Any], path: Path) -> None:
+    objects = payload["objects"]
+    validate_static_recognized_dwarfs(objects)
+    if len({item["key"] for item in objects}) != len(objects):
+        raise ValueError("catalog contains duplicate object keys")
+    objects.sort(key=lambda item: (item["object_type"], item.get("absolute_magnitude") is None, item.get("absolute_magnitude") or 99.0, item["name"]))
+    payload["object_count"] = len(objects)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".json.tmp")
+    try:
+        # One object per line keeps the snapshot below GitHub's file-size limit
+        # and avoids constructing another catalog-sized string in memory.
+        with temporary.open("w", encoding="utf-8") as output:
+            header = {key: value for key, value in payload.items() if key != "objects"}
+            output.write(json.dumps(header, indent=2, sort_keys=True)[:-2] + ',\n  "objects": [\n')
+            for index, item in enumerate(objects):
+                if index:
+                    output.write(",\n")
+                output.write("    ")
+                json.dump(item, output, sort_keys=True, separators=(",", ":"), allow_nan=False)
+            output.write("\n  ]\n}\n")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    print(f"Wrote {len(objects)} JPL small bodies to {path}")
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Build the JPL small-body catalog.")
+    parser.add_argument("--refresh-neos", action="store_true", help="Refresh all near-Earth asteroids and retain other saved selections.")
+    args = parser.parse_args()
     generated_at = datetime.now(timezone.utc)
+    if args.refresh_neos:
+        payload = json.loads(OUTPUT_PATH.read_text(encoding="utf-8"))
+        write_catalog(refresh_neos(payload, generated_at), OUTPUT_PATH)
+        return
     target_jd = julian_day(generated_at)
     rows, slice_meta = fetch_rows()
     retrieved_at_utc = generated_at.isoformat().replace("+00:00", "Z")
     for source_slice in slice_meta:
         source_slice["retrieved_at_utc"] = retrieved_at_utc
-    objects = [build_object(row, target_jd) for row in rows]
-    objects = [reject_none(item) for item in objects if item is not None]
-    validate_static_recognized_dwarfs(objects)
-    objects.sort(key=lambda item: (item["object_type"], item.get("absolute_magnitude") is None, item.get("absolute_magnitude") or 99.0, item["name"]))
+    objects = build_objects(rows, target_jd, slice_meta)
 
     payload = {
         "schema_version": 2,
@@ -627,9 +769,7 @@ def main() -> None:
         "objects": objects,
     }
 
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"Wrote {payload['object_count']} JPL small bodies to {OUTPUT_PATH}")
+    write_catalog(payload, OUTPUT_PATH)
 
 
 if __name__ == "__main__":
