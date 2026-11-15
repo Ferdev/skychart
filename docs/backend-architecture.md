@@ -103,6 +103,7 @@ See [Catalog Tile Format](tile-format.md) for the SMP3 and SMPK1 contracts.
 - `GET /api/now`
 - `POST /api/observe/plan`, with `include_transits: true` for the predicted transits
 - `POST /api/catalog/match`
+- `POST /api/flights` and `GET /api/flights/:flight` (see [Answer flights](answer-flights.md))
 - `GET /api/agent/v1/objects/search`
 - `GET /api/agent/v1/objects/:key`
 - `GET /api/agent/v1/catalogs`
