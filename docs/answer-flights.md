@@ -29,8 +29,10 @@ owner. This repository change creates no key and sends no model request.
 2. The same normalized question in the same language gives the stored flight, so a replay
    makes no model call. A flight that failed, or a job that a deploy stopped, starts again.
 3. `Flights.Worker` runs in the `flights` queue, one job at a time, in the web container. The
-   web container holds the scientific service that the position tools need. The worker
-   container does not. The job waits for the network and holds no image in memory.
+   web container starts the Python scientific service that the position tools need.
+   The separate `community_worker` container runs the `media`, `publish`, and `mail` queues
+   with `COMMUNITY_WORKER=true`; its startup script does not start the scientific service.
+   A flight job waits for the network and holds no image in memory.
 4. `Flights.Agent` gives the model only these tools: `search_sky_objects`, `get_sky_object`,
    `match_sky_objects`, `get_solar_system_positions`, `measure_object_separation`,
    `list_sky_events`, and `list_guided_tours`. These are the operations of `AgentInterface` and
