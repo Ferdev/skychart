@@ -104,7 +104,10 @@ defmodule StarsmapApiWeb.CatalogController do
   def match(conn, params) do
     case TargetMatch.run(params["rows"], radius_arcmin: params["radius_arcmin"]) do
       {:ok, payload} ->
-        json(conn, payload)
+        json(
+          conn,
+          Map.put(payload, :receipt, StarsmapApi.Catalog.TargetSnapshot.receipt(payload.rows))
+        )
 
       {:error, {:too_many_rows, limit}} ->
         conn

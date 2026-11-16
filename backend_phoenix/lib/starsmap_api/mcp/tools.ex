@@ -269,7 +269,7 @@ defmodule StarsmapApi.Mcp.Tools do
 
         case Map.keys(arguments) -- allowed do
           [] ->
-            run(name, arguments)
+            mark_link(run(name, arguments), name)
 
           [unknown | _] ->
             AgentInterface.error(
@@ -280,6 +280,15 @@ defmodule StarsmapApi.Mcp.Tools do
         end
     end
   end
+
+  defp mark_link({:ok, %{url: url} = result}, name)
+       when name in ["create_sky_view_link", "create_object_sky_link"] do
+    uri = URI.parse(url)
+    query = URI.decode_query(uri.query || "") |> Map.put("source", "mcp") |> URI.encode_query()
+    {:ok, Map.put(result, :url, URI.to_string(%{uri | query: query}))}
+  end
+
+  defp mark_link(result, _name), do: result
 
   defp run("search_sky_objects", arguments), do: AgentInterface.search(arguments)
 

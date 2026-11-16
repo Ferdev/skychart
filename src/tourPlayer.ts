@@ -34,6 +34,7 @@ export type TourPlayerAdapter = {
   report?(slug: string): void;
   /** The language of the reader, for numbers and browser speech. */
   locale(): string;
+  surveyContext?(): string;
   /** A chip opens its source record in the inspector. */
   openObject?(key: string): void;
 };
@@ -283,6 +284,13 @@ export class TourPlayer {
       // A disabled button cannot have the focus (Next on the last step): the title of the step gets it.
       const control = this.plate.querySelector<HTMLElement>(`${focusTarget}:not(:disabled)`) ?? this.plate.querySelector<HTMLElement>("h2");
       control?.focus({ preventScroll: true });
+    }
+    if (tour.slug === "sun-to-survey-field") {
+      const signal = this.transition!.signal;
+      const index = this.index;
+      void import("./marketing/surveyFlight").then(m => {
+        if (!signal.aborted) m.mountSurveyFlight(this.plate, index, signal, this.adapter.surveyContext);
+      });
     }
     this.announce(`${t("tour.stepOf", { step: this.index + 1, total })}: ${step.title}`);
   }

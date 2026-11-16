@@ -36,6 +36,16 @@ defmodule StarsmapApi.Spacecraft do
            end)
   @by_key Map.new(@objects, &{&1.key, &1})
 
+  def public_manifest,
+    do:
+      Map.take(@manifest, [
+        "retrieved_at",
+        "source_url",
+        "coverage_note",
+        "spacecraft",
+        "excluded"
+      ])
+
   def get(key) do
     case Map.get(@by_key, String.downcase(key)) do
       nil -> {:error, :not_found}
