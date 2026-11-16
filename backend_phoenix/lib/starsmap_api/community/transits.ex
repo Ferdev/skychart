@@ -2,9 +2,15 @@ defmodule StarsmapApi.Community.Transits do
   @moduledoc """
   Community transit timings.
 
-  The browser sends measurements only. The server calculates each result from those
-  measurements, and a moderator must approve it. A timing is a community result next to
-  the archive values: it does not change an orbit and it does not confirm a planet.
+  The browser sends measurements and observation metadata. The server calculates the
+  timing and fit diagnostics from the measurements, and a moderator must approve the result.
+  The stored checks `comparison_count`, `comparison_rms_ppt`, `frames_dropped`, and
+  `pipeline_version` are unverified browser input, with only type checks and a length limit
+  on `pipeline_version`. The comparison fields come from `comparison.count` and
+  `comparison.check_rms_ppt`; the other two keep their input names.
+
+  A timing is a community result next to the archive values: it does not change an orbit
+  and it does not confirm a planet.
   """
   import Ecto.Query
 

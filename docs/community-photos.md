@@ -62,7 +62,10 @@ Install PostgreSQL and `libvips-tools`. Use the project's Node and Elixir toolch
 For the task container, prefix Mix commands with
 `ERL_FLAGS='+S 2:2' mise exec elixir@1.15.8 erlang@26.2.5.21 --`.
 
-Create a separate local database, then configure the local service:
+Create a separate local database, then configure the local service. The example
+URL below uses the local `postgres` role and the `starsmap_community_dev` database;
+adjust it for your PostgreSQL setup. `openssl rand -hex 32` generates 32 random
+bytes encoded as 64 hexadecimal characters for the secret.
 
 ```bash
 createdb -U postgres starsmap_community_dev
@@ -77,6 +80,11 @@ cd backend_phoenix
 mix ecto.migrate -r StarsmapApi.CommunityRepo
 PORT=4020 mix phx.server
 ```
+
+With `COMMUNITY_ENABLED=true`, `mix phx.server` in development starts the
+`flights` queue without `PHX_SERVER`. A web release needs `PHX_SERVER=true`
+to start that queue. Answer flights also need the API key described in
+[Answer flights](answer-flights.md#activation).
 
 The local adapter issues a 15-minute, write-once upload URL. Run a second release
 process with `COMMUNITY_WORKER=true` to process jobs. Its HTTP endpoint is disabled.
