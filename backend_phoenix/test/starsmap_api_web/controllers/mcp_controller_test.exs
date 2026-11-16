@@ -101,6 +101,8 @@ defmodule StarsmapApiWeb.McpControllerTest do
       statuses = for _ <- 1..250, do: modern(recycle(conn), "server/discover").status
 
       assert 429 in statuses
+      other_client = %{recycle(conn) | remote_ip: {192, 0, 2, 2}}
+      assert other_client |> modern("server/discover") |> json_response(200)
       assert conn |> recycle() |> get(~p"/api/agent/v1/catalogs") |> json_response(200)
     end
   end

@@ -105,6 +105,10 @@ defmodule StarsmapApi.FlightsTest do
       end
 
       assert reasons(check([[text("Arabic ٤٢ digits too.")]], "en")) == ["number_in_text"]
+
+      for digits <- ["０１２３４５６７８９", "०१२३४५६७८९"], digit <- String.graphemes(digits) do
+        assert reasons(check([[text("Digit #{digit}.")]], "en")) == ["number_in_text"]
+      end
     end
 
     test "a number word fails in the language of the flight" do
@@ -260,10 +264,18 @@ defmodule StarsmapApi.FlightsTest do
 
     test "the daily cap stops a new question and a running flight" do
       Application.put_env(:starsmap_api, :answer_flight_daily_usd, 1.0)
+      {:ok, flight} = Flights.request("How far is Andromeda?", "en")
+      {:ok, _} = Script.start([tool_turn("get_sky_object", %{"key" => "ngc-224"})])
       Flights.add_spend(0.6)
       Flights.add_spend(0.5)
       assert Repo.get!(Spend, Date.utc_today()).calls == 2
       assert {:error, :daily_limit} = Flights.request("How far is Mars?", "en")
+
+      assert :ok = perform_job(Worker, %{id: flight.id})
+      stopped = Repo.get!(AnswerFlight, flight.id)
+      assert stopped.status == "failed"
+      assert stopped.refusal == "daily_limit"
+      assert Script.requests() == []
     end
 
     test "the nearby tour shares the most words with the question" do
