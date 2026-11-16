@@ -14,7 +14,7 @@ defmodule StarsmapApi.Catalog.Search do
   @search_timeout 5_000
   @fallback_search_timeout 15_000
 
-  def search(params) do
+  def search(params, options \\ []) do
     limit = bounded_integer(params["limit"], @default_limit, 1, @max_limit)
     offset = bounded_integer(params["offset"], 0, 0, 10_000_000)
     query_text = string_param(params["q"])
@@ -41,7 +41,14 @@ defmodule StarsmapApi.Catalog.Search do
 
       result =
         if remaining > 0 and not missions_only do
-          search_source_objects(query_text, groups, types, max(0, offset - count), remaining)
+          search_source_objects(
+            query_text,
+            groups,
+            types,
+            max(0, offset - count),
+            remaining,
+            options
+          )
         else
           %{objects: [], total: 0, has_more: not missions_only}
         end
@@ -59,7 +66,9 @@ defmodule StarsmapApi.Catalog.Search do
     end
   end
 
-  defp search_source_objects(query_text, groups, types, offset, limit) do
+  defp search_source_objects(query_text, groups, types, offset, limit, options) do
+    log = Keyword.get(options, :log, :debug)
+
     base_query =
       CatalogSourceObject
       |> maybe_filter_groups(groups)
@@ -76,18 +85,21 @@ defmodule StarsmapApi.Catalog.Search do
         |> order_for_search(query_text)
         |> limit(^(limit + 1))
         |> offset(^offset)
-        |> Repo.all(timeout: search_timeout())
+        |> Repo.all(timeout: search_timeout(), log: log)
       rescue
         e in [DBConnection.ConnectionError, DBConnection.OwnershipError] ->
+          # Private target-list lookups must not expose SQL parameters in an exception.
+          detail = if log == false, do: "", else: ": #{Exception.message(e)}"
+
           Logger.warning(
-            "ranked catalog search timed out, retrying with magnitude ordering: #{Exception.message(e)}"
+            "ranked catalog search timed out, retrying with magnitude ordering" <> detail
           )
 
           base_query
           |> order_for_search("")
           |> limit(^(limit + 1))
           |> offset(^offset)
-          |> Repo.all(timeout: @fallback_search_timeout)
+          |> Repo.all(timeout: @fallback_search_timeout, log: log)
       end
 
     has_more = length(objects) > limit

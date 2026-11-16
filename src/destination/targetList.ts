@@ -19,6 +19,7 @@ export type TargetObject = {
 export type TargetCandidate = { key: string; name: string; object_type: string; catalog_group: string };
 export type TargetMatchRow = {
   input: string;
+  identity_key?: string;
   status: "matched" | "ambiguous" | "unmatched";
   object?: TargetObject;
   candidates?: TargetCandidate[];

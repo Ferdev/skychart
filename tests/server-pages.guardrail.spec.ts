@@ -12,7 +12,11 @@ test.describe("server pages", () => {
     await expect(page.locator("canvas")).toHaveCount(0);
     await expect(page.locator("#app")).toHaveCount(0);
     await expect(page.locator(".back")).toHaveText("← Back to the atlas");
-    await expect(page.locator("ol.steps > li")).toHaveCount(2);
+    const tours = page.locator("ol.steps > li > a");
+    await expect(tours).toHaveCount(3);
+    for (const slug of ["earth-to-observable-universe", "near-the-sun", "sun-to-survey-field"]) {
+      await expect(page.locator(`ol.steps > li > a[href="/tours/${slug}"]`)).toBeVisible();
+    }
     // One sans-serif font stack: no serif heading.
     const headingFont = await page.locator("h1").evaluate((heading) => getComputedStyle(heading).fontFamily);
     expect(headingFont).not.toMatch(/Georgia|(^|,\s*)serif/);

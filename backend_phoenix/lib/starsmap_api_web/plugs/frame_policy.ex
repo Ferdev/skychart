@@ -9,7 +9,11 @@ defmodule StarsmapApiWeb.Plugs.FramePolicy do
       conn =
         conn
         |> put_resp_header("x-content-type-options", "nosniff")
-        |> put_resp_header("referrer-policy", "strict-origin-when-cross-origin")
+        |> put_resp_header(
+          "referrer-policy",
+          List.first(get_resp_header(conn, "referrer-policy")) ||
+            "strict-origin-when-cross-origin"
+        )
         |> script_policy()
 
       if conn.request_path == "/embed",

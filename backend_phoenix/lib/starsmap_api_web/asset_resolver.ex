@@ -6,7 +6,7 @@ defmodule StarsmapApiWeb.AssetResolver do
          %{"file" => file} = entry <- Map.get(manifest, name) do
       %{script: "/" <> file, css: Enum.map(entry["css"] || [], &("/" <> &1))}
     else
-      _ -> %{script: "/src/main.ts", css: []}
+      _ -> %{script: if(name == "index.html", do: "/src/main.ts", else: "/" <> name), css: []}
     end
   end
 end

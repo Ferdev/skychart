@@ -108,11 +108,21 @@ export class AtlasControlView {
   }
 
   updateExploreDomains(bodies: Body[], summary: CatalogSummary | null, activeGuidedSetId: string | null, activeFilter: BodyFilter) {
-    atlasDom.exploreDomains.innerHTML = EXPLORE_DOMAINS.map((domain) => {
+    for (const domain of EXPLORE_DOMAINS) {
+      // Catalog updates must not replace a button while it has keyboard focus.
+      let button = atlasDom.exploreDomains.querySelector<HTMLButtonElement>(`[data-explore-domain="${domain.id}"]`);
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.dataset.exploreDomain = domain.id;
+        atlasDom.exploreDomains.append(button);
+      }
       const count = domain.count(summary, bodies);
       const active = activeGuidedSetId === domain.guidedSetId && activeFilter === domain.filterKey;
-      return `<button type="button" class="explore-domain-card${active ? " active" : ""}" data-explore-domain="${escapeHtml(domain.id)}" aria-pressed="${active}"><span class="explore-domain-card__copy"><strong>${escapeHtml(t(domain.titleKey))}</strong><small>${escapeHtml(t(domain.descriptionKey))}</small></span>${count === null ? "" : `<span class="explore-domain-card__count">${escapeHtml(t("explore.count", { count: formatCount(count) }))}</span>`}</button>`;
-    }).join("");
+      button.className = `explore-domain-card${active ? " active" : ""}`;
+      button.setAttribute("aria-pressed", String(active));
+      button.innerHTML = `<span class="explore-domain-card__copy"><strong>${escapeHtml(t(domain.titleKey))}</strong><small>${escapeHtml(t(domain.descriptionKey))}</small></span>${count === null ? "" : `<span class="explore-domain-card__count">${escapeHtml(t("explore.count", { count: formatCount(count) }))}</span>`}`;
+    }
   }
 
   updateGuidedSets(bodyByKey: ReadonlyMap<string, Body>, activeId: string | null) {

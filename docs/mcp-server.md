@@ -154,3 +154,5 @@ Protocol references, read on 2026-10-10:
 - [Streamable HTTP transport, 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http)
 - [Versioning and compatibility](https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning)
 - [Tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)
+
+The public [MCP guide](/mcp-guide) has client setup, bounds and four example calls.
