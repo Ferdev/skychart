@@ -45,9 +45,12 @@ test.describe("object inspector", () => {
     await expect(subtitle).toHaveAttribute("title", /\S/);
     // The three actions are in a row below the name.
     const nameBox = (await name.boundingBox())!;
-    for (const action of ["#center-selected", "#zoom-selected"]) {
-      const box = await page.locator(action).boundingBox();
-      if (box) expect(box.y, `${action} is below the name`).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
+    for (const action of ["#center-selected", "#zoom-selected", "#compare-selected"]) {
+      const button = page.locator(action);
+      await expect(button).toBeVisible();
+      const box = await button.boundingBox();
+      expect(box, `${action} box`).not.toBeNull();
+      expect(box!.y, `${action} is below the name`).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
     }
   });
 
@@ -93,9 +96,9 @@ test.describe("object inspector", () => {
     const rows = result.locator(".observe-table tbody tr");
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0).locator("th")).toHaveText("Rise");
-    // The second column is the time of the browser, and the third column is UTC.
+    // Local time depends on the browser timezone; English renders the fixed 18:05 UTC as 06:05 PM.
     await expect(rows.nth(0).locator("td").nth(0)).toHaveText(/\d{1,2}:\d{2}/);
-    await expect(rows.nth(0).locator("td").nth(1)).toHaveText(/(06|18):05/);
+    await expect(rows.nth(0).locator("td").nth(1)).toHaveText("06:05 PM");
     await expect(rows.nth(1).locator("td").nth(1)).toHaveText(/(11|23):40/);
     await expect(rows.nth(2).locator("td").nth(0)).toHaveText("Not in the next 24 hours");
     await expect(result).toContainText("Fixture accuracy note.");

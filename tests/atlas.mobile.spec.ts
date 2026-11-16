@@ -86,7 +86,8 @@ test.describe("Cosmic Atlas mobile layout", () => {
     await expect(page.locator('[data-projection-mode="sky-sphere"]')).toHaveCount(0);
     const slider = page.locator("#zoom-scale-slider");
     const box = await slider.boundingBox();
-    expect((box?.x ?? -1) + (box?.width ?? 0)).toBeLessThanOrEqual(390);
+    expect(box, "zoom slider box").not.toBeNull();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
     issues.assertClean();
   });
 

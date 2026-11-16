@@ -125,7 +125,7 @@ test("the planner keeps the site private, ranks targets, and opens a target in S
   await expect.poll(() => new URL(page.url()).searchParams.get("t")).toMatch(/^2026-10-3[01]T/);
   expect(new URL(page.url()).searchParams.get("sky")).toBe("earth");
 
-  await page.waitForTimeout(500);
+  await expect.poll(async () => (await sentBodies()).some(({ body }) => body.includes("page_view"))).toBe(true);
   const sent = await sentBodies();
   const isPlannerCall = ({ method, url }: SentBody) => method === "POST" && new URL(url).pathname === "/api/observe/plan";
   const plannerBodies = sent.filter(isPlannerCall).map(({ body }) => body);

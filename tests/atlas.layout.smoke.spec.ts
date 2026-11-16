@@ -68,12 +68,16 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768
       await page.locator("#compare-selected").click();
       await expect(page.locator("#selection-compare")).toBeVisible();
       await expectNoOverlap(page, "compare");
-      // All controls stay in the window.
+      // Active controls stay in the window. A portrait sheet moves the disabled toolbar offscreen.
       for (const selector of ["#share-menu-button", "#map-settings-toggle", "#zoom-in", "#time-date"]) {
-        const box = await page.locator(selector).boundingBox();
-        if (!box || !(await page.locator(selector).isVisible())) continue;
+        const control = page.locator(selector);
+        const box = await control.boundingBox();
+        if (!box || !(await control.isVisible())) continue;
+        if (await control.evaluate((element) => getComputedStyle(element).pointerEvents === "none")) continue;
         expect(box.x, selector).toBeGreaterThanOrEqual(0);
         expect(box.x + box.width, selector).toBeLessThanOrEqual(viewport.width + 1);
+        expect(box.y, selector).toBeGreaterThanOrEqual(0);
+        expect(box.y + box.height, selector).toBeLessThanOrEqual(viewport.height + 1);
       }
       issues.assertClean();
     });
