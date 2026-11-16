@@ -66,15 +66,34 @@ defmodule StarsmapApiWeb.PythonProxyControllerTest do
     end
 
     test "do not show a target list", %{conn: conn} do
+      StarsmapApiWeb.Plugs.RateLimit.reset()
+
+      rows = [
+        %{name: "Private list item"},
+        %{key: "private-list-key"},
+        %{ra_deg: 12.3456, dec_deg: -65.4321}
+      ]
+
       log =
         capture_log(fn ->
-          conn
-          |> put_req_header("content-type", "application/json")
-          |> post("/api/catalog/match", Jason.encode!(%{targets: [%{name: "Private list item"}]}))
+          payload =
+            conn
+            |> put_req_header("content-type", "application/json")
+            |> post("/api/catalog/match", Jason.encode!(%{rows: rows}))
+            |> json_response(200)
+
+          assert [%{"input" => "Private list item"}, _, _] = payload["rows"]
         end)
 
-      assert log =~ ~s("targets" => "[FILTERED]")
+      assert log =~ "POST /api/catalog/match"
+      assert log =~ "Sent 200"
+      # This route suppresses parameter logging entirely, including filtered values.
+      refute log =~ "Parameters:"
       refute log =~ "Private list item"
+      refute log =~ "private list item"
+      refute log =~ "private-list-key"
+      refute log =~ "12.3456"
+      refute log =~ "65.4321"
     end
   end
 

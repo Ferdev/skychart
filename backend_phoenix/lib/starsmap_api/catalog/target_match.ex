@@ -127,7 +127,7 @@ defmodule StarsmapApi.Catalog.TargetMatch do
     if keys == [],
       do: %{},
       else:
-        Repo.all(from o in CatalogSourceObject, where: o.key in ^keys)
+        Repo.all(from(o in CatalogSourceObject, where: o.key in ^keys), log: false)
         |> Map.new(&{&1.key, &1})
   end
 
@@ -168,7 +168,7 @@ defmodule StarsmapApi.Catalog.TargetMatch do
 
   defp search(name) do
     objects =
-      Search.search(%{"q" => name, "limit" => "#{@search_limit}"}).objects
+      Search.search(%{"q" => name, "limit" => "#{@search_limit}"}, log: false).objects
       |> Enum.uniq_by(&identity(&1.key))
 
     needle = String.downcase(name)
@@ -197,7 +197,7 @@ defmodule StarsmapApi.Catalog.TargetMatch do
       ra_ranges(ra, ra_margin)
       |> Enum.flat_map(fn {low, high} ->
         Repo.all(
-          from o in CatalogSourceObject,
+          from(o in CatalogSourceObject,
             where:
               o.dec_deg >= ^(dec - degrees) and o.dec_deg <= ^(dec + degrees) and
                 o.ra_deg >= ^low and o.ra_deg <= ^high,
@@ -216,6 +216,8 @@ defmodule StarsmapApi.Catalog.TargetMatch do
             ],
             limit: 1,
             select: map(o, [:id, :key, :ra_deg, :dec_deg])
+          ),
+          log: false
         )
       end)
 
@@ -232,7 +234,7 @@ defmodule StarsmapApi.Catalog.TargetMatch do
   # A candidate has only the columns of the ranking, because a full record is large. The lookup
   # uses the id: a key is unique in one source table, and the view has several tables.
   defp nearest_payload(candidate, separation) do
-    case Repo.get(CatalogSourceObject, candidate.id) do
+    case Repo.get(CatalogSourceObject, candidate.id, log: false) do
       nil -> unmatched()
       object -> Map.put(matched(object), :separation_arcsec, separation)
     end
