@@ -1,5 +1,5 @@
 import { expect, test, type Route } from "@playwright/test";
-import { collectBrowserIssues, openAtlas, openSearchWorkspace, selectCatalogObject, skipIfAtlasUnavailable } from "./atlas-test-utils";
+import { collectBrowserIssues, openAtlas, openSearchWorkspace, selectCatalogObject, serveSourceModules, skipIfAtlasUnavailable } from "./atlas-test-utils";
 
 const STATIC_POINT_TILE_WITH_ONE_POINT = (() => {
   const tile = Buffer.alloc(20);
@@ -846,6 +846,25 @@ test.describe("Cosmic Atlas browser smoke", () => {
     await expect(page.locator('#body-picker [data-body-key="m31"]')).toHaveCount(0);
 
     issues.assertClean();
+  });
+
+  test("Explore refresh retains the focused card for keyboard activation", async ({ page }) => {
+    await serveSourceModules(page);
+    await openSearchWorkspace(page);
+
+    const retainedFocus = await page.evaluate(async () => {
+      const { AtlasControlView } = await import("/src/atlas/atlasControlView.ts");
+      const card = document.querySelector<HTMLButtonElement>('[data-explore-domain="small-bodies"]')!;
+      card.focus();
+      new AtlasControlView().updateExploreDomains([], null, null, "all");
+      return document.activeElement === card && card.isConnected;
+    });
+
+    expect(retainedFocus).toBe(true);
+    // Use the current keyboard focus; locator.press() would focus a replacement button.
+    await page.keyboard.press("Enter");
+    await expect(page.locator('[data-explore-domain="small-bodies"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('#body-filter-buttons [data-body-filter="small_body"]')).toHaveClass(/active/);
   });
 
   test("shared view-state links restore a selected small body", async ({ page }) => {
