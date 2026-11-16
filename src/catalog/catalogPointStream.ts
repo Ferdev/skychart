@@ -70,6 +70,12 @@ export class CatalogPointStream {
     this.fetcher = options.fetcher ?? globalThis.fetch.bind(globalThis);
   }
 
+  /** True only when the active rendered tile set contains this catalog's points. */
+  hasLoadedGroup(group: string): boolean {
+    return [...this.tiles.values()].some(tile => this.activeKeys.has(tile.request.key)
+      && tile.request.groups.includes(group) && (tile.payload?.returned ?? 0) > 0);
+  }
+
   schedule(refresh: DataRefreshOptions = {}): void {
     if (!this.options.canLoad()) return;
     const requests = this.options.planner.plan(this.options.viewport());

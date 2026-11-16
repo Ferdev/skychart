@@ -211,24 +211,7 @@ export class NightPlannerPanel {
   }
 
   private transitRow(transit: PlannedTransit, index: number, night: PlanWindow) {
-    const window = { start_utc: transit.ingress_utc, end_utc: transit.egress_utc };
-    const bar = barSegments(night, [window]).map((part) => `<span style="left:${Math.max(0, part.left).toFixed(2)}%;width:${Math.min(100 - Math.max(0, part.left), part.width).toFixed(2)}%"></span>`).join("");
-    const facts = [
-      t(`transit.status.${transit.status}`),
-      t(`transit.coverage.${transit.coverage}`),
-      t("transit.depth", { value: t("transit.ppt", { value: formatFixed(transit.depth_ppt, 1) }), hours: formatDuration(transit.duration_hours * 3600), band: transit.magnitude_band, magnitude: formatFixed(transit.magnitude, 1) }),
-    ].join(" · ");
-    const canRecord = this.options.recordTransit?.();
-    return `<li class="planner-row">
-      <div class="planner-row__head"><span class="planner-row__rank">${formatCount(index + 1)}</span><strong>${h(transit.name)}</strong>${canRecord ? `<button type="button" class="secondary-action" data-record="${index}" aria-label="${h(`${t("transit.record")} · ${transit.name}`)}">${h(t("transit.record"))}</button>` : ""}</div>
-      <p class="planner-row__facts">${h(facts)}</p>
-      <div class="planner-bar" aria-hidden="true">${bar}</div>
-      <dl class="planner-row__data">
-        <div><dt>${h(t("transit.tab.transits"))}</dt><dd>${h(t("transit.times", { ingress: clock(transit.ingress_utc), middle: clock(transit.mid_utc), egress: clock(transit.egress_utc) }))}</dd></div>
-        <div><dt>${h(t("transit.altitudes"))}</dt><dd>${h([transit.altitude_ingress_deg, transit.altitude_mid_deg, transit.altitude_egress_deg].map(degrees).join(" → "))}</dd></div>
-        <div><dt>${h(t("transit.prediction"))}</dt><dd>± ${h(t("transit.minutes", { value: formatFixed(transit.uncertainty_minutes, 1) }))}</dd></div>
-        <div><dt>${h(t("planner.moonDistance"))}</dt><dd>${h(degrees(transit.moon_separation_deg))}</dd></div>
-      </dl></li>`;
+    return renderTransitRow(transit, index, night, Boolean(this.options.recordTransit?.()));
   }
 
   private row(target: PlanTarget, index: number, night: PlanWindow) {
@@ -249,4 +232,25 @@ export class NightPlannerPanel {
         <div><dt>${h(t("planner.moonDistance"))}</dt><dd>${h(degrees(target.moon_separation_deg))}</dd></div>
       </dl></li>`;
   }
+}
+
+/** Shared transit facts for the dialog and the standalone night page. */
+export function renderTransitRow(transit: PlannedTransit, index: number, night: PlanWindow, canRecord: boolean): string {
+    const window = { start_utc: transit.ingress_utc, end_utc: transit.egress_utc };
+    const bar = barSegments(night, [window]).map((part) => `<span style="left:${Math.max(0, part.left).toFixed(2)}%;width:${Math.min(100 - Math.max(0, part.left), part.width).toFixed(2)}%"></span>`).join("");
+    const facts = [
+      t(`transit.status.${transit.status}`),
+      t(`transit.coverage.${transit.coverage}`),
+      t("transit.depth", { value: t("transit.ppt", { value: formatFixed(transit.depth_ppt, 1) }), hours: formatDuration(transit.duration_hours * 3600), band: transit.magnitude_band, magnitude: formatFixed(transit.magnitude, 1) }),
+    ].join(" · ");
+    return `<li class="planner-row">
+      <div class="planner-row__head"><span class="planner-row__rank">${formatCount(index + 1)}</span><strong>${h(transit.name)}</strong>${canRecord ? `<button type="button" class="secondary-action" data-record="${index}" aria-label="${h(`${t("transit.record")} · ${transit.name}`)}">${h(t("transit.record"))}</button>` : ""}</div>
+      <p class="planner-row__facts">${h(facts)}</p>
+      <div class="planner-bar" aria-hidden="true">${bar}</div>
+      <dl class="planner-row__data">
+        <div><dt>${h(t("transit.tab.transits"))}</dt><dd>${h(t("transit.times", { ingress: clock(transit.ingress_utc), middle: clock(transit.mid_utc), egress: clock(transit.egress_utc) }))}</dd></div>
+        <div><dt>${h(t("transit.altitudes"))}</dt><dd>${h([transit.altitude_ingress_deg, transit.altitude_mid_deg, transit.altitude_egress_deg].map(degrees).join(" → "))}</dd></div>
+        <div><dt>${h(t("transit.prediction"))}</dt><dd>± ${h(t("transit.minutes", { value: formatFixed(transit.uncertainty_minutes, 1) }))}</dd></div>
+        <div><dt>${h(t("planner.moonDistance"))}</dt><dd>${h(degrees(transit.moon_separation_deg))}</dd></div>
+      </dl></li>`;
 }

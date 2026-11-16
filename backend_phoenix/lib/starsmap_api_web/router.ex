@@ -62,6 +62,12 @@ defmodule StarsmapApiWeb.Router do
     get "/embed", PageController, :embed
     get "/about", PageController, :about
     get "/agents", AgentController, :show
+    get "/mcp-guide", MarketingPageController, :mcp
+    get "/spacecraft", MarketingPageController, :fleet
+    get "/spacecraft/:slug", MarketingPageController, :spacecraft
+    get "/tonight", MarketingPageController, :tonight
+    get "/targets", MarketingPageController, :targets
+    get "/targets/r/:token", MarketingPageController, :targets, log: false
     get "/agents.json", AgentController, :guide_json
     get "/llms.txt", AgentController, :llms
     get "/openapi.json", AgentController, :openapi
@@ -98,13 +104,14 @@ defmodule StarsmapApiWeb.Router do
   scope "/api", StarsmapApiWeb do
     pipe_through :catalog_match
 
-    post "/catalog/match", CatalogController, :match
+    post "/catalog/match", CatalogController, :match, log: false
+    post "/catalog/target-snapshots", TargetSnapshotController, :create, log: false
   end
 
   scope "/api", StarsmapApiWeb do
     pipe_through :night_plan
 
-    post "/observe/plan", PythonProxyController, :night_plan
+    post "/observe/plan", PythonProxyController, :night_plan, log: false
   end
 
   scope "/api", StarsmapApiWeb do
@@ -114,6 +121,7 @@ defmodule StarsmapApiWeb.Router do
     get "/survey-image", SurveyImageController, :show
     get "/now", NowController, :index
     post "/events", EventController, :create
+    get "/catalog/target-snapshots/:token", TargetSnapshotController, :show, log: false
     get "/catalog", CatalogController, :summary
     get "/catalog/search", CatalogController, :search
     get "/catalog/density", CatalogController, :density

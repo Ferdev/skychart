@@ -76,6 +76,8 @@ import type {
   BodyFilterDefinition,
 } from "./atlas/contracts";
 
+const targetHandoffToken = new URLSearchParams(location.hash.slice(1)).get("targets");
+if (targetHandoffToken) history.replaceState(null, "", location.pathname + location.search);
 initializeErrorReporting();
 installAnalytics();
 
@@ -424,7 +426,7 @@ const exoplanetSystems = new ExoplanetSystemNavigator({
   root: bodyInfo, mapper: catalogObjectMapper, body: (key) => bodyByKey.get(key), bodies: () => ephemeris?.bodies ?? [], mergeBodies, viewport: usableViewportRect, maximumZoom: MAX_ZOOM,
   animateCameraTo: (target) => { activeZoomPreset = null; updateZoomPresetButtons(); animateCameraTo(target, LOCAL_ZOOM_DURATION_MS, scheduleViewStateReplace); },
 });
-const tourPlayer = new TourPlayer({ navigate: (state, options) => viewStateController.navigateTour(state, options), prewarm: (state) => viewStateController.prewarmTour(state), track: (event, properties) => trackEvent(event, properties), translate: t, closed: () => viewStateController.endTour(), report: (slug) => community.reportTour(slug, () => tourPlayer.close()), locale, openObject: (key) => void community.selectObject?.(key) });
+const tourPlayer = new TourPlayer({ navigate: (state, options) => viewStateController.navigateTour(state, options), prewarm: (state) => viewStateController.prewarmTour(state), track: (event, properties) => trackEvent(event, properties), translate: t, closed: () => viewStateController.endTour(), report: (slug) => community.reportTour(slug, () => tourPlayer.close()), locale, surveyContext: () => catalogPointStream.hasLoadedGroup("desi_dr1_galaxies") || catalogPointStream.hasLoadedGroup("desi_dr1_quasars") ? "DESI DR1 spectra points are loaded in this view. The landmarks use Messier and SIMBAD records." : "This view uses the curated landmark set. No DESI DR1 spectra points are loaded in this view.", openObject: (key) => void community.selectObject?.(key) });
 const objectInspection: ObjectInspectionView = new ObjectInspectionView({
   bodyInfo,
   hydrationStates: objectDetailHydrationStates,
@@ -626,7 +628,9 @@ initializeUi();
 void loadCatalogTileManifest();
 void loadNowEvents(nowStatus, nowEvents, atlasDom.nowShowAll);
 bindCalendarSubscribe(atlasDom.nowSubscribe);
-loadAtlas(viewTime === "now" ? undefined : viewTime);
+loadAtlas(viewTime === "now" ? undefined : viewTime).then(() => {
+  if (targetHandoffToken) void import("./marketing/targetHandoff").then(m => m.restoreTargetLayer(targetHandoffToken, key => selectBodyByKey(key, { center: true, zoom: "local" })));
+});
 requestRender({ data: true });
 
 async function loadAtlas(timestampIso?: string) {

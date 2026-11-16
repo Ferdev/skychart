@@ -73,7 +73,8 @@ const invariant = (condition, message) => { if (!condition) throw new Error(mess
 
 const openapi = read("openapi.json");
 invariant(openapi.openapi === "3.1.0", "OpenAPI must declare version 3.1.0");
-invariant(Object.keys(openapi.paths).length === 4, "OpenAPI must expose exactly four bounded paths");
+const expectedPaths = ["/api/agent/v1/objects/search", "/api/agent/v1/objects/{key}", "/api/agent/v1/catalogs", "/api/agent/v1/view-link", "/calendar.ics"];
+invariant(JSON.stringify(Object.keys(openapi.paths).sort()) === JSON.stringify(expectedPaths.sort()), "OpenAPI must expose four bounded agent paths and the read-only calendar");
 
 const guide = read("agents.json");
 invariant(guide.api?.read_only === true && guide.api?.bounded === true, "Agent guide must describe a bounded read-only API");

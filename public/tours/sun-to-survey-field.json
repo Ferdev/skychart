@@ -1,0 +1,86 @@
+{
+  "slug": "sun-to-survey-field",
+  "title": "From the Sun to a survey field",
+  "description": "Three catalog stops: the Sun, Andromeda, and 3C 273, with distance sources and a Legacy Surveys DR11 image.",
+  "steps": [
+    {
+      "viewState": "v=1&c=0%2C0&z=24&t=now&o=sun&L=labels.1~grid.1~references.1",
+      "title": "Start at the Sun",
+      "body": "The Sun is the origin of this heliocentric map. It has no measured distance from itself."
+    },
+    {
+      "viewState": "v=1&c=140239773341.69492%2C73506712829.32841&z=2e-09&t=now&o=m31&L=labels.1~grid.1~references.1",
+      "title": "Andromeda in the Messier catalog",
+      "body": "The loaded Messier snapshot places Andromeda at approximately 3 million light-years. This is a catalog estimate.",
+      "sentences": [
+        [
+          {
+            "kind": "text",
+            "text": "The Messier catalog estimate for Andromeda is "
+          },
+          {
+            "kind": "fact",
+            "value": 3000000.0001540054,
+            "unit": "ly",
+            "keys": [
+              "m31"
+            ],
+            "as_of": "2026-05-06T22:50:00Z"
+          },
+          {
+            "kind": "text",
+            "text": ". The source chip opens the record; this is an estimate, not an exact distance."
+          }
+        ]
+      ],
+      "sources": [
+        {
+          "key": "m31",
+          "name": "Andromeda distance record",
+          "catalog": "Messier snapshot 2026-05-06",
+          "url": "/o/m31"
+        }
+      ]
+    },
+    {
+      "viewState": "v=1&c=-137139885621576.42%2C-14098270734917.627&z=2e-12&t=now&o=simbad-3c-273&L=labels.1~grid.1~references.1",
+      "title": "3C 273 and the DR11 field",
+      "body": "3C 273 has a redshift-derived comoving distance. The DR11 cutout is an angular image seen from Earth and does not measure its distance.",
+      "sentences": [
+        [
+          {
+            "kind": "text",
+            "text": "The SIMBAD redshift model places 3C 273 at "
+          },
+          {
+            "kind": "fact",
+            "value": 2187541731.6042295,
+            "unit": "ly",
+            "keys": [
+              "simbad-3c-273"
+            ],
+            "as_of": "2026-05-10T11:01:55Z"
+          },
+          {
+            "kind": "text",
+            "text": " comoving distance. This is not a lookback time or a luminosity distance."
+          }
+        ],
+        [
+          {
+            "kind": "text",
+            "text": "The model uses H0=67.8 km/s/Mpc, matter density 0.308, and dark-energy density 0.692. The image is an Earth-view angular field."
+          }
+        ]
+      ],
+      "sources": [
+        {
+          "key": "simbad-3c-273",
+          "name": "3C 273 redshift and distance",
+          "catalog": "SIMBAD snapshot 2026-05-10",
+          "url": "/o/simbad-3c-273"
+        }
+      ]
+    }
+  ]
+}

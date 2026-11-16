@@ -341,6 +341,15 @@ defmodule StarsmapApiWeb.McpControllerTest do
         rest = conn |> recycle() |> get(rest_path) |> json_response(200)
         result = call_tool(recycle(conn), tool, arguments)
 
+        rest =
+          if tool == "create_sky_view_link" do
+            uri = URI.parse(rest["url"])
+            query = URI.decode_query(uri.query) |> Map.put("source", "mcp") |> URI.encode_query()
+            Map.put(rest, "url", URI.to_string(%{uri | query: query}))
+          else
+            rest
+          end
+
         assert result["isError"] == false
         assert result["structuredContent"] == rest
         assert [%{"type" => "text", "text" => text}] = result["content"]

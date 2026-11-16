@@ -44,7 +44,10 @@ defmodule StarsmapApiWeb.Endpoint do
   end
 
   plug Plug.RequestId
-  plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
+
+  plug Plug.Telemetry,
+    event_prefix: [:phoenix, :endpoint],
+    log: {__MODULE__, :request_log_level, []}
 
   plug StarsmapApiWeb.Plugs.McpBody
 
@@ -58,6 +61,10 @@ defmodule StarsmapApiWeb.Endpoint do
   plug Plug.Head
   plug Plug.Session, @session_options
   plug StarsmapApiWeb.Router
+
+  def request_log_level(%{path_info: ["targets", "r" | _]}), do: false
+  def request_log_level(%{path_info: ["api", "catalog", "target-snapshots" | _]}), do: false
+  def request_log_level(_), do: :info
 
   @doc false
   def catalog_tile_cache_headers(conn) do

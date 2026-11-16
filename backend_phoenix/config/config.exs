@@ -54,6 +54,8 @@ config :phoenix, :filter_parameters, [
   "lat",
   "lon",
   "rows",
+  "receipt",
+  "selections",
   "targets",
   "question"
 ]

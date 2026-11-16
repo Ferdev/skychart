@@ -7,7 +7,7 @@ const previewHosts = (process.env.RONDAR_PREVIEW_HOSTS ?? "")
   .filter(Boolean);
 
 export default defineConfig({
-  build: { manifest: true },
+  build: { manifest: true, rollupOptions: { input: ["index.html", "src/marketing/page.ts"] } },
   server: {
     allowedHosts: previewHosts,
     host: "0.0.0.0",
@@ -34,6 +34,10 @@ export default defineConfig({
       "/api/events": "http://127.0.0.1:4020",
       "/catalog-tiles": "http://127.0.0.1:4020",
       "/about": "http://127.0.0.1:4020",
+      "/tonight": "http://127.0.0.1:4020",
+      "/targets": "http://127.0.0.1:4020",
+      "/spacecraft": "http://127.0.0.1:4020",
+      "/tours": "http://127.0.0.1:4020",
       "/agents": "http://127.0.0.1:4020",
       "/mcp": "http://127.0.0.1:4020",
       "/llms.txt": "http://127.0.0.1:4020",

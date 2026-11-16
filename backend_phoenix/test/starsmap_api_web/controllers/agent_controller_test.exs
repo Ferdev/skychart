@@ -115,7 +115,7 @@ defmodule StarsmapApiWeb.AgentControllerTest do
     pages = conn |> recycle() |> get(~p"/sitemaps/pages.xml") |> response(200)
     assert pages =~ base <> "/about"
     assert pages =~ base <> "/agents"
-    assert pages =~ "<lastmod>2026-08-31</lastmod>"
+    assert pages =~ "<lastmod>2026-11-16</lastmod>"
   end
 
   test "source discovery files keep standards-compliant crawlers open and link the guide normally" do

@@ -2,8 +2,8 @@ defmodule StarsmapApi.Analytics do
   alias StarsmapApi.Analytics.Event
   alias StarsmapApi.Repo
 
-  @event_names ~w(page_view search object compare share embed_loaded image_export tour_started tour_completed methodology citation_copied filter data_export cross_tool depth_flight depth_clip deep_field answer_flight)
-  @property_keys ~w(query_length object_type source filter format tour tool method resolution_tier)
+  @event_names ~w(page_view search object compare share embed_loaded image_export tour_started tour_completed methodology citation_copied filter data_export cross_tool depth_flight depth_clip deep_field answer_flight calculation_completed source_open mcp_request)
+  @property_keys ~w(query_length object_type source filter format tour tool method resolution_tier positioned gaps)
   @referrer_surfaces [
     {"chatgpt", ["chatgpt.com", "chat.openai.com"]},
     {"claude", ["claude.ai"]},
@@ -49,6 +49,7 @@ defmodule StarsmapApi.Analytics do
 
   defp minimize_path(path) when is_binary(path) and byte_size(path) <= 300 do
     clean = URI.parse(path).path || "/"
+    clean = if String.starts_with?(clean, "/targets/r/"), do: "/targets/r/:result", else: clean
     if String.starts_with?(clean, "/") and byte_size(clean) <= 160, do: {:ok, clean}, else: :error
   end
 

@@ -266,7 +266,22 @@ defmodule StarsmapApi.Catalog.TargetMatch do
     do: matched_payload(PublicObjects.catalog_object_payload(object))
 
   defp matched_payload(payload),
-    do: %{status: "matched", object: Map.put(payload, :source, source(payload.source))}
+    do: %{
+      status: "matched",
+      identity_key: identity(payload.key),
+      object:
+        payload
+        |> Map.put(
+          :source_snapshot,
+          Map.take(payload.source, ["catalog", "generated_at_utc", "schema_version"])
+        )
+        |> Map.put(
+          :source_revision,
+          "sha256:" <>
+            Base.encode16(:crypto.hash(:sha256, Jason.encode!(payload.source)), case: :lower)
+        )
+        |> Map.put(:source, source(payload.source))
+    }
 
   # The full source record of a catalog is large, and a list has hundreds of rows.
   defp source(record) do
