@@ -24,7 +24,9 @@ test("object gallery keeps credit, escapes author text, and does not taint map e
   const requests = state.indexRequests;
   await page.mouse.move(900, 450);
   await page.mouse.wheel(0, -150);
-  await expect.poll(() => state.indexRequests).toBe(requests);
+  // Observe the full settle period so a delayed request cannot pass an immediate poll.
+  await page.waitForTimeout(1_000);
+  expect(state.indexRequests).toBe(requests);
   expect(
     await page
       .locator("#map")

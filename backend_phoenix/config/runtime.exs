@@ -234,7 +234,7 @@ if config_env() != :test do
     worker = System.get_env("COMMUNITY_WORKER") == "true"
 
     answer_flight_daily_usd =
-      case Float.parse(System.get_env("ANSWER_FLIGHTS_DAILY_USD", "5")) do
+      case Float.parse(community_env.("ANSWER_FLIGHTS_DAILY_USD") || "5") do
         {limit, ""} when limit >= 0 -> limit
         _ -> raise "ANSWER_FLIGHTS_DAILY_USD must be a number"
       end

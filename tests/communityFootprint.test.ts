@@ -22,6 +22,23 @@ test("small TAN footprints stay finite at RA wrap and near the pole", () => {
     assert.ok(Math.abs(Math.hypot(p.x, p.y, p.z) - 1) < 0.001);
   }
 });
+test("a scaled identity CD matrix and centered CRPIX keep the corner order", () => {
+  const scale = wcs.pixel_scale_arcsec / 3600;
+  const corners = footprintDirections({
+    ...wcs,
+    cd: [scale, 0, 0, scale],
+    crpix: [(wcs.width + 1) / 2, (wcs.height + 1) / 2],
+  });
+  const expected = footprintDirections(wcs);
+  assert.equal(corners.length, 4);
+  for (const [index, p] of corners.entries()) {
+    assert.ok([p.x, p.y, p.z].every(Number.isFinite));
+    assert.ok(Math.abs(Math.hypot(p.x, p.y, p.z) - 1) < 0.001);
+    for (const axis of ["x", "y", "z"] as const) {
+      assert.ok(Math.abs(p[axis] - expected[index][axis]) < 1e-12, `corner ${index} ${axis}`);
+    }
+  }
+});
 test("footprints keep a readable alpha at a low photo opacity and follow it above the floor", () => {
   assert.equal(footprintAlpha(0), 0.35);
   assert.equal(footprintAlpha(0.2), 0.35);

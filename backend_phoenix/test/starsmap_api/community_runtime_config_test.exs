@@ -35,11 +35,13 @@ defmodule StarsmapApi.CommunityRuntimeConfigTest do
     COMMUNITY_MEDIA_URL
   )
 
+  @optional ~w(COMMUNITY_POOL_SIZE PHX_SERVER ANSWER_FLIGHTS_DAILY_USD ANSWER_FLIGHTS_MODEL ANSWER_FLIGHTS_API_KEY)
+
   setup do
-    names = ["COMMUNITY_POOL_SIZE" | Map.keys(@settings)]
+    names = @optional ++ Map.keys(@settings)
     previous = Map.new(names, &{&1, System.get_env(&1)})
     System.put_env(@settings)
-    System.delete_env("COMMUNITY_POOL_SIZE")
+    Enum.each(@optional, &System.delete_env/1)
 
     on_exit(fn ->
       Enum.each(previous, fn
@@ -112,6 +114,29 @@ defmodule StarsmapApi.CommunityRuntimeConfigTest do
 
     assert config[:starsmap_api][:community_mail_token] == nil
     assert config[:starsmap_api][:community_media_url] == "/api/community/media"
+  end
+
+  test "the web container runs only the flights queue without COMMUNITY_WORKER" do
+    System.delete_env("COMMUNITY_WORKER")
+    System.put_env("PHX_SERVER", "true")
+
+    assert read()[:starsmap_api][StarsmapApi.CommunityJobs][:queues] == [flights: 1]
+  end
+
+  for value <- ["abc", "-1"] do
+    test "ANSWER_FLIGHTS_DAILY_USD rejects #{inspect(value)}" do
+      System.put_env("ANSWER_FLIGHTS_DAILY_USD", unquote(value))
+
+      assert_raise RuntimeError, ~r/ANSWER_FLIGHTS_DAILY_USD/, fn -> read() end
+    end
+  end
+
+  for value <- ["", "   "] do
+    test "a blank flight daily limit #{inspect(value)} uses the default" do
+      System.put_env("ANSWER_FLIGHTS_DAILY_USD", unquote(value))
+
+      assert read()[:starsmap_api][:answer_flight_daily_usd] == 5.0
+    end
   end
 
   defp cron(config) do
