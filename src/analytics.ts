@@ -1,13 +1,14 @@
 export const ANALYTICS_EVENTS = [
   "page_view", "search", "object", "compare", "share", "embed_loaded", "image_export",
-  "tour_started", "tour_completed", "methodology", "citation_copied", "filter", "data_export", "cross_tool", "depth_flight", "depth_clip", "deep_field", "answer_flight"
+  "tour_started", "tour_completed", "methodology", "citation_copied", "filter", "data_export", "cross_tool", "depth_flight", "depth_clip", "deep_field", "answer_flight", "calculation_completed", "source_open", "mcp_request"
 ] as const;
 export type AnalyticsEvent = (typeof ANALYTICS_EVENTS)[number];
 export type AnalyticsProperties = Record<string, string | number>;
 
 export function trackAnalytics(name: AnalyticsEvent, properties: AnalyticsProperties = {}): void {
+  try { if (sessionStorage.getItem("cosmic-atlas:owner-test") === "1") return; } catch {}
   const bounded = Object.fromEntries(Object.entries(properties).slice(0, 6).map(([key, value]) => [key, String(value).slice(0, 80)]));
-  const payload = JSON.stringify({ name, path: location.pathname, referrer: referrerHostname(), properties: bounded });
+  const payload = JSON.stringify({ name, path: location.pathname.startsWith("/targets/r/") ? "/targets/r/:result" : location.pathname, referrer: referrerHostname(), properties: bounded });
   if (payload.length > 2_048 || navigator.webdriver) return;
   if (navigator.sendBeacon) navigator.sendBeacon("/api/events", new Blob([payload], { type: "application/json" }));
   else void fetch("/api/events", { method: "POST", headers: { "content-type": "application/json" }, body: payload, keepalive: true });
@@ -22,7 +23,9 @@ export function trackEvent(event: string, properties: AnalyticsProperties = {}):
 export const trackAnalyticsEvent = trackEvent;
 
 export function installAnalytics(): void {
+  if (new URLSearchParams(location.search).get("measurement") === "owner-test") { try { sessionStorage.setItem("cosmic-atlas:owner-test", "1"); } catch {} }
   trackAnalytics("page_view");
+  if (new URLSearchParams(location.search).get("source") === "mcp") trackAnalytics("cross_tool", { source: "mcp", tool: location.pathname.startsWith("/sky/") ? "sky" : "atlas" });
   document.addEventListener("click", (event) => {
     const name = (event.target as Element).closest<HTMLElement>("[data-analytics-event]")?.dataset.analyticsEvent as AnalyticsEvent | undefined;
     if (name && ANALYTICS_EVENTS.includes(name)) trackAnalytics(name);
@@ -32,4 +35,10 @@ export function installAnalytics(): void {
 function referrerHostname(): string | undefined {
   try { return document.referrer ? new URL(document.referrer).hostname : undefined; }
   catch { return undefined; }
+}
+
+/** Explicit owner checks can opt out without adding a visitor identifier. */
+export function measurementHeaders(): Record<string, string> {
+  try { if (sessionStorage.getItem("cosmic-atlas:owner-test") === "1") return { "x-atlas-measurement": "owner-test" }; } catch {}
+  return {};
 }

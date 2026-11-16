@@ -118,7 +118,9 @@ defmodule StarsmapApi.Community.Privacy do
     "/api/photos",
     "/api/flights",
     "/api/observe",
-    "/api/catalog/match"
+    "/api/catalog/match",
+    "/api/catalog/target-snapshots",
+    "/targets/r"
   ]
 
   def scrub(event) do

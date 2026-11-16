@@ -15,10 +15,39 @@ defmodule StarsmapApiWeb.McpController do
          :ok <- accepts_json(conn),
          {:ok, message} <- decoded_body(conn) do
       {status, response} = Mcp.handle(message, mirrored_headers(conn))
+      record_call(conn, message, status, response)
       respond(conn, status, response)
     else
       {status, response} -> respond(conn, status, response)
     end
+  end
+
+  defp record_call(conn, message, status, response) do
+    if status == 200 and is_map(message) and is_map(response) and
+         not Map.has_key?(response, :error) and not Map.has_key?(response, "error") and
+         get_in(response, [:result, :isError]) != true and
+         get_req_header(conn, "x-atlas-measurement") != ["owner-test"] do
+      method = message["method"]
+      tool = get_in(message, ["params", "name"])
+
+      if method == "initialize" or
+           (method == "tools/call" and tool in StarsmapApi.Mcp.Tools.names()) do
+        StarsmapApi.Analytics.record(
+          %{
+            "name" => "mcp_request",
+            "path" => "/mcp",
+            "properties" => %{
+              "method" => method,
+              "tool" => tool || "initialize",
+              "source" => "mcp"
+            }
+          },
+          StarsmapApiWeb.ClientIp.resolve(conn)
+        )
+      end
+    end
+  rescue
+    _ -> :ok
   end
 
   # A server without event streams and sessions answers GET and DELETE with 405.

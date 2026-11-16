@@ -3,8 +3,24 @@ defmodule StarsmapApiWeb.SitemapController do
   alias StarsmapApi.Catalog.PublicCache
   alias StarsmapApi.Catalog.PublicObjects
   @ttl :timer.hours(24)
-  @pages ["/", "/about", "/agents", "/methodology", "/tours"]
-  @pages_lastmod ~D[2026-08-31]
+  @pages [
+    "/",
+    "/about",
+    "/agents",
+    "/methodology",
+    "/tours",
+    "/mcp-guide",
+    "/spacecraft",
+    "/spacecraft/voyager-1",
+    "/spacecraft/voyager-2",
+    "/spacecraft/jwst",
+    "/spacecraft/juno",
+    "/spacecraft/new-horizons",
+    "/tonight",
+    "/targets",
+    "/tours/sun-to-survey-field"
+  ]
+  @pages_lastmod ~D[2026-11-16]
   def index(conn, _), do: xml(conn, cached(:index, &index_xml/0))
 
   def catalog(conn, %{"catalog" => filename}) do

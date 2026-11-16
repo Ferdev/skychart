@@ -1,7 +1,7 @@
 defmodule StarsmapApiWeb.TourPageController do
   use StarsmapApiWeb, :controller
   alias StarsmapApiWeb.StaticPage
-  @tours ~w(earth-to-observable-universe near-the-sun)
+  @tours ~w(earth-to-observable-universe near-the-sun sun-to-survey-field)
   # The tour pages are standalone static pages. A link opens the tour in the atlas.
   def index(conn, _) do
     tours = Enum.map(@tours, &load!/1)
@@ -31,7 +31,7 @@ defmodule StarsmapApiWeb.TourPageController do
     body =
       "<nav aria-label=\"Site\">#{StaticPage.back_link()}<a href=\"/tours\">All guided tours</a></nav>" <>
         "<article class=\"tour-page\"><p class=\"eyebrow\">Guided tour</p><h1>#{h(tour["title"])}</h1><p class=\"lede\">#{h(tour["description"])}</p>" <>
-        "<p><a class=\"action\" href=\"/?tour=#{h(slug)}&amp;step=0\">Start this tour in the atlas</a></p><ol class=\"steps\">#{steps}</ol></article>"
+        "<p><a class=\"action\" href=\"/?tour=#{h(slug)}&amp;step=0\">Start this tour in the atlas</a></p><ol class=\"steps\">#{steps}</ol>#{survey_note(slug)}</article>"
 
     html(conn, page(tour["title"], tour["description"], "/tours/#{slug}", body))
   end
@@ -41,6 +41,12 @@ defmodule StarsmapApiWeb.TourPageController do
       conn
       |> put_status(:not_found)
       |> html(StaticPage.not_found("Tour not found", "This guided tour does not exist."))
+
+  defp survey_note("sun-to-survey-field"),
+    do:
+      "<section><h2>Catalogs and image</h2><p>This flight uses the Messier snapshot of 6 May 2026 and the curated SIMBAD extragalactic snapshot of 10 May 2026. Andromeda has a catalog distance estimate. The 3C 273 distance is comoving, derived from SIMBAD redshift with H0=67.8, Ωm=0.308 and ΩΛ=0.692.</p><p>The player reports whether DESI DR1 spectra points have loaded for the current view. If they have not loaded, the flight uses the curated landmarks. Legacy Imaging Surveys DR11 supplies the image, which does not establish distance. These are different data products.</p><p>The last stop shows the cutout credit. A failed DR11 field can use an explicitly labeled AllWISE fallback.</p><a href=\"/o/m31\">Andromeda source</a> · <a href=\"/o/simbad-3c-273\">3C 273 source</a> · <a href=\"https://www.legacysurvey.org/dr11/\">DR11 release</a></section>"
+
+  defp survey_note(_), do: ""
 
   defp load!(slug),
     do:
